@@ -87,7 +87,7 @@ class SequencerImportMovieOperator(Operator):
             )
             return False
         import_module(self, "open_clip_torch")
-        import_module(self, "pytorch-lightning")
+        import_module(self, "pytorch_lightning")
 
         from modelscope.pipelines import pipeline
         from modelscope.outputs import OutputKeys
