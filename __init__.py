@@ -65,8 +65,8 @@ class SequencerImportMovieOperator(Operator):
         try:
             subprocess.call([pybin, "-m", "ensurepip"])
         except ImportError:
-            pass       
-        
+            pass
+
         subprocess.check_call(
             [
                 pybin,
