@@ -12,6 +12,9 @@ bl_info = {
 
 import bpy
 from bpy.types import Operator, Panel
+import site
+import subprocess
+import sys
 
 
 def import_module(self, module):
@@ -19,10 +22,6 @@ def import_module(self, module):
     try:
         exec("import " + module)
     except ModuleNotFoundError:
-        import site
-        import subprocess
-        import sys
-
         app_path = site.USER_SITE
         if app_path not in sys.path:
             sys.path.append(app_path)
@@ -39,13 +38,6 @@ def import_module(self, module):
         try:
             exec("import " + module)
         except ModuleNotFoundError:
-            # print("Installation of the " + module + " module failed")
-            # self.report(
-                # {"INFO"},
-                # "Installing "
-                # + module
-                # + " module failed! Try to run Blender as administrator.",
-            # )
             return False
     return True
 
@@ -64,26 +56,47 @@ class SequencerImportMovieOperator(Operator):
 
     def execute(self, context):
         scene = context.scene
-        import_module(self, "open_clip_torch")
-        if import_module(self, "modelscope"):
-            from modelscope.pipelines import pipeline
-            from modelscope.outputs import OutputKeys
 
-            p = pipeline("text-to-video-synthesis", "damo/text-to-video-synthesis")
-            test_text = {"text": self.filename}
-            output_video_path = p(
-                test_text,
-            )[OutputKeys.OUTPUT_VIDEO]
-
-            filepath = bpy.path.abspath(output_video_path)
-            strip = scene.sequence_editor.sequences.new_movie(
-                name=self.filename,
-                filepath=filepath,
-                channel=1,
-                frame_start=scene.frame_current,
+        subprocess.check_call(
+            [
+                pybin,
+                "-m",
+                "pip",
+                "install",
+                "git+https://github.com/modelscope/modelscope.git",
+                "--user",
+            ]
+        )
+        try:
+            import modelscope
+        except ModuleNotFoundError:
+            print("Installation of the modelscope module failed")
+            self.report(
+                {"INFO"},
+                "Installing modelscope module failed! Try to run Blender as administrator.",
             )
-            if strip:
-                strip.frame_final_duration = strip.frame_duration
+            return False
+        import_module(self, "open_clip_torch")
+        import_module(self, "pytorch-lightning")
+
+        from modelscope.pipelines import pipeline
+        from modelscope.outputs import OutputKeys
+
+        p = pipeline("text-to-video-synthesis", "damo/text-to-video-synthesis")
+        test_text = {"text": self.filename}
+        output_video_path = p(
+            test_text,
+        )[OutputKeys.OUTPUT_VIDEO]
+
+        filepath = bpy.path.abspath(output_video_path)
+        strip = scene.sequence_editor.sequences.new_movie(
+            name=self.filename,
+            filepath=filepath,
+            channel=1,
+            frame_start=scene.frame_current,
+        )
+        if strip:
+            strip.frame_final_duration = strip.frame_duration
         return {"FINISHED"}
 
 
@@ -110,7 +123,7 @@ def register():
     bpy.utils.register_class(SequencerPanel)
     bpy.types.Scene.my_movie_filename = bpy.props.StringProperty(
         name="My Movie Filename", default=""
-    )  # , update=bpy.ops.sequencer.import_movie)
+    )
 
 
 def unregister():
