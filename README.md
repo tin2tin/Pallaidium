@@ -14,4 +14,8 @@ Video Sequence Editor > Sidebar > Text to Video
 
 ![image](https://user-images.githubusercontent.com/1322593/226438089-2c81fceb-6cfd-4c72-b79e-e83b97b2f8f6.png)
 
+## Module
+ModelScope: https://modelscope.cn/models/damo/text-to-video-synthesis/summary
+
+
 
