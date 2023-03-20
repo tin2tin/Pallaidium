@@ -57,6 +57,16 @@ class SequencerImportMovieOperator(Operator):
     def execute(self, context):
         scene = context.scene
 
+        app_path = site.USER_SITE
+        if app_path not in sys.path:
+            sys.path.append(app_path)
+        pybin = sys.executable
+
+        try:
+            subprocess.call([pybin, "-m", "ensurepip"])
+        except ImportError:
+            pass       
+        
         subprocess.check_call(
             [
                 pybin,
