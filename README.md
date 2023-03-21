@@ -6,7 +6,10 @@ Dunno if this is actually working, I'm still in the process of downloading the 1
 ## How to install
 Run Blender as Administrator and open the system console before clicking the Generate Movie button, so you can see how it is progressing the module installation. It'll take a lot of time, since it is a 12GB download.
 
-If some additional modules are missing, write about it here(so I can add them), and use the Blender PIP add-on to manually install the missing modules: https://github.com/amb/blender_pip
+If some additional python modules are missing, write about it here(so I can add them), and use the Blender PIP add-on to manually install the missing modules: https://github.com/amb/blender_pip
+
+If the weights takes forever to download they can be downloaded here:
+https://huggingface.co/damo-vilab/modelscope-damo-text-to-video-synthesis/tree/main
 
 ## Location
 
