@@ -9,7 +9,7 @@ Run Blender as Administrator and open the system console before clicking the Gen
 If some additional python modules are missing, write about it here(so I can add them), and use the Blender PIP add-on to manually install the missing modules: https://github.com/amb/blender_pip
 
 If the weights takes forever to download they can be downloaded here:
-https://huggingface.co/damo-vilab/modelscope-damo-text-to-video-synthesis/tree/main
+https://modelscope.cn/models/damo/text-to-video-synthesis/files
 
 ## Location
 
