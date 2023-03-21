@@ -62,34 +62,28 @@ class SequencerImportMovieOperator(Operator):
             sys.path.append(app_path)
         pybin = sys.executable
 
-        try:
-            subprocess.call([pybin, "-m", "ensurepip"])
-        except ImportError:
-            pass
-
-        subprocess.check_call(
-            [
-                pybin,
-                "-m",
-                "pip",
-                "install",
-                "git+https://github.com/modelscope/modelscope.git",
-                "--user",
-            ]
-        )
-        try:
-            import modelscope
-        except ModuleNotFoundError:
-            print("Installation of the modelscope module failed")
-            self.report(
-                {"INFO"},
-                "Installing modelscope module failed! Try to run Blender as administrator.",
-            )
-            return False
         import_module(self, "open_clip_torch")
         import_module(self, "pytorch_lightning")
         import_module(self, "gast")
         import_module(self, "tensorflow")
+
+        try:
+            import modelscope
+        except ModuleNotFoundError:
+            try:
+                subprocess.call([pybin, "-m", "ensurepip"])
+            except ImportError:
+                pass
+            subprocess.check_call(
+                [
+                    pybin,
+                    "-m",
+                    "pip",
+                    "install",
+                    "git+https://github.com/modelscope/modelscope.git",
+                    "--user",
+                ]
+            )
 
         from modelscope.pipelines import pipeline
         from modelscope.outputs import OutputKeys
