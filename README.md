@@ -11,6 +11,8 @@ If some additional python modules are missing, write about it here(so I can add 
 If the weights takes forever to download they can be downloaded here:
 https://modelscope.cn/models/damo/text-to-video-synthesis/files
 
+Btw. the Blender system console processsing can be stopped with Ctrl + C
+
 ## Location
 
 Video Sequence Editor > Sidebar > Text to Video
