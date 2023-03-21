@@ -88,6 +88,8 @@ class SequencerImportMovieOperator(Operator):
             return False
         import_module(self, "open_clip_torch")
         import_module(self, "pytorch_lightning")
+        import_module(self, "gast")
+        import_module(self, "tensorflow")
 
         from modelscope.pipelines import pipeline
         from modelscope.outputs import OutputKeys
@@ -105,13 +107,11 @@ class SequencerImportMovieOperator(Operator):
             channel=1,
             frame_start=scene.frame_current,
         )
-        if strip:
-            strip.frame_final_duration = strip.frame_duration
         return {"FINISHED"}
 
 
 class SequencerPanel(Panel):
-    """Text to Video usin ModelScope"""
+    """Text to Video using ModelScope"""
 
     bl_idname = "SEQUENCER_PT_sequencer_panel"
     bl_label = "Text to Video"
