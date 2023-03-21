@@ -17,7 +17,7 @@ import subprocess
 import sys
 
 
-def import_module(self, module):
+def import_module(self, module, install_module):
     module = str(module)
     try:
         exec("import " + module)
@@ -34,7 +34,7 @@ def import_module(self, module):
             pass
         self.report({"INFO"}, "Installing: " + module + " module.")
         print("Installing: " + module + " module")
-        subprocess.check_call([pybin, "-m", "pip", "install", module])
+        subprocess.check_call([pybin, "-m", "pip", "install", install_module])
         try:
             exec("import " + module)
         except ModuleNotFoundError:
@@ -62,28 +62,11 @@ class SequencerImportMovieOperator(Operator):
             sys.path.append(app_path)
         pybin = sys.executable
 
-        import_module(self, "open_clip_torch")
-        import_module(self, "pytorch_lightning")
-        import_module(self, "gast")
-        import_module(self, "tensorflow")
-
-        try:
-            import modelscope
-        except ModuleNotFoundError:
-            try:
-                subprocess.call([pybin, "-m", "ensurepip"])
-            except ImportError:
-                pass
-            subprocess.check_call(
-                [
-                    pybin,
-                    "-m",
-                    "pip",
-                    "install",
-                    "git+https://github.com/modelscope/modelscope.git",
-                    "--user",
-                ]
-            )
+        import_module(self, "open_clip_torch", "open_clip_torch")
+        import_module(self, "pytorch_lightning", "pytorch_lightning")
+        import_module(self, "gast", "gast")
+        import_module(self, "tensorflow", "tensorflow")
+        import_module(self, "modelscope", "modelscope==1.4.2") #git+https://github.com/modelscope/modelscope.git
 
         from modelscope.pipelines import pipeline
         from modelscope.outputs import OutputKeys
