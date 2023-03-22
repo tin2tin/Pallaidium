@@ -10,8 +10,11 @@ Run Blender as Administrator and open the system console before clicking the Gen
 
 If some additional python modules are missing, write about it here(so I can add them), and use the Blender PIP add-on to manually install the missing modules: https://github.com/amb/blender_pip
 
-If the weights takes forever to download they can be downloaded here:
+Alternative download for the weighted set which needs 20 GB of VRAM to run:
 https://modelscope.cn/models/damo/text-to-video-synthesis/files
+
+Here's a pruned weighted set which should be able to run on 6GB VRAM:
+https://huggingface.co/kabachuha/modelscope-damo-text2video-pruned-weights/tree/main
 
 Btw. the Blender system console processsing can be stopped with Ctrl + C
 
