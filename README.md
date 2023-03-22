@@ -1,6 +1,8 @@
 # Text to Video
 Adding text to video to the Blender Video Sequence Editor using ModelScope.
 
+It needs 20 GB of VRAM to run, this and impossible download times, makes me give up this project for now. 
+
 Dunno if this is actually working, I'm still in the process of downloading the 12 GB models...
 
 ## How to install
