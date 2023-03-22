@@ -62,22 +62,43 @@ class SequencerImportMovieOperator(Operator):
             sys.path.append(app_path)
         pybin = sys.executable
 
+        import_module(self, "modelscope", "modelscope==1.4.2") #git+https://github.com/modelscope/modelscope.git
         import_module(self, "open_clip_torch", "open_clip_torch")
         import_module(self, "pytorch_lightning", "pytorch_lightning")
         import_module(self, "gast", "gast")
         import_module(self, "tensorflow", "tensorflow")
-        import_module(self, "modelscope", "modelscope==1.4.2") #git+https://github.com/modelscope/modelscope.git
+
+        from huggingface_hub import snapshot_download
 
         from modelscope.pipelines import pipeline
         from modelscope.outputs import OutputKeys
+        import pathlib
 
-        p = pipeline("text-to-video-synthesis", "damo/text-to-video-synthesis")
+##        model_dir = pathlib.Path('weights')
+##        snapshot_download('damo-vilab/modelscope-damo-text-to-video-synthesis',
+##                           repo_type='model', local_dir=model_dir)
+
+#        pipe = pipeline('text-to-video-synthesis', "damo/text-to-video-synthesis")
+#        test_text = {
+#                'text': 'A panda eating bamboo on a rock.',
+#            }
+#        output_video_path = pipe(test_text,)[OutputKeys.OUTPUT_VIDEO]
+#        filepath = bpy.path.abspath(output_video_path)
+        model_dir = pathlib.Path('weights')
+        if not model_dir.exists():
+            model_dir.mkdir()
+            snapshot_download('damo-vilab/modelscope-damo-text-to-video-synthesis',
+                              repo_type='model',
+                              dir=model_dir)
+        p = pipeline('text-to-video-synthesis', model_dir.as_posix())
+
+
+        #p = pipeline("text-to-video-synthesis", "damo/text-to-video-synthesis")
         test_text = {"text": self.filename}
         output_video_path = p(
             test_text,
         )[OutputKeys.OUTPUT_VIDEO]
 
-        filepath = bpy.path.abspath(output_video_path)
         strip = scene.sequence_editor.sequences.new_movie(
             name=self.filename,
             filepath=filepath,
