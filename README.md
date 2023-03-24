@@ -1,12 +1,8 @@
 # Text to Video
 Adding text to video to the Blender Video Sequence Editor using ModelScope.
 
-It needs 20 GB of VRAM to run, this and impossible download times, makes me give up this project for now. 
-
 ## How to install
 Run Blender as Administrator and open the system console(Blender system console processsing can be stopped with Ctrl + C) before clicking the Generate Movie button, so you can see how it is progressing the module installation. It'll take a lot of time, since it is a huge and slow download.
-
-If some additional python modules are missing, write about it here(so I can add them), and use the Blender PIP add-on to manually install the missing modules: https://github.com/amb/blender_pip
 
 Alternative download for the weighted set which needs 20 GB of VRAM to run:
 https://modelscope.cn/models/damo/text-to-video-synthesis/files
@@ -24,6 +20,6 @@ Video Sequence Editor > Sidebar > Text to Video
 
 ## Module
 ModelScope: https://modelscope.cn/models/damo/text-to-video-synthesis/summary
-
+If some additional python modules are missing, write about it here(so I can add them), and use the Blender PIP add-on to manually install the missing modules: https://github.com/amb/blender_pip
 
 
