@@ -7,17 +7,61 @@ bl_info = {
     "blender": (3, 4, 0),
     "location": "Video Sequence Editor > Sidebar > Text to Video",
     "description": "Convert text to video",
-    "category": "SequenceR",
+    "category": "Sequencer",
 }
 
-import bpy
+import bpy, ctypes
 from bpy.types import Operator, Panel
 import site
 import subprocess
 import sys, os
 
 
+def show_system_console(show):
+    # https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindow
+    SW_HIDE = 0
+    SW_SHOW = 5
+
+    ctypes.windll.user32.ShowWindow(
+        ctypes.windll.kernel32.GetConsoleWindow(), SW_SHOW if show else SW_HIDE
+    )
+
+
+def set_system_console_topmost(top):
+    # https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos
+    HWND_NOTOPMOST = -2
+    HWND_TOPMOST = -1
+    HWND_TOP = 0
+    SWP_NOMOVE = 0x0002
+    SWP_NOSIZE = 0x0001
+    SWP_NOZORDER = 0x0004
+
+    ctypes.windll.user32.SetWindowPos(
+        ctypes.windll.kernel32.GetConsoleWindow(),
+        HWND_TOP if top else HWND_NOTOPMOST,
+        0,
+        0,
+        0,
+        0,
+        SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER,
+    )
+
+app_path = site.USER_SITE
+if app_path not in sys.path:
+    sys.path.append(app_path)
+pybin = sys.executable
+
+print("Ensuring: pip")
+try:
+    subprocess.call([pybin, "-m", "ensurepip"])
+    subprocess.call([pybin, "-m", "pip", "install", "--upgrade","pip"])
+except ImportError:
+    pass
+
 def import_module(self, module, install_module):
+    show_system_console(True)
+    set_system_console_topmost(True)   
+    
     module = str(module)
     try:
         exec("import " + module)
@@ -26,13 +70,6 @@ def import_module(self, module, install_module):
         if app_path not in sys.path:
             sys.path.append(app_path)
         pybin = sys.executable
-
-        print("Ensuring: pip")
-        try:
-            subprocess.call([pybin, "-m", "ensurepip"])
-            subprocess.call([pybin, "-m", "pip", "install", "--upgrade","pip"])
-        except ImportError:
-            pass
         self.report({"INFO"}, "Installing: " + module + " module.")
         print("Installing: " + module + " module")
         subprocess.check_call([pybin, "-m", "pip", "install", install_module])
