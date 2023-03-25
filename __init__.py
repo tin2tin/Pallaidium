@@ -126,7 +126,7 @@ class SequencerImportMovieOperator(Operator):
             os.mkdir(model_dir)
         
         # list of file names to check
-        files = ["configuration.json", "file2.txt", "file3.txt"]
+        files = ["configuration.json", "VQGAN_autoencoder.pth", "open_clip_pytorch_model.bin", "text2video_pytorch_model.pth"]
 
         all_found = True
 
