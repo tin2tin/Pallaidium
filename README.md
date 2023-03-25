@@ -1,5 +1,5 @@
 # Text to Video
-Adding text to video to the Blender Video Sequence Editor using ModelScope. The full version needs 20 GB VRAM to work. An alternative version with a pruned data set(smaller), should run on 6+ GB VRAM can be fund here: https://github.com/tin2tin/text_to_video/blob/t2v_6vram/__init__.py
+Adding text to video to the Blender Video Sequence Editor using ModelScope. The full version needs 20 GB VRAM to work. An alternative version with a pruned data set(smaller) this is the one it'll download as default, for now - see code the change to 20 GB VRAM version.
 
 ## How to install
 Run Blender as Administrator and open the system console(Blender system console processsing can be stopped with Ctrl + C) before clicking the Generate Movie button, so you can see how it is progressing the module installation. It'll take a lot of time, since it is a huge and slow download.
