@@ -98,6 +98,8 @@ class SequencerImportMovieOperator(Operator):
             sys.path.append(app_path)
         pybin = sys.executable
 
+        subprocess.call([pybin, "-m", "pip3", "install", "torch","torchvision","torchaudio","--index-url","https://download.pytorch.org/whl/cu118"])
+
         import_module(self, "open_clip_torch", "open_clip_torch")
         import_module(self, "pytorch_lightning", "pytorch_lightning")
         import_module(self, "addict", "addict")
@@ -110,6 +112,7 @@ class SequencerImportMovieOperator(Operator):
         import_module(self, "huggingface_hub", "--upgrade huggingface_hub")
         import_module(self, "numpy", "--upgrade numpy")
         import_module(self, "gast", "gast")
+        import_module(self, "diffusers", "diffusers")
         import_module(self, "tensorflow", "tensorflow")
         import_module(self, "modelscope", "modelscope==1.4.2") #git+https://github.com/modelscope/modelscope.git
 
@@ -118,6 +121,8 @@ class SequencerImportMovieOperator(Operator):
         from modelscope.pipelines import pipeline
         from modelscope.outputs import OutputKeys
         import pathlib
+
+
 
         script_file = os.path.realpath(__file__)
         directory = os.path.dirname(script_file)
@@ -133,8 +138,10 @@ class SequencerImportMovieOperator(Operator):
         # loop over the files and check if they exist
         for filename in files:
             check_file = os.path.join(model_dir, filename)
+            #print(check_file)
             check_file = pathlib.Path(check_file) 
             if not os.path.isfile(check_file):
+                print(check_file)
                 all_found = False                  
 
         if not all_found: #snapshot_download(repo_id='damo-vilab/modelscope-damo-text-to-video-synthesis',  # 20 GB VRAM
@@ -143,11 +150,34 @@ class SequencerImportMovieOperator(Operator):
                               local_dir=model_dir,
                               local_dir_use_symlinks=False)
 
-        p = pipeline('text-to-video-synthesis', model_dir)
+        #import torch
+        #from diffusers import DiffusionPipeline
+        #from diffusers.utils import export_to_video
+
+        #pipe = DiffusionPipeline.from_pretrained("kabachuha/modelscope-damo-text2video-pruned-weights", torch_dtype=torch.float16, variant="fp16")
+        #pipe.enable_model_cpu_offload()
+
+        # memory optimization
+        #pipe.enable_vae_slicing()
+
+        #prompt = {'type': 'latent-text-to-video-synthesis', 'model_args': {'ckpt_clip': 'open_clip_pytorch_model.bin', 'ckpt_unet': 'text2video_pytorch_model.pth', 'ckpt_autoencoder': 'VQGAN_autoencoder.pth', 'max_frames': 16, 'tiny_gpu': 1}, 'model_cfg': {'unet_in_dim': 4, 'unet_dim': 320, 'unet_y_dim': 768, 'unet_context_dim': 1024, 'unet_out_dim': 4, 'unet_dim_mult': [1, 2, 4, 4], 'unet_num_heads': 8, 'unet_head_dim': 64, 'unet_res_blocks': 2, 'unet_attn_scales': [1, 0.5, 0.25], 'unet_dropout': 0.1, 'temporal_attention': 'True', 'num_timesteps': 1000, 'mean_type': 'eps', 'var_type': 'fixed_small', 'loss_type': 'mse'}}, pipeline={'type': 'latent-text-to-video-synthesis'})
+        #prompt = "Darth Vader surfing a wave"
+        #file_path = pipe(prompt, num_frames=10)[OutputKeys.OUTPUT_VIDEO]
+        #file_path = export_to_video(video_frames)
+
+
+        p = pipeline('text-to-video-synthesis', model_dir)#, torch_dtype=torch.float16, variant="fp16")
+        #p.enable_model_cpu_offload()
+
+        # memory optimization
+        #p.enable_vae_slicing()
 
         test_text = {"text": self.text_prompt}
+        num_frames = {"num_frames": 10}
+        
         output_video_path = p(
             test_text,
+            num_frames,
         )[OutputKeys.OUTPUT_VIDEO]
 
         filepath = bpy.path.abspath(output_video_path)
