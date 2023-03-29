@@ -1,5 +1,5 @@
 # Text to Video
-Adding text to video to the Blender Video Sequence Editor using ModelScope. The full version needs 20 GB VRAM to work. An alternative version with a pruned data set(smaller) this is the one it'll download as default, for now - see code the change to 20 GB VRAM version.
+Adding text to video to the Blender Video Sequence Editor using ModelScope. The full version needs 20 GB VRAM to work. An alternative version with a pruned data set(smaller) will download as default, for now - see code to change to 20 GB VRAM version.
 
 ## How to install
 Run Blender as Administrator and open the system console(Blender system console processsing can be stopped with Ctrl + C) before clicking the Generate Movie button, so you can see how it is progressing the module installation. It'll take a lot of time, since it is a huge and slow download.
@@ -10,7 +10,9 @@ https://modelscope.cn/models/damo/text-to-video-synthesis/files
 Or a pruned weighted set which should be able to run on 6+ GB VRAM:
 https://huggingface.co/kabachuha/modelscope-damo-text2video-pruned-weights/tree/main
 
-The downloaded models should be placen in this folder: C:\Users\Your_user_name\AppData\Roaming\Blender Foundation\Blender\3.4\scripts\addons\text_to_video-main\model
+The downloaded models should be placen in this folder on Windows: C:\Users\Your_user_name\AppData\Roaming\Blender Foundation\Blender\3.4\scripts\addons\text_to_video-main\model
+
+(I'm constantly running into installation problems, and will wait till ModelScope matures, to continue this project)
 
 ## Location
 
