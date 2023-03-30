@@ -112,6 +112,7 @@ class SequencerImportMovieOperator(Operator):
         import_module(self, "gast", "gast")
         import_module(self, "diffusers", "diffusers")
         import_module(self, "tensorflow", "tensorflow")
+        import_module(self, "cffi", "cffi")
         import_module(self, "modelscope", "modelscope==1.4.2") #git+https://github.com/modelscope/modelscope.git
 
         from huggingface_hub import snapshot_download
