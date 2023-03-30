@@ -72,7 +72,7 @@ def import_module(self, module, install_module):
         pybin = sys.executable
         self.report({"INFO"}, "Installing: " + module + " module.")
         print("Installing: " + module + " module")
-        subprocess.check_call([pybin, "-m", "pip", "install", install_module])
+        subprocess.check_call([pybin, "-m", "pip", "install", install_module, "--no-warn-script-location", "--user"])
         try:
             exec("import " + module)
         except ModuleNotFoundError:
