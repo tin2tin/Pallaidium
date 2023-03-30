@@ -12,7 +12,7 @@ https://huggingface.co/kabachuha/modelscope-damo-text2video-pruned-weights/tree/
 
 The downloaded models should be placen in this folder on Windows: C:\Users\Your_user_name\AppData\Roaming\Blender Foundation\Blender\3.4\scripts\addons\text_to_video-main\model
 
-(I'm constantly running into installation problems, and will wait till ModelScope matures, to continue this project)
+(My RTX card isn't detected as a CUDA supported card, so I can't check if this is actually working. So, if it works for you, let me know.)
 
 ## Location
 
