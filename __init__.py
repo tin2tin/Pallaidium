@@ -46,17 +46,6 @@ def set_system_console_topmost(top):
         SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER,
     )
 
-app_path = site.USER_SITE
-if app_path not in sys.path:
-    sys.path.append(app_path)
-pybin = sys.executable
-
-print("Ensuring: pip")
-try:
-    subprocess.call([pybin, "-m", "ensurepip"])
-    subprocess.call([pybin, "-m", "pip", "install", "--upgrade","pip"])
-except ImportError:
-    pass
 
 def import_module(self, module, install_module):
     show_system_console(True)
@@ -97,6 +86,13 @@ class SequencerImportMovieOperator(Operator):
         if app_path not in sys.path:
             sys.path.append(app_path)
         pybin = sys.executable
+
+        print("Ensuring: pip")
+        try:
+            subprocess.call([pybin, "-m", "ensurepip"])
+            subprocess.call([pybin, "-m", "pip", "install", "--upgrade","pip"])
+        except ImportError:
+            pass
 
         import_module(self, "open_clip_torch", "open_clip_torch")
         import_module(self, "pytorch_lightning", "pytorch_lightning")
