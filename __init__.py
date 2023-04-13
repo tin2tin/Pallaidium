@@ -5,7 +5,7 @@ bl_info = {
     "author": "tintwotin",
     "version": (1, 0),
     "blender": (3, 4, 0),
-    "location": "Video Sequence Editor > Sidebar > Text to Video",
+    "location": "Video Sequence Editor > Sidebar > Generate",
     "description": "Convert text to video",
     "category": "Sequencer",
 }
@@ -15,6 +15,7 @@ from bpy.types import Operator, Panel
 import site
 import subprocess
 import sys, os
+import string
 
 
 def show_system_console(show):
@@ -47,10 +48,16 @@ def set_system_console_topmost(top):
     )
 
 
+def clean_path(string_path):
+    valid_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
+    clean_path = "".join(c if c in valid_chars else "_" for c in string_path)
+    return clean_path
+
+
 def import_module(self, module, install_module):
     show_system_console(True)
-    set_system_console_topmost(True)   
-    
+    set_system_console_topmost(True)
+
     module = str(module)
     try:
         exec("import " + module)
@@ -61,7 +68,17 @@ def import_module(self, module, install_module):
         pybin = sys.executable
         self.report({"INFO"}, "Installing: " + module + " module.")
         print("Installing: " + module + " module")
-        subprocess.check_call([pybin, "-m", "pip", "install", install_module, "--no-warn-script-location", "--user"])
+        subprocess.check_call(
+            [
+                pybin,
+                "-m",
+                "pip",
+                "install",
+                install_module,
+                "--no-warn-script-location",
+                "--user",
+            ]
+        )
         try:
             exec("import " + module)
         except ModuleNotFoundError:
@@ -69,134 +86,222 @@ def import_module(self, module, install_module):
     return True
 
 
-class SequencerImportMovieOperator(Operator):
-    """Text to Video"""
+def install_modules(self):
+    app_path = site.USER_SITE
+    if app_path not in sys.path:
+        sys.path.append(app_path)
+    pybin = sys.executable
 
-    bl_idname = "sequencer.import_movie"
-    bl_label = "Prompt"
-    bl_description = "Convert text to video"
-    bl_options = {"REGISTER", "UNDO"}
-
-    def execute(self, context):
-        if not bpy.types.Scene.text_prompt:
-            return {"CANCELLED"}
-        scene = context.scene
-
+    print("Ensuring: pip")
+    try:
+        subprocess.call([pybin, "-m", "ensurepip"])
+        subprocess.call([pybin, "-m", "pip", "install", "--upgrade", "pip"])
+    except ImportError:
+        pass
+    try:
+        exec("import torch")
+    except ModuleNotFoundError:
         app_path = site.USER_SITE
         if app_path not in sys.path:
             sys.path.append(app_path)
         pybin = sys.executable
+        self.report({"INFO"}, "Installing: torch module.")
+        print("Installing: torch module")
+        subprocess.check_call(
+            [
+                pybin,
+                "-m",
+                "pip",
+                "install",
+                "torch",
+                "--index-url",
+                "https://download.pytorch.org/whl/cu118",
+                "--no-warn-script-location",
+                "--user",
+            ]
+        )
+        subprocess.check_call(
+            [
+                pybin,
+                "-m",
+                "pip",
+                "install",
+                "torchvision",
+                "--index-url",
+                "https://download.pytorch.org/whl/cu118",
+                "--no-warn-script-location",
+                "--user",
+            ]
+        )
+        subprocess.check_call(
+            [
+                pybin,
+                "-m",
+                "pip",
+                "install",
+                "torchaudio",
+                "--index-url",
+                "https://download.pytorch.org/whl/cu118",
+                "--no-warn-script-location",
+                "--user",
+            ]
+        )
+    import_module(self, "PySoundFile", "PySoundFile")  # Sox for Linux pip install sox
+    import_module(self, "diffusers", "diffusers")
+    import_module(self, "accelerate", "accelerate")
+    import_module(self, "transformers", "transformers")
+    import_module(self, "opencv_python", "opencv_python")
 
-        print("Ensuring: pip")
-        try:
-            subprocess.call([pybin, "-m", "ensurepip"])
-            subprocess.call([pybin, "-m", "pip", "install", "--upgrade","pip"])
-        except ImportError:
-            pass
 
-        import_module(self, "open_clip_torch", "open_clip_torch")
-        import_module(self, "pytorch_lightning", "pytorch_lightning")
-        import_module(self, "addict", "addict")
-        import_module(self, "yapf", "yapf")
-        import_module(self, "datasets", "datasets")
-        import_module(self, "einops", "einops")
-        import_module(self, "jsonplus", "jsonplus") 
-        import_module(self, "oss2", "oss2")
-        import_module(self, "pyarrow", "pyarrow")
-        import_module(self, "huggingface_hub", "--upgrade huggingface_hub")
-        import_module(self, "numpy", "--upgrade numpy")
-        import_module(self, "gast", "gast")
-        import_module(self, "diffusers", "diffusers")
-        import_module(self, "tensorflow", "tensorflow")
-        import_module(self, "cffi", "cffi")
-        import_module(self, "modelscope", "modelscope==1.4.2") #git+https://github.com/modelscope/modelscope.git
+class SEQUENCER_OT_generate_movie(Operator):
+    """Text to Video"""
 
-        from huggingface_hub import snapshot_download
+    bl_idname = "sequencer.generate_movie"
+    bl_label = "Prompt"
+    bl_description = "Convert text to video"
+    bl_options = {"REGISTER", "UNDO"}
 
-        from modelscope.pipelines import pipeline
-        from modelscope.outputs import OutputKeys
-        import pathlib
+    #    generate_movie_prompt: bpy.props.StringProperty(
+    #        name="generate_movie_prompt", default=""
+    #    )
 
-        script_file = os.path.realpath(__file__)
-        directory = os.path.dirname(script_file)
-        model_dir = os.path.join(directory, "model")
-        if not os.path.isdir(model_dir):
-            os.mkdir(model_dir)
-        
-        # list of file names to check
-        files = ["configuration.json", "VQGAN_autoencoder.pth", "open_clip_pytorch_model.bin", "text2video_pytorch_model.pth"]
+    def execute(self, context):
+        if not bpy.types.Scene.generate_movie_prompt:
+            return {"CANCELLED"}
+        scene = context.scene
 
-        all_found = True
+        install_modules(self)
+        import torch
+        from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
+        from diffusers.utils import export_to_video
 
-        # loop over the files and check if they exist
-        for filename in files:
-            check_file = os.path.join(model_dir, filename)
-            #print(check_file)
-            check_file = pathlib.Path(check_file) 
-            if not os.path.isfile(check_file):
-                print(check_file)
-                all_found = False                  
+        pipe = DiffusionPipeline.from_pretrained(
+            "damo-vilab/text-to-video-ms-1.7b",
+            torch_dtype=torch.float16,
+            variant="fp16",
+        )  # "damo-vilab/text-to-video-ms-1.7b"
+        pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+        pipe.enable_model_cpu_offload()
 
-        if not all_found: #snapshot_download(repo_id='damo-vilab/modelscope-damo-text-to-video-synthesis',  # 20 GB VRAM
-            snapshot_download(repo_id='kabachuha/modelscope-damo-text2video-pruned-weights', # 6GB VRAM
-                              repo_type='model',
-                              local_dir=model_dir,
-                              local_dir_use_symlinks=False)
+        prompt = context.scene.generate_movie_prompt
+        video_frames = pipe(prompt, num_inference_steps=25).frames
+        video_path = export_to_video(video_frames)
 
-        p = pipeline('text-to-video-synthesis', model_dir)#, torch_dtype=torch.float16, variant="fp16")
-
-        test_text = {"text": self.text_prompt}
-        num_frames = {"num_frames": 10}
-        
-        output_video_path = p(
-            test_text,
-            num_frames,
-        )[OutputKeys.OUTPUT_VIDEO]
-
-        filepath = bpy.path.abspath(output_video_path)
+        filepath = bpy.path.abspath(video_path)
         if os.path.isfile(filepath):
             strip = scene.sequence_editor.sequences.new_movie(
-                name=bpy.types.Scene.text_prompt,
+                name=context.scene.generate_movie_prompt,
                 filepath=filepath,
                 channel=1,
                 frame_start=scene.frame_current,
             )
         else:
             print("Modelscope did not produce a file!")
-            
         return {"FINISHED"}
 
 
-class SequencerPanel(Panel):
+class SEQUENCER_OT_generate_audio(Operator):
+    """Text to Audio"""
+
+    bl_idname = "sequencer.generate_audio"
+    bl_label = "Prompt"
+    bl_description = "Convert text to audio"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        if not bpy.types.Scene.generate_audio_prompt:
+            return {"CANCELLED"}
+        scene = context.scene
+
+        install_modules(self)
+
+        from diffusers import AudioLDMPipeline
+        import torch
+
+        repo_id = "cvssp/audioldm"
+        pipe = AudioLDMPipeline.from_pretrained(repo_id, torch_dtype=torch.float16)
+        pipe = pipe.to("cuda")
+
+        prompt = context.scene.generate_audio_prompt
+        audio = pipe(prompt, num_inference_steps=10, audio_length_in_s=5.0).audios[0]
+
+        import scipy
+
+        filename = clean_path(prompt + ".wav")
+        scipy.io.wavfile.write(filename, rate=16000, data=audio)  ###
+
+        filepath = bpy.path.abspath(filename)  ###
+        if os.path.isfile(filepath):
+            strip = scene.sequence_editor.sequences.new_sound(
+                name=prompt,
+                filepath=filepath,
+                channel=1,
+                frame_start=scene.frame_current,
+            )
+        else:
+            print("No file was saved!")
+        return {"FINISHED"}
+
+
+class SEQEUNCER_PT_generate_movie(Panel):
     """Text to Video using ModelScope"""
 
-    bl_idname = "SEQUENCER_PT_sequencer_panel"
+    bl_idname = "SEQUENCER_PT_sequencer_generate_movie_panel"
     bl_label = "Text to Video"
     bl_space_type = "SEQUENCE_EDITOR"
     bl_region_type = "UI"
-    bl_category = "Text to Video"
+    bl_category = "Generate"
 
     def draw(self, context):
         layout = self.layout
         scene = context.scene
         row = layout.row()
-        row.prop(context.scene, "text_prompt", text="")
+        row.prop(context.scene, "generate_movie_prompt", text="")
         row = layout.row()
-        row.operator("sequencer.import_movie", text="Generate Movie")
+        row.operator("sequencer.generate_movie", text="Generate Movie")
 
+
+class SEQEUNCER_PT_generate_audio(Panel):
+    """Text to Audio"""
+
+    bl_idname = "SEQUENCER_PT_sequencer_generate_audio_panel"
+    bl_label = "Text to Audio"
+    bl_space_type = "SEQUENCE_EDITOR"
+    bl_region_type = "UI"
+    bl_category = "Generate"
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        row = layout.row()
+        row.prop(context.scene, "generate_audio_prompt", text="")
+        row = layout.row()
+        row.operator("sequencer.generate_audio", text="Generate Audio")
+
+
+classes = (
+    SEQUENCER_OT_generate_movie,
+    SEQUENCER_OT_generate_audio,
+    SEQEUNCER_PT_generate_movie,
+    SEQEUNCER_PT_generate_audio,
+)
 
 def register():
-    bpy.utils.register_class(SequencerImportMovieOperator)
-    bpy.utils.register_class(SequencerPanel)
-    bpy.types.Scene.text_prompt = bpy.props.StringProperty(
-        name="text_prompt", default=""
+    for cls in classes:
+        bpy.utils.register_class(cls)
+    bpy.types.Scene.generate_movie_prompt = bpy.props.StringProperty(
+        name="generate_movie_prompt", default=""
+    )
+    bpy.types.Scene.generate_audio_prompt = bpy.props.StringProperty(
+        name="generate_audio_prompt", default=""
     )
 
 
 def unregister():
-    bpy.utils.unregister_class(SequencerImportMovieOperator)
-    bpy.utils.unregister_class(SequencerPanel)
-    del bpy.types.Scene.text_prompt
+    for cls in classes:
+        bpy.utils.unregister_class(cls)
+    del bpy.types.Scene.generate_movie_prompt
+    del bpy.types.Scene.generate_audio_prompt
 
 
 if __name__ == "__main__":
