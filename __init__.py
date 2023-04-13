@@ -16,6 +16,8 @@ import site
 import subprocess
 import sys, os
 import string
+from os.path import dirname, realpath, isfile
+import shutil
 
 
 def show_system_console(show):
@@ -146,11 +148,11 @@ def install_modules(self):
                 "--user",
             ]
         )
-    import_module(self, "PySoundFile", "PySoundFile")  # Sox for Linux pip install sox
+    import_module(self, "soundfile", "PySoundFile")  # Sox for Linux pip install sox
     import_module(self, "diffusers", "diffusers")
     import_module(self, "accelerate", "accelerate")
     import_module(self, "transformers", "transformers")
-    import_module(self, "opencv_python", "opencv_python")
+    import_module(self, "cv2", "opencv_python")
 
 
 class SEQUENCER_OT_generate_movie(Operator):
@@ -185,13 +187,14 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         prompt = context.scene.generate_movie_prompt
         video_frames = pipe(prompt, num_inference_steps=25).frames
-        video_path = export_to_video(video_frames)
+        src_path = export_to_video(video_frames)
 
-        filepath = bpy.path.abspath(video_path)
-        if os.path.isfile(filepath):
+        dst_path = dirname(realpath(__file__)) + '/' + os.path.basename(src_path)
+        shutil.move(src_path, dst_path)
+        if os.path.isfile(dst_path):
             strip = scene.sequence_editor.sequences.new_movie(
                 name=context.scene.generate_movie_prompt,
-                filepath=filepath,
+                filepath=dst_path,
                 channel=1,
                 frame_start=scene.frame_current,
             )
@@ -227,10 +230,10 @@ class SEQUENCER_OT_generate_audio(Operator):
 
         import scipy
 
-        filename = clean_path(prompt + ".wav")
+        filename = dirname(realpath(__file__)) + '/' + clean_path(prompt + ".wav")
         scipy.io.wavfile.write(filename, rate=16000, data=audio)  ###
 
-        filepath = bpy.path.abspath(filename)  ###
+        filepath = filename#bpy.path.abspath(filename)  ###
         if os.path.isfile(filepath):
             strip = scene.sequence_editor.sequences.new_sound(
                 name=prompt,
