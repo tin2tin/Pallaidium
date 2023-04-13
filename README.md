@@ -14,7 +14,7 @@ The downloaded models should be placen in this folder on Windows: C:\Users\Your_
 
 ## Location
 
-Video Sequence Editor > Sidebar > Text to Video
+Video Sequence Editor > Sidebar > Generator
 
 ![image](https://user-images.githubusercontent.com/1322593/226438089-2c81fceb-6cfd-4c72-b79e-e83b97b2f8f6.png)
 
