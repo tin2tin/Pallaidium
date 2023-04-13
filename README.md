@@ -2,6 +2,8 @@
 Adding text to video to the Blender Video Sequence Editor using ModelScope. The full version needs 20 GB VRAM to work. An alternative version with a pruned data set(smaller) will download as default, for now - see code to change to 20 GB VRAM version.
 
 ## How to install
+Download the add-on: https://github.com/tin2tin/text_to_video/archive/refs/heads/main.zip
+
 Run Blender as Administrator and install the add-on as usual: Preferences > Add-ons > Install > select file > Enable the add-on. When running the first generation of video or audio many GB will have to be downloaded, so go grab a coffee. 
 
 Alternative download for the weighted set which needs 20 GB of VRAM to run:
