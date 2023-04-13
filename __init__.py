@@ -196,6 +196,7 @@ class SEQUENCER_OT_generate_movie(Operator):
         if not bpy.types.Scene.generate_movie_prompt:
             return {"CANCELLED"}
         scene = context.scene
+        scene.sequence_editor_create()
 
         install_modules(self)
 
@@ -251,6 +252,7 @@ class SEQUENCER_OT_generate_audio(Operator):
         if not bpy.types.Scene.generate_audio_prompt:
             return {"CANCELLED"}
         scene = context.scene
+        scene.sequence_editor_create()
 
         install_modules(self)
 
