@@ -22,10 +22,15 @@ Video Sequence Editor > Sidebar > Text to Video
 Currently, not working. Produces a file without any content.
 
 ## Modules
-Diffusers: 
+Diffusers: https://github.com/huggingface/diffusers
+
 ModelScope: https://modelscope.cn/models/damo/text-to-video-synthesis/summary
+
 AudioLDM: https://github.com/haoheliu/AudioLDM
-If some additional python modules are missing, write about it here(so I can add them), and use the Blender PIP add-on to manually install the missing modules: https://github.com/amb/blender_pip
+
+If some additional python modules are missing, write about it here(so I can add them), and use the Blender PIP add-on to manually install the missing modules:
+
+https://github.com/amb/blender_pip
 
 
 
