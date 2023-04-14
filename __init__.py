@@ -11,11 +11,11 @@ bl_info = {
 }
 
 import bpy, ctypes
-from bpy.types import Operator, Panel
+from bpy.types import Operator, Panel, AddonPreferences
 from bpy.props import StringProperty, BoolProperty, EnumProperty, IntProperty
 import site
 import subprocess
-import sys, os
+import sys, os, aud
 import string
 from os.path import dirname, realpath, isfile
 import shutil
@@ -184,6 +184,104 @@ def install_modules(self):
     import_module(self, "cv2", "opencv_python")
 
 
+class GeneratorAddonPreferences(AddonPreferences):
+    bl_idname = __name__
+
+    soundselect: EnumProperty(
+        name="Sound",
+        items={
+            ("ding", "Ding", "A simple bell sound"),
+            ("coin", "Coin", "A Mario-like coin sound"),
+            ("user", "User", "Load a custom sound file"),
+        },
+        default="ding",
+    )
+
+    default_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)),'sounds','*.wav')
+    if default_folder not in sys.path:
+        sys.path.append(default_folder)
+
+    usersound: StringProperty(
+        name="User",
+        description="Load a custom sound from your computer",
+        subtype="FILE_PATH",
+        default=default_folder,
+        maxlen=1024,
+    )
+
+    playsound: BoolProperty(
+        name="Audio Notification",
+        default=True,
+    )
+
+    def draw(self, context):
+        layout = self.layout
+        box = layout.box()
+        box.prop(self, "playsound")
+        row = box.row()
+        row.prop(self, "soundselect")
+        if self.soundselect == "user":
+            row.prop(self, "usersound", text="")
+        row.operator("renderreminder.play_notification", text="", icon="PLAY")
+        row.active = self.playsound
+
+
+class GENERATOR_OT_sound_notification(Operator):
+    """Test your notification settings"""
+
+    bl_idname = "renderreminder.play_notification"
+    bl_label = "Test Notification"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        preferences = context.preferences
+        addon_prefs = preferences.addons[__name__].preferences
+        if addon_prefs.playsound:
+            device = aud.Device()
+
+            def coinSound():
+                sound = aud.Sound("")
+                handle = device.play(
+                    sound.triangle(1000)
+                    .highpass(20)
+                    .lowpass(2000)
+                    .ADSR(0, 0.5, 1, 0)
+                    .fadeout(0.1, 0.1)
+                    .limit(0, 1)
+                )
+
+                handle = device.play(
+                    sound.triangle(1500)
+                    .highpass(20)
+                    .lowpass(2000)
+                    .ADSR(0, 0.5, 1, 0)
+                    .fadeout(0.2, 0.2)
+                    .delay(0.1)
+                    .limit(0, 1)
+                )
+
+            def ding():
+                sound = aud.Sound("")
+                handle = device.play(
+                    sound.triangle(3000)
+                    .highpass(20)
+                    .lowpass(1000)
+                    .ADSR(0, 0.5, 1, 0)
+                    .fadeout(0, 1)
+                    .limit(0, 1)
+                )
+
+            if addon_prefs.soundselect == "ding":
+                ding()
+            if addon_prefs.soundselect == "coin":
+                coinSound()
+            if addon_prefs.soundselect == "user":
+                file = str(addon_prefs.usersound)
+                sound = aud.Sound(file)
+                handle = device.play(sound)
+        return {"FINISHED"}
+
+
 class SEQUENCER_OT_generate_movie(Operator):
     """Text to Video"""
 
@@ -255,9 +353,11 @@ class SEQUENCER_OT_generate_movie(Operator):
                     channel=empty_channel,
                     fit_method="FIT",
                 )
+                strip.channel = find_first_empty_channel(strip.frame_final_start, strip.frame_final_start+strip.frame_final_duration)
                 scene.sequence_editor.active_strip = strip
             else:
                 print("No resulting file found.")
+        bpy.ops.renderreminder.play_notification()
         wm.progress_end()
         return {"FINISHED"}
 
@@ -363,6 +463,9 @@ classes = (
     #SEQUENCER_OT_generate_audio,
     SEQEUNCER_PT_generate_movie,
     #SEQEUNCER_PT_generate_audio,
+    GeneratorAddonPreferences,
+    GENERATOR_OT_sound_notification,
+    
 )
 
 
