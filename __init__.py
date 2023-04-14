@@ -213,33 +213,52 @@ class SEQUENCER_OT_generate_movie(Operator):
         duration = scene.generate_movie_frames
         movie_num_inference_steps = scene.movie_num_inference_steps
 
-        pipe = DiffusionPipeline.from_pretrained(
-            "damo-vilab/text-to-video-ms-1.7b",
-            torch_dtype=torch.float16,
-            variant="fp16",
-        )
-        pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-        pipe.enable_model_cpu_offload()
+        wm = bpy.context.window_manager
+        tot = scene.movie_num_batch
+        wm.progress_begin(0, tot)
 
-        # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
-        video_frames = pipe(
-            prompt, num_inference_steps=25, height=y, width=x, num_frames=duration
-        ).frames
-        src_path = export_to_video(video_frames)
+        for i in range(scene.movie_num_batch):
 
-        dst_path = dirname(realpath(__file__)) + "/" + os.path.basename(src_path)
-        shutil.move(src_path, dst_path)
-        if os.path.isfile(dst_path):
-            empty_channel = find_first_empty_channel(0, 10000000000)
-            strip = scene.sequence_editor.sequences.new_movie(
-                name=context.scene.generate_movie_prompt,
-                frame_start=scene.frame_current,
-                filepath=dst_path,
-                channel=empty_channel,
-                fit_method="FIT",
+            wm.progress_update(i)
+            if i > 0:
+                empty_channel = scene.sequence_editor.active_strip.channel
+                start_frame = scene.sequence_editor.active_strip.frame_final_start + scene.sequence_editor.active_strip.frame_final_duration
+            else:
+                empty_channel = find_first_empty_channel(0, 10000000000)
+                start_frame = scene.frame_current
+
+            # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
+            pipe = DiffusionPipeline.from_pretrained(
+                "damo-vilab/text-to-video-ms-1.7b",
+                torch_dtype=torch.float16,
+                variant="fp16",
             )
-        else:
-            print("No resulting file found.")
+
+            pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+            pipe.enable_model_cpu_offload()
+
+            # memory optimization
+            pipe.enable_vae_slicing()
+
+            video_frames = pipe(
+                prompt, num_inference_steps=movie_num_inference_steps, height=y, width=x, num_frames=duration,
+            ).frames
+            src_path = export_to_video(video_frames)
+
+            dst_path = dirname(realpath(__file__)) + "/" + os.path.basename(src_path)
+            shutil.move(src_path, dst_path)
+            if os.path.isfile(dst_path):
+                strip = scene.sequence_editor.sequences.new_movie(
+                    name=context.scene.generate_movie_prompt,
+                    frame_start=start_frame,
+                    filepath=dst_path,
+                    channel=empty_channel,
+                    fit_method="FIT",
+                )
+                scene.sequence_editor.active_strip = strip
+            else:
+                print("No resulting file found.")
+        wm.progress_end()
         return {"FINISHED"}
 
 
@@ -271,9 +290,9 @@ class SEQUENCER_OT_generate_audio(Operator):
         prompt = context.scene.generate_audio_prompt
         # Options: https://huggingface.co/docs/diffusers/main/en/api/pipelines/audioldm
         audio = pipe(prompt, num_inference_steps=10, audio_length_in_s=5.0).audios[0]
-
+        print(audio.tostring())
         filename = dirname(realpath(__file__)) + "/" + clean_path(prompt + ".wav")
-        scipy.io.wavfile.write(filename, rate=48000, data=audio.transpose())
+        scipy.io.wavfile.write(filename, 48000, audio.transpose())
 
         filepath = filename
         if os.path.isfile(filepath):
@@ -284,6 +303,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 channel=empty_channel,
                 frame_start=scene.frame_current,
             )
+            scene.sequence_editor.active_strip = strip
         else:
             print("No resulting file found!")
         return {"FINISHED"}
@@ -304,15 +324,18 @@ class SEQEUNCER_PT_generate_movie(Panel):
         row = layout.row()
         row.scale_y = 1.2
         row.prop(context.scene, "generate_movie_prompt", text="")
-        row = layout.row(align=True)
+        col = layout.column(align=True)
+        row = col.row()
         row.prop(context.scene, "generate_movie_x", text="X")
-        row.prop(context.scene, "generate_movie_y", text="Y")
-        row = layout.row(align=True)
         row.prop(context.scene, "generate_movie_frames", text="Frames")
+        row = col.row()
+        row.prop(context.scene, "generate_movie_y", text="Y")
         row.prop(context.scene, "movie_num_inference_steps", text="Inference")
-        row = layout.row()
+        
+        row = layout.row(align=True)
         row.scale_y = 1.2
-        row.operator("sequencer.generate_movie", text="Generate Video")
+        row.operator("sequencer.generate_movie", text="Generate")
+        row.prop(context.scene, "movie_num_batch", text="")
 
 
 class SEQEUNCER_PT_generate_audio(Panel):
@@ -337,9 +360,9 @@ class SEQEUNCER_PT_generate_audio(Panel):
 
 classes = (
     SEQUENCER_OT_generate_movie,
-    SEQUENCER_OT_generate_audio,
+    #SEQUENCER_OT_generate_audio,
     SEQEUNCER_PT_generate_movie,
-    SEQEUNCER_PT_generate_audio,
+    #SEQEUNCER_PT_generate_audio,
 )
 
 
@@ -361,14 +384,22 @@ def register():
         step=64,
         min=192,
     )
+    # The number of frames to be generated.
     bpy.types.Scene.generate_movie_frames = bpy.props.IntProperty(
         name="generate_movie_y",
         default=16,
         min=1,
     )
+    # The number of denoising steps. More denoising steps usually lead to a higher quality audio at the expense of slower inference.
     bpy.types.Scene.movie_num_inference_steps = bpy.props.IntProperty(
         name="movie_num_inference_steps",
         default=25,
+        min=1,
+    )
+    # The number of videos to generate.
+    bpy.types.Scene.movie_num_batch = bpy.props.IntProperty(
+        name="movie_num_batch",
+        default=1,
         min=1,
     )
 
@@ -381,6 +412,7 @@ def unregister():
     del bpy.types.Scene.generate_movie_x
     del bpy.types.Scene.generate_movie_y
     del bpy.types.Scene.movie_num_inference_steps
+    del bpy.types.Scene.movie_num_batch
 
 
 if __name__ == "__main__":
