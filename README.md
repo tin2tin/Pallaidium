@@ -16,7 +16,7 @@ https://huggingface.co/kabachuha/modelscope-damo-text2video-pruned-weights/tree/
 
 Video Sequence Editor > Sidebar > Generator
 
-![image](https://user-images.githubusercontent.com/1322593/226438089-2c81fceb-6cfd-4c72-b79e-e83b97b2f8f6.png)
+![image](https://user-images.githubusercontent.com/1322593/232002471-c487eea2-fd56-4dca-a7cc-f5b43b46516f.png)
 
 # Text to Audio
 Currently, not working. Produces a file without any content.
