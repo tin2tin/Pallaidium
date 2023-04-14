@@ -199,7 +199,6 @@ class SEQUENCER_OT_generate_movie(Operator):
         seq_editor = scene.sequence_editor
         if not seq_editor:
             scene.sequence_editor_create()
-
         install_modules(self)
 
         import torch
@@ -212,6 +211,7 @@ class SEQUENCER_OT_generate_movie(Operator):
         x = scene.generate_movie_x = closest_divisible_64(movie_x)
         y = scene.generate_movie_y = closest_divisible_64(movie_y)
         duration = scene.generate_movie_frames
+        movie_num_inference_steps = scene.movie_num_inference_steps
 
         pipe = DiffusionPipeline.from_pretrained(
             "damo-vilab/text-to-video-ms-1.7b",
@@ -220,12 +220,14 @@ class SEQUENCER_OT_generate_movie(Operator):
         )
         pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
         pipe.enable_model_cpu_offload()
-    
+
         # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
-        video_frames = pipe(prompt, num_inference_steps=25, height=y, width=x, num_frames=duration).frames
+        video_frames = pipe(
+            prompt, num_inference_steps=25, height=y, width=x, num_frames=duration
+        ).frames
         src_path = export_to_video(video_frames)
 
-        dst_path = dirname(realpath(__file__)) + '/' + os.path.basename(src_path)
+        dst_path = dirname(realpath(__file__)) + "/" + os.path.basename(src_path)
         shutil.move(src_path, dst_path)
         if os.path.isfile(dst_path):
             empty_channel = find_first_empty_channel(0, 10000000000)
@@ -234,9 +236,8 @@ class SEQUENCER_OT_generate_movie(Operator):
                 frame_start=scene.frame_current,
                 filepath=dst_path,
                 channel=empty_channel,
-                fit_method='FIT',
+                fit_method="FIT",
             )
-            
         else:
             print("No resulting file found.")
         return {"FINISHED"}
@@ -257,7 +258,6 @@ class SEQUENCER_OT_generate_audio(Operator):
         seq_editor = scene.sequence_editor
         if not seq_editor:
             scene.sequence_editor_create()
-
         install_modules(self)
 
         from diffusers import AudioLDMPipeline
@@ -272,8 +272,8 @@ class SEQUENCER_OT_generate_audio(Operator):
         # Options: https://huggingface.co/docs/diffusers/main/en/api/pipelines/audioldm
         audio = pipe(prompt, num_inference_steps=10, audio_length_in_s=5.0).audios[0]
 
-        filename = dirname(realpath(__file__)) + '/' + clean_path(prompt + ".wav")
-        scipy.io.wavfile.write(filename, rate=16000, data=audio)
+        filename = dirname(realpath(__file__)) + "/" + clean_path(prompt + ".wav")
+        scipy.io.wavfile.write(filename, rate=48000, data=audio.transpose())
 
         filepath = filename
         if os.path.isfile(filepath):
@@ -302,14 +302,17 @@ class SEQEUNCER_PT_generate_movie(Panel):
         layout = self.layout
         scene = context.scene
         row = layout.row()
+        row.scale_y = 1.2
         row.prop(context.scene, "generate_movie_prompt", text="")
         row = layout.row(align=True)
         row.prop(context.scene, "generate_movie_x", text="X")
         row.prop(context.scene, "generate_movie_y", text="Y")
-        row = layout.row()
+        row = layout.row(align=True)
         row.prop(context.scene, "generate_movie_frames", text="Frames")
+        row.prop(context.scene, "movie_num_inference_steps", text="Inference")
         row = layout.row()
-        row.operator("sequencer.generate_movie", text="Generate Movie")
+        row.scale_y = 1.2
+        row.operator("sequencer.generate_movie", text="Generate Video")
 
 
 class SEQEUNCER_PT_generate_audio(Panel):
@@ -325,8 +328,10 @@ class SEQEUNCER_PT_generate_audio(Panel):
         layout = self.layout
         scene = context.scene
         row = layout.row()
+        row.scale_y = 1.2
         row.prop(context.scene, "generate_audio_prompt", text="")
         row = layout.row()
+        row.scale_y = 1.2
         row.operator("sequencer.generate_audio", text="Generate Audio")
 
 
@@ -336,6 +341,7 @@ classes = (
     SEQEUNCER_PT_generate_movie,
     SEQEUNCER_PT_generate_audio,
 )
+
 
 def register():
     for cls in classes:
@@ -347,14 +353,25 @@ def register():
         name="generate_audio_prompt", default=""
     )
     bpy.types.Scene.generate_movie_x = bpy.props.IntProperty(
-        name="generate_movie_x", default=512, step=64, min = 192
+        name="generate_movie_x", default=512, step=64, min=192
     )
     bpy.types.Scene.generate_movie_y = bpy.props.IntProperty(
-        name="generate_movie_y", default=256, step=64, min = 192,
+        name="generate_movie_y",
+        default=256,
+        step=64,
+        min=192,
     )
     bpy.types.Scene.generate_movie_frames = bpy.props.IntProperty(
-        name="generate_movie_y", default=16, min = 1,
+        name="generate_movie_y",
+        default=16,
+        min=1,
     )
+    bpy.types.Scene.movie_num_inference_steps = bpy.props.IntProperty(
+        name="movie_num_inference_steps",
+        default=25,
+        min=1,
+    )
+
 
 def unregister():
     for cls in classes:
@@ -363,6 +380,7 @@ def unregister():
     del bpy.types.Scene.generate_audio_prompt
     del bpy.types.Scene.generate_movie_x
     del bpy.types.Scene.generate_movie_y
+    del bpy.types.Scene.movie_num_inference_steps
 
 
 if __name__ == "__main__":
