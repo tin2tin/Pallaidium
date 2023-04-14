@@ -18,6 +18,15 @@ Video Sequence Editor > Sidebar > Generator
 
 ![image](https://user-images.githubusercontent.com/1322593/232002471-c487eea2-fd56-4dca-a7cc-f5b43b46516f.png)
 
+## How to
+In order to make Blender run the generated video properly, the resolution and the fps should be set to match the footage. 
+The resolution can be set by selecting a strip > Strip Menu > Movie Strip > Set Render Size.
+The project/scene fps can be set in the Properties > Output Tab > Format > Frame Rate - set it to Custom and 8. 
+
+Alternatively can this .blend be loaded as a quick start, but the add-on still needs to be installed:
+
+https://github.com/tin2tin/text_to_video/raw/main/text2video_ui.blend
+
 # Text to Audio
 Currently, not working. Produces a file without any content.
 
