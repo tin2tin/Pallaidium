@@ -18,6 +18,11 @@ Video Sequence Editor > Sidebar > Generator
 
 ![image](https://user-images.githubusercontent.com/1322593/232002471-c487eea2-fd56-4dca-a7cc-f5b43b46516f.png)
 
+Notification sound can be changed or switched on/off under Preferences:
+
+![image](https://user-images.githubusercontent.com/1322593/232142035-b435dc72-e2bb-4cb0-9522-957f20c1ecb0.png)
+
+
 ## How to
 In order to make Blender run the generated video properly, the resolution and the fps should be set to match the footage. 
 The resolution can be set by selecting a strip > Strip Menu > Movie Strip > Set Render Size.
