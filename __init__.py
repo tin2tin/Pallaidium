@@ -70,7 +70,7 @@ def find_first_empty_channel(start_frame, end_frame):
         for seq in bpy.context.scene.sequence_editor.sequences_all:
             if (
                 seq.channel == ch
-                and seq.frame_final_start < end_frame
+                and seq.frame_final_start < end_frame 
                 and (seq.frame_final_start + seq.frame_final_duration) > start_frame
             ):
                 break
@@ -322,7 +322,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 empty_channel = scene.sequence_editor.active_strip.channel
                 start_frame = scene.sequence_editor.active_strip.frame_final_start + scene.sequence_editor.active_strip.frame_final_duration
             else:
-                empty_channel = find_first_empty_channel(0, 10000000000)
+                empty_channel = find_first_empty_channel(scene.frame_current, (scene.movie_num_batch*duration)+scene.frame_current)
                 start_frame = scene.frame_current
 
             # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
@@ -353,7 +353,6 @@ class SEQUENCER_OT_generate_movie(Operator):
                     channel=empty_channel,
                     fit_method="FIT",
                 )
-                strip.channel = find_first_empty_channel(strip.frame_final_start, strip.frame_final_start+strip.frame_final_duration)
                 scene.sequence_editor.active_strip = strip
             else:
                 print("No resulting file found.")
