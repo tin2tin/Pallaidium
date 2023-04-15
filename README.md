@@ -1,4 +1,4 @@
-# Text to Video
+# Generative AI - Text to Video
 Adding text to video to the Blender Video Sequence Editor using ModelScope. The full version needs 20 GB VRAM to work. An alternative version with a pruned data set(smaller) will download as default, for now - see code to change to 20 GB VRAM version.
 
 ## How to install
