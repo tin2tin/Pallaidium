@@ -303,6 +303,7 @@ class SEQUENCER_OT_generate_movie(Operator):
         from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
         from diffusers.utils import export_to_video
 
+        current_frame = scene.frame_current
         prompt = scene.generate_movie_prompt
         negative_prompt = scene.generate_movie_negative_prompt
         movie_x = scene.generate_movie_x
@@ -322,6 +323,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             if i > 0:
                 empty_channel = scene.sequence_editor.active_strip.channel
                 start_frame = scene.sequence_editor.active_strip.frame_final_start + scene.sequence_editor.active_strip.frame_final_duration
+                scene.frame_current = scene.sequence_editor.active_strip.frame_final_start
             else:
                 empty_channel = find_first_empty_channel(scene.frame_current, (scene.movie_num_batch*duration)+scene.frame_current)
                 start_frame = scene.frame_current
@@ -355,11 +357,14 @@ class SEQUENCER_OT_generate_movie(Operator):
                     fit_method="FIT",
                 )
                 scene.sequence_editor.active_strip = strip
+                if i > 0:
+                    scene.frame_current = scene.sequence_editor.active_strip.frame_final_start
                 bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1) # Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
             else:
                 print("No resulting file found.")
         bpy.ops.renderreminder.play_notification()
         wm.progress_end()
+        scene.frame_current = current_frame
         return {"FINISHED"}
 
 
