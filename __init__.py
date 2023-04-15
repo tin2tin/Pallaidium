@@ -1,12 +1,12 @@
 # https://modelscope.cn/models/damo/text-to-video-synthesis/summary
 
 bl_info = {
-    "name": "Text to Video",
+    "name": "Generative AI",
     "author": "tintwotin",
     "version": (1, 0),
     "blender": (3, 4, 0),
-    "location": "Video Sequence Editor > Sidebar > Generator",
-    "description": "Convert text to video",
+    "location": "Video Sequence Editor > Sidebar > Generative AI",
+    "description": "Generate media in the VSE",
     "category": "Sequencer",
 }
 
@@ -283,7 +283,7 @@ class GENERATOR_OT_sound_notification(Operator):
 
 
 class SEQUENCER_OT_generate_movie(Operator):
-    """Text to Video"""
+    """Generate Video"""
 
     bl_idname = "sequencer.generate_movie"
     bl_label = "Prompt"
@@ -304,12 +304,13 @@ class SEQUENCER_OT_generate_movie(Operator):
         from diffusers.utils import export_to_video
 
         prompt = scene.generate_movie_prompt
+        negative_prompt = scene.generate_movie_negative_prompt
         movie_x = scene.generate_movie_x
         movie_y = scene.generate_movie_y
         x = scene.generate_movie_x = closest_divisible_64(movie_x)
         y = scene.generate_movie_y = closest_divisible_64(movie_y)
         duration = scene.generate_movie_frames
-        movie_num_inference_steps = scene.movie_num_inference_steps
+        movie_num_inference_steps = scene.movie_num_inference_steps  
 
         wm = bpy.context.window_manager
         tot = scene.movie_num_batch
@@ -339,7 +340,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             pipe.enable_vae_slicing()
 
             video_frames = pipe(
-                prompt, num_inference_steps=movie_num_inference_steps, height=y, width=x, num_frames=duration,
+                prompt, negative_prompt=negative_prompt, num_inference_steps=movie_num_inference_steps, height=y, width=x, num_frames=duration,
             ).frames
             src_path = export_to_video(video_frames)
 
@@ -361,8 +362,41 @@ class SEQUENCER_OT_generate_movie(Operator):
         return {"FINISHED"}
 
 
+class SEQEUNCER_PT_generate_movie(Panel):
+    """Generate Video using AI"""
+
+    bl_idname = "SEQUENCER_PT_sequencer_generate_movie_panel"
+    bl_label = "Generate Video"
+    bl_space_type = "SEQUENCE_EDITOR"
+    bl_region_type = "UI"
+    bl_category = "Generator"
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        col = layout.column(align=True)
+        row = col.row()
+        row.scale_y = 1.2
+        row.prop(context.scene, "generate_movie_prompt", text="", icon="ADD")
+        row = col.row()
+        row.scale_y = 1.2
+        row.prop(context.scene, "generate_movie_negative_prompt", text="", icon="REMOVE")
+        col = layout.column(align=True)
+        row = col.row()
+        row.prop(context.scene, "generate_movie_x", text="X")
+        row.prop(context.scene, "generate_movie_frames", text="Frames")
+        row = col.row()
+        row.prop(context.scene, "generate_movie_y", text="Y")
+        row.prop(context.scene, "movie_num_inference_steps", text="Inference")
+        
+        row = layout.row(align=True)
+        row.scale_y = 1.1
+        row.operator("sequencer.generate_movie", text="Generate")
+        row.prop(context.scene, "movie_num_batch", text="")
+
+
 class SEQUENCER_OT_generate_audio(Operator):
-    """Text to Audio"""
+    """Generate Audio"""
 
     bl_idname = "sequencer.generate_audio"
     bl_label = "Prompt"
@@ -408,40 +442,11 @@ class SEQUENCER_OT_generate_audio(Operator):
         return {"FINISHED"}
 
 
-class SEQEUNCER_PT_generate_movie(Panel):
-    """Text to Video using ModelScope"""
-
-    bl_idname = "SEQUENCER_PT_sequencer_generate_movie_panel"
-    bl_label = "Text to Video"
-    bl_space_type = "SEQUENCE_EDITOR"
-    bl_region_type = "UI"
-    bl_category = "Generator"
-
-    def draw(self, context):
-        layout = self.layout
-        scene = context.scene
-        row = layout.row()
-        row.scale_y = 1.2
-        row.prop(context.scene, "generate_movie_prompt", text="")
-        col = layout.column(align=True)
-        row = col.row()
-        row.prop(context.scene, "generate_movie_x", text="X")
-        row.prop(context.scene, "generate_movie_frames", text="Frames")
-        row = col.row()
-        row.prop(context.scene, "generate_movie_y", text="Y")
-        row.prop(context.scene, "movie_num_inference_steps", text="Inference")
-        
-        row = layout.row(align=True)
-        row.scale_y = 1.2
-        row.operator("sequencer.generate_movie", text="Generate")
-        row.prop(context.scene, "movie_num_batch", text="")
-
-
 class SEQEUNCER_PT_generate_audio(Panel):
-    """Text to Audio"""
+    """Generate Audio with AI"""
 
     bl_idname = "SEQUENCER_PT_sequencer_generate_audio_panel"
-    bl_label = "Text to Audio"
+    bl_label = "Generate Audio"
     bl_space_type = "SEQUENCE_EDITOR"
     bl_region_type = "UI"
     bl_category = "Generator"
@@ -473,6 +478,9 @@ def register():
         bpy.utils.register_class(cls)
     bpy.types.Scene.generate_movie_prompt = bpy.props.StringProperty(
         name="generate_movie_prompt", default=""
+    )
+    bpy.types.Scene.generate_movie_negative_prompt = bpy.props.StringProperty(
+        name="generate_movie_negative_prompt", default="text, watermark, copyright, blurry"
     )
     bpy.types.Scene.generate_audio_prompt = bpy.props.StringProperty(
         name="generate_audio_prompt", default=""
