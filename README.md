@@ -14,13 +14,13 @@ https://huggingface.co/kabachuha/modelscope-damo-text2video-pruned-weights/tree/
 
 ## Location
 
-Video Sequence Editor > Sidebar > Generator
+Video Sequence Editor > Sidebar > Generative AI
 
-![image](https://user-images.githubusercontent.com/1322593/232002471-c487eea2-fd56-4dca-a7cc-f5b43b46516f.png)
+![image](https://user-images.githubusercontent.com/1322593/232183922-a935570b-5020-4960-88d9-305d49d5387a.png)
 
 Notification sound can be changed or switched on/off under Preferences:
 
-![image](https://user-images.githubusercontent.com/1322593/232142035-b435dc72-e2bb-4cb0-9522-957f20c1ecb0.png)
+![image](https://user-images.githubusercontent.com/1322593/232183893-b0d4a413-d11a-4fc8-965e-172d83ff60aa.png)
 
 
 ## How to
