@@ -354,6 +354,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     channel=empty_channel,
                     fit_method="FIT",
                 )
+                bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1) # Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
                 scene.sequence_editor.active_strip = strip
             else:
                 print("No resulting file found.")
