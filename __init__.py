@@ -10,7 +10,7 @@ bl_info = {
     "category": "Sequencer",
 }
 
-import bpy, ctypes
+import bpy, ctypes, random
 from bpy.types import Operator, Panel, AddonPreferences
 from bpy.props import StringProperty, BoolProperty, EnumProperty, IntProperty
 import site
@@ -70,7 +70,7 @@ def find_first_empty_channel(start_frame, end_frame):
         for seq in bpy.context.scene.sequence_editor.sequences_all:
             if (
                 seq.channel == ch
-                and seq.frame_final_start < end_frame 
+                and seq.frame_final_start < end_frame
                 and (seq.frame_final_start + seq.frame_final_duration) > start_frame
             ):
                 break
@@ -197,10 +197,11 @@ class GeneratorAddonPreferences(AddonPreferences):
         default="ding",
     )
 
-    default_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)),'sounds','*.wav')
+    default_folder = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "sounds", "*.wav"
+    )
     if default_folder not in sys.path:
         sys.path.append(default_folder)
-
     usersound: StringProperty(
         name="User",
         description="Load a custom sound from your computer",
@@ -311,23 +312,30 @@ class SEQUENCER_OT_generate_movie(Operator):
         x = scene.generate_movie_x = closest_divisible_64(movie_x)
         y = scene.generate_movie_y = closest_divisible_64(movie_y)
         duration = scene.generate_movie_frames
-        movie_num_inference_steps = scene.movie_num_inference_steps  
+        movie_num_inference_steps = scene.movie_num_inference_steps
+        movie_num_guidance = scene.movie_num_guidance
 
         wm = bpy.context.window_manager
         tot = scene.movie_num_batch
         wm.progress_begin(0, tot)
 
         for i in range(scene.movie_num_batch):
-
             wm.progress_update(i)
             if i > 0:
                 empty_channel = scene.sequence_editor.active_strip.channel
-                start_frame = scene.sequence_editor.active_strip.frame_final_start + scene.sequence_editor.active_strip.frame_final_duration
-                scene.frame_current = scene.sequence_editor.active_strip.frame_final_start
+                start_frame = (
+                    scene.sequence_editor.active_strip.frame_final_start
+                    + scene.sequence_editor.active_strip.frame_final_duration
+                )
+                scene.frame_current = (
+                    scene.sequence_editor.active_strip.frame_final_start
+                )
             else:
-                empty_channel = find_first_empty_channel(scene.frame_current, (scene.movie_num_batch*duration)+scene.frame_current)
+                empty_channel = find_first_empty_channel(
+                    scene.frame_current,
+                    (scene.movie_num_batch * duration) + scene.frame_current,
+                )
                 start_frame = scene.frame_current
-
             # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
             pipe = DiffusionPipeline.from_pretrained(
                 "damo-vilab/text-to-video-ms-1.7b",
@@ -335,19 +343,48 @@ class SEQUENCER_OT_generate_movie(Operator):
                 variant="fp16",
             )
 
-            pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-            pipe.enable_model_cpu_offload()
+            pipe.scheduler = DPMSolverMultistepScheduler.from_config(
+                pipe.scheduler.config
+            )
 
             # memory optimization
+            pipe.enable_model_cpu_offload()
             pipe.enable_vae_slicing()
 
-            video_frames = pipe(
-                prompt, negative_prompt=negative_prompt, num_inference_steps=movie_num_inference_steps, height=y, width=x, num_frames=duration,
-            ).frames
-            src_path = export_to_video(video_frames)
+            seed = context.scene.movie_num_seed
+            seed = (seed if not context.scene.movie_use_random else random.randint(0, 2147483647))
+            context.scene.movie_num_seed = seed
+            guidance = 7.5
 
+            # Use cuda if possible
+            if torch.cuda.is_available():
+                generator = (
+                    torch.Generator("cuda").manual_seed(seed) if seed != 0 else None
+                )
+            else:
+                if seed != 0:
+                    generator = torch.Generator()
+                    generator.manual_seed(seed)
+                else:
+                    generator = None
+
+            video_frames = pipe(
+                prompt,
+                negative_prompt=negative_prompt,
+                num_inference_steps=movie_num_inference_steps,
+                guidance_scale = movie_num_guidance,
+                height=y,
+                width=x,
+                num_frames=duration,
+                generator=generator,
+            ).frames
+
+            # Move to folder
+            src_path = export_to_video(video_frames)
             dst_path = dirname(realpath(__file__)) + "/" + os.path.basename(src_path)
             shutil.move(src_path, dst_path)
+
+            # Add strip
             if os.path.isfile(dst_path):
                 strip = scene.sequence_editor.sequences.new_movie(
                     name=context.scene.generate_movie_prompt,
@@ -358,8 +395,13 @@ class SEQUENCER_OT_generate_movie(Operator):
                 )
                 scene.sequence_editor.active_strip = strip
                 if i > 0:
-                    scene.frame_current = scene.sequence_editor.active_strip.frame_final_start
-                bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1) # Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
+                    scene.frame_current = (
+                        scene.sequence_editor.active_strip.frame_final_start
+                    )
+                # Redraw UI to display the new strip
+                bpy.ops.wm.redraw_timer(
+                    type="DRAW_WIN_SWAP", iterations=1
+                )  # Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
             else:
                 print("No resulting file found.")
         bpy.ops.renderreminder.play_notification()
@@ -379,6 +421,8 @@ class SEQEUNCER_PT_generate_movie(Panel):
 
     def draw(self, context):
         layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
         scene = context.scene
         col = layout.column(align=True)
         row = col.row()
@@ -386,19 +430,29 @@ class SEQEUNCER_PT_generate_movie(Panel):
         row.prop(context.scene, "generate_movie_prompt", text="", icon="ADD")
         row = col.row()
         row.scale_y = 1.2
-        row.prop(context.scene, "generate_movie_negative_prompt", text="", icon="REMOVE")
+        row.prop(
+            context.scene, "generate_movie_negative_prompt", text="", icon="REMOVE"
+        )
         col = layout.column(align=True)
-        row = col.row()
-        row.prop(context.scene, "generate_movie_x", text="X")
-        row.prop(context.scene, "generate_movie_frames", text="Frames")
-        row = col.row()
-        row.prop(context.scene, "generate_movie_y", text="Y")
-        row.prop(context.scene, "movie_num_inference_steps", text="Inference")
-        
+        col.prop(context.scene, "generate_movie_x", text="X")
+        col.prop(context.scene, "generate_movie_y", text="Y")
+
+        col = layout.column(align=True)        
+        col.prop(context.scene, "generate_movie_frames", text="Frames")
+        col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
+        col.prop(context.scene, "movie_num_guidance", text="Word Power")
+        col.prop(context.scene, "movie_num_batch", text="Batch Count")
+
+        col = layout.column(align=True)
+        row = col.row(align=True)
+        sub_row = row.row(align=True)
+        sub_row.prop(context.scene, "movie_num_seed", text="Seed")
+        row.prop(context.scene, "movie_use_random", text="", icon="QUESTION")
+        sub_row.active = not context.scene.movie_use_random
+ 
         row = layout.row(align=True)
         row.scale_y = 1.1
         row.operator("sequencer.generate_movie", text="Generate")
-        row.prop(context.scene, "movie_num_batch", text="")
 
 
 class SEQUENCER_OT_generate_audio(Operator):
@@ -470,12 +524,11 @@ class SEQEUNCER_PT_generate_audio(Panel):
 
 classes = (
     SEQUENCER_OT_generate_movie,
-    #SEQUENCER_OT_generate_audio,
+    # SEQUENCER_OT_generate_audio,
     SEQEUNCER_PT_generate_movie,
-    #SEQEUNCER_PT_generate_audio,
+    # SEQEUNCER_PT_generate_audio,
     GeneratorAddonPreferences,
     GENERATOR_OT_sound_notification,
-    
 )
 
 
@@ -486,37 +539,63 @@ def register():
         name="generate_movie_prompt", default=""
     )
     bpy.types.Scene.generate_movie_negative_prompt = bpy.props.StringProperty(
-        name="generate_movie_negative_prompt", default="text, watermark, copyright, blurry"
+        name="generate_movie_negative_prompt",
+        default="text, watermark, copyright, blurry",
     )
     bpy.types.Scene.generate_audio_prompt = bpy.props.StringProperty(
         name="generate_audio_prompt", default=""
     )
     bpy.types.Scene.generate_movie_x = bpy.props.IntProperty(
-        name="generate_movie_x", default=512, step=64, min=192
+        name="generate_movie_x", default=512, step=64, min=192, max=1024,
     )
     bpy.types.Scene.generate_movie_y = bpy.props.IntProperty(
         name="generate_movie_y",
         default=256,
         step=64,
         min=192,
+        max=1024,
     )
     # The number of frames to be generated.
     bpy.types.Scene.generate_movie_frames = bpy.props.IntProperty(
         name="generate_movie_y",
         default=16,
         min=1,
+        max=125,
     )
     # The number of denoising steps. More denoising steps usually lead to a higher quality audio at the expense of slower inference.
     bpy.types.Scene.movie_num_inference_steps = bpy.props.IntProperty(
         name="movie_num_inference_steps",
         default=25,
         min=1,
+        max=100,
     )
     # The number of videos to generate.
     bpy.types.Scene.movie_num_batch = bpy.props.IntProperty(
         name="movie_num_batch",
         default=1,
         min=1,
+        max=100,
+    )
+    # The seed number.
+    bpy.types.Scene.movie_num_seed = bpy.props.IntProperty(
+        name="movie_num_seed",
+        default=1,
+        min=1,
+        max=2147483647,
+    )
+
+    # The seed number.
+    bpy.types.Scene.movie_use_random = bpy.props.BoolProperty(
+        name="movie_use_random",
+        default=0,
+    )
+
+    # The seed number.
+    bpy.types.Scene.movie_num_guidance = bpy.props.IntProperty(
+        name="movie_num_guidance",
+        default=17,
+        min=1,
+        max=100,
     )
 
 
@@ -529,6 +608,9 @@ def unregister():
     del bpy.types.Scene.generate_movie_y
     del bpy.types.Scene.movie_num_inference_steps
     del bpy.types.Scene.movie_num_batch
+    del bpy.types.Scene.movie_num_seed
+    del bpy.types.Scene.movie_use_random
+    del bpy.types.Scene.movie_num_guidance
 
 
 if __name__ == "__main__":
