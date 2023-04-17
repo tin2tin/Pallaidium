@@ -407,6 +407,11 @@ class SEQUENCER_OT_generate_movie(Operator):
         bpy.ops.renderreminder.play_notification()
         wm.progress_end()
         scene.frame_current = current_frame
+
+        # clear the VRAM
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
         return {"FINISHED"}
 
 
@@ -477,15 +482,15 @@ class SEQUENCER_OT_generate_audio(Operator):
         import scipy
 
         repo_id = "cvssp/audioldm"
-        pipe = AudioLDMPipeline.from_pretrained(repo_id, torch_dtype=torch.float16)
+        pipe = AudioLDMPipeline.from_pretrained(repo_id) #, torch_dtype=torch.float16z
         pipe = pipe.to("cuda")
 
         prompt = context.scene.generate_audio_prompt
         # Options: https://huggingface.co/docs/diffusers/main/en/api/pipelines/audioldm
-        audio = pipe(prompt, num_inference_steps=10, audio_length_in_s=5.0).audios[0]
-        print(audio.tostring())
+        audio = pipe(prompt, num_inference_steps=30, audio_length_in_s=10.0).audios[0]
+        #print(audio.tostring())
         filename = dirname(realpath(__file__)) + "/" + clean_path(prompt + ".wav")
-        scipy.io.wavfile.write(filename, 48000, audio.transpose())
+        scipy.io.wavfile.write(filename, 16000, audio.transpose())
 
         filepath = filename
         if os.path.isfile(filepath):
@@ -524,9 +529,9 @@ class SEQEUNCER_PT_generate_audio(Panel):
 
 classes = (
     SEQUENCER_OT_generate_movie,
-    # SEQUENCER_OT_generate_audio,
+    SEQUENCER_OT_generate_audio,
     SEQEUNCER_PT_generate_movie,
-    # SEQEUNCER_PT_generate_audio,
+    SEQEUNCER_PT_generate_audio,
     GeneratorAddonPreferences,
     GENERATOR_OT_sound_notification,
 )
@@ -540,7 +545,7 @@ def register():
     )
     bpy.types.Scene.generate_movie_negative_prompt = bpy.props.StringProperty(
         name="generate_movie_negative_prompt",
-        default="text, watermark, copyright, blurry",
+        default="text, watermark, copyright, blurry, grainy, copyright",
     )
     bpy.types.Scene.generate_audio_prompt = bpy.props.StringProperty(
         name="generate_audio_prompt", default=""
@@ -611,7 +616,6 @@ def unregister():
     del bpy.types.Scene.movie_num_seed
     del bpy.types.Scene.movie_use_random
     del bpy.types.Scene.movie_num_guidance
-
 
 if __name__ == "__main__":
     register()
