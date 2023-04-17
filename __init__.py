@@ -528,6 +528,46 @@ class SEQEUNCER_PT_generate_audio(Panel):
         row.operator("sequencer.generate_audio", text="Generate Audio")
 
 
+class SEQUENCER_OT_strip_to_generatorAI(Operator):
+    """Convert selected text strips to GeneratorAI"""
+    bl_idname = 'sequencer.text_to_generator'
+    bl_label = 'Convert Text Strips to GeneratorAI'
+    bl_options = {'INTERNAL'}
+    bl_description = "Adds selected text strips as GeneratorAI strips"
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene and context.scene.sequence_editor
+
+    def execute(self, context):
+        global global_captions
+        self.report({'INFO'}, "Text to GeneratorAI: Started.")
+        scene = context.scene
+        sequencer = bpy.ops.sequencer
+        sequences = bpy.context.sequences
+        strips = context.selected_sequences
+        prompt = context.scene.generate_movie_prompt
+        current_frame = scene.frame_current
+        for strip in strips:
+            if strip.type == 'TEXT':
+                if strip.text:
+                    print("Processing: "+strip.text)
+                    scene.generate_movie_prompt = strip.text
+                    scene.frame_current = strip.frame_final_start
+                    sequencer.generate_movie()
+
+        scene.frame_current = current_frame
+        context.scene.generate_movie_prompt = prompt
+
+        self.report({'INFO'}, "Text to GeneratorAI: Finished.")
+        return {'FINISHED'}
+
+def panel_text_to_generatorAI(self, context):
+    layout = self.layout
+    layout.separator()
+    layout.operator('sequencer.text_to_generator', text='Text to GeneratorAI', icon="SHADERFX")
+
+
 classes = (
     SEQUENCER_OT_generate_movie,
     SEQUENCER_OT_generate_audio,
@@ -535,6 +575,7 @@ classes = (
     SEQEUNCER_PT_generate_audio,
     GeneratorAddonPreferences,
     GENERATOR_OT_sound_notification,
+    SEQUENCER_OT_strip_to_generatorAI,
 )
 
 
@@ -603,7 +644,8 @@ def register():
         min=1,
         max=100,
     )
-
+    
+    bpy.types.SEQUENCER_MT_add.append(panel_text_to_generatorAI)
 
 def unregister():
     for cls in classes:
@@ -617,6 +659,7 @@ def unregister():
     del bpy.types.Scene.movie_num_seed
     del bpy.types.Scene.movie_use_random
     del bpy.types.Scene.movie_num_guidance
+    bpy.types.SEQUENCER_MT_add.remove(panel_text_to_generatorAI)
 
 if __name__ == "__main__":
     register()
