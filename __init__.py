@@ -182,6 +182,7 @@ def install_modules(self):
     import_module(self, "accelerate", "accelerate")
     import_module(self, "transformers", "transformers")
     import_module(self, "cv2", "opencv_python")
+    import_module(self, "scipy", "scipy") 
 
 
 class GeneratorAddonPreferences(AddonPreferences):
