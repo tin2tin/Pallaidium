@@ -33,7 +33,9 @@ Alternatively can this .blend be loaded as a quick start, but the add-on still n
 https://github.com/tin2tin/text_to_video/raw/main/text2video_ui.blend
 
 # Text to Audio
-Currently, not working. Produces a file without any content.
+
+Find documentation here: https://github.com/haoheliu/AudioLDM
+
 
 https://github.com/huggingface/diffusers/issues/3091
 
