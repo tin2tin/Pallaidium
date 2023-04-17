@@ -36,8 +36,7 @@ https://github.com/tin2tin/text_to_video/raw/main/text2video_ui.blend
 
 Find documentation here: https://github.com/haoheliu/AudioLDM
 
-
-https://github.com/huggingface/diffusers/issues/3091
+Issue: https://github.com/huggingface/diffusers/issues/3091
 
 ## Modules
 Diffusers: https://github.com/huggingface/diffusers
