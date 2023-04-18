@@ -1,22 +1,31 @@
 # Generative AI - Text to Video
-Adding text to video to the Blender Video Sequence Editor using ModelScope. The full version needs 20 GB VRAM to work. An alternative version with a pruned data set(smaller) will download as default, for now - see code to change to 20 GB VRAM version.
+AI generate video and audio from text prompts. 
 
 ## How to install
 Download the add-on: https://github.com/tin2tin/text_to_video/archive/refs/heads/main.zip
 
-Run Blender as Administrator and install the add-on as usual: Preferences > Add-ons > Install > select file > Enable the add-on. When running the first generation of video or audio many GB will have to be downloaded, so go grab a coffee. 
+Run Blender as Administrator and install the add-on as usual: Preferences > Add-ons > Install > select file > Enable the add-on. 
 
-Alternative download for the weighted set which needs 20 GB of VRAM to run:
+Now, in the add-on preferences, hit the "Install all Dependencies" button, and many GB will have to be downloaded, so go grab a coffee. 
+
+### Weights
+Pruned 6 GB VRAM(included in the add-on download):
+
+https://huggingface.co/kabachuha/modelscope-damo-text2video-pruned-weights/tree/main
+
+20 GB of VRAM:
+
 https://modelscope.cn/models/damo/text-to-video-synthesis/files
 
-Or a pruned weighted set which should be able to run on 6 GB VRAM:
-https://huggingface.co/kabachuha/modelscope-damo-text2video-pruned-weights/tree/main
+Anime - 6 GB VRAM:
+
+https://huggingface.co/kabachuha/animov-0.1-modelscope-original-format
 
 ## Location
 
 Video Sequence Editor > Sidebar > Generative AI
 
-![image](https://user-images.githubusercontent.com/1322593/232339521-fa87dd3d-7e54-4a18-ad4a-1d6cc5c7398c.png)
+![image](https://user-images.githubusercontent.com/1322593/232787047-bcd06bbe-f3cf-4523-917d-80af6faf76ed.png)
 
 Notification sound can be changed or switched on/off under Preferences:
 
