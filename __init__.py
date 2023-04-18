@@ -183,6 +183,7 @@ def install_modules(self):
     import_module(self, "transformers", "transformers")
     import_module(self, "cv2", "opencv_python")
     import_module(self, "scipy", "scipy") 
+    import_module(self, "xformers", "xformers") 
 
 
 class GeneratorAddonPreferences(AddonPreferences):
@@ -219,13 +220,28 @@ class GeneratorAddonPreferences(AddonPreferences):
     def draw(self, context):
         layout = self.layout
         box = layout.box()
-        box.prop(self, "playsound")
-        row = box.row()
-        row.prop(self, "soundselect")
+        box.operator("sequencer.install_generator")
+        row = box.row(align=True)
+        row.prop(self, "playsound", text="Notification")
+        row.prop(self, "soundselect", text="")
         if self.soundselect == "user":
             row.prop(self, "usersound", text="")
         row.operator("renderreminder.play_notification", text="", icon="PLAY")
         row.active = self.playsound
+
+
+class GENERATOR_OT_install(Operator):
+    """Install all dependencies"""
+
+    bl_idname = "sequencer.install_generator"
+    bl_label = "Install Dependencies"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        preferences = context.preferences
+        addon_prefs = preferences.addons[__name__].preferences
+        install_modules(self)
+        return {"FINISHED"}
 
 
 class GENERATOR_OT_sound_notification(Operator):
@@ -279,8 +295,9 @@ class GENERATOR_OT_sound_notification(Operator):
                 coinSound()
             if addon_prefs.soundselect == "user":
                 file = str(addon_prefs.usersound)
-                sound = aud.Sound(file)
-                handle = device.play(sound)
+                if os.path.isfile(file):
+                    sound = aud.Sound(file)
+                    handle = device.play(sound)
         return {"FINISHED"}
 
 
@@ -299,11 +316,14 @@ class SEQUENCER_OT_generate_movie(Operator):
         seq_editor = scene.sequence_editor
         if not seq_editor:
             scene.sequence_editor_create()
-        install_modules(self)
 
-        import torch
-        from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
-        from diffusers.utils import export_to_video
+        try:
+            import torch
+            from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
+            from diffusers.utils import export_to_video
+        except ModuleNotFoundError:
+            print("Dependencies needs to be installed in the add-on preferences.")
+            return {"CANCELLED"}
 
         current_frame = scene.frame_current
         prompt = scene.generate_movie_prompt
@@ -382,13 +402,13 @@ class SEQUENCER_OT_generate_movie(Operator):
 
             # Move to folder
             src_path = export_to_video(video_frames)
-            dst_path = dirname(realpath(__file__)) + "/" + os.path.basename(src_path)
+            dst_path = dirname(realpath(__file__)) + "/" os.path.basename(src_path)
             shutil.move(src_path, dst_path)
 
             # Add strip
             if os.path.isfile(dst_path):
                 strip = scene.sequence_editor.sequences.new_movie(
-                    name=context.scene.generate_movie_prompt,
+                    name=context.scene.generate_movie_prompt+" "+str(seed),
                     frame_start=start_frame,
                     filepath=dst_path,
                     channel=empty_channel,
@@ -476,11 +496,14 @@ class SEQUENCER_OT_generate_audio(Operator):
         seq_editor = scene.sequence_editor
         if not seq_editor:
             scene.sequence_editor_create()
-        install_modules(self)
 
-        from diffusers import AudioLDMPipeline
-        import torch
-        import scipy
+        try:
+            from diffusers import AudioLDMPipeline
+            import torch
+            import scipy
+        except ModuleNotFoundError:
+            print("Dependencies needs to be installed in the add-on preferences.")
+            return {"CANCELLED"}
 
         repo_id = "cvssp/audioldm"
         pipe = AudioLDMPipeline.from_pretrained(repo_id) #, torch_dtype=torch.float16z
@@ -576,6 +599,7 @@ classes = (
     GeneratorAddonPreferences,
     GENERATOR_OT_sound_notification,
     SEQUENCER_OT_strip_to_generatorAI,
+    GENERATOR_OT_install,
 )
 
 
