@@ -25,7 +25,7 @@ https://huggingface.co/kabachuha/animov-0.1-modelscope-original-format
 
 Video Sequence Editor > Sidebar > Generative AI
 
-![image](https://user-images.githubusercontent.com/1322593/232787047-bcd06bbe-f3cf-4523-917d-80af6faf76ed.png)
+![image](https://user-images.githubusercontent.com/1322593/233038942-ae01ed61-9977-4478-b90a-af8282d6556c.png)
 
 Notification sound can be changed or switched on/off under Preferences:
 
