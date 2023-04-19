@@ -26,6 +26,7 @@ https://huggingface.co/kabachuha/animov-0.1-modelscope-original-format
 Video Sequence Editor > Sidebar > Generative AI
 
 ![image](https://user-images.githubusercontent.com/1322593/233038942-ae01ed61-9977-4478-b90a-af8282d6556c.png)
+![image](https://user-images.githubusercontent.com/1322593/233155019-05c514a3-d7cc-4f4f-ba9c-7d77f957fd98.png)
 
 Converting Text strips into GeneratorAI strips:
 
