@@ -31,9 +31,9 @@ Converting Text strips into GeneratorAI strips:
 
 ![image](https://user-images.githubusercontent.com/1322593/232625894-6726d407-c802-4619-864a-0b8b7faeceff.png)
 
-Notification sound can be changed or switched on/off under Preferences:
+Install Dependencies and Sound Notification in the add-on preferences:
 
-![image](https://user-images.githubusercontent.com/1322593/232183893-b0d4a413-d11a-4fc8-965e-172d83ff60aa.png)
+![image](https://user-images.githubusercontent.com/1322593/233042178-8a7d300e-6093-4a95-ab79-13024e0af60e.png)
 
 ## How to
 In order to make Blender run the generated video properly, the resolution and the fps should be set to match the footage. 
