@@ -27,13 +27,13 @@ Video Sequence Editor > Sidebar > Generative AI
 
 ![image](https://user-images.githubusercontent.com/1322593/233038942-ae01ed61-9977-4478-b90a-af8282d6556c.png)
 
-Notification sound can be changed or switched on/off under Preferences:
-
-![image](https://user-images.githubusercontent.com/1322593/232183893-b0d4a413-d11a-4fc8-965e-172d83ff60aa.png)
-
 Converting Text strips into GeneratorAI strips:
 
 ![image](https://user-images.githubusercontent.com/1322593/232625894-6726d407-c802-4619-864a-0b8b7faeceff.png)
+
+Notification sound can be changed or switched on/off under Preferences:
+
+![image](https://user-images.githubusercontent.com/1322593/232183893-b0d4a413-d11a-4fc8-965e-172d83ff60aa.png)
 
 ## How to
 In order to make Blender run the generated video properly, the resolution and the fps should be set to match the footage. 
@@ -47,8 +47,9 @@ https://github.com/tin2tin/text_to_video/raw/main/text2video_ui.blend
 # Text to Audio
 
 Find documentation here: https://github.com/haoheliu/AudioLDM
+Try prompts like: Bag pipes playing a funeral dirge, punk rock band playing hardcore song, techno dj playing deep bass house music, and acid house loop with jazz.
+Or: Voice of God judging mankind, woman talking about celestial beings, hammer on wood.
 
-Issue: https://github.com/huggingface/diffusers/issues/3091
 
 ## Modules
 Diffusers: https://github.com/huggingface/diffusers
