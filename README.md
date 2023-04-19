@@ -1,4 +1,4 @@
-# Generative AI - Text to Video and Audio
+# Generative AI - Text to Video and Audio in Blender
 AI generate video and audio from text prompts. 
 
 ## How to install
