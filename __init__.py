@@ -347,6 +347,21 @@ class SEQUENCER_OT_generate_movie(Operator):
         #tot = scene.movie_num_batch
         #wm.progress_begin(0, tot)
 
+        # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
+        pipe = DiffusionPipeline.from_pretrained(
+            "damo-vilab/text-to-video-ms-1.7b",
+            torch_dtype=torch.float16,
+            variant="fp16",
+        )
+
+        pipe.scheduler = DPMSolverMultistepScheduler.from_config(
+            pipe.scheduler.config
+        )
+
+        # memory optimization
+        pipe.enable_model_cpu_offload()
+        pipe.enable_vae_slicing()
+
         for i in range(scene.movie_num_batch):
             #wm.progress_update(i)
             if i > 0:
@@ -364,20 +379,6 @@ class SEQUENCER_OT_generate_movie(Operator):
                     (scene.movie_num_batch * duration) + scene.frame_current,
                 )
                 start_frame = scene.frame_current
-            # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
-            pipe = DiffusionPipeline.from_pretrained(
-                "damo-vilab/text-to-video-ms-1.7b",
-                torch_dtype=torch.float16,
-                variant="fp16",
-            )
-
-            pipe.scheduler = DPMSolverMultistepScheduler.from_config(
-                pipe.scheduler.config
-            )
-
-            # memory optimization
-            pipe.enable_model_cpu_offload()
-            pipe.enable_vae_slicing()
 
             seed = context.scene.movie_num_seed
             seed = (
@@ -398,6 +399,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     generator.manual_seed(seed)
                 else:
                     generator = None
+
             video_frames = pipe(
                 prompt,
                 negative_prompt=negative_prompt,
@@ -472,7 +474,7 @@ class SEQEUNCER_PT_generate_movie(Panel):
  
         layout = self.layout
         layout.use_property_split = True
-        layout.use_property_decorate = False       
+        layout.use_property_decorate = False 
         if type == "movie":
             col = layout.column(align=True)
             col.prop(context.scene, "generate_movie_x", text="X")
@@ -480,11 +482,13 @@ class SEQEUNCER_PT_generate_movie(Panel):
         col = layout.column(align=True)
         if type == "movie":
             col.prop(context.scene, "generate_movie_frames", text="Frames")
+        if type == "audio":
+            col.prop(context.scene, "audio_length_in_f", text="Frames")
         col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
         col.prop(context.scene, "movie_num_guidance", text="Word Power")
-        col.prop(context.scene, "movie_num_batch", text="Batch Count")
-
         if type == "movie":
+            col.prop(context.scene, "movie_num_batch", text="Batch Count")
+
             col = layout.column(align=True)
             row = col.row(align=True)
             sub_row = row.row(align=True)
@@ -520,6 +524,7 @@ class SEQUENCER_OT_generate_audio(Operator):
         negative_prompt = scene.generate_movie_negative_prompt
         movie_num_inference_steps = scene.movie_num_inference_steps
         movie_num_guidance = scene.movie_num_guidance
+        audio_length_in_s = scene.audio_length_in_f/(scene.render.fps / scene.render.fps_base)
 
         try:
             from diffusers import AudioLDMPipeline
@@ -538,29 +543,74 @@ class SEQUENCER_OT_generate_audio(Operator):
         # Use cuda if possible
         if torch.cuda.is_available():
             pipe = pipe.to("cuda")
-        prompt = context.scene.generate_movie_prompt
-        # Options: https://huggingface.co/docs/diffusers/main/en/api/pipelines/audioldm
-        audio = pipe(
-            prompt,
-            num_inference_steps=movie_num_inference_steps,
-            audio_length_in_s=10.0,
-            guidance_scale=movie_num_guidance,
-        ).audios[0]
-        filename = dirname(realpath(__file__)) + "/" + clean_path(prompt + ".wav")
-        scipy.io.wavfile.write(filename, 16000, audio.transpose())
+            
+        for i in range(1):#scene.movie_num_batch): seed do not work for audio
+            #wm.progress_update(i)
+            if i > 0:
+                empty_channel = scene.sequence_editor.active_strip.channel
+                start_frame = (
+                    scene.sequence_editor.active_strip.frame_final_start
+                    + scene.sequence_editor.active_strip.frame_final_duration
+                )
+                scene.frame_current = (
+                    scene.sequence_editor.active_strip.frame_final_start
+                )
+            else:
+                empty_channel = find_first_empty_channel(
+                    scene.frame_current,
+                    (scene.movie_num_batch * scene.audio_length_in_f) + scene.frame_current,
+                )
+                start_frame = scene.frame_current            
 
-        filepath = filename
-        if os.path.isfile(filepath):
-            empty_channel = find_first_empty_channel(0, 10000000000)
-            strip = scene.sequence_editor.sequences.new_sound(
-                name=prompt,
-                filepath=filepath,
-                channel=empty_channel,
-                frame_start=scene.frame_current,
+            seed = context.scene.movie_num_seed
+            seed = (
+                seed
+                if not context.scene.movie_use_random
+                else random.randint(0, 2147483647)
             )
-            scene.sequence_editor.active_strip = strip
-        else:
-            print("No resulting file found!")
+            context.scene.movie_num_seed = seed
+
+            # Use cuda if possible
+#            if torch.cuda.is_available():
+#                generator = (
+#                    torch.Generator("cuda").manual_seed(seed) if seed != 0 else None
+#                )
+#            else:
+#                if seed != 0:
+#                    generator = torch.Generator()
+#                    generator.manual_seed(seed)
+#                else:
+#                    generator = None
+            
+            prompt = context.scene.generate_movie_prompt
+            # Options: https://huggingface.co/docs/diffusers/main/en/api/pipelines/audioldm
+            audio = pipe(
+                prompt,
+                num_inference_steps=movie_num_inference_steps,
+                audio_length_in_s=audio_length_in_s,
+                guidance_scale=movie_num_guidance,
+                #generator=generator,
+            ).audios[0]
+            filename = dirname(realpath(__file__)) + "/" + clean_path(prompt + ".wav")
+            scipy.io.wavfile.write(filename, 16000, audio.transpose())
+
+            filepath = filename
+            if os.path.isfile(filepath):
+                empty_channel = empty_channel
+                strip = scene.sequence_editor.sequences.new_sound(
+                    name=prompt,
+                    filepath=filepath,
+                    channel=empty_channel,
+                    frame_start=start_frame,
+                )
+                scene.sequence_editor.active_strip = strip
+                if i > 0:
+                    scene.frame_current = (
+                        scene.sequence_editor.active_strip.frame_final_start
+                    )
+            else:
+                print("No resulting file found!")
+        
         # clear the VRAM
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -719,6 +769,14 @@ def register():
         default=17,
         min=1,
         max=100,
+    )
+
+    # The frame ausio duration.
+    bpy.types.Scene.audio_length_in_f = bpy.props.IntProperty(
+        name="audio_length_in_f",
+        default=80,
+        min=1,
+        max=10000,
     )
 
     bpy.types.Scene.generatorai_typeselect = bpy.props.EnumProperty(
