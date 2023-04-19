@@ -1,4 +1,4 @@
-# Generative AI - Text to Video
+# Generative AI - Text to Video and Audio
 AI generate video and audio from text prompts. 
 
 ## How to install
