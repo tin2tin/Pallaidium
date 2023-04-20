@@ -371,7 +371,8 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
         pipe = DiffusionPipeline.from_pretrained(
-            "damo-vilab/text-to-video-ms-1.7b", #"strangeman3107/animov-0.1", #
+            "damo-vilab/text-to-video-ms-1.7b",
+            #"strangeman3107/animov-0.1.1",
             torch_dtype=torch.float16,
             variant="fp16",
         )
@@ -445,8 +446,9 @@ class SEQUENCER_OT_generate_movie(Operator):
                     frame_start=start_frame,
                     filepath=dst_path,
                     channel=empty_channel,
-                    fit_method="FIT",
+                    fit_method="FILL",
                 )
+                strip.transform.filter = 'SUBSAMPLING_3x3'
                 scene.sequence_editor.active_strip = strip
                 if i > 0:
                     scene.frame_current = (
@@ -508,7 +510,7 @@ class SEQEUNCER_PT_generate_movie(Panel):
             col.prop(context.scene, "audio_length_in_f", text="Frames")
         col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
         col.prop(context.scene, "movie_num_guidance", text="Word Power")
-        if type == "movie":
+        if type == "movie" or type == "image":
             col.prop(context.scene, "movie_num_batch", text="Batch Count")
 
         if type == "movie" or type == "image":
@@ -784,9 +786,11 @@ class SEQUENCER_OT_generate_image(Operator):
                     frame_start=start_frame,
                     filepath=dst_path,
                     channel=empty_channel,
-                    fit_method="FIT",
+                    fit_method="FILL",
                 )
                 strip.frame_final_duration = scene.generate_movie_frames
+                strip.transform.filter = 'SUBSAMPLING_3x3'
+
                 scene.sequence_editor.active_strip = strip
                 if i > 0:
                     scene.frame_current = (
