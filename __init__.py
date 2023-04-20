@@ -196,7 +196,10 @@ def install_modules(self):
             )
         else:
             import_module(self, "torch", "torch")
-    import_module(self, "soundfile", "PySoundFile")  # Sox for Linux pip install sox
+    if os_platform == 'Darwin':
+        import_module(self, "sox", "sex")
+    else:
+        import_module(self, "soundfile", "PySoundFile")
     import_module(self, "diffusers", "diffusers")
     import_module(self, "accelerate", "accelerate")
     import_module(self, "transformers", "transformers")
