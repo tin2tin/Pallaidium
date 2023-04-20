@@ -27,6 +27,7 @@ Video Sequence Editor > Sidebar > Generative AI
 
 ![image](https://user-images.githubusercontent.com/1322593/233038942-ae01ed61-9977-4478-b90a-af8282d6556c.png)
 ![image](https://user-images.githubusercontent.com/1322593/233155019-05c514a3-d7cc-4f4f-ba9c-7d77f957fd98.png)
+![image](https://user-images.githubusercontent.com/1322593/233361486-e8fc96c3-1c3f-4077-af56-98bab66638c3.png)
 
 Converting Text strips into GeneratorAI strips:
 
