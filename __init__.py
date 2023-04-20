@@ -13,42 +13,44 @@ bl_info = {
 import bpy, ctypes, random
 from bpy.types import Operator, Panel, AddonPreferences
 from bpy.props import StringProperty, BoolProperty, EnumProperty, IntProperty
-import site
+import site, platform
 import subprocess
 import sys, os, aud
 import string
 from os.path import dirname, realpath, isfile
 import shutil
-
+os_platform = platform.system()  # 'Linux', 'Darwin', 'Java', 'Windows'
 
 def show_system_console(show):
-    # https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindow
-    SW_HIDE = 0
-    SW_SHOW = 5
+    if os_platform == "Windows":
+        # https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindow
+        SW_HIDE = 0
+        SW_SHOW = 5
 
-    ctypes.windll.user32.ShowWindow(
-        ctypes.windll.kernel32.GetConsoleWindow(), SW_SHOW #if show else SW_HIDE
-    )
+        ctypes.windll.user32.ShowWindow(
+            ctypes.windll.kernel32.GetConsoleWindow(), SW_SHOW #if show else SW_HIDE
+        )
 
 
 def set_system_console_topmost(top):
-    # https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos
-    HWND_NOTOPMOST = -2
-    HWND_TOPMOST = -1
-    HWND_TOP = 0
-    SWP_NOMOVE = 0x0002
-    SWP_NOSIZE = 0x0001
-    SWP_NOZORDER = 0x0004
+    if os_platform == "Windows":
+        # https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos
+        HWND_NOTOPMOST = -2
+        HWND_TOPMOST = -1
+        HWND_TOP = 0
+        SWP_NOMOVE = 0x0002
+        SWP_NOSIZE = 0x0001
+        SWP_NOZORDER = 0x0004
 
-    ctypes.windll.user32.SetWindowPos(
-        ctypes.windll.kernel32.GetConsoleWindow(),
-        HWND_TOP if top else HWND_NOTOPMOST,
-        0,
-        0,
-        0,
-        0,
-        SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER,
-    )
+        ctypes.windll.user32.SetWindowPos(
+            ctypes.windll.kernel32.GetConsoleWindow(),
+            HWND_TOP if top else HWND_NOTOPMOST,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER,
+        )
 
 
 def closest_divisible_64(num):
@@ -86,6 +88,8 @@ def clean_filename(filename):
 
 
 def clean_path(full_path):
+    max_chars = 250
+    full_path = full_path[:max_chars]
     dir_path, filename = os.path.split(full_path)
     cleaned_filename = clean_filename(filename)
     new_filename = cleaned_filename
@@ -150,45 +154,48 @@ def install_modules(self):
         pybin = sys.executable
         self.report({"INFO"}, "Installing: torch module.")
         print("Installing: torch module")
-        subprocess.check_call(
-            [
-                pybin,
-                "-m",
-                "pip",
-                "install",
-                "torch",
-                "--index-url",
-                "https://download.pytorch.org/whl/cu118",
-                "--no-warn-script-location",
-                "--user",
-            ]
-        )
-        subprocess.check_call(
-            [
-                pybin,
-                "-m",
-                "pip",
-                "install",
-                "torchvision",
-                "--index-url",
-                "https://download.pytorch.org/whl/cu118",
-                "--no-warn-script-location",
-                "--user",
-            ]
-        )
-        subprocess.check_call(
-            [
-                pybin,
-                "-m",
-                "pip",
-                "install",
-                "torchaudio",
-                "--index-url",
-                "https://download.pytorch.org/whl/cu118",
-                "--no-warn-script-location",
-                "--user",
-            ]
-        )
+        if os_platform == "Windows":
+            subprocess.check_call(
+                [
+                    pybin,
+                    "-m",
+                    "pip",
+                    "install",
+                    "torch",
+                    "--index-url",
+                    "https://download.pytorch.org/whl/cu118",
+                    "--no-warn-script-location",
+                    "--user",
+                ]
+            )
+            subprocess.check_call(
+                [
+                    pybin,
+                    "-m",
+                    "pip",
+                    "install",
+                    "torchvision",
+                    "--index-url",
+                    "https://download.pytorch.org/whl/cu118",
+                    "--no-warn-script-location",
+                    "--user",
+                ]
+            )
+            subprocess.check_call(
+                [
+                    pybin,
+                    "-m",
+                    "pip",
+                    "install",
+                    "torchaudio",
+                    "--index-url",
+                    "https://download.pytorch.org/whl/cu118",
+                    "--no-warn-script-location",
+                    "--user",
+                ]
+            )
+        else:
+            import_module(self, "torch", "torch")
     import_module(self, "soundfile", "PySoundFile")  # Sox for Linux pip install sox
     import_module(self, "diffusers", "diffusers")
     import_module(self, "accelerate", "accelerate")
@@ -361,7 +368,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
         pipe = DiffusionPipeline.from_pretrained(
-            "strangeman3107/animov-0.1", #"damo-vilab/text-to-video-ms-1.7b",
+            "damo-vilab/text-to-video-ms-1.7b", #"strangeman3107/animov-0.1", #
             torch_dtype=torch.float16,
             variant="fp16",
         )
