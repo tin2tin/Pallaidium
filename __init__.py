@@ -79,10 +79,22 @@ def find_first_empty_channel(start_frame, end_frame):
     return 1
 
 
-def clean_path(string_path):
+def clean_filename(filename):
     valid_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
-    clean_path = "".join(c if c in valid_chars else "_" for c in string_path)
-    return clean_path
+    clean_filename = "".join(c if c in valid_chars else "_" for c in filename)
+    return clean_filename
+
+
+def clean_path(full_path):
+    dir_path, filename = os.path.split(full_path)
+    cleaned_filename = clean_filename(filename)
+    new_filename = cleaned_filename
+    i = 1
+    while os.path.exists(os.path.join(dir_path, new_filename)):
+        name, ext = os.path.splitext(cleaned_filename)
+        new_filename = f"{name}({i}){ext}"
+        i += 1
+    return os.path.join(dir_path, new_filename)
 
 
 def import_module(self, module, install_module):
@@ -349,7 +361,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
         pipe = DiffusionPipeline.from_pretrained(
-            "damo-vilab/text-to-video-ms-1.7b",
+            "strangeman3107/animov-0.1", #"damo-vilab/text-to-video-ms-1.7b",
             torch_dtype=torch.float16,
             variant="fp16",
         )
@@ -413,7 +425,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
             # Move to folder
             src_path = export_to_video(video_frames)
-            dst_path = dirname(realpath(__file__)) + "/" + os.path.basename(src_path)
+            dst_path = clean_path(dirname(realpath(__file__)) + "/" + os.path.basename(src_path))
             shutil.move(src_path, dst_path)
 
             # Add strip
@@ -475,12 +487,12 @@ class SEQEUNCER_PT_generate_movie(Panel):
         layout = self.layout
         layout.use_property_split = True
         layout.use_property_decorate = False 
-        if type == "movie":
+        if type == "movie" or type == "image":
             col = layout.column(align=True)
             col.prop(context.scene, "generate_movie_x", text="X")
             col.prop(context.scene, "generate_movie_y", text="Y")
         col = layout.column(align=True)
-        if type == "movie":
+        if type == "movie" or type == "image":
             col.prop(context.scene, "generate_movie_frames", text="Frames")
         if type == "audio":
             col.prop(context.scene, "audio_length_in_f", text="Frames")
@@ -489,16 +501,20 @@ class SEQEUNCER_PT_generate_movie(Panel):
         if type == "movie":
             col.prop(context.scene, "movie_num_batch", text="Batch Count")
 
+        if type == "movie" or type == "image":
             col = layout.column(align=True)
             row = col.row(align=True)
             sub_row = row.row(align=True)
             sub_row.prop(context.scene, "movie_num_seed", text="Seed")
             row.prop(context.scene, "movie_use_random", text="", icon="QUESTION")
             sub_row.active = not context.scene.movie_use_random
+
         row = layout.row(align=True)
         row.scale_y = 1.1
         if type == "movie":
             row.operator("sequencer.generate_movie", text="Generate")
+        if type == "image":
+            row.operator("sequencer.generate_image", text="Generate")
         if type == "audio":
             row.operator("sequencer.generate_audio", text="Generate")
 
@@ -571,16 +587,16 @@ class SEQUENCER_OT_generate_audio(Operator):
             context.scene.movie_num_seed = seed
 
             # Use cuda if possible
-#            if torch.cuda.is_available():
-#                generator = (
-#                    torch.Generator("cuda").manual_seed(seed) if seed != 0 else None
-#                )
-#            else:
-#                if seed != 0:
-#                    generator = torch.Generator()
-#                    generator.manual_seed(seed)
-#                else:
-#                    generator = None
+            if torch.cuda.is_available():
+                generator = (
+                    torch.Generator("cuda").manual_seed(seed) if seed != 0 else None
+                )
+            else:
+                if seed != 0:
+                    generator = torch.Generator()
+                    generator.manual_seed(seed)
+                else:
+                    generator = None
             
             prompt = context.scene.generate_movie_prompt
             # Options: https://huggingface.co/docs/diffusers/main/en/api/pipelines/audioldm
@@ -589,9 +605,9 @@ class SEQUENCER_OT_generate_audio(Operator):
                 num_inference_steps=movie_num_inference_steps,
                 audio_length_in_s=audio_length_in_s,
                 guidance_scale=movie_num_guidance,
-                #generator=generator,
+                generator=generator,
             ).audios[0]
-            filename = dirname(realpath(__file__)) + "/" + clean_path(prompt + ".wav")
+            filename = clean_path(dirname(realpath(__file__)) + "/" + prompt + ".wav")
             scipy.io.wavfile.write(filename, 16000, audio.transpose())
 
             filepath = filename
@@ -637,6 +653,149 @@ class SEQUENCER_OT_generate_audio(Operator):
 #        row = layout.row()
 #        row.scale_y = 1.2
 #        row.operator("sequencer.generate_audio", text="Generate Audio")
+
+
+class SEQUENCER_OT_generate_image(Operator):
+    """Generate Image"""
+
+    bl_idname = "sequencer.generate_image"
+    bl_label = "Prompt"
+    bl_description = "Convert text to image"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        if not bpy.types.Scene.generate_movie_prompt:
+            return {"CANCELLED"}
+
+        show_system_console(True)
+        set_system_console_topmost(True)
+
+        scene = context.scene
+        seq_editor = scene.sequence_editor
+        if not seq_editor:
+            scene.sequence_editor_create()
+        try:
+            from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
+            import torch
+        except ModuleNotFoundError:
+            print("Dependencies needs to be installed in the add-on preferences.")
+            self.report(
+                {"INFO"},
+                "Dependencies needs to be installed in the add-on preferences.",
+            )
+            return {"CANCELLED"}
+
+        current_frame = scene.frame_current
+        prompt = scene.generate_movie_prompt
+        negative_prompt = scene.generate_movie_negative_prompt
+        image_x = scene.generate_movie_x
+        image_y = scene.generate_movie_y
+        x = scene.generate_movie_x = closest_divisible_64(image_x)
+        y = scene.generate_movie_y = closest_divisible_64(image_y)
+        duration = scene.generate_movie_frames
+        image_num_inference_steps = scene.movie_num_inference_steps
+        image_num_guidance = scene.movie_num_guidance
+
+        #wm = bpy.context.window_manager
+        #tot = scene.movie_num_batch
+        #wm.progress_begin(0, tot)
+
+        # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
+        pipe = DiffusionPipeline.from_pretrained(
+            "stabilityai/stable-diffusion-2",
+            torch_dtype=torch.float16,
+            variant="fp16",
+        )
+
+        pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+
+        # memory optimization
+        pipe.enable_model_cpu_offload()
+        pipe.enable_vae_slicing()
+
+        for i in range(scene.movie_num_batch):
+            #wm.progress_update(i)
+            if i > 0:
+                empty_channel = scene.sequence_editor.active_strip.channel
+                start_frame = (
+                    scene.sequence_editor.active_strip.frame_final_start
+                    + scene.sequence_editor.active_strip.frame_final_duration
+                )
+                scene.frame_current = (
+                    scene.sequence_editor.active_strip.frame_final_start
+                )
+            else:
+                empty_channel = find_first_empty_channel(
+                    scene.frame_current,
+                    (scene.movie_num_batch * duration) + scene.frame_current,
+                )
+                start_frame = scene.frame_current
+
+            seed = context.scene.movie_num_seed
+            seed = (
+                seed
+                if not context.scene.movie_use_random
+                else random.randint(0, 2147483647)
+            )
+            context.scene.movie_num_seed = seed
+
+            # Use cuda if possible
+            if torch.cuda.is_available():
+                generator = (
+                    torch.Generator("cuda").manual_seed(seed) if seed != 0 else None
+                )
+            else:
+                if seed != 0:
+                    generator = torch.Generator()
+                    generator.manual_seed(seed)
+                else:
+                    generator = None
+
+            image = pipe(
+                prompt,
+                negative_prompt=negative_prompt,
+                num_inference_steps=image_num_inference_steps,
+                guidance_scale=image_num_guidance,
+                height=y,
+                width=x,
+                generator=generator,
+            ).images[0]
+
+            # Move to folder
+            image.save("temp.png")
+            #print(src_path)
+            dst_path = clean_path(dirname(realpath(__file__)) + "/" + context.scene.generate_movie_prompt + ".png")
+            shutil.move("temp.png", dst_path)
+
+            # Add strip
+            if os.path.isfile(dst_path):
+                strip = scene.sequence_editor.sequences.new_image(
+                    name=context.scene.generate_movie_prompt + " " + str(seed),
+                    frame_start=start_frame,
+                    filepath=dst_path,
+                    channel=empty_channel,
+                    fit_method="FIT",
+                )
+                strip.frame_final_duration = scene.generate_movie_frames
+                scene.sequence_editor.active_strip = strip
+                if i > 0:
+                    scene.frame_current = (
+                        scene.sequence_editor.active_strip.frame_final_start
+                    )
+            else:
+                print("No resulting file found.")
+
+            # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
+            #bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
+
+        bpy.ops.renderreminder.play_notification()
+        #wm.progress_end()
+        scene.frame_current = current_frame
+
+        # clear the VRAM
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        return {"FINISHED"}
 
 
 class SEQUENCER_OT_strip_to_generatorAI(Operator):
@@ -692,6 +851,7 @@ def panel_text_to_generatorAI(self, context):
 classes = (
     SEQUENCER_OT_generate_movie,
     SEQUENCER_OT_generate_audio,
+    SEQUENCER_OT_generate_image,
     SEQEUNCER_PT_generate_movie,
     # SEQEUNCER_PT_generate_audio,
     GeneratorAddonPreferences,
@@ -783,8 +943,8 @@ def register():
         name="Sound",
         items={
             ("movie", "Video", "Generate Video"),
+            ("image", "Image", "Generate Image"),
             ("audio", "Audio", "Generate Audio"),
-            # ("image", "Image", "Generate Image"),
         },
         default="movie",
     )
