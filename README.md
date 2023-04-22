@@ -46,6 +46,9 @@ Alternatively can this .blend be loaded as a quick start, but the add-on still n
 
 https://github.com/tin2tin/text_to_video/raw/main/text2video_ui.blend
 
+## Tip
+If the image of your renders breaks, then use the resolution from the Model Card in the Preferences.
+
 # Text to Audio
 
 Find documentation here: https://github.com/haoheliu/AudioLDM
