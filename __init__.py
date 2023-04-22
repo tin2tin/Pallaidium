@@ -245,17 +245,28 @@ class GeneratorAddonPreferences(AddonPreferences):
     movie_model_card: bpy.props.EnumProperty(
         name="Movie Model Card",
         items={
-            ("damo-vilab/text-to-video-ms-1.7b", "Modelscope", "Modelscope"),
+            ("damo-vilab/text-to-video-ms-1.7b", "Modelscope (256x256)", "Modelscope"),
             ("strangeman3107/animov-0.1.1", "Anime (448x384)", "Anime"),
         },
         default="damo-vilab/text-to-video-ms-1.7b",
     )
+
+    image_model_card: bpy.props.EnumProperty(
+        name="Image Model Card",
+        items={
+            ("runwayml/stable-diffusion-v1-5", "Stable Diffusion 1.5 (512x512)", "Stable Diffusion 1.5"),
+            ("stabilityai/stable-diffusion-2", "Stable Diffusion 2 (768x768)", "Stable Diffusion 2"),
+        },
+        default="stabilityai/stable-diffusion-2",
+    )
+
 
     def draw(self, context):
         layout = self.layout
         box = layout.box()
         box.operator("sequencer.install_generator")
         box.prop(self, "movie_model_card")
+        box.prop(self, "image_model_card")
         row = box.row(align=True)
         row.label(text="Notification:")
         row.prop(self, "playsound", text="")
@@ -431,7 +442,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         scene = context.scene
         if not scene.generate_movie_prompt:
-            self.report({"INFO"}, "Text prompt in the Generator AI tab is empty!")
+            self.report({"INFO"}, "Text prompt in the Generative AI tab is empty!")
             return {"CANCELLED"}
 
         show_system_console(True)
@@ -563,11 +574,10 @@ class SEQUENCER_OT_generate_movie(Operator):
                     scene.frame_current = (
                         scene.sequence_editor.active_strip.frame_final_start
                     )
+                # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
+                bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
             else:
                 print("No resulting file found.")
-
-            # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
-            #bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
 
         bpy.ops.renderreminder.play_notification()
         #wm.progress_end()
@@ -590,7 +600,7 @@ class SEQUENCER_OT_generate_audio(Operator):
     def execute(self, context):
         scene = context.scene
         if not scene.generate_movie_prompt:
-            self.report({"INFO"}, "Text prompt in the Generator AI tab is empty!")
+            self.report({"INFO"}, "Text prompt in the Generative AI tab is empty!")
             return {"CANCELLED"}
 
         if not scene.sequence_editor:
@@ -712,7 +722,7 @@ class SEQUENCER_OT_generate_image(Operator):
     def execute(self, context):
         scene = context.scene
         if scene.generate_movie_prompt == "":
-            self.report({"INFO"}, "Text prompt in the Generator AI tab is empty!")
+            self.report({"INFO"}, "Text prompt in the Generative AI tab is empty!")
             return {"CANCELLED"}
 
         show_system_console(True)
@@ -754,9 +764,14 @@ class SEQUENCER_OT_generate_image(Operator):
         #tot = scene.movie_num_batch
         #wm.progress_begin(0, tot)
 
+        preferences = context.preferences
+        addon_prefs = preferences.addons[__name__].preferences
+        image_model_card = addon_prefs.image_model_card
+
         # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
         pipe = DiffusionPipeline.from_pretrained(
-            "stabilityai/stable-diffusion-2", # 768x768
+            image_model_card,
+            #"stabilityai/stable-diffusion-2", # 768x768
             #"runwayml/stable-diffusion-v1-5",
             torch_dtype=torch.float16,
             variant="fp16",
@@ -838,11 +853,10 @@ class SEQUENCER_OT_generate_image(Operator):
                     scene.frame_current = (
                         scene.sequence_editor.active_strip.frame_final_start
                     )
+                # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
+                bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
             else:
                 print("No resulting file found.")
-
-            # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
-            #bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
 
         bpy.ops.renderreminder.play_notification()
         #wm.progress_end()
@@ -855,12 +869,12 @@ class SEQUENCER_OT_generate_image(Operator):
 
 
 class SEQUENCER_OT_strip_to_generatorAI(Operator):
-    """Convert selected text strips to GeneratorAI"""
+    """Convert selected text strips to Generative AI"""
 
     bl_idname = "sequencer.text_to_generator"
-    bl_label = "Convert Text Strips to GeneratorAI"
+    bl_label = "Convert Text Strips to Generative AI"
     bl_options = {"INTERNAL"}
-    bl_description = "Adds selected text strips as GeneratorAI strips"
+    bl_description = "Adds selected text strips as Generative AI strips"
 
     @classmethod
     def poll(cls, context):
@@ -902,7 +916,7 @@ def panel_text_to_generatorAI(self, context):
     layout = self.layout
     layout.separator()
     layout.operator(
-        "sequencer.text_to_generator", text="Text to GeneratorAI", icon="SHADERFX"
+        "sequencer.text_to_generator", text="Text to Generative AI", icon="SHADERFX"
     )
 
 
