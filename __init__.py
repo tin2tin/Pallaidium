@@ -239,17 +239,29 @@ class GeneratorAddonPreferences(AddonPreferences):
         default=True,
     )
 
+    movie_model_card: bpy.props.EnumProperty(
+        name="Movie Model Card",
+        items={
+            ("damo-vilab/text-to-video-ms-1.7b", "Modelscope", "Modelscope"),
+            ("strangeman3107/animov-0.1.1", "Anime (448x384)", "Anime"),
+        },
+        default="damo-vilab/text-to-video-ms-1.7b",
+    )
+
     def draw(self, context):
         layout = self.layout
         box = layout.box()
         box.operator("sequencer.install_generator")
+        box.prop(self, "movie_model_card")
         row = box.row(align=True)
-        row.prop(self, "playsound", text="Notification")
-        row.prop(self, "soundselect", text="")
+        row.label(text="Notification:")
+        row.prop(self, "playsound", text="")
+        sub_row = row.row()
+        sub_row.prop(self, "soundselect", text="")
         if self.soundselect == "user":
-            row.prop(self, "usersound", text="")
-        row.operator("renderreminder.play_notification", text="", icon="PLAY")
-        row.active = self.playsound
+            sub_row.prop(self, "usersound", text="")
+        sub_row.operator("renderreminder.play_notification", text="", icon="PLAY")
+        sub_row.active = self.playsound
 
 
 class GENERATOR_OT_install(Operator):
@@ -369,10 +381,17 @@ class SEQUENCER_OT_generate_movie(Operator):
         #tot = scene.movie_num_batch
         #wm.progress_begin(0, tot)
 
+
+        preferences = context.preferences
+        addon_prefs = preferences.addons[__name__].preferences
+        movie_model_card = addon_prefs.movie_model_card
+        print(scene.movie_model_card)
+        
         # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
         pipe = DiffusionPipeline.from_pretrained(
-            "damo-vilab/text-to-video-ms-1.7b",
+            movie_model_card,
             #"strangeman3107/animov-0.1.1",
+            #"damo-vilab/text-to-video-ms-1.7b",
             torch_dtype=torch.float16,
             variant="fp16",
         )
