@@ -3,7 +3,7 @@
 bl_info = {
     "name": "Generative AI",
     "author": "tintwotin",
-    "version": (1, 0),
+    "version": (1, 1),
     "blender": (3, 4, 0),
     "location": "Video Sequence Editor > Sidebar > Generative AI",
     "description": "Generate media in the VSE",
@@ -82,21 +82,21 @@ def find_first_empty_channel(start_frame, end_frame):
 
 
 def clean_filename(filename):
+    filename = filename[:50]
     valid_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
     clean_filename = "".join(c if c in valid_chars else "_" for c in filename)
-    return clean_filename
+    return clean_filename.strip()
 
 
 def clean_path(full_path):
-    max_chars = 250
-    full_path = full_path[:max_chars]
-    dir_path, filename = os.path.split(full_path)
+    name, ext = os.path.splitext(full_path)
+    dir_path, filename = os.path.split(name)
     cleaned_filename = clean_filename(filename)
-    new_filename = cleaned_filename
+    new_filename = cleaned_filename + ext
     i = 1
     while os.path.exists(os.path.join(dir_path, new_filename)):
-        name, ext = os.path.splitext(cleaned_filename)
-        new_filename = f"{name}({i}){ext}"
+        name, ext = os.path.splitext(new_filename)
+        new_filename = f"{name.rsplit('(', 1)[0]}({i}){ext}"
         i += 1
     return os.path.join(dir_path, new_filename)
 
@@ -335,6 +335,87 @@ class GENERATOR_OT_sound_notification(Operator):
         return {"FINISHED"}
 
 
+class SEQEUNCER_PT_generate_ai(Panel):
+    """Generate Media using AI"""
+
+    bl_idname = "SEQUENCER_PT_sequencer_generate_movie_panel"
+    bl_label = "Generative AI"
+    bl_space_type = "SEQUENCE_EDITOR"
+    bl_region_type = "UI"
+    bl_category = "Generative AI"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = False
+        layout.use_property_decorate = False
+        scene = context.scene
+        type = scene.generatorai_typeselect
+        col = layout.column()
+        col.prop(context.scene, "generatorai_typeselect", text="")
+
+        layout = self.layout
+        col = layout.column(align=True)
+        col.use_property_split = True
+        col.use_property_decorate = False
+        col.scale_y = 1.2
+        col.prop(context.scene, "generate_movie_prompt", text="", icon="ADD")
+        col.prop(context.scene, "generate_movie_negative_prompt", text="", icon="REMOVE")
+ 
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False 
+        if type == "movie" or type == "image":
+            col = layout.column(align=True)
+            col.prop(context.scene, "generate_movie_x", text="X")
+            col.prop(context.scene, "generate_movie_y", text="Y")
+        col = layout.column(align=True)
+        if type == "movie" or type == "image":
+            col.prop(context.scene, "generate_movie_frames", text="Frames")
+        if type == "audio":
+            col.prop(context.scene, "audio_length_in_f", text="Frames")
+        col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
+        col.prop(context.scene, "movie_num_guidance", text="Word Power")
+        if type == "movie" or type == "image":
+            col.prop(context.scene, "movie_num_batch", text="Batch Count")
+
+        if type == "movie" or type == "image":
+            col = layout.column(align=True)
+            row = col.row(align=True)
+            sub_row = row.row(align=True)
+            sub_row.prop(context.scene, "movie_num_seed", text="Seed")
+            row.prop(context.scene, "movie_use_random", text="", icon="QUESTION")
+            sub_row.active = not context.scene.movie_use_random
+
+        row = layout.row(align=True)
+        row.scale_y = 1.1
+        if type == "movie":
+            row.operator("sequencer.generate_movie", text="Generate")
+        if type == "image":
+            row.operator("sequencer.generate_image", text="Generate")
+        if type == "audio":
+            row.operator("sequencer.generate_audio", text="Generate")
+
+
+#class SEQEUNCER_PT_generate_audio(Panel):
+#    """Generate Audio with AI"""
+
+#    bl_idname = "SEQUENCER_PT_sequencer_generate_audio_panel"
+#    bl_label = "Generate Audio"
+#    bl_space_type = "SEQUENCE_EDITOR"
+#    bl_region_type = "UI"
+#    bl_category = "Generative AI"
+
+#    def draw(self, context):
+#        layout = self.layout
+#        scene = context.scene
+#        row = layout.row()
+#        row.scale_y = 1.2
+#        row.prop(context.scene, "generate_audio_prompt", text="")
+#        row = layout.row()
+#        row.scale_y = 1.2
+#        row.operator("sequencer.generate_audio", text="Generate Audio")
+
+
 class SEQUENCER_OT_generate_movie(Operator):
     """Generate Video"""
 
@@ -352,8 +433,10 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         scene = context.scene
         seq_editor = scene.sequence_editor
+
         if not seq_editor:
             scene.sequence_editor_create()
+
         try:
             import torch
             from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
@@ -365,6 +448,10 @@ class SEQUENCER_OT_generate_movie(Operator):
                 "Dependencies needs to be installed in the add-on preferences.",
             )
             return {"CANCELLED"}
+
+        # clear the VRAM
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
         current_frame = scene.frame_current
         prompt = scene.generate_movie_prompt
@@ -381,11 +468,9 @@ class SEQUENCER_OT_generate_movie(Operator):
         #tot = scene.movie_num_batch
         #wm.progress_begin(0, tot)
 
-
         preferences = context.preferences
         addon_prefs = preferences.addons[__name__].preferences
         movie_model_card = addon_prefs.movie_model_card
-        print(scene.movie_model_card)
         
         # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
         pipe = DiffusionPipeline.from_pretrained(
@@ -489,67 +574,6 @@ class SEQUENCER_OT_generate_movie(Operator):
         return {"FINISHED"}
 
 
-class SEQEUNCER_PT_generate_movie(Panel):
-    """Generate Video using AI"""
-
-    bl_idname = "SEQUENCER_PT_sequencer_generate_movie_panel"
-    bl_label = "Generative AI"
-    bl_space_type = "SEQUENCE_EDITOR"
-    bl_region_type = "UI"
-    bl_category = "Generative AI"
-
-    def draw(self, context):
-        layout = self.layout
-        layout.use_property_split = False
-        layout.use_property_decorate = False
-        scene = context.scene
-        type = scene.generatorai_typeselect
-        col = layout.column()
-        col.prop(context.scene, "generatorai_typeselect", text="")
-
-        layout = self.layout
-        col = layout.column(align=True)
-        col.use_property_split = True
-        col.use_property_decorate = False
-        col.scale_y = 1.2
-        col.prop(context.scene, "generate_movie_prompt", text="", icon="ADD")
-        col.prop(context.scene, "generate_movie_negative_prompt", text="", icon="REMOVE")
- 
-        layout = self.layout
-        layout.use_property_split = True
-        layout.use_property_decorate = False 
-        if type == "movie" or type == "image":
-            col = layout.column(align=True)
-            col.prop(context.scene, "generate_movie_x", text="X")
-            col.prop(context.scene, "generate_movie_y", text="Y")
-        col = layout.column(align=True)
-        if type == "movie" or type == "image":
-            col.prop(context.scene, "generate_movie_frames", text="Frames")
-        if type == "audio":
-            col.prop(context.scene, "audio_length_in_f", text="Frames")
-        col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
-        col.prop(context.scene, "movie_num_guidance", text="Word Power")
-        if type == "movie" or type == "image":
-            col.prop(context.scene, "movie_num_batch", text="Batch Count")
-
-        if type == "movie" or type == "image":
-            col = layout.column(align=True)
-            row = col.row(align=True)
-            sub_row = row.row(align=True)
-            sub_row.prop(context.scene, "movie_num_seed", text="Seed")
-            row.prop(context.scene, "movie_use_random", text="", icon="QUESTION")
-            sub_row.active = not context.scene.movie_use_random
-
-        row = layout.row(align=True)
-        row.scale_y = 1.1
-        if type == "movie":
-            row.operator("sequencer.generate_movie", text="Generate")
-        if type == "image":
-            row.operator("sequencer.generate_image", text="Generate")
-        if type == "audio":
-            row.operator("sequencer.generate_audio", text="Generate")
-
-
 class SEQUENCER_OT_generate_audio(Operator):
     """Generate Audio"""
 
@@ -566,6 +590,7 @@ class SEQUENCER_OT_generate_audio(Operator):
 
         if not scene.sequence_editor:
             scene.sequence_editor_create()
+
         current_frame = scene.frame_current
         prompt = scene.generate_movie_prompt
         negative_prompt = scene.generate_movie_negative_prompt
@@ -584,6 +609,11 @@ class SEQUENCER_OT_generate_audio(Operator):
                 "Dependencies needs to be installed in the add-on preferences.",
             )
             return {"CANCELLED"}
+
+        # clear the VRAM
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
         repo_id = "cvssp/audioldm"
         pipe = AudioLDMPipeline.from_pretrained(repo_id)  # , torch_dtype=torch.float16z
 
@@ -666,26 +696,6 @@ class SEQUENCER_OT_generate_audio(Operator):
         return {"FINISHED"}
 
 
-#class SEQEUNCER_PT_generate_audio(Panel):
-#    """Generate Audio with AI"""
-
-#    bl_idname = "SEQUENCER_PT_sequencer_generate_audio_panel"
-#    bl_label = "Generate Audio"
-#    bl_space_type = "SEQUENCE_EDITOR"
-#    bl_region_type = "UI"
-#    bl_category = "Generative AI"
-
-#    def draw(self, context):
-#        layout = self.layout
-#        scene = context.scene
-#        row = layout.row()
-#        row.scale_y = 1.2
-#        row.prop(context.scene, "generate_audio_prompt", text="")
-#        row = layout.row()
-#        row.scale_y = 1.2
-#        row.operator("sequencer.generate_audio", text="Generate Audio")
-
-
 class SEQUENCER_OT_generate_image(Operator):
     """Generate Image"""
 
@@ -703,8 +713,10 @@ class SEQUENCER_OT_generate_image(Operator):
 
         scene = context.scene
         seq_editor = scene.sequence_editor
+
         if not seq_editor:
             scene.sequence_editor_create()
+
         try:
             from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
             import torch
@@ -715,6 +727,10 @@ class SEQUENCER_OT_generate_image(Operator):
                 "Dependencies needs to be installed in the add-on preferences.",
             )
             return {"CANCELLED"}
+
+        # clear the VRAM
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
         current_frame = scene.frame_current
         prompt = scene.generate_movie_prompt
@@ -793,17 +809,16 @@ class SEQUENCER_OT_generate_image(Operator):
             ).images[0]
 
             # Move to folder
-            image.save("temp.png")
-            #print(src_path)
-            dst_path = clean_path(dirname(realpath(__file__)) + "/" + context.scene.generate_movie_prompt + ".png")
-            shutil.move("temp.png", dst_path)
+            filename = clean_filename(context.scene.generate_movie_prompt)
+            out_path = clean_path(dirname(realpath(__file__))+"/"+filename+".png")
+            image.save(out_path)
 
             # Add strip
-            if os.path.isfile(dst_path):
+            if os.path.isfile(out_path):
                 strip = scene.sequence_editor.sequences.new_image(
                     name=context.scene.generate_movie_prompt + " " + str(seed),
                     frame_start=start_frame,
-                    filepath=dst_path,
+                    filepath=out_path,
                     channel=empty_channel,
                     fit_method="FILL",
                 )
@@ -885,8 +900,7 @@ classes = (
     SEQUENCER_OT_generate_movie,
     SEQUENCER_OT_generate_audio,
     SEQUENCER_OT_generate_image,
-    SEQEUNCER_PT_generate_movie,
-    # SEQEUNCER_PT_generate_audio,
+    SEQEUNCER_PT_generate_ai,
     GeneratorAddonPreferences,
     GENERATOR_OT_sound_notification,
     SEQUENCER_OT_strip_to_generatorAI,
