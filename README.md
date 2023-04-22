@@ -35,7 +35,7 @@ Converting Text strips into GeneratorAI strips:
 
 Install Dependencies, set Movie Model Card and set Sound Notification in the add-on preferences:
 
-![image](https://user-images.githubusercontent.com/1322593/233765505-a771061a-de53-4148-b86e-c1b9c708b2a7.png)
+![image](https://user-images.githubusercontent.com/1322593/233810577-961de9ec-ce3f-433b-a43c-dd4583fb518c.png)
 
 ## How to
 In order to make Blender run the generated video properly, the resolution and the fps should be set to match the footage. 
