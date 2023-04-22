@@ -85,6 +85,9 @@ def clean_filename(filename):
     filename = filename[:50]
     valid_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
     clean_filename = "".join(c if c in valid_chars else "_" for c in filename)
+    clean_filename = clean_filename.replace('\n', ' ')
+    clean_filename = clean_filename.replace('\r', ' ')
+    
     return clean_filename.strip()
 
 
@@ -425,13 +428,15 @@ class SEQUENCER_OT_generate_movie(Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
-        if not bpy.types.Scene.generate_movie_prompt:
+
+        scene = context.scene
+        if not scene.generate_movie_prompt:
+            self.report({"INFO"}, "Text prompt in the Generator AI tab is empty!")
             return {"CANCELLED"}
 
         show_system_console(True)
         set_system_console_topmost(True)
 
-        scene = context.scene
         seq_editor = scene.sequence_editor
 
         if not seq_editor:
@@ -583,10 +588,10 @@ class SEQUENCER_OT_generate_audio(Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
-        if not bpy.types.Scene.generate_movie_prompt:
-            self.report({"INFO"}, "Text prompt in the GeneratorAI tab is empty!")
-            return {"CANCELLED"}
         scene = context.scene
+        if not scene.generate_movie_prompt:
+            self.report({"INFO"}, "Text prompt in the Generator AI tab is empty!")
+            return {"CANCELLED"}
 
         if not scene.sequence_editor:
             scene.sequence_editor_create()
@@ -705,7 +710,9 @@ class SEQUENCER_OT_generate_image(Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
-        if not bpy.types.Scene.generate_movie_prompt:
+        scene = context.scene
+        if scene.generate_movie_prompt == "":
+            self.report({"INFO"}, "Text prompt in the Generator AI tab is empty!")
             return {"CANCELLED"}
 
         show_system_console(True)
@@ -749,7 +756,8 @@ class SEQUENCER_OT_generate_image(Operator):
 
         # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
         pipe = DiffusionPipeline.from_pretrained(
-            "stabilityai/stable-diffusion-2",
+            "stabilityai/stable-diffusion-2", # 768x768
+            #"runwayml/stable-diffusion-v1-5",
             torch_dtype=torch.float16,
             variant="fp16",
         )
@@ -880,6 +888,8 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                         sequencer.generate_movie()
                     if type == "audio":
                         sequencer.generate_audio()
+                    if type == "image":
+                        sequencer.generate_image()
         scene.frame_current = current_frame
         context.scene.generate_movie_prompt = prompt
         addon_prefs.playsound = play_sound
