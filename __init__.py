@@ -209,6 +209,8 @@ def install_modules(self):
     import_module(self, "cv2", "opencv_python")
     import_module(self, "scipy", "scipy")
     import_module(self, "xformers", "xformers")
+    import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
+    import_module(self, "IPython", "IPython")
 
 
 class GeneratorAddonPreferences(AddonPreferences):
@@ -246,6 +248,7 @@ class GeneratorAddonPreferences(AddonPreferences):
         name="Movie Model Card",
         items={
             ("damo-vilab/text-to-video-ms-1.7b", "Modelscope (256x256)", "Modelscope"),
+            #("kabachuha/modelscope-damo-text2video-pruned-weights", "Pruned Modelscope (256x256)", "Pruned Modelscope"),
             ("strangeman3107/animov-0.1.1", "Anime (448x384)", "Anime"),
         },
         default="damo-vilab/text-to-video-ms-1.7b",
@@ -260,6 +263,15 @@ class GeneratorAddonPreferences(AddonPreferences):
         default="stabilityai/stable-diffusion-2",
     )
 
+    audio_model_card: bpy.props.EnumProperty(
+        name="Audio Model Card",
+        items={
+            ("cvssp/audioldm", "AudioLDM", "AudioLDM"),
+            ("bark", "Bark", "Bark"),
+        },
+        default="cvssp/audioldm",
+    )
+
 
     def draw(self, context):
         layout = self.layout
@@ -267,6 +279,7 @@ class GeneratorAddonPreferences(AddonPreferences):
         box.operator("sequencer.install_generator")
         box.prop(self, "movie_model_card")
         box.prop(self, "image_model_card")
+        box.prop(self, "audio_model_card")
         row = box.row(align=True)
         row.label(text="Notification:")
         row.prop(self, "playsound", text="")
@@ -359,6 +372,10 @@ class SEQEUNCER_PT_generate_ai(Panel):
     bl_category = "Generative AI"
 
     def draw(self, context):
+        preferences = context.preferences
+        addon_prefs = preferences.addons[__name__].preferences
+        audio_model_card = addon_prefs.audio_model_card
+        
         layout = self.layout
         layout.use_property_split = False
         layout.use_property_decorate = False
@@ -387,8 +404,11 @@ class SEQEUNCER_PT_generate_ai(Panel):
             col.prop(context.scene, "generate_movie_frames", text="Frames")
         if type == "audio":
             col.prop(context.scene, "audio_length_in_f", text="Frames")
-        col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
-        col.prop(context.scene, "movie_num_guidance", text="Word Power")
+
+        if type != "audio" and model_card != "bark":            
+            col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
+            col.prop(context.scene, "movie_num_guidance", text="Word Power")
+        
         if type == "movie" or type == "image":
             col.prop(context.scene, "movie_num_batch", text="Batch Count")
 
@@ -408,26 +428,6 @@ class SEQEUNCER_PT_generate_ai(Panel):
             row.operator("sequencer.generate_image", text="Generate")
         if type == "audio":
             row.operator("sequencer.generate_audio", text="Generate")
-
-
-#class SEQEUNCER_PT_generate_audio(Panel):
-#    """Generate Audio with AI"""
-
-#    bl_idname = "SEQUENCER_PT_sequencer_generate_audio_panel"
-#    bl_label = "Generate Audio"
-#    bl_space_type = "SEQUENCE_EDITOR"
-#    bl_region_type = "UI"
-#    bl_category = "Generative AI"
-
-#    def draw(self, context):
-#        layout = self.layout
-#        scene = context.scene
-#        row = layout.row()
-#        row.scale_y = 1.2
-#        row.prop(context.scene, "generate_audio_prompt", text="")
-#        row = layout.row()
-#        row.scale_y = 1.2
-#        row.operator("sequencer.generate_audio", text="Generate Audio")
 
 
 class SEQUENCER_OT_generate_movie(Operator):
@@ -606,6 +606,9 @@ class SEQUENCER_OT_generate_audio(Operator):
         if not scene.sequence_editor:
             scene.sequence_editor_create()
 
+        preferences = context.preferences
+        addon_prefs = preferences.addons[__name__].preferences
+      
         current_frame = scene.frame_current
         prompt = scene.generate_movie_prompt
         negative_prompt = scene.generate_movie_negative_prompt
@@ -617,6 +620,10 @@ class SEQUENCER_OT_generate_audio(Operator):
             from diffusers import AudioLDMPipeline
             import torch
             import scipy
+            from bark import SAMPLE_RATE, generate_audio, preload_models
+            from IPython.display import Audio
+            from scipy.io.wavfile import write as write_wav
+            import xformers
         except ModuleNotFoundError:
             print("Dependencies needs to be installed in the add-on preferences.")
             self.report(
@@ -629,12 +636,20 @@ class SEQUENCER_OT_generate_audio(Operator):
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-        repo_id = "cvssp/audioldm"
-        pipe = AudioLDMPipeline.from_pretrained(repo_id)  # , torch_dtype=torch.float16z
+        if addon_prefs.audio_model_card != "bark":
+            repo_id = addon_prefs.audio_model_card
+            pipe = AudioLDMPipeline.from_pretrained(repo_id)  # , torch_dtype=torch.float16z
 
-        # Use cuda if possible
-        if torch.cuda.is_available():
-            pipe = pipe.to("cuda")
+            # Use cuda if possible
+            if torch.cuda.is_available():
+                pipe = pipe.to("cuda")
+        else:
+            preload_models(
+            text_use_small=True,
+            coarse_use_small=True,
+            fine_use_gpu=True, 
+            fine_use_small=True,
+        )
             
         for i in range(1):#scene.movie_num_batch): seed do not work for audio
             #wm.progress_update(i)
@@ -654,37 +669,44 @@ class SEQUENCER_OT_generate_audio(Operator):
                 )
                 start_frame = scene.frame_current            
 
-            seed = context.scene.movie_num_seed
-            seed = (
-                seed
-                if not context.scene.movie_use_random
-                else random.randint(0, 2147483647)
-            )
-            context.scene.movie_num_seed = seed
-
-            # Use cuda if possible
-            if torch.cuda.is_available():
-                generator = (
-                    torch.Generator("cuda").manual_seed(seed) if seed != 0 else None
-                )
+            if addon_prefs.audio_model_card == "bark":
+                prompt = context.scene.generate_movie_prompt
+                audio = generate_audio(prompt)
+                rate = 24000
             else:
-                if seed != 0:
-                    generator = torch.Generator()
-                    generator.manual_seed(seed)
+                seed = context.scene.movie_num_seed
+                seed = (
+                    seed
+                    if not context.scene.movie_use_random
+                    else random.randint(0, 2147483647)
+                )
+                context.scene.movie_num_seed = seed
+
+                # Use cuda if possible
+                if torch.cuda.is_available():
+                    generator = (
+                        torch.Generator("cuda").manual_seed(seed) if seed != 0 else None
+                    )
                 else:
-                    generator = None
-            
-            prompt = context.scene.generate_movie_prompt
-            # Options: https://huggingface.co/docs/diffusers/main/en/api/pipelines/audioldm
-            audio = pipe(
-                prompt,
-                num_inference_steps=movie_num_inference_steps,
-                audio_length_in_s=audio_length_in_s,
-                guidance_scale=movie_num_guidance,
-                generator=generator,
-            ).audios[0]
+                    if seed != 0:
+                        generator = torch.Generator()
+                        generator.manual_seed(seed)
+                    else:
+                        generator = None
+                
+                prompt = context.scene.generate_movie_prompt
+                # Options: https://huggingface.co/docs/diffusers/main/en/api/pipelines/audioldm
+                audio = pipe(
+                    prompt,
+                    num_inference_steps=movie_num_inference_steps,
+                    audio_length_in_s=audio_length_in_s,
+                    guidance_scale=movie_num_guidance,
+                    generator=generator,
+                ).audios[0]
+                rate = 16000
+                
             filename = clean_path(dirname(realpath(__file__)) + "/" + prompt + ".wav")
-            scipy.io.wavfile.write(filename, 16000, audio.transpose())
+            scipy.io.wavfile.write(filename, rate, audio.transpose())
 
             filepath = filename
             if os.path.isfile(filepath):
