@@ -1,25 +1,25 @@
 # Generative AI - Text to Video, Image and Audio in Blender
 AI generate video and audio from text prompts. 
 
+## Features
+* Text to video
+* Text to audio
+* Text to image
+* Seed, Quality Steps, Frames, Word Power. 
+* Batch operation of text strips into videos, audios or images.
+* Model card selector
+* Render finished notification
+* Model Cards: Modelscope, Animov, Stable Diffusion 1.5 & 2, AudioLMD and Bark 
+
 ## How to install
 Download the add-on: https://github.com/tin2tin/text_to_video/archive/refs/heads/main.zip
 
 Run Blender as Administrator and install the add-on as usual: Preferences > Add-ons > Install > select file > Enable the add-on. 
 
-Now, in the add-on preferences, hit the "Install all Dependencies" button, and many GB will have to be downloaded, so go grab a coffee. 
+In the add-on preferences, hit the "Install all Dependencies" button.
 
-### Weights
-Pruned 6 GB VRAM(included in the add-on download):
+The first time a model is executed and many GB will have to be downloaded, so go grab a(lots of) coffee. 
 
-https://huggingface.co/kabachuha/modelscope-damo-text2video-pruned-weights/tree/main
-
-20 GB of VRAM:
-
-https://modelscope.cn/models/damo/text-to-video-synthesis/files
-
-Anime - 6 GB VRAM:
-
-https://huggingface.co/kabachuha/animov-0.1-modelscope-original-format
 
 ## Location
 
