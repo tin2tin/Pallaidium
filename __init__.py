@@ -405,7 +405,9 @@ class SEQEUNCER_PT_generate_ai(Panel):
         if type == "audio":
             col.prop(context.scene, "audio_length_in_f", text="Frames")
 
-        if type != "audio" and model_card != "bark":            
+        if type == "audio" and audio_model_card == "bark":
+            pass
+        else:            
             col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
             col.prop(context.scene, "movie_num_guidance", text="Word Power")
         
