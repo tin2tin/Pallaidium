@@ -673,7 +673,7 @@ class SEQUENCER_OT_generate_audio(Operator):
 
             if addon_prefs.audio_model_card == "bark":
                 prompt = context.scene.generate_movie_prompt
-                audio = generate_audio(prompt)
+                audio = generate_audio(prompt, history_prompt="en_speaker_1")
                 rate = 24000
             else:
                 seed = context.scene.movie_num_seed
