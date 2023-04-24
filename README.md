@@ -1,5 +1,5 @@
 # Generative AI - Text to Video, Image and Audio in Blender
-AI generate video and audio from text prompts. 
+AI generate video, image and audio from text prompts. 
 
 ## Features
 * Text to video
