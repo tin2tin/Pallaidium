@@ -49,7 +49,15 @@ https://github.com/tin2tin/text_to_video/raw/main/text2video_ui.blend
 ## Tip
 If the image of your renders breaks, then use the resolution from the Model Card in the Preferences.
 
-### Mark-ups for Bark
+# Text to Audio
+
+### AudioLDM
+Find AudioLDM documentation here: https://github.com/haoheliu/AudioLDM
+Try prompts like: Bag pipes playing a funeral dirge, punk rock band playing hardcore song, techno dj playing deep bass house music, and acid house loop with jazz.
+Or: Voice of God judging mankind, woman talking about celestial beings, hammer on wood.
+
+### Bark
+Find Bark documentation here: https://github.com/suno-ai/bark
 * [laughter]
 * [laughs]
 * [sighs]
@@ -60,13 +68,6 @@ If the image of your renders breaks, then use the resolution from the Model Card
 * ♪ for song lyrics
 * capitalization for emphasis of a word
 * MAN/WOMAN: for bias towards speaker
-
-
-# Text to Audio
-
-Find documentation here: https://github.com/haoheliu/AudioLDM
-Try prompts like: Bag pipes playing a funeral dirge, punk rock band playing hardcore song, techno dj playing deep bass house music, and acid house loop with jazz.
-Or: Voice of God judging mankind, woman talking about celestial beings, hammer on wood.
 
 
 ## Modules
