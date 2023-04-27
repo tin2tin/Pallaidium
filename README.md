@@ -20,6 +20,8 @@ In the add-on preferences, hit the "Install all Dependencies" button.
 
 The first time a model is executed and many GB will have to be downloaded, so go grab a(lots of) coffee. 
 
+If it says git is missing, you can find it here: https://git-scm.com/download/win
+
 
 ## Location
 
