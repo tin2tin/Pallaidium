@@ -77,7 +77,11 @@ Diffusers: https://github.com/huggingface/diffusers
 
 ModelScope: https://modelscope.cn/models/damo/text-to-video-synthesis/summary
 
-AudioLDM: https://github.com/haoheliu/AudioLDM
+AudioLDM: 
+
+https://huggingface.co/cvssp/audioldm-s-full-v2
+
+https://github.com/haoheliu/AudioLDM
 
 Bark: https://github.com/suno-ai/bark
 
