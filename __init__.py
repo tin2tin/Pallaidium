@@ -200,9 +200,10 @@ def install_modules(self):
         else:
             import_module(self, "torch", "torch")
     if os_platform == 'Darwin':
-        import_module(self, "sox", "sex")
+        import_module(self, "sox", "sox")
     else:
         import_module(self, "soundfile", "PySoundFile")
+    subprocess.check_call([pybin,"-m","pip","install","numpy","--upgrade","--no-warn-script-location"])
     import_module(self, "diffusers", "diffusers")
     import_module(self, "accelerate", "accelerate")
     import_module(self, "transformers", "transformers")
@@ -390,7 +391,11 @@ class SEQEUNCER_PT_generate_ai(Panel):
         col.use_property_decorate = False
         col.scale_y = 1.2
         col.prop(context.scene, "generate_movie_prompt", text="", icon="ADD")
-        col.prop(context.scene, "generate_movie_negative_prompt", text="", icon="REMOVE")
+
+        if type == "audio" and audio_model_card == "bark":
+            pass
+        else:
+            col.prop(context.scene, "generate_movie_negative_prompt", text="", icon="REMOVE")
  
         layout = self.layout
         layout.use_property_split = True
@@ -402,9 +407,8 @@ class SEQEUNCER_PT_generate_ai(Panel):
         col = layout.column(align=True)
         if type == "movie" or type == "image":
             col.prop(context.scene, "generate_movie_frames", text="Frames")
-        if type == "audio":
+        if type == "audio" and audio_model_card != "bark":
             col.prop(context.scene, "audio_length_in_f", text="Frames")
-
         if type == "audio" and audio_model_card == "bark":
             pass
         else:            
@@ -422,6 +426,11 @@ class SEQEUNCER_PT_generate_ai(Panel):
             row.prop(context.scene, "movie_use_random", text="", icon="QUESTION")
             sub_row.active = not context.scene.movie_use_random
 
+        if type == "audio" and audio_model_card == "bark":
+            col = layout.column(align=True)
+            col.prop(context.scene, "speakers", text="Speaker")
+            col.prop(context.scene, "languages", text="Language")
+            
         row = layout.row(align=True)
         row.scale_y = 1.1
         if type == "movie":
@@ -673,7 +682,9 @@ class SEQUENCER_OT_generate_audio(Operator):
 
             if addon_prefs.audio_model_card == "bark":
                 prompt = context.scene.generate_movie_prompt
-                audio = generate_audio(prompt, history_prompt="en_speaker_1")
+                lan_speak = scene.languages + "_" + scene.speakers
+                print(lan_speak)
+                audio = generate_audio(prompt, history_prompt=lan_speak)
                 rate = 24000
             else:
                 seed = context.scene.movie_num_seed
@@ -724,6 +735,8 @@ class SEQUENCER_OT_generate_audio(Operator):
                     scene.frame_current = (
                         scene.sequence_editor.active_strip.frame_final_start
                     )
+                # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
+                bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
             else:
                 print("No resulting file found!")
         
@@ -775,7 +788,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
         current_frame = scene.frame_current
         prompt = scene.generate_movie_prompt
-        negative_prompt = scene.generate_movie_negative_prompt
+        negative_prompt = scene.generate_movie_negative_prompt + "nsfw nude nudity"
         image_x = scene.generate_movie_x
         image_y = scene.generate_movie_y
         x = scene.generate_movie_x = closest_divisible_64(image_x)
@@ -1042,6 +1055,43 @@ def register():
             ("audio", "Audio", "Generate Audio"),
         },
         default="movie",
+    )
+
+    bpy.types.Scene.speakers = bpy.props.EnumProperty(
+        name="Speakers",
+        items=[
+            ("speaker_0", "Speaker 0", ""),
+            ("speaker_1", "Speaker 1", ""),
+            ("speaker_2", "Speaker 2", ""),
+            ("speaker_3", "Speaker 3", ""),
+            ("speaker_4", "Speaker 4", ""),
+            ("speaker_5", "Speaker 5", ""),
+            ("speaker_6", "Speaker 6", ""),
+            ("speaker_7", "Speaker 7", ""),
+            ("speaker_8", "Speaker 8", ""),
+            ("speaker_9", "Speaker 9", ""),
+        ],
+        default="speaker_1",
+    )
+
+    bpy.types.Scene.languages = bpy.props.EnumProperty(
+        name="Languages",
+        items=[
+            ("en", "English", ""),
+            ("de", "German", ""),
+            ("es", "Spanish", ""),
+            ("fr", "French", ""),
+            ("hi", "Hindi", ""),
+            ("it", "Italian", ""),
+            ("ja", "Japanese", ""),
+            ("ko", "Korean", ""),
+            ("pl", "Polish", ""),
+            ("pt", "Portuguese", ""),
+            ("ru", "Russian", ""),
+            ("tr", "Turkish", ""),
+            ("zh", "Chinese, simplified", ""),
+        ],
+        default="en"
     )
 
     bpy.types.SEQUENCER_MT_add.append(panel_text_to_generatorAI)
