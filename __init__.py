@@ -267,10 +267,11 @@ class GeneratorAddonPreferences(AddonPreferences):
     audio_model_card: bpy.props.EnumProperty(
         name="Audio Model Card",
         items={
+            ("cvssp/audioldm-s-full-v2", "AudioLDM S Full v2", "AudioLDM S Full v2"),
             ("cvssp/audioldm", "AudioLDM", "AudioLDM"),
             ("bark", "Bark", "Bark"),
         },
-        default="cvssp/audioldm",
+        default="cvssp/audioldm-s-full-v2",
     )
 
 
