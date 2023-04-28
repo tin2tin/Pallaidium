@@ -602,6 +602,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                                     )
                                 # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
                                 bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
+                                break
             else:
                 print("No resulting file found.")
 
