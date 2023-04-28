@@ -257,20 +257,20 @@ class GeneratorAddonPreferences(AddonPreferences):
 
     image_model_card: bpy.props.EnumProperty(
         name="Image Model Card",
-        items={
+        items=[
             ("runwayml/stable-diffusion-v1-5", "Stable Diffusion 1.5 (512x512)", "Stable Diffusion 1.5"),
             ("stabilityai/stable-diffusion-2", "Stable Diffusion 2 (768x768)", "Stable Diffusion 2"),
-        },
+        ],
         default="stabilityai/stable-diffusion-2",
     )
 
     audio_model_card: bpy.props.EnumProperty(
         name="Audio Model Card",
-        items={
-            ("cvssp/audioldm-s-full-v2", "AudioLDM S Full v2", "AudioLDM S Full v2"),
-            ("cvssp/audioldm", "AudioLDM", "AudioLDM"),
+        items=[
+            ("cvssp/audioldm-s-full-v2", "AudioLDM S Full v2", "AudioLDM Small Full v2"),
+            #("cvssp/audioldm", "AudioLDM", "AudioLDM"),
             ("bark", "Bark", "Bark"),
-        },
+        ],
         default="cvssp/audioldm-s-full-v2",
     )
 
@@ -410,28 +410,24 @@ class SEQEUNCER_PT_generate_ai(Panel):
             col.prop(context.scene, "generate_movie_frames", text="Frames")
         if type == "audio" and audio_model_card != "bark":
             col.prop(context.scene, "audio_length_in_f", text="Frames")
+            
         if type == "audio" and audio_model_card == "bark":
-            pass
+            col = layout.column(align=True)
+            col.prop(context.scene, "speakers", text="Speaker")
+            col.prop(context.scene, "languages", text="Language")
         else:            
             col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
             col.prop(context.scene, "movie_num_guidance", text="Word Power")
-        
-        if type == "movie" or type == "image":
-            col.prop(context.scene, "movie_num_batch", text="Batch Count")
 
-        if type == "movie" or type == "image":
             col = layout.column(align=True)
             row = col.row(align=True)
             sub_row = row.row(align=True)
             sub_row.prop(context.scene, "movie_num_seed", text="Seed")
             row.prop(context.scene, "movie_use_random", text="", icon="QUESTION")
-            sub_row.active = not context.scene.movie_use_random
+            sub_row.active = not context.scene.movie_use_random           
 
-        if type == "audio" and audio_model_card == "bark":
-            col = layout.column(align=True)
-            col.prop(context.scene, "speakers", text="Speaker")
-            col.prop(context.scene, "languages", text="Language")
-            
+        col.prop(context.scene, "movie_num_batch", text="Batch Count")
+
         row = layout.row(align=True)
         row.scale_y = 1.1
         if type == "movie":
@@ -573,15 +569,26 @@ class SEQUENCER_OT_generate_movie(Operator):
 
             # Add strip
             if os.path.isfile(dst_path):
-                strip = scene.sequence_editor.sequences.new_movie(
-                    name=context.scene.generate_movie_prompt + " " + str(seed),
-                    frame_start=start_frame,
-                    filepath=dst_path,
-                    channel=empty_channel,
-                    fit_method="FILL",
-                )
-                strip.transform.filter = 'SUBSAMPLING_3x3'
+#                strip = scene.sequence_editor.sequences.new_movie(
+#                    name=context.scene.generate_movie_prompt + " " + str(seed),
+#                    frame_start=start_frame,
+#                    filepath=dst_path,
+#                    channel=empty_channel,
+#                    fit_method="FILL",
+#                )
+                bpy.ops.sequencer.movie_strip_add(filepath=dst_path,
+                                                  frame_start=start_frame,
+                                                  channel=empty_channel,
+                                                  fit_method="FILL",
+                                                  adjust_playback_rate=True,
+                                                  sound=False,
+                                                  use_framerate = False,
+                                                  )
+                strip = scene.sequence_editor.active_strip
+                strip.transform.filter = 'NEAREST'
                 scene.sequence_editor.active_strip = strip
+                strip.use_proxy = True
+                bpy.ops.sequencer.rebuild_proxy()
                 if i > 0:
                     scene.frame_current = (
                         scene.sequence_editor.active_strip.frame_final_start
@@ -663,7 +670,7 @@ class SEQUENCER_OT_generate_audio(Operator):
             fine_use_small=True,
         )
             
-        for i in range(1):#scene.movie_num_batch): seed do not work for audio
+        for i in range(scene.movie_num_batch):
             #wm.progress_update(i)
             if i > 0:
                 empty_channel = scene.sequence_editor.active_strip.channel
@@ -789,7 +796,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
         current_frame = scene.frame_current
         prompt = scene.generate_movie_prompt
-        negative_prompt = scene.generate_movie_negative_prompt + "nsfw nude nudity"
+        negative_prompt = scene.generate_movie_negative_prompt + " nsfw nude nudity"
         image_x = scene.generate_movie_x
         image_y = scene.generate_movie_y
         x = scene.generate_movie_x = closest_divisible_64(image_x)
@@ -809,8 +816,6 @@ class SEQUENCER_OT_generate_image(Operator):
         # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
         pipe = DiffusionPipeline.from_pretrained(
             image_model_card,
-            #"stabilityai/stable-diffusion-2", # 768x768
-            #"runwayml/stable-diffusion-v1-5",
             torch_dtype=torch.float16,
             variant="fp16",
         )
@@ -884,7 +889,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     fit_method="FILL",
                 )
                 strip.frame_final_duration = scene.generate_movie_frames
-                strip.transform.filter = 'SUBSAMPLING_3x3'
+                strip.transform.filter = 'NEAREST'
 
                 scene.sequence_editor.active_strip = strip
                 if i > 0:
@@ -1029,7 +1034,7 @@ def register():
     # The seed number.
     bpy.types.Scene.movie_use_random = bpy.props.BoolProperty(
         name="movie_use_random",
-        default=0,
+        default=1,
     )
 
     # The seed number.
@@ -1050,11 +1055,11 @@ def register():
 
     bpy.types.Scene.generatorai_typeselect = bpy.props.EnumProperty(
         name="Sound",
-        items={
+        items=[
             ("movie", "Video", "Generate Video"),
             ("image", "Image", "Generate Image"),
             ("audio", "Audio", "Generate Audio"),
-        },
+        ],
         default="movie",
     )
 
