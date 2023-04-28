@@ -576,25 +576,32 @@ class SEQUENCER_OT_generate_movie(Operator):
 #                    channel=empty_channel,
 #                    fit_method="FILL",
 #                )
-                bpy.ops.sequencer.movie_strip_add(filepath=dst_path,
-                                                  frame_start=start_frame,
-                                                  channel=empty_channel,
-                                                  fit_method="FILL",
-                                                  adjust_playback_rate=True,
-                                                  sound=False,
-                                                  use_framerate = False,
-                                                  )
-                strip = scene.sequence_editor.active_strip
-                strip.transform.filter = 'NEAREST'
-                scene.sequence_editor.active_strip = strip
-                strip.use_proxy = True
-                bpy.ops.sequencer.rebuild_proxy()
-                if i > 0:
-                    scene.frame_current = (
-                        scene.sequence_editor.active_strip.frame_final_start
-                    )
-                # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
-                bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
+                for window in bpy.context.window_manager.windows:
+                    screen = window.screen
+                    for area in screen.areas:
+                        if area.type == "SEQUENCE_EDITOR":
+                            from bpy import context
+
+                            with context.temp_override(window=window, area=area):
+                                bpy.ops.sequencer.movie_strip_add(filepath=dst_path,
+                                                                  frame_start=start_frame,
+                                                                  channel=empty_channel,
+                                                                  fit_method="FILL",
+                                                                  adjust_playback_rate=True,
+                                                                  sound=False,
+                                                                  use_framerate = False,
+                                                                  )
+                                strip = scene.sequence_editor.active_strip
+                                strip.transform.filter = 'NEAREST'
+                                scene.sequence_editor.active_strip = strip
+                                strip.use_proxy = True
+                                bpy.ops.sequencer.rebuild_proxy()
+                                if i > 0:
+                                    scene.frame_current = (
+                                        scene.sequence_editor.active_strip.frame_final_start
+                                    )
+                                # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
+                                bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
             else:
                 print("No resulting file found.")
 
