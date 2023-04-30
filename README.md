@@ -1,6 +1,10 @@
 # Generative AI - Text to Video, Image and Audio in Blender
 AI generate video, image and audio from text prompts or strips. 
 
+## Video Examples
+### Modelscope & Bark
+[![Watch the video](https://img.youtube.com/vi/auHu02KJZQs/0.jpg)](https://youtu.be/auHu02KJZQs) [![Watch the video](https://img.youtube.com/vi/AAdQfQjENJU/0.jpg)](https://youtu.be/AAdQfQjENJU)
+
 ## Features
 * Text to video
 * Text to audio
@@ -21,7 +25,6 @@ In the add-on preferences, hit the "Install all Dependencies" button.
 The first time a model is executed and many GB will have to be downloaded, so go grab a(lots of) coffee. 
 
 If it says git is missing, you can find it here: https://git-scm.com/download/win
-
 
 ## Location
 
@@ -70,7 +73,6 @@ Find Bark documentation here: https://github.com/suno-ai/bark
 * ♪ for song lyrics
 * capitalization for emphasis of a word
 * MAN/WOMAN: for bias towards speaker
-
 
 ## Modules
 Diffusers: https://github.com/huggingface/diffusers
