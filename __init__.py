@@ -250,7 +250,7 @@ class GeneratorAddonPreferences(AddonPreferences):
         items={
             ("damo-vilab/text-to-video-ms-1.7b", "Modelscope (256x256)", "Modelscope"),
             #("kabachuha/modelscope-damo-text2video-pruned-weights", "Pruned Modelscope (256x256)", "Pruned Modelscope"),
-            ("strangeman3107/animov-0.1.1", "Anime (448x384)", "Anime"),
+            ("strangeman3107/animov-0.1.1", "Animov (448x384)", "Anime"),
         },
         default="damo-vilab/text-to-video-ms-1.7b",
     )
@@ -271,7 +271,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             #("cvssp/audioldm", "AudioLDM", "AudioLDM"),
             ("bark", "Bark", "Bark"),
         ],
-        default="cvssp/audioldm-s-full-v2",
+        default="strangeman3107/animov-0.1.1",
     )
 
 
@@ -998,21 +998,21 @@ def register():
     )
     bpy.types.Scene.generate_movie_x = bpy.props.IntProperty(
         name="generate_movie_x",
-        default=512,
+        default=448,
         step=64,
         min=192,
         max=1024,
     )
     bpy.types.Scene.generate_movie_y = bpy.props.IntProperty(
         name="generate_movie_y",
-        default=256,
+        default=384,
         step=64,
         min=192,
         max=1024,
     )
     # The number of frames to be generated.
     bpy.types.Scene.generate_movie_frames = bpy.props.IntProperty(
-        name="generate_movie_y",
+        name="generate_movie_frames",
         default=16,
         min=1,
         max=125,
@@ -1056,7 +1056,7 @@ def register():
     # The frame ausio duration.
     bpy.types.Scene.audio_length_in_f = bpy.props.IntProperty(
         name="audio_length_in_f",
-        default=80,
+        default=120,
         min=1,
         max=10000,
     )
