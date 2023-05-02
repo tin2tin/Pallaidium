@@ -15,16 +15,20 @@ AI generate video, image and audio from text prompts or strips.
 * Render finished notification
 * Model Cards: Modelscope, Animov, Stable Diffusion 1.5 & 2, AudioLMD and Bark 
 
-## How to install
+## How to install (on Win)
 Download the add-on: https://github.com/tin2tin/text_to_video/archive/refs/heads/main.zip
 
-Run Blender as Administrator and install the add-on as usual: Preferences > Add-ons > Install > select file > Enable the add-on. 
+Right click on the Blender icon and "Run Blender as Administrator".
+
+Install the add-on as usual: Preferences > Add-ons > Install > select file > enable the add-on. 
 
 In the add-on preferences, hit the "Install all Dependencies" button.
 
-The first time a model is executed and many GB will have to be downloaded, so go grab a(lots of) coffee. 
+The first time a model is executed and many GB will have to be downloaded, so go grab lots of coffee. 
 
 If it says git is missing, you can find it here: https://git-scm.com/download/win
+
+As for Linux and MacOS, if anything differs in installation, then please share instructions.
 
 ## Location
 
