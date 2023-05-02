@@ -4,7 +4,7 @@ bl_info = {
     "name": "Generative AI",
     "author": "tintwotin",
     "version": (1, 2),
-    "blender": (3, 4, 0),
+    "blender": (3, 5, 0),
     "location": "Video Sequence Editor > Sidebar > Generative AI",
     "description": "Generate media in the VSE",
     "category": "Sequencer",
