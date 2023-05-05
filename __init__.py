@@ -4,7 +4,7 @@ bl_info = {
     "name": "Generative AI",
     "author": "tintwotin",
     "version": (1, 2),
-    "blender": (3, 5, 0),
+    "blender": (3, 4, 0),
     "location": "Video Sequence Editor > Sidebar > Generative AI",
     "description": "Generate media in the VSE",
     "category": "Sequencer",
@@ -102,6 +102,14 @@ def clean_path(full_path):
         new_filename = f"{name.rsplit('(', 1)[0]}({i}){ext}"
         i += 1
     return os.path.join(dir_path, new_filename)
+
+
+def limit_string(my_string):
+    if len(my_string) > 77:
+        print("Warning: String is longer than 77 characters. Excessive string:", my_string[77:])
+        return my_string[:77]
+    else:
+        return my_string
 
 
 def import_module(self, module, install_module):
@@ -213,6 +221,7 @@ def install_modules(self):
     import_module(self, "xformers", "xformers")
     import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
     import_module(self, "IPython", "IPython")
+    import_module(self, "nltk", "nltk")
     subprocess.check_call([pybin,"-m","pip","install","numpy","--upgrade"])
 
 
@@ -249,11 +258,11 @@ class GeneratorAddonPreferences(AddonPreferences):
 
     movie_model_card: bpy.props.EnumProperty(
         name="Movie Model Card",
-        items={
+        items=[
             ("damo-vilab/text-to-video-ms-1.7b", "Modelscope (256x256)", "Modelscope"),
-            #("kabachuha/modelscope-damo-text2video-pruned-weights", "Pruned Modelscope (256x256)", "Pruned Modelscope"),
+            ("kabachuha/modelscope-damo-text2video-pruned-weights", "Pruned Modelscope (256x256)", "Pruned Modelscope"),
             ("strangeman3107/animov-0.1.1", "Animov (448x384)", "Animov"),
-        },
+        ],
         default="strangeman3107/animov-0.1.1",
     )
 
@@ -495,7 +504,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         current_frame = scene.frame_current
         prompt = scene.generate_movie_prompt
-        negative_prompt = scene.generate_movie_negative_prompt
+        negative_prompt = scene.generate_movie_negative_prompt + " nsfw nude nudity"
         movie_x = scene.generate_movie_x
         movie_y = scene.generate_movie_y
         x = scene.generate_movie_x = closest_divisible_64(movie_x)
@@ -584,7 +593,10 @@ class SEQUENCER_OT_generate_movie(Operator):
             shutil.move(src_path, dst_path)
 
             # Add strip
-            if os.path.isfile(dst_path):
+            if not os.path.isfile(dst_path):
+                print("No resulting file found.")
+                return {"CANCELLED"}
+                
 #                strip = scene.sequence_editor.sequences.new_movie(
 #                    name=context.scene.generate_movie_prompt + " " + str(seed),
 #                    frame_start=start_frame,
@@ -592,35 +604,34 @@ class SEQUENCER_OT_generate_movie(Operator):
 #                    channel=empty_channel,
 #                    fit_method="FILL",
 #                )
-                for window in bpy.context.window_manager.windows:
-                    screen = window.screen
-                    for area in screen.areas:
-                        if area.type == "SEQUENCE_EDITOR":
-                            from bpy import context
+            for window in bpy.context.window_manager.windows:
+                screen = window.screen
+                for area in screen.areas:
+                    if area.type == "SEQUENCE_EDITOR":
+                        from bpy import context
 
-                            with context.temp_override(window=window, area=area):
-                                bpy.ops.sequencer.movie_strip_add(filepath=dst_path,
-                                                                  frame_start=start_frame,
-                                                                  channel=empty_channel,
-                                                                  fit_method="FILL",
-                                                                  adjust_playback_rate=True,
-                                                                  sound=False,
-                                                                  use_framerate = False,
-                                                                  )
-                                strip = scene.sequence_editor.active_strip
-                                strip.transform.filter = 'NEAREST'
-                                scene.sequence_editor.active_strip = strip
-                                strip.use_proxy = True
-                                bpy.ops.sequencer.rebuild_proxy()
-                                if i > 0:
-                                    scene.frame_current = (
-                                        scene.sequence_editor.active_strip.frame_final_start
-                                    )
-                                # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
-                                bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
-                                break
-            else:
-                print("No resulting file found.")
+                        with context.temp_override(window=window, area=area):
+                            bpy.ops.sequencer.movie_strip_add(filepath=dst_path,
+                                                              frame_start=start_frame,
+                                                              channel=empty_channel,
+                                                              fit_method="FILL",
+                                                              adjust_playback_rate=True,
+                                                              sound=False,
+                                                              use_framerate = False,
+                                                              )
+                            strip = scene.sequence_editor.active_strip
+                            strip.transform.filter = 'NEAREST'
+                            scene.sequence_editor.active_strip = strip
+                            strip.use_proxy = True
+                            bpy.ops.sequencer.rebuild_proxy()
+                            if i > 0:
+                                scene.frame_current = (
+                                    scene.sequence_editor.active_strip.frame_final_start
+                                )
+                            # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
+                            bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
+                            break
+
 
         bpy.ops.renderreminder.play_notification()
         #wm.progress_end()
@@ -663,10 +674,22 @@ class SEQUENCER_OT_generate_audio(Operator):
             from diffusers import AudioLDMPipeline
             import torch
             import scipy
-            from bark import SAMPLE_RATE, generate_audio, preload_models
+            #from bark import SAMPLE_RATE, generate_audio, preload_models
             from IPython.display import Audio
             from scipy.io.wavfile import write as write_wav
             import xformers
+
+            if addon_prefs.audio_model_card == "bark":            
+                import numpy as np
+                from bark.generation import (
+                    generate_text_semantic,
+                    preload_models,
+                )
+                from bark.api import semantic_to_waveform
+                from bark import generate_audio, SAMPLE_RATE
+                import nltk
+                nltk.download('punkt')
+            
         except ModuleNotFoundError:
             print("Dependencies needs to be installed in the add-on preferences.")
             self.report(
@@ -674,6 +697,9 @@ class SEQUENCER_OT_generate_audio(Operator):
                 "Dependencies needs to be installed in the add-on preferences.",
             )
             return {"CANCELLED"}
+
+        show_system_console(True)
+        set_system_console_topmost(True)
 
         # clear the VRAM
         if torch.cuda.is_available():
@@ -686,7 +712,7 @@ class SEQUENCER_OT_generate_audio(Operator):
             # Use cuda if possible
             if torch.cuda.is_available():
                 pipe = pipe.to("cuda")
-        else:
+        else: #bark
             preload_models(
             text_use_small=True,
             coarse_use_small=True,
@@ -708,17 +734,38 @@ class SEQUENCER_OT_generate_audio(Operator):
             else:
                 empty_channel = find_first_empty_channel(
                     scene.frame_current,
-                    (scene.movie_num_batch * scene.audio_length_in_f) + scene.frame_current,
+                    100000000000000000000,
                 )
                 start_frame = scene.frame_current            
 
             if addon_prefs.audio_model_card == "bark":
                 prompt = context.scene.generate_movie_prompt
-                lan_speak = scene.languages + "_" + scene.speakers
-                print(lan_speak)
-                audio = generate_audio(prompt, history_prompt=lan_speak)
+                prompt = prompt.replace("\n", " ").strip()
+                sentences = nltk.sent_tokenize(prompt)
                 rate = 24000
-            else:
+                GEN_TEMP = 0.6
+                SPEAKER = scene.languages + "_" + scene.speakers #"v2/"+
+                silence = np.zeros(int(0.25 * rate))  # quarter second of silence
+                
+                pieces = []
+                for sentence in sentences:
+                    print(sentence)
+                    semantic_tokens = generate_text_semantic(
+                        sentence,
+                        history_prompt=SPEAKER,
+                        temp=GEN_TEMP,
+                        min_eos_p=0.05,  # this controls how likely the generation is to end
+                    )
+
+                    audio_array = semantic_to_waveform(semantic_tokens, history_prompt=SPEAKER)
+                    pieces += [audio_array, silence.copy()]
+                    
+                audio = np.concatenate(pieces) #Audio(np.concatenate(pieces), rate=rate)
+                filename = clean_path(dirname(realpath(__file__)) + "/" + prompt + ".wav")
+                # Write the combined audio to a file
+                write_wav(filename, rate, audio.transpose())
+
+            else: # AudioLDM
                 seed = context.scene.movie_num_seed
                 seed = (
                     seed
@@ -750,8 +797,8 @@ class SEQUENCER_OT_generate_audio(Operator):
                 ).audios[0]
                 rate = 16000
                 
-            filename = clean_path(dirname(realpath(__file__)) + "/" + prompt + ".wav")
-            scipy.io.wavfile.write(filename, rate, audio.transpose())
+                filename = clean_path(dirname(realpath(__file__)) + "/" + prompt + ".wav")
+                write_wav(filename, rate, audio.transpose()) #.transpose()
 
             filepath = filename
             if os.path.isfile(filepath):
@@ -1150,7 +1197,7 @@ def register():
             ("speaker_8", "Speaker 8", ""),
             ("speaker_9", "Speaker 9", ""),
         ],
-        default="speaker_1",
+        default="speaker_0",
     )
 
     bpy.types.Scene.languages = bpy.props.EnumProperty(
