@@ -15,7 +15,7 @@ from bpy.types import Operator, Panel, AddonPreferences
 from bpy.props import StringProperty, BoolProperty, EnumProperty, IntProperty
 import site, platform
 import subprocess
-import sys, os, aud
+import sys, os, aud, re
 import string
 from os.path import dirname, realpath, isfile
 import shutil
@@ -53,6 +53,78 @@ def set_system_console_topmost(top):
         )
 
 
+def split_and_recombine_text(text, desired_length=200, max_length=300):
+    """Split text it into chunks of a desired length trying to keep sentences intact."""
+    # normalize text, remove redundant whitespace and convert non-ascii quotes to ascii
+    text = re.sub(r'\n\n+', '\n', text)
+    text = re.sub(r'\s+', ' ', text)
+    text = re.sub(r'[“”]', '"', text)
+
+    rv = []
+    in_quote = False
+    current = ""
+    split_pos = []
+    pos = -1
+    end_pos = len(text) - 1
+
+    def seek(delta):
+        nonlocal pos, in_quote, current
+        is_neg = delta < 0
+        for _ in range(abs(delta)):
+            if is_neg:
+                pos -= 1
+                current = current[:-1]
+            else:
+                pos += 1
+                current += text[pos]
+            if text[pos] == '"':
+                in_quote = not in_quote
+        return text[pos]
+
+    def peek(delta):
+        p = pos + delta
+        return text[p] if p < end_pos and p >= 0 else ""
+
+    def commit():
+        nonlocal rv, current, split_pos
+        rv.append(current)
+        current = ""
+        split_pos = []
+
+    while pos < end_pos:
+        c = seek(1)
+        # do we need to force a split?
+        if len(current) >= max_length:
+            if len(split_pos) > 0 and len(current) > (desired_length / 2):
+                # we have at least one sentence and we are over half the desired length, seek back to the last split
+                d = pos - split_pos[-1]
+                seek(-d)
+            else:
+                # no full sentences, seek back until we are not in the middle of a word and split there
+                while c not in '!?.,\n ' and pos > 0 and len(current) > desired_length:
+                    c = seek(-1)
+            commit()
+        # check for sentence boundaries
+        elif not in_quote and (c in '!?\n' or (c == '.' and peek(1) in '\n ')):
+            # seek forward if we have consecutive boundary markers but still within the max length
+            while pos < len(text) - 1 and len(current) < max_length and peek(1) in '!?.,':
+                c = seek(1)
+            split_pos.append(pos)
+            if len(current) >= desired_length:
+                commit()
+        # treat end of quote as a boundary if its followed by a space or newline
+        elif in_quote and peek(1) == '"' and peek(2) in '\n ':
+            seek(2)
+            split_pos.append(pos)
+    rv.append(current)
+
+    # clean up, remove lines with only whitespace or punctuation
+    rv = [s.strip() for s in rv]
+    rv = [s for s in rv if len(s) > 0 and not re.match(r'^[\s\.,;:!?]*$', s)]
+
+    return rv
+
+
 def closest_divisible_64(num):
     # Determine the remainder when num is divided by 64
     remainder = num % 64
@@ -87,7 +159,7 @@ def clean_filename(filename):
     clean_filename = "".join(c if c in valid_chars else "_" for c in filename)
     clean_filename = clean_filename.replace('\n', ' ')
     clean_filename = clean_filename.replace('\r', ' ')
-    
+
     return clean_filename.strip()
 
 
@@ -221,7 +293,6 @@ def install_modules(self):
     import_module(self, "xformers", "xformers")
     import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
     import_module(self, "IPython", "IPython")
-    import_module(self, "nltk", "nltk")
     subprocess.check_call([pybin,"-m","pip","install","numpy","--upgrade"])
 
 
@@ -262,6 +333,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             ("damo-vilab/text-to-video-ms-1.7b", "Modelscope (256x256)", "Modelscope"),
             ("kabachuha/modelscope-damo-text2video-pruned-weights", "Pruned Modelscope (256x256)", "Pruned Modelscope"),
             ("strangeman3107/animov-0.1.1", "Animov (448x384)", "Animov"),
+            ("strangeman3107/animov-512x", "Animov (512x512)", "Animov"),
         ],
         default="strangeman3107/animov-0.1.1",
     )
@@ -328,7 +400,7 @@ class GENERATOR_OT_install(Operator):
         self.report(
             {"INFO"},
             "Installation of dependencies is finished.",
-        )        
+        )
         return {"FINISHED"}
 
 
@@ -402,7 +474,7 @@ class SEQEUNCER_PT_generate_ai(Panel):
         preferences = context.preferences
         addon_prefs = preferences.addons[__name__].preferences
         audio_model_card = addon_prefs.audio_model_card
-        
+
         layout = self.layout
         layout.use_property_split = False
         layout.use_property_decorate = False
@@ -422,10 +494,10 @@ class SEQEUNCER_PT_generate_ai(Panel):
             pass
         else:
             col.prop(context.scene, "generate_movie_negative_prompt", text="", icon="REMOVE")
- 
+
         layout = self.layout
         layout.use_property_split = True
-        layout.use_property_decorate = False 
+        layout.use_property_decorate = False
         if type == "movie" or type == "image":
             col = layout.column(align=True)
             col.prop(context.scene, "generate_movie_x", text="X")
@@ -435,12 +507,12 @@ class SEQEUNCER_PT_generate_ai(Panel):
             col.prop(context.scene, "generate_movie_frames", text="Frames")
         if type == "audio" and audio_model_card != "bark":
             col.prop(context.scene, "audio_length_in_f", text="Frames")
-            
+
         if type == "audio" and audio_model_card == "bark":
             col = layout.column(align=True)
             col.prop(context.scene, "speakers", text="Speaker")
             col.prop(context.scene, "languages", text="Language")
-        else:            
+        else:
             col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
             col.prop(context.scene, "movie_num_guidance", text="Word Power")
 
@@ -449,7 +521,7 @@ class SEQEUNCER_PT_generate_ai(Panel):
             sub_row = row.row(align=True)
             sub_row.prop(context.scene, "movie_num_seed", text="Seed")
             row.prop(context.scene, "movie_use_random", text="", icon="QUESTION")
-            sub_row.active = not context.scene.movie_use_random           
+            sub_row.active = not context.scene.movie_use_random
 
         col.prop(context.scene, "movie_num_batch", text="Batch Count")
 
@@ -520,7 +592,7 @@ class SEQUENCER_OT_generate_movie(Operator):
         preferences = context.preferences
         addon_prefs = preferences.addons[__name__].preferences
         movie_model_card = addon_prefs.movie_model_card
-        
+
         # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
         pipe = DiffusionPipeline.from_pretrained(
             movie_model_card,
@@ -596,7 +668,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             if not os.path.isfile(dst_path):
                 print("No resulting file found.")
                 return {"CANCELLED"}
-                
+
 #                strip = scene.sequence_editor.sequences.new_movie(
 #                    name=context.scene.generate_movie_prompt + " " + str(seed),
 #                    frame_start=start_frame,
@@ -662,7 +734,7 @@ class SEQUENCER_OT_generate_audio(Operator):
 
         preferences = context.preferences
         addon_prefs = preferences.addons[__name__].preferences
-      
+
         current_frame = scene.frame_current
         prompt = scene.generate_movie_prompt
         negative_prompt = scene.generate_movie_negative_prompt
@@ -679,7 +751,8 @@ class SEQUENCER_OT_generate_audio(Operator):
             from scipy.io.wavfile import write as write_wav
             import xformers
 
-            if addon_prefs.audio_model_card == "bark":            
+            if addon_prefs.audio_model_card == "bark":
+                os.environ["CUDA_VISIBLE_DEVICES"] = "0"
                 import numpy as np
                 from bark.generation import (
                     generate_text_semantic,
@@ -687,9 +760,6 @@ class SEQUENCER_OT_generate_audio(Operator):
                 )
                 from bark.api import semantic_to_waveform
                 from bark import generate_audio, SAMPLE_RATE
-                import nltk
-                nltk.download('punkt')
-            
         except ModuleNotFoundError:
             print("Dependencies needs to be installed in the add-on preferences.")
             self.report(
@@ -716,10 +786,10 @@ class SEQUENCER_OT_generate_audio(Operator):
             preload_models(
             text_use_small=True,
             coarse_use_small=True,
-            fine_use_gpu=True, 
+            fine_use_gpu=True,
             fine_use_small=True,
         )
-            
+
         for i in range(scene.movie_num_batch):
             #wm.progress_update(i)
             if i > 0:
@@ -736,17 +806,20 @@ class SEQUENCER_OT_generate_audio(Operator):
                     scene.frame_current,
                     100000000000000000000,
                 )
-                start_frame = scene.frame_current            
+                start_frame = scene.frame_current
 
             if addon_prefs.audio_model_card == "bark":
-                prompt = context.scene.generate_movie_prompt
-                prompt = prompt.replace("\n", " ").strip()
-                sentences = nltk.sent_tokenize(prompt)
+
                 rate = 24000
                 GEN_TEMP = 0.6
                 SPEAKER = scene.languages + "_" + scene.speakers #"v2/"+
-                silence = np.zeros(int(0.25 * rate))  # quarter second of silence
-                
+                silence = np.zeros(int(0.5 * rate))  # quarter second of silence
+
+                prompt = context.scene.generate_movie_prompt
+                prompt = prompt.replace("\n", " ").strip()
+
+                sentences = split_and_recombine_text(prompt, desired_length=90, max_length=150)
+
                 pieces = []
                 for sentence in sentences:
                     print(sentence)
@@ -754,14 +827,15 @@ class SEQUENCER_OT_generate_audio(Operator):
                         sentence,
                         history_prompt=SPEAKER,
                         temp=GEN_TEMP,
-                        min_eos_p=0.05,  # this controls how likely the generation is to end
+                        #min_eos_p=0.1,  # this controls how likely the generation is to end
                     )
 
                     audio_array = semantic_to_waveform(semantic_tokens, history_prompt=SPEAKER)
                     pieces += [audio_array, silence.copy()]
-                    
+
                 audio = np.concatenate(pieces) #Audio(np.concatenate(pieces), rate=rate)
                 filename = clean_path(dirname(realpath(__file__)) + "/" + prompt + ".wav")
+
                 # Write the combined audio to a file
                 write_wav(filename, rate, audio.transpose())
 
@@ -785,8 +859,9 @@ class SEQUENCER_OT_generate_audio(Operator):
                         generator.manual_seed(seed)
                     else:
                         generator = None
-                
+
                 prompt = context.scene.generate_movie_prompt
+
                 # Options: https://huggingface.co/docs/diffusers/main/en/api/pipelines/audioldm
                 audio = pipe(
                     prompt,
@@ -796,7 +871,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                     generator=generator,
                 ).audios[0]
                 rate = 16000
-                
+
                 filename = clean_path(dirname(realpath(__file__)) + "/" + prompt + ".wav")
                 write_wav(filename, rate, audio.transpose()) #.transpose()
 
@@ -818,7 +893,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
             else:
                 print("No resulting file found!")
-        
+
         # clear the VRAM
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -889,7 +964,7 @@ class SEQUENCER_OT_generate_image(Operator):
             from huggingface_hub.commands.user import login
             result = login(token = addon_prefs.hugginface_token)
             print("Login: " + str(result))
-            
+
             # stage 1
             stage_1 = DiffusionPipeline.from_pretrained("DeepFloyd/IF-I-M-v1.0", variant="fp16", torch_dtype=torch.float16)
             stage_1.enable_model_cpu_offload()
@@ -962,13 +1037,13 @@ class SEQUENCER_OT_generate_image(Operator):
                     generator = None
 
             if image_model_card == "DeepFloyd/IF-I-M-v1.0":
-                
+
                 # stage 1
                 image = stage_1(
                     prompt_embeds=prompt_embeds, negative_prompt_embeds=negative_embeds, generator=generator, output_type="pt"
                 ).images
                 pt_to_pil(image)[0].save("./if_stage_I.png")
-                
+
                 # stage 2
                 image = stage_2(
                     image=image,
@@ -978,7 +1053,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     output_type="pt",
                 ).images
                 pt_to_pil(image)[0].save("./if_stage_II.png")
-                
+
                 # stage 3
                 image = stage_3(prompt=prompt, image=image, noise_level=100, generator=generator).images
                 image[0].save("./if_stage_III.png")
