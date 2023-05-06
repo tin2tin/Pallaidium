@@ -632,7 +632,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             seed = (
                 seed
                 if not context.scene.movie_use_random
-                else random.randint(0, 2147483647)
+                else random.randint(0, 999999)
             )
             context.scene.movie_num_seed = seed
 
@@ -704,14 +704,14 @@ class SEQUENCER_OT_generate_movie(Operator):
                             bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
                             break
 
+            # clear the VRAM
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
-        bpy.ops.renderreminder.play_notification()
-        #wm.progress_end()
-        scene.frame_current = current_frame
+            bpy.ops.renderreminder.play_notification()
+            #wm.progress_end()
+            scene.frame_current = current_frame
 
-        # clear the VRAM
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
         return {"FINISHED"}
 
 
