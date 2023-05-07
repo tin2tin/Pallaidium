@@ -812,8 +812,8 @@ class SEQUENCER_OT_generate_audio(Operator):
 
                 rate = 24000
                 GEN_TEMP = 0.6
-                SPEAKER = scene.languages + "_" + scene.speakers #"v2/"+
-                silence = np.zeros(int(0.5 * rate))  # quarter second of silence
+                SPEAKER = "v2/"+scene.languages + "_" + scene.speakers #"v2/"+
+                silence = np.zeros(int(0.25 * rate))  # quarter second of silence
 
                 prompt = context.scene.generate_movie_prompt
                 prompt = prompt.replace("\n", " ").strip()
@@ -1273,7 +1273,7 @@ def register():
             ("speaker_8", "Speaker 8", ""),
             ("speaker_9", "Speaker 9", ""),
         ],
-        default="speaker_0",
+        default="speaker_6",
     )
 
     bpy.types.Scene.languages = bpy.props.EnumProperty(
