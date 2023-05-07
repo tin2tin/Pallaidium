@@ -12,7 +12,7 @@ bl_info = {
 
 import bpy, ctypes, random
 from bpy.types import Operator, Panel, AddonPreferences
-from bpy.props import StringProperty, BoolProperty, EnumProperty, IntProperty
+from bpy.props import StringProperty, BoolProperty, EnumProperty, IntProperty, FloatProperty
 import site, platform
 import subprocess
 import sys, os, aud, re
@@ -708,9 +708,9 @@ class SEQUENCER_OT_generate_movie(Operator):
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
-            bpy.ops.renderreminder.play_notification()
-            #wm.progress_end()
-            scene.frame_current = current_frame
+        bpy.ops.renderreminder.play_notification()
+        #wm.progress_end()
+        scene.frame_current = current_frame
 
         return {"FINISHED"}
 
@@ -844,7 +844,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 seed = (
                     seed
                     if not context.scene.movie_use_random
-                    else random.randint(0, 2147483647)
+                    else random.randint(0, 999999)
                 )
                 context.scene.movie_num_seed = seed
 
@@ -894,9 +894,10 @@ class SEQUENCER_OT_generate_audio(Operator):
             else:
                 print("No resulting file found!")
 
-        # clear the VRAM
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+            # clear the VRAM
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
         bpy.ops.renderreminder.play_notification()
 
         return {"FINISHED"}
@@ -1020,7 +1021,7 @@ class SEQUENCER_OT_generate_image(Operator):
             seed = (
                 seed
                 if not context.scene.movie_use_random
-                else random.randint(0, 2147483647)
+                else random.randint(0, 999999)
             )
             context.scene.movie_num_seed = seed
 
@@ -1233,9 +1234,9 @@ def register():
     )
 
     # The seed number.
-    bpy.types.Scene.movie_num_guidance = bpy.props.IntProperty(
+    bpy.types.Scene.movie_num_guidance = bpy.props.FloatProperty(
         name="movie_num_guidance",
-        default=17,
+        default=2.7,
         min=1,
         max=100,
     )
