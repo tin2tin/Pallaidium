@@ -1159,11 +1159,11 @@ def panel_text_to_generatorAI(self, context):
 
 
 classes = (
+    GeneratorAddonPreferences,
     SEQUENCER_OT_generate_movie,
     SEQUENCER_OT_generate_audio,
     SEQUENCER_OT_generate_image,
     SEQEUNCER_PT_generate_ai,
-    GeneratorAddonPreferences,
     GENERATOR_OT_sound_notification,
     SEQUENCER_OT_strip_to_generatorAI,
     GENERATOR_OT_install,
