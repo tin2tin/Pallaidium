@@ -28,7 +28,7 @@ AI generate video, image and audio from text prompts or strips.
 
 * In the Generative AI add-on preferences, hit the "Install all Dependencies" button.
 
-* Note that you can change what model cards are used in the various modes here (video, image, audio)
+* Note that you can change what model cards are used in the various modes here(video, image, audio).
 
 * When it writes that it is finished(if any errors, let me know).
 
