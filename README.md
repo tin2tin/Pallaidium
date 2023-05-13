@@ -36,6 +36,10 @@ AI generate video, image and audio from text prompts or strips.
 
 * The first time any model is executed many GB will have to be downloaded, so go grab lots of coffee. 
 
+Install Dependencies, set Movie Model Card and set Sound Notification in the add-on preferences:
+
+![image](https://user-images.githubusercontent.com/1322593/233810577-961de9ec-ce3f-433b-a43c-dd4583fb518c.png)
+
 
 ## Location
 
@@ -48,10 +52,6 @@ Video Sequence Editor > Sidebar > Generative AI
 Converting Text strips into GeneratorAI strips:
 
 ![image](https://user-images.githubusercontent.com/1322593/232625894-6726d407-c802-4619-864a-0b8b7faeceff.png)
-
-Install Dependencies, set Movie Model Card and set Sound Notification in the add-on preferences:
-
-![image](https://user-images.githubusercontent.com/1322593/233810577-961de9ec-ce3f-433b-a43c-dd4583fb518c.png)
 
 #### Tip
 If the image of your renders breaks, then use the resolution from the Model Card in the Preferences.
