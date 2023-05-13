@@ -15,20 +15,27 @@ AI generate video, image and audio from text prompts or strips.
 * Render finished notification
 * Model Cards: Modelscope, Animov, Stable Diffusion 1.5 & 2, AudioLMD and Bark 
 
-## How to install (on Win)
-Download the add-on: https://github.com/tin2tin/text_to_video/archive/refs/heads/main.zip
+## How to install
+(As for Linux and MacOS, if anything differs in installation, then please share instructions.)
 
-Right click on the Blender icon and "Run Blender as Administrator".
+* First you must download and install git for your platform(must be on PATH(or Bark will fail)): https://git-scm.com/downloads
 
-Install the add-on as usual: Preferences > Add-ons > Install > select file > enable the add-on. 
+* Download the add-on: https://github.com/tin2tin/text_to_video/archive/refs/heads/main.zip
 
-In the add-on preferences, hit the "Install all Dependencies" button.
+* On Windows, right click on the Blender icon and "Run Blender as Administrator"(or you'll get write permission errors).
 
-The first time a model is executed and many GB will have to be downloaded, so go grab lots of coffee. 
+* Install the add-on as usual: Preferences > Add-ons > Install > select file > enable the add-on. 
 
-If it says git is missing, you can find it here: https://git-scm.com/download/win
+* In the Generative AI add-on preferences, hit the "Install all Dependencies" button.
 
-As for Linux and MacOS, if anything differs in installation, then please share instructions.
+* Note that you can change what model cards are used in the various modes here (video, image, audio)
+
+* When it writes that it is finished(if any errors, let me know).
+
+* Open the add-on UI in the Sequencedr > Sidebar > Generative AI.
+
+* The first time any model is executed many GB will have to be downloaded, so go grab lots of coffee. 
+
 
 ## Location
 
