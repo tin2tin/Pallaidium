@@ -330,10 +330,9 @@ class GeneratorAddonPreferences(AddonPreferences):
     movie_model_card: bpy.props.EnumProperty(
         name="Movie Model Card",
         items=[
-            ("damo-vilab/text-to-video-ms-1.7b", "Modelscope (256x256)", "Modelscope"),
-            ("kabachuha/modelscope-damo-text2video-pruned-weights", "Pruned Modelscope (256x256)", "Pruned Modelscope"),
             ("strangeman3107/animov-0.1.1", "Animov (448x384)", "Animov"),
             ("strangeman3107/animov-512x", "Animov (512x512)", "Animov"),
+            ("damo-vilab/text-to-video-ms-1.7b", "Modelscope (256x256)", "Modelscope"),
         ],
         default="strangeman3107/animov-0.1.1",
     )
@@ -1236,7 +1235,7 @@ def register():
     # The seed number.
     bpy.types.Scene.movie_num_guidance = bpy.props.FloatProperty(
         name="movie_num_guidance",
-        default=2.7,
+        default=15.0,
         min=1,
         max=100,
     )
