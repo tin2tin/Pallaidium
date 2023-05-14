@@ -279,6 +279,8 @@ def install_modules(self):
             )
         else:
             import_module(self, "torch", "torch")
+            import_module(self, "torchvision", "torchvision")
+            import_module(self, "torchaudio", "torchaudio")
     if os_platform == 'Darwin':
         import_module(self, "sox", "sox")
     else:
@@ -685,7 +687,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                             bpy.ops.sequencer.movie_strip_add(filepath=dst_path,
                                                               frame_start=start_frame,
                                                               channel=empty_channel,
-                                                              fit_method="FILL",
+                                                              fit_method="FIT",
                                                               adjust_playback_rate=True,
                                                               sound=False,
                                                               use_framerate = False,
@@ -1081,7 +1083,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     frame_start=start_frame,
                     filepath=out_path,
                     channel=empty_channel,
-                    fit_method="FILL",
+                    fit_method="FIT",
                 )
                 strip.frame_final_duration = scene.generate_movie_frames
                 strip.transform.filter = 'NEAREST'
@@ -1171,8 +1173,7 @@ classes = (
 
 
 def register():
-    for cls in classes:
-        bpy.utils.register_class(cls)
+
     bpy.types.Scene.generate_movie_prompt = bpy.props.StringProperty(
         name="generate_movie_prompt", default=""
     )
@@ -1200,7 +1201,7 @@ def register():
     # The number of frames to be generated.
     bpy.types.Scene.generate_movie_frames = bpy.props.IntProperty(
         name="generate_movie_frames",
-        default=16,
+        default=18,
         min=1,
         max=125,
     )
@@ -1294,6 +1295,9 @@ def register():
         ],
         default="en"
     )
+
+    for cls in classes:
+        bpy.utils.register_class(cls)
 
     bpy.types.SEQUENCER_MT_add.append(panel_text_to_generatorAI)
 
