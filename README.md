@@ -68,8 +68,6 @@ Tip           |
 :------------- |
 If the image of your renders breaks, then use the resolution from the Model Card in the Preferences.     |
 
-#### Tip
-If the image of your renders breaks, then use the resolution from the Model Card in the Preferences.
 
 # Text to Audio
 
