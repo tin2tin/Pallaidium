@@ -64,6 +64,10 @@ The Modelscope model have a watermark, since it's been trained on Shutterstock m
 The Animov models have been trained on Anime material, so adding "anime" to the prompt is nessessary for especially the Animov-512x model. 
 The Stable Diffusion models for generating images, have been used a lot, so there are plenty of promt suggestions out there if you google for them. 
 
+Tip           |
+:------------- |
+If the image of your renders breaks, then use the resolution from the Model Card in the Preferences.     |
+
 #### Tip
 If the image of your renders breaks, then use the resolution from the Model Card in the Preferences.
 
@@ -89,8 +93,9 @@ Find Bark documentation here: https://github.com/suno-ai/bark
 
 Speaker Library: https://suno-ai.notion.site/8b8e8749ed514b0cbf3f699013548683?v=bc67cff786b04b50b3ceb756fd05f68c
 
-#### Tip
-If the audio breaks up, try processing longer sentences.
+Tip           |
+:------------- |
+If the audio breaks up, try processing longer sentences.      |
 
 ## Modules
 Diffusers: https://github.com/huggingface/diffusers
