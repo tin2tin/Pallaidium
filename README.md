@@ -113,10 +113,10 @@ If some additional python modules are missing, write about it here(so I can add 
 https://github.com/amb/blender_pip
 
 
-## Disclaimer for using the Modelscope model:
+## Restrictions for using the AI models:
 
-- The model can only be used for non-commercial purposes. The model is meant for research purposes.
-- The model was not trained to realistically represent people or events, so using it to generate such content is beyond the model's capabilities.
+- The models can only be used for non-commercial purposes. The model is meant for research purposes.
+- The models was not trained to realistically represent people or events, so using it to generate such content is beyond the model's capabilities.
 - It is prohibited to generate content that is demeaning or harmful to people or their environment, culture, religion, etc.
 - Prohibited for pornographic, violent and bloody content generation.
 - Prohibited for error and false information generation.
