@@ -115,7 +115,7 @@ https://github.com/amb/blender_pip
 
 ## Restrictions for using the AI models:
 
-- The models can only be used for non-commercial purposes. The model is meant for research purposes.
+- The models can only be used for non-commercial purposes. The models are meant for research purposes.
 - The models was not trained to realistically represent people or events, so using it to generate such content is beyond the model's capabilities.
 - It is prohibited to generate content that is demeaning or harmful to people or their environment, culture, religion, etc.
 - Prohibited for pornographic, violent and bloody content generation.
