@@ -281,7 +281,7 @@ def install_modules(self):
             import_module(self, "torch", "torch")
             import_module(self, "torchvision", "torchvision")
             import_module(self, "torchaudio", "torchaudio")
-    if os_platform == 'Darwin':
+    if os_platform == 'Darwin' or os_platform == 'Linux':
         import_module(self, "sox", "sox")
     else:
         import_module(self, "soundfile", "PySoundFile")
@@ -296,6 +296,21 @@ def install_modules(self):
     import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
     import_module(self, "IPython", "IPython")
     subprocess.check_call([pybin,"-m","pip","install","numpy","--upgrade"])
+    if os_platform == "Windows":
+        subprocess.check_call(
+            [
+                pybin,
+                "-m",
+                "pip",
+                "install",
+                "torch",
+                "--index-url",
+                "https://download.pytorch.org/whl/cu118",
+                "--no-warn-script-location",
+                "--user",
+            ]
+        )
+
 
 
 class GeneratorAddonPreferences(AddonPreferences):
@@ -332,9 +347,9 @@ class GeneratorAddonPreferences(AddonPreferences):
     movie_model_card: bpy.props.EnumProperty(
         name="Movie Model Card",
         items=[
-            ("strangeman3107/animov-0.1.1", "Animov (448x384)", "Animov"),
-            ("strangeman3107/animov-512x", "Animov (512x512)", "Animov"),
-            ("damo-vilab/text-to-video-ms-1.7b", "Modelscope (256x256)", "Modelscope"),
+            ("strangeman3107/animov-0.1.1", "Animov (448x384)", "Animov (448x384)"),
+            ("strangeman3107/animov-512x", "Animov (512x512)", "Animov (512x512)"),
+            ("damo-vilab/text-to-video-ms-1.7b", "Modelscope (256x256)", "Modelscope (256x256)"),
         ],
         default="strangeman3107/animov-0.1.1",
     )
