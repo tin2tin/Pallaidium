@@ -41,7 +41,7 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 
 * The first time any model is executed many GB will have to be downloaded, so go grab lots of coffee. 
 
-* If it says xformers are missing, then try to restart Blender.
+* If it says:"ModuleNotFoundError: Refer to https://github.com/facebookresearch/xformers for more information on how to install xformers", then try to restart Blender.
 
 Install Dependencies, set Movie Model Card and set Sound Notification in the add-on preferences:
 
