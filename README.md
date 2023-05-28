@@ -37,9 +37,11 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 
 * When it writes that it is finished(if any errors, let me know).
 
-* Open the add-on UI in the Sequencedr > Sidebar > Generative AI.
+* Open the add-on UI in the Sequencer > Sidebar > Generative AI.
 
 * The first time any model is executed many GB will have to be downloaded, so go grab lots of coffee. 
+
+* If it says xformers not found. Try to restart Blender.
 
 Install Dependencies, set Movie Model Card and set Sound Notification in the add-on preferences:
 
