@@ -223,11 +223,13 @@ def install_modules(self):
     pybin = sys.executable
 
     print("Ensuring: pip")
+
     try:
         subprocess.call([pybin, "-m", "ensurepip"])
         subprocess.call([pybin, "-m", "pip", "install", "--upgrade", "pip"])
     except ImportError:
         pass
+
     try:
         exec("import torch")
     except ModuleNotFoundError:
@@ -292,9 +294,10 @@ def install_modules(self):
     import_module(self, "safetensors", "safetensors")
     import_module(self, "cv2", "opencv_python")
     import_module(self, "scipy", "scipy")
-    import_module(self, "xformers", "xformers")
-    import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
     import_module(self, "IPython", "IPython")
+    import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
+    import_module(self, "xformers", "xformers")
+    subprocess.check_call([pybin,"-m","pip","install","force-reinstall","no-deps","pre xformers"])
     subprocess.check_call([pybin,"-m","pip","install","numpy","--upgrade"])
     if os_platform == "Windows":
         subprocess.check_call(
@@ -532,7 +535,7 @@ class SEQEUNCER_PT_generate_ai(Panel):
             col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
             col.prop(context.scene, "movie_num_guidance", text="Word Power")
 
-            col = layout.column(align=True)
+            col = layout.column()
             row = col.row(align=True)
             sub_row = row.row(align=True)
             sub_row.prop(context.scene, "movie_num_seed", text="Seed")
@@ -625,6 +628,7 @@ class SEQUENCER_OT_generate_movie(Operator):
         # memory optimization
         pipe.enable_model_cpu_offload()
         pipe.enable_vae_slicing()
+        pipe.enable_xformers_memory_efficient_attention()
 
         for i in range(scene.movie_num_batch):
             #wm.progress_update(i)
@@ -1014,6 +1018,7 @@ class SEQUENCER_OT_generate_image(Operator):
             # memory optimization
             pipe.enable_model_cpu_offload()
             pipe.enable_vae_slicing()
+            pipe.enable_xformers_memory_efficient_attention()
 
         for i in range(scene.movie_num_batch):
             #wm.progress_update(i)
@@ -1057,15 +1062,15 @@ class SEQUENCER_OT_generate_image(Operator):
 
                 # stage 1
                 image = stage_1(
-                    prompt_embeds=prompt_embeds, negative_prompt_embeds=negative_embeds, generator=generator, output_type="pt"
+                    prompt_embeds=prompt, negative_prompt_embeds=negative_prompt, generator=generator, output_type="pt"
                 ).images
                 pt_to_pil(image)[0].save("./if_stage_I.png")
 
                 # stage 2
                 image = stage_2(
                     image=image,
-                    prompt_embeds=prompt_embeds,
-                    negative_prompt_embeds=negative_embeds,
+                    prompt_embeds=prompt,
+                    negative_prompt_embeds=negative_prompt,
                     generator=generator,
                     output_type="pt",
                 ).images
@@ -1288,7 +1293,7 @@ def register():
             ("speaker_8", "Speaker 8", ""),
             ("speaker_9", "Speaker 9", ""),
         ],
-        default="speaker_6",
+        default="speaker_3",
     )
 
     bpy.types.Scene.languages = bpy.props.EnumProperty(
