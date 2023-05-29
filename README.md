@@ -110,6 +110,8 @@ https://github.com/haoheliu/AudioLDM
 
 Bark: https://github.com/suno-ai/bark
 
+Deep Floyd IF: https://github.com/deep-floyd/IF
+
 If some additional python modules are missing, write about it here(so I can add them), and use the Blender PIP add-on to manually install the missing modules:
 
 https://github.com/amb/blender_pip
