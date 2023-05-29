@@ -3,7 +3,7 @@
 bl_info = {
     "name": "Generative AI",
     "author": "tintwotin",
-    "version": (1, 2),
+    "version": (1, 3),
     "blender": (3, 4, 0),
     "location": "Video Sequence Editor > Sidebar > Generative AI",
     "description": "Generate media in the VSE",
@@ -985,10 +985,13 @@ class SEQUENCER_OT_generate_image(Operator):
             from huggingface_hub.commands.user import login
             result = login(token = addon_prefs.hugginface_token)
             print("Login: " + str(result))
+            
+            torch.cuda.set_per_process_memory_fraction(0.90)
 
             # stage 1
             stage_1 = DiffusionPipeline.from_pretrained("DeepFloyd/IF-I-M-v1.0", variant="fp16", torch_dtype=torch.float16)
-            stage_1.enable_model_cpu_offload()
+            # stage_1.enable_model_cpu_offload()
+            stage_1.enable_sequential_cpu_offload() # 6 GB VRAM
 
             # stage 2
             stage_2 = DiffusionPipeline.from_pretrained(
@@ -1006,6 +1009,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 "stabilityai/stable-diffusion-x4-upscaler", **safety_modules, torch_dtype=torch.float16
             )
             stage_3.enable_model_cpu_offload()
+            
         else: # stable Diffusion
             pipe = DiffusionPipeline.from_pretrained(
                 image_model_card,
@@ -1059,7 +1063,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     generator = None
 
             if image_model_card == "DeepFloyd/IF-I-M-v1.0":
-                prompt_embeds, negative_embeds = stage_1.encode_prompt(prompt)
+                prompt_embeds, negative_embeds = stage_1.encode_prompt(prompt=prompt, negative_prompt=negative_prompt)
                 
                 # stage 1
                 image = stage_1(
@@ -1108,7 +1112,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     fit_method="FIT",
                 )
                 strip.frame_final_duration = scene.generate_movie_frames
-                strip.transform.filter = 'NEAREST'
+                strip.transform.filter = 'SUBSAMPLING_3x3'
 
                 scene.sequence_editor.active_strip = strip
                 if i > 0:
@@ -1119,6 +1123,10 @@ class SEQUENCER_OT_generate_image(Operator):
                 bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
             else:
                 print("No resulting file found.")
+                
+            # clear the VRAM
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
         bpy.ops.renderreminder.play_notification()
         #wm.progress_end()
