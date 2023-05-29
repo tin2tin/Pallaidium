@@ -1079,7 +1079,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
                 # stage 3
                 image = stage_3(prompt=prompt, image=image, noise_level=100, generator=generator).images
-                image[0].save("./if_stage_III.png")
+                # image[0].save("./if_stage_III.png")
                 image = image[0]
 
             else: # Stable Diffusion
@@ -1197,11 +1197,11 @@ classes = (
 def register():
 
     bpy.types.Scene.generate_movie_prompt = bpy.props.StringProperty(
-        name="generate_movie_prompt", default=""
+        name="generate_movie_prompt", default=", high quality, masterpiece, slow motion, 4k"
     )
     bpy.types.Scene.generate_movie_negative_prompt = bpy.props.StringProperty(
         name="generate_movie_negative_prompt",
-        default="text, watermark, copyright, blurry, grainy, copyright",
+        default=", low quality, windy, flicker, jitter",
     )
     bpy.types.Scene.generate_audio_prompt = bpy.props.StringProperty(
         name="generate_audio_prompt", default=""
