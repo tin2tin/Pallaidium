@@ -15,7 +15,7 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 * Batch operation of text strips into videos, audios or images.
 * Model card selector
 * Render finished notification
-* Model Cards: Modelscope, Animov, Stable Diffusion 1.5 & 2, AudioLMD and Bark 
+* Model Cards: Modelscope, Animov, Stable Diffusion 1.5 & 2, Deep Floyd IF, AudioLMD and Bark 
 
 ## Requirements
 * A CUDA supported Nvidia card with at least 4 GB VRam.
