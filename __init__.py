@@ -3,7 +3,7 @@
 bl_info = {
     "name": "Generative AI",
     "author": "tintwotin",
-    "version": (1, 3),
+    "version": (1, 2),
     "blender": (3, 4, 0),
     "location": "Video Sequence Editor > Sidebar > Generative AI",
     "description": "Generate media in the VSE",
@@ -20,6 +20,21 @@ import string
 from os.path import dirname, realpath, isfile
 import shutil
 os_platform = platform.system()  # 'Linux', 'Darwin', 'Java', 'Windows'
+
+
+def get_active_device_vram():
+    active_scene = bpy.context.scene
+    active_view_layer = active_scene.view_layers.active
+    active_view_layer.use_gpu_select = True  # Enable GPU selection in the view layer
+
+    # Iterate over available GPU devices
+    for gpu_device in bpy.context.preferences.system.compute_device:
+        if gpu_device.type == 'CUDA':  # Only consider CUDA devices
+            if gpu_device.use:
+                return gpu_device.memory_total
+
+    return None
+
 
 def show_system_console(show):
     if os_platform == "Windows":
@@ -984,7 +999,6 @@ class SEQUENCER_OT_generate_image(Operator):
         if image_model_card == "DeepFloyd/IF-I-M-v1.0":
             from huggingface_hub.commands.user import login
             result = login(token = addon_prefs.hugginface_token)
-            print("Login: " + str(result))
             
             torch.cuda.set_per_process_memory_fraction(0.90)
 
@@ -1063,7 +1077,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     generator = None
 
             if image_model_card == "DeepFloyd/IF-I-M-v1.0":
-                prompt_embeds, negative_embeds = stage_1.encode_prompt(prompt=prompt, negative_prompt=negative_prompt)
+                prompt_embeds, negative_embeds = stage_1.encode_prompt(prompt, negative_prompt)
                 
                 # stage 1
                 image = stage_1(
@@ -1089,7 +1103,7 @@ class SEQUENCER_OT_generate_image(Operator):
             else: # Stable Diffusion
                 image = pipe(
                     prompt,
-                    negative_prompt=negative_embeds,
+                    negative_prompt=negative_prompt,
                     num_inference_steps=image_num_inference_steps,
                     guidance_scale=image_num_guidance,
                     height=y,
