@@ -17,11 +17,12 @@ import site, platform
 import subprocess
 import sys, os, aud, re
 import string
-from os.path import dirname, realpath, isfile
+from os.path import dirname, realpath, isdir, join, basename
 import shutil
 os_platform = platform.system()  # 'Linux', 'Darwin', 'Java', 'Windows'
 
 
+# not working
 def get_active_device_vram():
     active_scene = bpy.context.scene
     active_view_layer = active_scene.view_layers.active
@@ -178,9 +179,18 @@ def clean_filename(filename):
     return clean_filename.strip()
 
 
+def create_folder(folderpath):
+    if not isdir(folderpath):
+        os.makedirs(folderpath, exist_ok=True)
+    return folderpath
+
+
 def clean_path(full_path):
+    preferences = bpy.context.preferences
+    addon_prefs = preferences.addons[__name__].preferences
     name, ext = os.path.splitext(full_path)
     dir_path, filename = os.path.split(name)
+    dir_path = create_folder(addon_prefs.generator_ai)
     cleaned_filename = clean_filename(filename)
     new_filename = cleaned_filename + ext
     i = 1
@@ -443,6 +453,13 @@ class GeneratorAddonPreferences(AddonPreferences):
         subtype = "PASSWORD",
     )
 
+    generator_ai: StringProperty(
+        name = "Filepath",
+        description = "Path to the folder where the generated files are stored",
+        subtype = 'DIR_PATH',
+        default = join(bpy.utils.user_resource('DATAFILES'), "Generator AI")
+    )
+
     def draw(self, context):
         layout = self.layout
         box = layout.box()
@@ -456,6 +473,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             row.prop(self, "hugginface_token")
             row.operator("wm.url_open", text="", icon='URL').url = "https://huggingface.co/settings/tokens"
         box.prop(self, "audio_model_card")
+        box.prop(self, "generator_ai")
         row = box.row(align=True)
         row.label(text="Notification:")
         row.prop(self, "playsound", text="")
@@ -788,13 +806,6 @@ class SEQUENCER_OT_generate_movie(Operator):
                 print("No resulting file found.")
                 return {"CANCELLED"}
 
-#                strip = scene.sequence_editor.sequences.new_movie(
-#                    name=context.scene.generate_movie_prompt + " " + str(seed),
-#                    frame_start=start_frame,
-#                    filepath=dst_path,
-#                    channel=empty_channel,
-#                    fit_method="FILL",
-#                )
             for window in bpy.context.window_manager.windows:
                 screen = window.screen
                 for area in screen.areas:
@@ -814,6 +825,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                             strip.transform.filter = 'SUBSAMPLING_3x3'
                             scene.sequence_editor.active_strip = strip
                             strip.use_proxy = True
+                            strip.name = str(seed)+"_"+prompt
                             bpy.ops.sequencer.rebuild_proxy()
                             if i > 0:
                                 scene.frame_current = (
@@ -998,7 +1010,7 @@ class SEQUENCER_OT_generate_audio(Operator):
             if os.path.isfile(filepath):
                 empty_channel = empty_channel
                 strip = scene.sequence_editor.sequences.new_sound(
-                    name=prompt,
+                    name = str(seed)+"_"+prompt,
                     filepath=filepath,
                     channel=empty_channel,
                     frame_start=start_frame,
@@ -1084,7 +1096,7 @@ class SEQUENCER_OT_generate_image(Operator):
             from huggingface_hub.commands.user import login
             result = login(token = addon_prefs.hugginface_token)
             
-            torch.cuda.set_per_process_memory_fraction(0.90)
+            torch.cuda.set_per_process_memory_fraction(0.85)  # 6 GB VRAM
 
             # stage 1
             stage_1 = DiffusionPipeline.from_pretrained("DeepFloyd/IF-I-M-v1.0", variant="fp16", torch_dtype=torch.float16)
@@ -1118,7 +1130,7 @@ class SEQUENCER_OT_generate_image(Operator):
             pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
             # memory optimization
-            #pipe.enable_model_cpu_offload()
+            pipe.enable_model_cpu_offload()
             pipe.enable_vae_slicing()
             pipe.enable_xformers_memory_efficient_attention()
 
@@ -1196,14 +1208,14 @@ class SEQUENCER_OT_generate_image(Operator):
                 ).images[0]
 
             # Move to folder
-            filename = clean_filename(context.scene.generate_movie_prompt)
+            filename = clean_filename(str(seed)+"_"+context.scene.generate_movie_prompt)
             out_path = clean_path(dirname(realpath(__file__))+"/"+filename+".png")
             image.save(out_path)
 
             # Add strip
             if os.path.isfile(out_path):
                 strip = scene.sequence_editor.sequences.new_image(
-                    name=context.scene.generate_movie_prompt + " " + str(seed),
+                    name = str(seed)+"_"+context.scene.generate_movie_prompt,
                     frame_start=start_frame,
                     filepath=out_path,
                     channel=empty_channel,
