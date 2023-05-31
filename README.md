@@ -117,6 +117,17 @@ If some additional python modules are missing, write about it here(so I can add 
 https://github.com/amb/blender_pip
 
 
+## Uninstall
+
+Hugging Face diffusers model are downloaded from the hub and saved to a local cache directory. By default, the cache directory is located at:
+
+On Linux and macOS: ~/.cache/huggingface/transformers
+
+On Windows: %userprofile%\.cache\huggingface\transformers
+
+Here you can locate and delete the individual models.
+
+
 ## Restrictions for using the AI models:
 
 - The models can only be used for non-commercial purposes. The models are meant for research purposes.
