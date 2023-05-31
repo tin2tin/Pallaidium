@@ -372,6 +372,8 @@ def uninstall_module_with_dependencies(module_name):
     # Uninstall the dependencies
     for dependency in dependencies:
         subprocess.run([pybin, '-m', 'pip', 'uninstall', '-y', dependency])
+        
+    subprocess.check_call([pybin,"-m","pip","install","numpy"])
 
 
 class GeneratorAddonPreferences(AddonPreferences):
