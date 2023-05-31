@@ -330,6 +330,49 @@ def install_modules(self):
         )
 
 
+def get_module_dependencies(module_name):
+    """
+    Get the list of dependencies for a given module.
+    """
+
+    app_path = site.USER_SITE
+    if app_path not in sys.path:
+        sys.path.append(app_path)
+    pybin = sys.executable
+
+    result = subprocess.run([pybin,'-m' , 'pip', 'show', module_name], capture_output=True, text=True)
+    output = result.stdout.strip()
+
+    dependencies = []
+    for line in output.split('\n'):
+        if line.startswith('Requires:'):
+            dependencies = line.split(':')[1].strip().split(', ')
+            break
+    return dependencies
+
+
+def uninstall_module_with_dependencies(module_name):
+    """
+    Uninstall a module and its dependencies.
+    """
+
+    show_system_console(True)
+    set_system_console_topmost(True)
+
+    app_path = site.USER_SITE
+    if app_path not in sys.path:
+        sys.path.append(app_path)
+    pybin = sys.executable
+
+    dependencies = get_module_dependencies(module_name)
+
+    # Uninstall the module
+    subprocess.run([pybin, '-m', 'pip', 'uninstall', '-y', module_name])
+
+    # Uninstall the dependencies
+    for dependency in dependencies:
+        subprocess.run([pybin, '-m', 'pip', 'uninstall', '-y', dependency])
+
 
 class GeneratorAddonPreferences(AddonPreferences):
     bl_idname = __name__
@@ -401,7 +444,9 @@ class GeneratorAddonPreferences(AddonPreferences):
     def draw(self, context):
         layout = self.layout
         box = layout.box()
-        box.operator("sequencer.install_generator")
+        row = box.row()
+        row.operator("sequencer.install_generator")
+        row.operator("sequencer.uninstall_generator")
         box.prop(self, "movie_model_card")
         box.prop(self, "image_model_card")
         if self.image_model_card == "DeepFloyd/IF-I-M-v1.0":
@@ -434,6 +479,43 @@ class GENERATOR_OT_install(Operator):
         self.report(
             {"INFO"},
             "Installation of dependencies is finished.",
+        )
+        return {"FINISHED"}
+
+
+class GENERATOR_OT_uninstall(Operator):
+    """Unnstall all dependencies"""
+
+    bl_idname = "sequencer.uninstall_generator"
+    bl_label = "Uninstall Dependencies"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        preferences = context.preferences
+        addon_prefs = preferences.addons[__name__].preferences
+
+        uninstall_module_with_dependencies("torch")
+        uninstall_module_with_dependencies("torchvision")
+        uninstall_module_with_dependencies("torchaudio")
+
+        if os_platform == 'Darwin' or os_platform == 'Linux':
+            uninstall_module_with_dependencies("sox")
+        else:
+            uninstall_module_with_dependencies("PySoundFile")
+        uninstall_module_with_dependencies("diffusers")
+        uninstall_module_with_dependencies("accelerate")
+        uninstall_module_with_dependencies("transformers")
+        uninstall_module_with_dependencies("sentencepiece")
+        uninstall_module_with_dependencies("safetensors")
+        uninstall_module_with_dependencies("opencv_python")
+        uninstall_module_with_dependencies("scipy")
+        uninstall_module_with_dependencies("IPython")
+        uninstall_module_with_dependencies("bark")
+        uninstall_module_with_dependencies("xformers")
+        
+        self.report(
+            {"INFO"},
+            "\nRemove AI Models manually: \nOn Linux and macOS: ~/.cache/huggingface/transformers\nOn Windows: %userprofile%.cache\\huggingface\\transformers",
         )
         return {"FINISHED"}
 
@@ -727,7 +809,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                                                               use_framerate = False,
                                                               )
                             strip = scene.sequence_editor.active_strip
-                            strip.transform.filter = 'NEAREST'
+                            strip.transform.filter = 'SUBSAMPLING_3x3'
                             scene.sequence_editor.active_strip = strip
                             strip.use_proxy = True
                             bpy.ops.sequencer.rebuild_proxy()
@@ -1034,7 +1116,7 @@ class SEQUENCER_OT_generate_image(Operator):
             pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
             # memory optimization
-            pipe.enable_model_cpu_offload()
+            #pipe.enable_model_cpu_offload()
             pipe.enable_vae_slicing()
             pipe.enable_xformers_memory_efficient_attention()
 
@@ -1213,17 +1295,18 @@ classes = (
     GENERATOR_OT_sound_notification,
     SEQUENCER_OT_strip_to_generatorAI,
     GENERATOR_OT_install,
+    GENERATOR_OT_uninstall,
 )
 
 
 def register():
 
     bpy.types.Scene.generate_movie_prompt = bpy.props.StringProperty(
-        name="generate_movie_prompt", default=", high quality, masterpiece, slow motion, 4k"
+        name="generate_movie_prompt", default="high quality, masterpiece, slow motion, 4k"
     )
     bpy.types.Scene.generate_movie_negative_prompt = bpy.props.StringProperty(
         name="generate_movie_negative_prompt",
-        default=", low quality, windy, flicker, jitter",
+        default="low quality, windy, flicker, jitter",
     )
     bpy.types.Scene.generate_audio_prompt = bpy.props.StringProperty(
         name="generate_audio_prompt", default=""
