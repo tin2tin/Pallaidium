@@ -46,18 +46,23 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 
 * If it says:"ModuleNotFoundError: Refer to https://github.com/facebookresearch/xformers for more information on how to install xformers", then try to restart Blender.
 
-Install Dependencies, set Movie Model Card and set Sound Notification in the add-on preferences:
-
-![image](https://user-images.githubusercontent.com/1322593/233810577-961de9ec-ce3f-433b-a43c-dd4583fb518c.png)
+Tip           |
+:------------- |
+If any python modules are missing, use this add-on to manually install them:      |
+https://github.com/amb/blender_pip      |
 
 
 ## Location
 
+Install Dependencies, set Movie Model Card and set Sound Notification in the add-on preferences:
+
+![image](https://user-images.githubusercontent.com/1322593/233810577-961de9ec-ce3f-433b-a43c-dd4583fb518c.png)
+
 Video Sequence Editor > Sidebar > Generative AI
 
 ![image](https://user-images.githubusercontent.com/1322593/233038942-ae01ed61-9977-4478-b90a-af8282d6556c.png)
-![image](https://user-images.githubusercontent.com/1322593/233155019-05c514a3-d7cc-4f4f-ba9c-7d77f957fd98.png)
 ![image](https://user-images.githubusercontent.com/1322593/233361486-e8fc96c3-1c3f-4077-af56-98bab66638c3.png)
+![image](https://user-images.githubusercontent.com/1322593/233155019-05c514a3-d7cc-4f4f-ba9c-7d77f957fd98.png)
 
 Converting Text strips into GeneratorAI strips:
 
@@ -105,19 +110,16 @@ Diffusers: https://github.com/huggingface/diffusers
 
 ModelScope: https://modelscope.cn/models/damo/text-to-video-synthesis/summary
 
-AudioLDM: 
+Animov: https://huggingface.co/vdo/animov-0.1.1
 
-https://huggingface.co/cvssp/audioldm-s-full-v2
+Zeroscope: https://huggingface.co/cerspense/zeroscope_v1_320s
 
-https://github.com/haoheliu/AudioLDM
+AudioLDM: https://huggingface.co/cvssp/audioldm-s-full-v2 https://github.com/haoheliu/AudioLDM
 
 Bark: https://github.com/suno-ai/bark
 
 Deep Floyd IF: https://github.com/deep-floyd/IF
 
-If some additional python modules are missing, write about it here(so I can add them), and use the Blender PIP add-on to manually install the missing modules:
-
-https://github.com/amb/blender_pip
 
 
 ## Uninstall
