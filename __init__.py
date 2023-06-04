@@ -422,6 +422,7 @@ class GeneratorAddonPreferences(AddonPreferences):
         items=[
             ("strangeman3107/animov-0.1.1", "Animov (448x384)", "Animov (448x384)"),
             ("strangeman3107/animov-512x", "Animov (512x512)", "Animov (512x512)"),
+            ("cerspense/zeroscope_v1_320s", "Zeroscope v1 (320x320)", "Modelscope (320x320)"),
             ("damo-vilab/text-to-video-ms-1.7b", "Modelscope (256x256)", "Modelscope (256x256)"),
         ],
         default="strangeman3107/animov-0.1.1",
@@ -822,7 +823,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                                                               use_framerate = False,
                                                               )
                             strip = scene.sequence_editor.active_strip
-                            strip.transform.filter = 'SUBSAMPLING_3x3'
+                            strip.transform.filter = 'NEAREST'
                             scene.sequence_editor.active_strip = strip
                             strip.use_proxy = True
                             strip.name = str(seed)+"_"+prompt
@@ -1010,7 +1011,7 @@ class SEQUENCER_OT_generate_audio(Operator):
             if os.path.isfile(filepath):
                 empty_channel = empty_channel
                 strip = scene.sequence_editor.sequences.new_sound(
-                    name = str(seed)+"_"+prompt,
+                    name = prompt,
                     filepath=filepath,
                     channel=empty_channel,
                     frame_start=start_frame,
@@ -1222,7 +1223,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     fit_method="FIT",
                 )
                 strip.frame_final_duration = scene.generate_movie_frames
-                strip.transform.filter = 'SUBSAMPLING_3x3'
+                strip.transform.filter = 'NEAREST'
 
                 scene.sequence_editor.active_strip = strip
                 if i > 0:
@@ -1275,8 +1276,8 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         for strip in strips:
             if strip.type == "TEXT":
                 if strip.text:
-                    print("Processing: " + strip.text)
-                    scene.generate_movie_prompt = strip.text
+                    print("Processing: " + strip.text+", "+prompt)
+                    scene.generate_movie_prompt = strip.text+", "+prompt
                     scene.frame_current = strip.frame_final_start
                     if type == "movie":
                         sequencer.generate_movie()
@@ -1284,8 +1285,10 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                         sequencer.generate_audio()
                     if type == "image":
                         sequencer.generate_image()
+                    scene.generate_movie_prompt = prompt
+                    
         scene.frame_current = current_frame
-        context.scene.generate_movie_prompt = prompt
+        scene.generate_movie_prompt = prompt
         addon_prefs.playsound = play_sound
         bpy.ops.renderreminder.play_notification()
 
