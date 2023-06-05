@@ -418,7 +418,7 @@ class GeneratorAddonPreferences(AddonPreferences):
     )
 
     movie_model_card: bpy.props.EnumProperty(
-        name="Movie Model Card",
+        name="Video Model Card",
         items=[
             ("strangeman3107/animov-0.1.1", "Animov (448x384)", "Animov (448x384)"),
             ("strangeman3107/animov-512x", "Animov (512x512)", "Animov (512x512)"),
@@ -823,7 +823,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                                                               use_framerate = False,
                                                               )
                             strip = scene.sequence_editor.active_strip
-                            strip.transform.filter = 'NEAREST'
+                            strip.transform.filter = 'SUBSAMPLING_3x3'
                             scene.sequence_editor.active_strip = strip
                             strip.use_proxy = True
                             strip.name = str(seed)+"_"+prompt
@@ -1223,13 +1223,16 @@ class SEQUENCER_OT_generate_image(Operator):
                     fit_method="FIT",
                 )
                 strip.frame_final_duration = scene.generate_movie_frames
-                strip.transform.filter = 'NEAREST'
+                strip.transform.filter = 'SUBSAMPLING_3x3'
 
                 scene.sequence_editor.active_strip = strip
                 if i > 0:
                     scene.frame_current = (
                         scene.sequence_editor.active_strip.frame_final_start
                     )
+                strip.use_proxy = True
+                bpy.ops.sequencer.rebuild_proxy()
+
                 # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
                 bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
             else:
