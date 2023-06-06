@@ -312,7 +312,7 @@ def install_modules(self):
         import_module(self, "sox", "sox")
     else:
         import_module(self, "soundfile", "PySoundFile")
-    import_module(self, "diffusers", "diffusers")
+    import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
     import_module(self, "accelerate", "accelerate")
     import_module(self, "transformers", "transformers")
     import_module(self, "sentencepiece", "sentencepiece")
@@ -423,6 +423,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             ("strangeman3107/animov-0.1.1", "Animov (448x384)", "Animov (448x384)"),
             ("strangeman3107/animov-512x", "Animov (512x512)", "Animov (512x512)"),
             ("cerspense/zeroscope_v1_320s", "Zeroscope v1 (320x320)", "Modelscope (320x320)"),
+            ("camenduru/potat1", "Potat v1 (1024x576)", "Modelscope (1024x576)"),
             ("damo-vilab/text-to-video-ms-1.7b", "Modelscope (256x256)", "Modelscope (256x256)"),
         ],
         default="strangeman3107/animov-0.1.1",
