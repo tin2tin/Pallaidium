@@ -112,6 +112,8 @@ ModelScope: https://modelscope.cn/models/damo/text-to-video-synthesis/summary
 
 Animov: https://huggingface.co/vdo/animov-0.1.1
 
+Potat1: https://huggingface.co/camenduru/potat1
+
 Zeroscope: https://huggingface.co/cerspense/zeroscope_v1_320s
 
 AudioLDM: https://huggingface.co/cvssp/audioldm-s-full-v2 https://github.com/haoheliu/AudioLDM
