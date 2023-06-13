@@ -116,6 +116,8 @@ Potat1: https://huggingface.co/camenduru/potat1
 
 Zeroscope: https://huggingface.co/cerspense/zeroscope_v1_320s
 
+Polyware's T2V: https://huggingface.co/polyware-ai/text-to-video-ms-stable-v1
+
 AudioLDM: https://huggingface.co/cvssp/audioldm-s-full-v2 https://github.com/haoheliu/AudioLDM
 
 Bark: https://github.com/suno-ai/bark
