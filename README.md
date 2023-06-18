@@ -70,13 +70,17 @@ Converting Text strips into GeneratorAI strips:
 
 # Text to Video/Image
 
-The Modelscope model have a watermark, since it's been trained on Shutterstock material, and can't be used for commercial purposes. 
-The Animov models have been trained on Anime material, so adding "anime" to the prompt is nessessary for especially the Animov-512x model. 
-The Stable Diffusion models for generating images, have been used a lot, so there are plenty of promt suggestions out there if you google for them. 
+The Animov models have been trained on Anime material, so adding "anime" to the prompt is necessary, especially for the Animov-512x model. 
+The Stable Diffusion models for generating images have been used a lot, so there are plenty of prompt suggestions out there if you google for them. 
+The Modelscope model has a watermark, since it's been trained on Shutterstock material, and can't be used for commercial purposes. 
 
 Tip           |
 :------------- |
 If the image of your renders breaks, then use the resolution from the Model Card in the Preferences.     |
+
+Tip           |
+:------------- |
+If the image of your playback stutters, then select a strip > Menu > Strip > Movie Strip > Set Render Size.     |
 
 
 # Text to Audio
