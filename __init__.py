@@ -422,9 +422,11 @@ class GeneratorAddonPreferences(AddonPreferences):
         items=[
             ("strangeman3107/animov-0.1.1", "Animov (448x384)", "Animov (448x384)"),
             ("strangeman3107/animov-512x", "Animov (512x512)", "Animov (512x512)"),
-            ("cerspense/zeroscope_v1-1_320s", "Zeroscope v1.1 (320x320)", "Zerocope (320x320)"),
+            # ("cerspense/zeroscope_v1-1_320s", "Zeroscope v1.1 (320x320)", "Zeroscope (320x320)"),
+            # ("cerspense/zeroscope_v2_30x448x256", "Zeroscope v2.0 (448x256)", "Zeroscope (448x256)"),
+            ("cerspense/zeroscope_v2_dark_30x448x256", "Zeroscope v2.0 (448x256)", "Zeroscope (448x256)"),
             ("camenduru/potat1", "Potat v1 (1024x576)", "Potat (1024x576)"),
-            ("polyware-ai/text-to-video-ms-stable-v1", "text-to-video-ms-1.7b (384x384)", "text-to-video-ms-1.7b (384x384)"),
+            ("polyware-ai/text-to-video-ms-stable-v1", "Polyware 1.7b (384x384)", "Polyware 1.7b (384x384)"),
             #("vdo/potat1-50000", "Potat v1 50000 (1024x576)", "Potat (1024x576)"),
             ("damo-vilab/text-to-video-ms-1.7b", "Modelscope (256x256)", "Modelscope (256x256)"),
         ],
