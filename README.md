@@ -118,9 +118,13 @@ Animov: https://huggingface.co/vdo/animov-0.1.1
 
 Potat1: https://huggingface.co/camenduru/potat1
 
-Zeroscope: https://huggingface.co/cerspense/zeroscope_v1_320s
+Zeroscope Dark: https://huggingface.co/cerspense/zeroscope_v2_dark_30x448x256
+
+Zeroscope XL: https://huggingface.co/cerspense/zeroscope_v2_XL
 
 Polyware's T2V: https://huggingface.co/polyware-ai/text-to-video-ms-stable-v1
+
+Longscope: https://huggingface.co/polyware-ai/longscope
 
 AudioLDM: https://huggingface.co/cvssp/audioldm-s-full-v2 https://github.com/haoheliu/AudioLDM
 
