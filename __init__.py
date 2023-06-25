@@ -422,15 +422,16 @@ class GeneratorAddonPreferences(AddonPreferences):
         items=[
             ("strangeman3107/animov-0.1.1", "Animov (448x384)", "Animov (448x384)"),
             ("strangeman3107/animov-512x", "Animov (512x512)", "Animov (512x512)"),
-            # ("cerspense/zeroscope_v1-1_320s", "Zeroscope v1.1 (320x320)", "Zeroscope (320x320)"),
-            # ("cerspense/zeroscope_v2_30x448x256", "Zeroscope v2.0 (448x256)", "Zeroscope (448x256)"),
-            ("cerspense/zeroscope_v2_dark_30x448x256", "Zeroscope v2.0 (448x256)", "Zeroscope (448x256)"),
-            ("camenduru/potat1", "Potat v1 (1024x576)", "Potat (1024x576)"),
-            ("polyware-ai/text-to-video-ms-stable-v1", "Polyware 1.7b (384x384)", "Polyware 1.7b (384x384)"),
-            #("vdo/potat1-50000", "Potat v1 50000 (1024x576)", "Potat (1024x576)"),
+            ("vdo/potat1-lotr-25000/", "LOTR (1024x576x24)", "LOTR (1024x576x24)"),
             ("damo-vilab/text-to-video-ms-1.7b", "Modelscope (256x256)", "Modelscope (256x256)"),
+            ("polyware-ai/text-to-video-ms-stable-v1", "Polyware 1.7b (384x384)", "Polyware 1.7b (384x384)"),
+            ("camenduru/potat1", "Potat v1 (1024x576)", "Potat (1024x576)"),
+            # ("cerspense/zeroscope_v1-1_320s", "Zeroscope v1.1 (320x320)", "Zeroscope (320x320)"),
+            ("cerspense/zeroscope_v2_dark_30x448x256", "Zeroscope (448x256x30)", "Zeroscope (448x256x30)"),
+            ("cerspense/zeroscope_v2_576w", "Zeroscope (576x320x24)", "Zeroscope (576x320x24)"),
+            #("vdo/potat1-50000", "Potat v1 50000 (1024x576)", "Potat (1024x576)"),
         ],
-        default="strangeman3107/animov-0.1.1",
+        default="cerspense/zeroscope_v2_dark_30x448x256",
     )
 
     image_model_card: bpy.props.EnumProperty(
@@ -1345,7 +1346,7 @@ def register():
     )
     bpy.types.Scene.generate_movie_y = bpy.props.IntProperty(
         name="generate_movie_y",
-        default=384,
+        default=256,
         step=64,
         min=192,
         max=1024,
