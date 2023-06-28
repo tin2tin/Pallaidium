@@ -83,6 +83,13 @@ Tip           |
 If the image of your playback stutters, then select a strip > Menu > Strip > Movie Strip > Set Render Size.     |
 
 
+# Text Strips to Video/Image/Audio/Speech
+
+Accessed through the Add menu > Text to GenerativeAI
+
+https://github.com/tin2tin/Generative_AI/assets/1322593/c1d86548-5e6b-46b7-80f2-4d202685fc47
+
+
 # Text to Audio
 
 ### AudioLDM
