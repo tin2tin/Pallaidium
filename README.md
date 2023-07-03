@@ -5,7 +5,7 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 
 ## Video Examples
 ### Modelscope & Bark
-[![Watch the video](https://img.youtube.com/vi/auHu02KJZQs/0.jpg)](https://youtu.be/auHu02KJZQs) [![Watch the video](https://img.youtube.com/vi/AAdQfQjENJU/0.jpg)](https://youtu.be/AAdQfQjENJU)
+[![Watch the video](https://img.youtube.com/vi/LejSJGmtEvE/0.jpg)](https://youtu.be/LejSJGmtEvE) [![Watch the video](https://img.youtube.com/vi/AAdQfQjENJU/0.jpg)](https://youtu.be/AAdQfQjENJU)
 
 ## Features
 * Text to video
