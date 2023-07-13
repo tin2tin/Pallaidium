@@ -3,7 +3,7 @@
 bl_info = {
     "name": "Generative AI",
     "author": "tintwotin",
-    "version": (1, 2),
+    "version": (1, 3),
     "blender": (3, 4, 0),
     "location": "Video Sequence Editor > Sidebar > Generative AI",
     "description": "Generate media in the VSE",
@@ -312,7 +312,9 @@ def install_modules(self):
         import_module(self, "sox", "sox")
     else:
         import_module(self, "soundfile", "PySoundFile")
-    import_module(self, "diffusers", "diffusers") #git+https://github.com/huggingface/diffusers.git")
+    import_module(self, "diffusers", "diffusers")
+    #import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
+    #import_module(self, "diffusers", "git+https://github.com/huggingface/accelerate.git")
     import_module(self, "accelerate", "accelerate")
     import_module(self, "transformers", "transformers")
     import_module(self, "sentencepiece", "sentencepiece")
@@ -322,6 +324,7 @@ def install_modules(self):
     import_module(self, "IPython", "IPython")
     import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
     import_module(self, "xformers", "xformers")
+    import_module(self, "imwatermark", "invisible-watermark>=0.2.0")
     #subprocess.check_call([pybin,"-m","pip","install","force-reinstall","no-deps","pre xformers"])
     subprocess.check_call([pybin,"-m","pip","install","numpy","--upgrade"])
     if os_platform == "Windows":
@@ -441,6 +444,7 @@ class GeneratorAddonPreferences(AddonPreferences):
         items=[
             ("runwayml/stable-diffusion-v1-5", "Stable Diffusion 1.5 (512x512)", "Stable Diffusion 1.5"),
             ("stabilityai/stable-diffusion-2", "Stable Diffusion 2 (768x768)", "Stable Diffusion 2"),
+            ("stabilityai/stable-diffusion-xl-base-0.9", "Stable Diffusion XL Base 0.9", "Stable Diffusion XL Base 0.9"),
             ("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd"),
         ],
         default="stabilityai/stable-diffusion-2",
@@ -513,7 +517,7 @@ class GENERATOR_OT_install(Operator):
 
 
 class GENERATOR_OT_uninstall(Operator):
-    """Unnstall all dependencies"""
+    """Uninstall all dependencies"""
 
     bl_idname = "sequencer.uninstall_generator"
     bl_label = "Uninstall Dependencies"
@@ -541,10 +545,11 @@ class GENERATOR_OT_uninstall(Operator):
         uninstall_module_with_dependencies("IPython")
         uninstall_module_with_dependencies("bark")
         uninstall_module_with_dependencies("xformers")
+        uninstall_module_with_dependencies("invisible-watermark")
         
         self.report(
             {"INFO"},
-            "\nRemove AI Models manually: \nOn Linux and macOS: ~/.cache/huggingface/transformers\nOn Windows: %userprofile%.cache\\huggingface\\transformers",
+            "\nRemove AI Models manually: \nLinux and macOS: ~/.cache/huggingface/transformers\nWindows: %userprofile%.cache\\huggingface\\transformers",
         )
         return {"FINISHED"}
 
@@ -619,6 +624,7 @@ class SEQEUNCER_PT_generate_ai(Panel):
         preferences = context.preferences
         addon_prefs = preferences.addons[__name__].preferences
         audio_model_card = addon_prefs.audio_model_card
+        movie_model_card = addon_prefs.movie_model_card
 
         layout = self.layout
         layout.use_property_split = False
@@ -670,6 +676,14 @@ class SEQEUNCER_PT_generate_ai(Panel):
 
         col.prop(context.scene, "movie_num_batch", text="Batch Count")
 
+        if type == "movie" and (movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w"):
+
+            col = layout.column(heading="Upscale", align=True)
+            col.prop(context.scene, "video_to_video", text="2x")
+            sub_col = col.row()
+            sub_col.prop(context.scene, "denoising_strength", text="Denoising Strength")
+            sub_col.active = context.scene.video_to_video
+
         row = layout.row(align=True)
         row.scale_y = 1.1
         if type == "movie":
@@ -705,7 +719,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         try:
             import torch
-            from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
+            from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler#, TextToVideoSDPipeline
             from diffusers.utils import export_to_video
         except ModuleNotFoundError:
             print("Dependencies needs to be installed in the add-on preferences.")
@@ -714,6 +728,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 "Dependencies needs to be installed in the add-on preferences.",
             )
             return {"CANCELLED"}
+        from PIL import Image
 
         # clear the VRAM
         if torch.cuda.is_available():
@@ -740,9 +755,8 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
         pipe = DiffusionPipeline.from_pretrained(
+        #pipe = TextToVideoSDPipeline.from_pretrained(
             movie_model_card,
-            #"strangeman3107/animov-0.1.1",
-            #"damo-vilab/text-to-video-ms-1.7b",
             torch_dtype=torch.float16,
             variant="fp16",
         )
@@ -753,10 +767,18 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         # memory optimization
         pipe.enable_model_cpu_offload()
+
+        # memory optimization
+        pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
         pipe.enable_vae_slicing()
-        #pipe.enable_xformers_memory_efficient_attention()
 
         for i in range(scene.movie_num_batch):
+            
+            # memory optimization
+            # pipe.enable_model_cpu_offload()
+            # pipe.enable_vae_slicing()
+            #pipe.enable_xformers_memory_efficient_attention()
+            
             #wm.progress_update(i)
             if i > 0:
                 empty_channel = scene.sequence_editor.active_strip.channel
@@ -804,6 +826,40 @@ class SEQUENCER_OT_generate_movie(Operator):
                 num_frames=duration,
                 generator=generator,
             ).frames
+
+            movie_model_card = addon_prefs.movie_model_card
+             
+            if scene.video_to_video and (movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w"):
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                    
+                # Make sure CUDA has < 13GB VRAM
+                #torch.cuda.set_per_process_memory_fraction(0.9)
+          
+                pipe = DiffusionPipeline.from_pretrained("cerspense/zeroscope_v2_XL", torch_dtype=torch.float16)
+                pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+
+                # memory optimization
+                pipe.enable_model_cpu_offload()
+
+                # memory optimization
+                pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                pipe.enable_vae_slicing()
+#                pipe.enable_model_cpu_offload()
+#                pipe.enable_vae_slicing()
+                # pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
+                # pipe.enable_xformers_memory_efficient_attention()
+
+                video = [Image.fromarray(frame).resize((x*2, y*2)) for frame in video_frames]
+
+                video_frames = pipe(
+                prompt,
+                video=video,
+                strength=0.75,
+                negative_prompt=negative_prompt,
+                num_inference_steps=movie_num_inference_steps,
+                guidance_scale=movie_num_guidance,
+                generator=generator).frames
 
             # Move to folder
             src_path = export_to_video(video_frames)
@@ -1117,6 +1173,8 @@ class SEQUENCER_OT_generate_image(Operator):
                 "DeepFloyd/IF-II-M-v1.0", text_encoder=None, variant="fp16", torch_dtype=torch.float16
             )
             stage_2.enable_model_cpu_offload()
+            stage_2.unet.enable_forward_chunking(chunk_size=1, dim=1)
+            stage_2.enable_vae_slicing()
 
             # stage 3
             safety_modules = {
@@ -1128,6 +1186,8 @@ class SEQUENCER_OT_generate_image(Operator):
                 "stabilityai/stable-diffusion-x4-upscaler", **safety_modules, torch_dtype=torch.float16
             )
             stage_3.enable_model_cpu_offload()
+            stage_3.unet.enable_forward_chunking(chunk_size=1, dim=1)
+            stage_3.enable_vae_slicing()
             
         else: # stable Diffusion
             pipe = DiffusionPipeline.from_pretrained(
@@ -1140,8 +1200,8 @@ class SEQUENCER_OT_generate_image(Operator):
 
             # memory optimization
             pipe.enable_model_cpu_offload()
+            pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
             pipe.enable_vae_slicing()
-            pipe.enable_xformers_memory_efficient_attention()
 
         for i in range(scene.movie_num_batch):
             #wm.progress_update(i)
@@ -1449,6 +1509,20 @@ def register():
             ("zh", "Chinese, simplified", ""),
         ],
         default="en"
+    )
+
+    # Upscale
+    bpy.types.Scene.video_to_video = bpy.props.BoolProperty(
+        name="video_to_video",
+        default=0,
+    )
+
+    # Strength
+    bpy.types.Scene.denoising_strength = bpy.props.FloatProperty(
+        name="denoising_strength",
+        default=0.75,
+        min=0.0,
+        max=1.0,
     )
 
     for cls in classes:
