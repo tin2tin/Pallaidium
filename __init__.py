@@ -769,7 +769,7 @@ class SEQUENCER_OT_generate_movie(Operator):
         pipe.enable_model_cpu_offload()
 
         # memory optimization
-        pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
+        #pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
         pipe.enable_vae_slicing()
 
         for i in range(scene.movie_num_batch):
@@ -1200,7 +1200,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             # memory optimization
             pipe.enable_model_cpu_offload()
-            pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
+            #pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
             pipe.enable_vae_slicing()
 
         for i in range(scene.movie_num_batch):
