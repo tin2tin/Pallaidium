@@ -139,6 +139,8 @@ Bark: https://github.com/suno-ai/bark
 
 Deep Floyd IF: https://github.com/deep-floyd/IF
 
+Stable Diffusion XL: https://huggingface.co/stabilityai/stable-diffusion-xl-base-0.9
+
 
 
 ## Uninstall
