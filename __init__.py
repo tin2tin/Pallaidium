@@ -324,6 +324,7 @@ def install_modules(self):
     import_module(self, "IPython", "IPython")
     import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
     import_module(self, "xformers", "xformers")
+    import_module(self, "imageio", "imageio")
     import_module(self, "imwatermark", "invisible-watermark>=0.2.0")
     #subprocess.check_call([pybin,"-m","pip","install","force-reinstall","no-deps","pre xformers"])
     subprocess.check_call([pybin,"-m","pip","install","numpy","--upgrade"])
@@ -425,10 +426,11 @@ class GeneratorAddonPreferences(AddonPreferences):
         items=[
             ("strangeman3107/animov-0.1.1", "Animov (448x384)", "Animov (448x384)"),
             ("strangeman3107/animov-512x", "Animov (512x512)", "Animov (512x512)"),
+            ("camenduru/AnimateDiff/", "AnimateDiff", "AnimateDiff"),
             ("polyware-ai/longscope", "Longscope (384x216x94)", "Longscope ( 384x216x94)"),
             #("vdo/potat1-lotr-25000/", "LOTR (1024x576x24)", "LOTR (1024x576x24)"),
-            ("damo-vilab/text-to-video-ms-1.7b", "Modelscope (256x256)", "Modelscope (256x256)"),
-            ("polyware-ai/text-to-video-ms-stable-v1", "Polyware 1.7b (384x384)", "Polyware 1.7b (384x384)"),
+            #("damo-vilab/text-to-video-ms-1.7b", "Modelscope (256x256)", "Modelscope (256x256)"),
+            #("polyware-ai/text-to-video-ms-stable-v1", "Polyware 1.7b (384x384)", "Polyware 1.7b (384x384)"),
             ("camenduru/potat1", "Potat v1 (1024x576)", "Potat (1024x576)"),
             # ("cerspense/zeroscope_v1-1_320s", "Zeroscope v1.1 (320x320)", "Zeroscope (320x320)"),
             ("cerspense/zeroscope_v2_dark_30x448x256", "Zeroscope (448x256x30)", "Zeroscope (448x256x30)"),
@@ -436,6 +438,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             ("cerspense/zeroscope_v2_XL", "Zeroscope XL (1024x576x24)", "Zeroscope XL (1024x576x24)"),
             #("vdo/potat1-50000", "Potat v1 50000 (1024x576)", "Potat (1024x576)"),
         ],
+        
         default="cerspense/zeroscope_v2_dark_30x448x256",
     )
 
@@ -445,7 +448,9 @@ class GeneratorAddonPreferences(AddonPreferences):
             ("runwayml/stable-diffusion-v1-5", "Stable Diffusion 1.5 (512x512)", "Stable Diffusion 1.5"),
             ("stabilityai/stable-diffusion-2", "Stable Diffusion 2 (768x768)", "Stable Diffusion 2"),
             ("stabilityai/stable-diffusion-xl-base-0.9", "Stable Diffusion XL Base 0.9", "Stable Diffusion XL Base 0.9"),
+            ("stabilityai/stable-diffusion-xl-base-1.0", "Stable Diffusion XL 1.0", "Stable Diffusion XL 1.0"),
             ("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd"),
+            ("kandinsky-community/kandinsky-2-1", "Kandinsky 2.1 (768x768)", "Kandinsky 2.1 (768x768)"),
         ],
         default="stabilityai/stable-diffusion-2",
     )
@@ -545,6 +550,7 @@ class GENERATOR_OT_uninstall(Operator):
         uninstall_module_with_dependencies("IPython")
         uninstall_module_with_dependencies("bark")
         uninstall_module_with_dependencies("xformers")
+        uninstall_module_with_dependencies("imageio")
         uninstall_module_with_dependencies("invisible-watermark")
         
         self.report(
@@ -796,6 +802,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 )
                 start_frame = scene.frame_current
 
+            # generate video
             seed = context.scene.movie_num_seed
             seed = (
                 seed
@@ -828,8 +835,9 @@ class SEQUENCER_OT_generate_movie(Operator):
             ).frames
 
             movie_model_card = addon_prefs.movie_model_card
-             
-            if scene.video_to_video and (movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w"):
+
+            # upscale video
+            if scene.video_to_video: # and (movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w"):
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
                     
@@ -1188,6 +1196,10 @@ class SEQUENCER_OT_generate_image(Operator):
             stage_3.enable_model_cpu_offload()
             stage_3.unet.enable_forward_chunking(chunk_size=1, dim=1)
             stage_3.enable_vae_slicing()
+ 
+#        else if :
+#            pipe_prior = DiffusionPipeline.from_pretrained("kandinsky-community/kandinsky-2-1-prior", torch_dtype=torch.float16)
+#pipe_prior.to("cuda")
             
         else: # stable Diffusion
             pipe = DiffusionPipeline.from_pretrained(
@@ -1195,7 +1207,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 torch_dtype=torch.float16,
                 variant="fp16",
             )
-
+            #pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True) #Not supported on Win.
             pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
             # memory optimization
