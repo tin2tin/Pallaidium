@@ -426,8 +426,8 @@ class GeneratorAddonPreferences(AddonPreferences):
         items=[
             ("strangeman3107/animov-0.1.1", "Animov (448x384)", "Animov (448x384)"),
             ("strangeman3107/animov-512x", "Animov (512x512)", "Animov (512x512)"),
-            ("camenduru/AnimateDiff/", "AnimateDiff", "AnimateDiff"),
-            ("polyware-ai/longscope", "Longscope (384x216x94)", "Longscope ( 384x216x94)"),
+            #("camenduru/AnimateDiff/", "AnimateDiff", "AnimateDiff"),
+            #("polyware-ai/longscope", "Longscope (384x216x94)", "Longscope ( 384x216x94)"),
             #("vdo/potat1-lotr-25000/", "LOTR (1024x576x24)", "LOTR (1024x576x24)"),
             #("damo-vilab/text-to-video-ms-1.7b", "Modelscope (256x256)", "Modelscope (256x256)"),
             #("polyware-ai/text-to-video-ms-stable-v1", "Polyware 1.7b (384x384)", "Polyware 1.7b (384x384)"),
@@ -447,10 +447,10 @@ class GeneratorAddonPreferences(AddonPreferences):
         items=[
             ("runwayml/stable-diffusion-v1-5", "Stable Diffusion 1.5 (512x512)", "Stable Diffusion 1.5"),
             ("stabilityai/stable-diffusion-2", "Stable Diffusion 2 (768x768)", "Stable Diffusion 2"),
-            ("stabilityai/stable-diffusion-xl-base-0.9", "Stable Diffusion XL Base 0.9", "Stable Diffusion XL Base 0.9"),
-            ("stabilityai/stable-diffusion-xl-base-1.0", "Stable Diffusion XL 1.0", "Stable Diffusion XL 1.0"),
+            # ("stabilityai/stable-diffusion-xl-base-0.9", "Stable Diffusion XL Base 0.9", "Stable Diffusion XL Base 0.9"),
+            ("stabilityai/stable-diffusion-xl-base-1.0", "Stable Diffusion XL 1.0 (1024x1024)", "Stable Diffusion XL 1.0"),
             ("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd"),
-            ("kandinsky-community/kandinsky-2-1", "Kandinsky 2.1 (768x768)", "Kandinsky 2.1 (768x768)"),
+            #("kandinsky-community/kandinsky-2-1", "Kandinsky 2.1 (768x768)", "Kandinsky 2.1 (768x768)"),
         ],
         default="stabilityai/stable-diffusion-2",
     )
@@ -725,7 +725,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         try:
             import torch
-            from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler#, TextToVideoSDPipeline
+            from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler, TextToVideoSDPipeline
             from diffusers.utils import export_to_video
         except ModuleNotFoundError:
             print("Dependencies needs to be installed in the add-on preferences.")
@@ -760,8 +760,8 @@ class SEQUENCER_OT_generate_movie(Operator):
         movie_model_card = addon_prefs.movie_model_card
 
         # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
-        pipe = DiffusionPipeline.from_pretrained(
-        #pipe = TextToVideoSDPipeline.from_pretrained(
+        #pipe = DiffusionPipeline.from_pretrained(
+        pipe = TextToVideoSDPipeline.from_pretrained(
             movie_model_card,
             torch_dtype=torch.float16,
             variant="fp16",
@@ -772,6 +772,7 @@ class SEQUENCER_OT_generate_movie(Operator):
         )
 
         # memory optimization
+        #pipe.to("cuda")
         pipe.enable_model_cpu_offload()
 
         # memory optimization
@@ -837,7 +838,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             movie_model_card = addon_prefs.movie_model_card
 
             # upscale video
-            if scene.video_to_video: # and (movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w"):
+            if scene.video_to_video and (movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w"):
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
                     
@@ -849,9 +850,8 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 # memory optimization
                 pipe.enable_model_cpu_offload()
-
-                # memory optimization
-                pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                #pipe.to("cuda")
+                # pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
                 pipe.enable_vae_slicing()
 #                pipe.enable_model_cpu_offload()
 #                pipe.enable_vae_slicing()
@@ -863,7 +863,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 video_frames = pipe(
                 prompt,
                 video=video,
-                strength=0.75,
+                strength=0.65,
                 negative_prompt=negative_prompt,
                 num_inference_steps=movie_num_inference_steps,
                 guidance_scale=movie_num_guidance,
@@ -1169,7 +1169,7 @@ class SEQUENCER_OT_generate_image(Operator):
             from huggingface_hub.commands.user import login
             result = login(token = addon_prefs.hugginface_token)
             
-            torch.cuda.set_per_process_memory_fraction(0.85)  # 6 GB VRAM
+            #torch.cuda.set_per_process_memory_fraction(0.85)  # 6 GB VRAM
 
             # stage 1
             stage_1 = DiffusionPipeline.from_pretrained("DeepFloyd/IF-I-M-v1.0", variant="fp16", torch_dtype=torch.float16)
@@ -1207,6 +1207,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 torch_dtype=torch.float16,
                 variant="fp16",
             )
+
             #pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True) #Not supported on Win.
             pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
@@ -1275,7 +1276,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 # stage 3
                 image = stage_3(prompt=prompt, image=image, noise_level=100, generator=generator).images
                 # image[0].save("./if_stage_III.png")
-                image = image[0]
+                image = image[0]         
 
             else: # Stable Diffusion
                 image = pipe(
@@ -1287,6 +1288,33 @@ class SEQUENCER_OT_generate_image(Operator):
                     width=x,
                     generator=generator,
                 ).images[0]
+
+            # Add refiner
+            if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+                refiner = DiffusionPipeline.from_pretrained(
+                    "stabilityai/stable-diffusion-xl-refiner-1.0",
+                    text_encoder_2=pipe.text_encoder_2,
+                    vae=pipe.vae,
+                    torch_dtype=torch.float16,
+                    use_safetensors=True,
+                    variant="fp16",
+                )
+
+                # memory optimization
+                #refiner.to("cuda")
+                refiner.enable_model_cpu_offload()
+                # refiner.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                refiner.enable_vae_slicing()
+
+                n_steps = 50
+                high_noise_frac = 0.8
+                image = refiner(
+                    prompt,
+                    negative_prompt=negative_prompt,
+                    num_inference_steps=image_num_inference_steps,
+                    denoising_start=high_noise_frac,
+                    image=image,
+                ).images[0]  
 
             # Move to folder
             filename = clean_filename(str(seed)+"_"+context.scene.generate_movie_prompt)
