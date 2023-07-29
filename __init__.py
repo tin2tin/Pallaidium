@@ -631,6 +631,7 @@ class SEQEUNCER_PT_generate_ai(Panel):
         addon_prefs = preferences.addons[__name__].preferences
         audio_model_card = addon_prefs.audio_model_card
         movie_model_card = addon_prefs.movie_model_card
+        image_model_card = addon_prefs.image_model_card
 
         layout = self.layout
         layout.use_property_split = False
@@ -689,6 +690,11 @@ class SEQEUNCER_PT_generate_ai(Panel):
             sub_col = col.row()
             sub_col.prop(context.scene, "denoising_strength", text="Denoising Strength")
             sub_col.active = context.scene.video_to_video
+
+        if type == "image" and (image_model_card == "stabilityai/stable-diffusion-xl-base-1.0"):
+
+            col = layout.column(heading="Refine", align=True)
+            col.prop(context.scene, "refine_sd", text="Image")
 
         row = layout.row(align=True)
         row.scale_y = 1.1
@@ -1290,7 +1296,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 ).images[0]
 
             # Add refiner
-            if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+            if scene.refine_sd and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
                 refiner = DiffusionPipeline.from_pretrained(
                     "stabilityai/stable-diffusion-xl-refiner-1.0",
                     text_encoder_2=pipe.text_encoder_2,
@@ -1444,14 +1450,14 @@ def register():
         default=448,
         step=64,
         min=192,
-        max=1024,
+        max=1536,
     )
     bpy.types.Scene.generate_movie_y = bpy.props.IntProperty(
         name="generate_movie_y",
         default=256,
         step=64,
         min=192,
-        max=1024,
+        max=1536,
     )
     # The number of frames to be generated.
     bpy.types.Scene.generate_movie_frames = bpy.props.IntProperty(
@@ -1563,6 +1569,12 @@ def register():
         default=0.75,
         min=0.0,
         max=1.0,
+    )
+
+    # Refine SD
+    bpy.types.Scene.refine_sd = bpy.props.BoolProperty(
+        name="refine_sd",
+        default=1,
     )
 
     for cls in classes:
