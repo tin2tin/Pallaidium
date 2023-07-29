@@ -1,10 +1,10 @@
-# Generative AI - Text to Video, Image and Audio in Blender
-AI generate video, image and audio from text prompts or strips. 
+# Generative AI - Text to Video, Image, and Audio in Blender
+AI generate video, image, and audio from text prompts or strips. 
 
 https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-455c77443535
 
 ## Video Examples
-### Modelscope & Bark
+### Zeroscope & Bark
 [![Watch the video](https://img.youtube.com/vi/LejSJGmtEvE/0.jpg)](https://youtu.be/LejSJGmtEvE) [![Watch the video](https://img.youtube.com/vi/AAdQfQjENJU/0.jpg)](https://youtu.be/AAdQfQjENJU)
 
 ## Features
@@ -12,16 +12,16 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 * Text to audio
 * Text to image
 * Seed, Quality Steps, Frames, Word Power. 
-* Batch operation of text strips into videos, audio, music, speech or images.
+* Batch operation of text strips into videos, audio, music, speech, or images.
 * Model card selector
 * Render finished notification
 * Model Cards: Modelscope, Animov, Stable Diffusion 1.5 & 2, Deep Floyd IF, AudioLMD and Bark
 * One click install and uninstall dependencies
-* User defined file path for generated files
+* User-defined file path for generated files
 * Seed added to strip name
 
 ## Requirements
-* A CUDA supported Nvidia card with at least 4 GB VRam.
+* A CUDA-supported Nvidia card with at least 4 GB VRAM.
 
 ## How to install
 (As for Linux and MacOS, if anything differs in installation, then please share instructions.)
@@ -30,7 +30,7 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 
 * Download the add-on: https://github.com/tin2tin/text_to_video/archive/refs/heads/main.zip
 
-* On Windows, right click on the Blender icon and "Run Blender as Administrator"(or you'll get write permission errors).
+* On Windows, right-click on the Blender icon and "Run Blender as Administrator"(or you'll get write permission errors).
 
 * Install the add-on as usual: Preferences > Add-ons > Install > select file > enable the add-on. 
 
@@ -44,17 +44,17 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 
 * The first time any model is executed many GB will have to be downloaded, so go grab lots of coffee. 
 
-* If it says:"ModuleNotFoundError: Refer to https://github.com/facebookresearch/xformers for more information on how to install xformers", then try to restart Blender.
+* If it says: "ModuleNotFoundError: Refer to https://github.com/facebookresearch/xformers for more information on how to install xformers", then try to restart Blender.
 
 Tip           |
 :------------- |
-If any python modules are missing, use this add-on to manually install them:      |
+If any Python modules are missing, use this add-on to manually install them:      |
 https://github.com/amb/blender_pip      |
 
 
 ## Location
 
-Install Dependencies, set Movie Model Card and set Sound Notification in the add-on preferences:
+Install Dependencies, set Movie Model Card, and set Sound Notification in the add-on preferences:
 
 ![image](https://user-images.githubusercontent.com/1322593/233810577-961de9ec-ce3f-433b-a43c-dd4583fb518c.png)
 
@@ -129,10 +129,6 @@ Zeroscope Dark: https://huggingface.co/cerspense/zeroscope_v2_dark_30x448x256
 
 Zeroscope XL: https://huggingface.co/cerspense/zeroscope_v2_XL
 
-Polyware's T2V: https://huggingface.co/polyware-ai/text-to-video-ms-stable-v1
-
-Longscope: https://huggingface.co/polyware-ai/longscope
-
 AudioLDM: https://huggingface.co/cvssp/audioldm-s-full-v2 https://github.com/haoheliu/AudioLDM
 
 Bark: https://github.com/suno-ai/bark
@@ -145,7 +141,7 @@ Stable Diffusion XL: https://huggingface.co/stabilityai/stable-diffusion-xl-base
 
 ## Uninstall
 
-Hugging Face diffusers model are downloaded from the hub and saved to a local cache directory. By default, the cache directory is located at:
+Hugging Face diffusers model is downloaded from the hub and saved to a local cache directory. By default, the cache directory is located at:
 
 On Linux and macOS: ~/.cache/huggingface/transformers
 
