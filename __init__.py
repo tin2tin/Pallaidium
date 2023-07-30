@@ -785,6 +785,18 @@ class SEQUENCER_OT_generate_movie(Operator):
         #pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
         pipe.enable_vae_slicing()
 
+        if scene.video_to_video and (movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w"):
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                      
+            upscale = DiffusionPipeline.from_pretrained("cerspense/zeroscope_v2_XL", torch_dtype=torch.float16)
+            upscale.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+
+            # memory optimization
+            upscale.enable_model_cpu_offload()
+            upscale.enable_vae_slicing()
+
+
         for i in range(scene.movie_num_batch):
             
             # memory optimization
@@ -847,26 +859,9 @@ class SEQUENCER_OT_generate_movie(Operator):
             if scene.video_to_video and (movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w"):
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
-                    
-                # Make sure CUDA has < 13GB VRAM
-                #torch.cuda.set_per_process_memory_fraction(0.9)
-          
-                pipe = DiffusionPipeline.from_pretrained("cerspense/zeroscope_v2_XL", torch_dtype=torch.float16)
-                pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-
-                # memory optimization
-                pipe.enable_model_cpu_offload()
-                #pipe.to("cuda")
-                # pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                pipe.enable_vae_slicing()
-#                pipe.enable_model_cpu_offload()
-#                pipe.enable_vae_slicing()
-                # pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
-                # pipe.enable_xformers_memory_efficient_attention()
-
                 video = [Image.fromarray(frame).resize((x*2, y*2)) for frame in video_frames]
 
-                video_frames = pipe(
+                video_frames = upscale(
                 prompt,
                 video=video,
                 strength=0.65,
