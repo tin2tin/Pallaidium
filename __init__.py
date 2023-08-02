@@ -386,7 +386,7 @@ def uninstall_module_with_dependencies(module_name):
     # Uninstall the dependencies
     for dependency in dependencies:
         subprocess.run([pybin, '-m', 'pip', 'uninstall', '-y', dependency])
-        
+
     subprocess.check_call([pybin,"-m","pip","install","numpy"])
 
 
@@ -438,7 +438,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             ("cerspense/zeroscope_v2_XL", "Zeroscope XL (1024x576x24)", "Zeroscope XL (1024x576x24)"),
             #("vdo/potat1-50000", "Potat v1 50000 (1024x576)", "Potat (1024x576)"),
         ],
-        
+
         default="cerspense/zeroscope_v2_dark_30x448x256",
     )
 
@@ -552,7 +552,7 @@ class GENERATOR_OT_uninstall(Operator):
         uninstall_module_with_dependencies("xformers")
         uninstall_module_with_dependencies("imageio")
         uninstall_module_with_dependencies("invisible-watermark")
-        
+
         self.report(
             {"INFO"},
             "\nRemove AI Models manually: \nLinux and macOS: ~/.cache/huggingface/transformers\nWindows: %userprofile%.cache\\huggingface\\transformers",
@@ -788,7 +788,7 @@ class SEQUENCER_OT_generate_movie(Operator):
         if scene.video_to_video and (movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w"):
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
-                      
+
             upscale = DiffusionPipeline.from_pretrained("cerspense/zeroscope_v2_XL", torch_dtype=torch.float16)
             upscale.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
@@ -798,12 +798,12 @@ class SEQUENCER_OT_generate_movie(Operator):
 
 
         for i in range(scene.movie_num_batch):
-            
+
             # memory optimization
             # pipe.enable_model_cpu_offload()
             # pipe.enable_vae_slicing()
             #pipe.enable_xformers_memory_efficient_attention()
-            
+
             #wm.progress_update(i)
             if i > 0:
                 empty_channel = scene.sequence_editor.active_strip.channel
@@ -1135,6 +1135,7 @@ class SEQUENCER_OT_generate_image(Operator):
             from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
             from diffusers.utils import pt_to_pil
             import torch
+            from diffusers.utils import load_image
         except ModuleNotFoundError:
             print("Dependencies needs to be installed in the add-on preferences.")
             self.report(
@@ -1166,57 +1167,88 @@ class SEQUENCER_OT_generate_image(Operator):
         addon_prefs = preferences.addons[__name__].preferences
         image_model_card = addon_prefs.image_model_card
 
-        if image_model_card == "DeepFloyd/IF-I-M-v1.0":
-            from huggingface_hub.commands.user import login
-            result = login(token = addon_prefs.hugginface_token)
-            
-            #torch.cuda.set_per_process_memory_fraction(0.85)  # 6 GB VRAM
+        # IMPORT MODELS
+        # Model for batch refine
+        if scene.image_path:
+            from diffusers import StableDiffusionXLImg2ImgPipeline
+            from diffusers.utils import load_image
 
-            # stage 1
-            stage_1 = DiffusionPipeline.from_pretrained("DeepFloyd/IF-I-M-v1.0", variant="fp16", torch_dtype=torch.float16)
-            # stage_1.enable_model_cpu_offload()
-            stage_1.enable_sequential_cpu_offload() # 6 GB VRAM
-
-            # stage 2
-            stage_2 = DiffusionPipeline.from_pretrained(
-                "DeepFloyd/IF-II-M-v1.0", text_encoder=None, variant="fp16", torch_dtype=torch.float16
+            refiner = StableDiffusionXLImg2ImgPipeline.from_pretrained(
+                "stabilityai/stable-diffusion-xl-refiner-1.0", torch_dtype=torch.float16
             )
-            stage_2.enable_model_cpu_offload()
-            stage_2.unet.enable_forward_chunking(chunk_size=1, dim=1)
-            stage_2.enable_vae_slicing()
+            # memory optimization
+            #refiner.to("cuda")
+            refiner.enable_model_cpu_offload()
+            # refiner.unet.enable_forward_chunking(chunk_size=1, dim=1)
+            refiner.enable_vae_slicing()
 
-            # stage 3
-            safety_modules = {
-                "feature_extractor": stage_1.feature_extractor,
-                "safety_checker": stage_1.safety_checker,
-                "watermarker": stage_1.watermarker,
-            }
-            stage_3 = DiffusionPipeline.from_pretrained(
-                "stabilityai/stable-diffusion-x4-upscaler", **safety_modules, torch_dtype=torch.float16
-            )
-            stage_3.enable_model_cpu_offload()
-            stage_3.unet.enable_forward_chunking(chunk_size=1, dim=1)
-            stage_3.enable_vae_slicing()
- 
-#        else if :
-#            pipe_prior = DiffusionPipeline.from_pretrained("kandinsky-community/kandinsky-2-1-prior", torch_dtype=torch.float16)
-#pipe_prior.to("cuda")
-            
-        else: # stable Diffusion
-            pipe = DiffusionPipeline.from_pretrained(
-                image_model_card,
+        # Model for generate
+        else:
+            if image_model_card == "DeepFloyd/IF-I-M-v1.0":
+                from huggingface_hub.commands.user import login
+                result = login(token = addon_prefs.hugginface_token)
+
+                #torch.cuda.set_per_process_memory_fraction(0.85)  # 6 GB VRAM
+
+                # stage 1
+                stage_1 = DiffusionPipeline.from_pretrained("DeepFloyd/IF-I-M-v1.0", variant="fp16", torch_dtype=torch.float16)
+                # stage_1.enable_model_cpu_offload()
+                stage_1.enable_sequential_cpu_offload() # 6 GB VRAM
+
+                # stage 2
+                stage_2 = DiffusionPipeline.from_pretrained(
+                    "DeepFloyd/IF-II-M-v1.0", text_encoder=None, variant="fp16", torch_dtype=torch.float16
+                )
+                stage_2.enable_model_cpu_offload()
+                stage_2.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                stage_2.enable_vae_slicing()
+
+                # stage 3
+                safety_modules = {
+                    "feature_extractor": stage_1.feature_extractor,
+                    "safety_checker": stage_1.safety_checker,
+                    "watermarker": stage_1.watermarker,
+                }
+                stage_3 = DiffusionPipeline.from_pretrained(
+                    "stabilityai/stable-diffusion-x4-upscaler", **safety_modules, torch_dtype=torch.float16
+                )
+                stage_3.enable_model_cpu_offload()
+                stage_3.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                stage_3.enable_vae_slicing()
+
+            else: # model for stable diffusion
+                pipe = DiffusionPipeline.from_pretrained(
+                    image_model_card,
+                    torch_dtype=torch.float16,
+                    variant="fp16",
+                )
+
+                pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+
+                # memory optimization
+                pipe.enable_model_cpu_offload()
+                #pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                pipe.enable_vae_slicing()       
+
+              
+        # Add refiner model if chosen.
+        if (scene.refine_sd and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0") and not scene.image_path:
+            refiner = DiffusionPipeline.from_pretrained(
+                "stabilityai/stable-diffusion-xl-refiner-1.0",
+                text_encoder_2=pipe.text_encoder_2,
+                vae=pipe.vae,
                 torch_dtype=torch.float16,
+                use_safetensors=True,
                 variant="fp16",
             )
 
-            #pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True) #Not supported on Win.
-            pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-
             # memory optimization
-            pipe.enable_model_cpu_offload()
-            #pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
-            pipe.enable_vae_slicing()
+            #refiner.to("cuda")
+            refiner.enable_model_cpu_offload()
+            # refiner.unet.enable_forward_chunking(chunk_size=1, dim=1)
+            refiner.enable_vae_slicing()
 
+        # Main Generate Loop:
         for i in range(scene.movie_num_batch):
             #wm.progress_update(i)
             if i > 0:
@@ -1257,7 +1289,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             if image_model_card == "DeepFloyd/IF-I-M-v1.0":
                 prompt_embeds, negative_embeds = stage_1.encode_prompt(prompt, negative_prompt)
-                
+
                 # stage 1
                 image = stage_1(
                     prompt_embeds=prompt_embeds, negative_prompt_embeds=negative_embeds, generator=generator, output_type="pt"
@@ -1277,7 +1309,21 @@ class SEQUENCER_OT_generate_image(Operator):
                 # stage 3
                 image = stage_3(prompt=prompt, image=image, noise_level=100, generator=generator).images
                 # image[0].save("./if_stage_III.png")
-                image = image[0]         
+                image = image[0]
+
+            # img2img
+            elif scene.image_path:
+                init_image = load_image(scene.image_path).convert("RGB")
+                image = refiner(
+                    prompt,
+                    negative_prompt=negative_prompt,
+                    image=init_image,
+                    num_inference_steps=image_num_inference_steps,
+                    guidance_scale=image_num_guidance,
+                    #height=y,
+                    #width=x,
+                    generator=generator,
+                ).images[0]
 
             else: # Stable Diffusion
                 image = pipe(
@@ -1292,20 +1338,6 @@ class SEQUENCER_OT_generate_image(Operator):
 
             # Add refiner
             if scene.refine_sd and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
-                refiner = DiffusionPipeline.from_pretrained(
-                    "stabilityai/stable-diffusion-xl-refiner-1.0",
-                    text_encoder_2=pipe.text_encoder_2,
-                    vae=pipe.vae,
-                    torch_dtype=torch.float16,
-                    use_safetensors=True,
-                    variant="fp16",
-                )
-
-                # memory optimization
-                #refiner.to("cuda")
-                refiner.enable_model_cpu_offload()
-                # refiner.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                refiner.enable_vae_slicing()
 
                 n_steps = 50
                 high_noise_frac = 0.8
@@ -1315,7 +1347,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     num_inference_steps=image_num_inference_steps,
                     denoising_start=high_noise_frac,
                     image=image,
-                ).images[0]  
+                ).images[0]
 
             # Move to folder
             filename = clean_filename(str(seed)+"_"+context.scene.generate_movie_prompt)
@@ -1346,7 +1378,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
             else:
                 print("No resulting file found.")
-                
+
             # clear the VRAM
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
@@ -1365,9 +1397,9 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
     """Convert selected text strips to Generative AI"""
 
     bl_idname = "sequencer.text_to_generator"
-    bl_label = "Convert Text Strips to Generative AI"
+    bl_label = "Strips as Generative AI input"
     bl_options = {"INTERNAL"}
-    bl_description = "Adds selected text strips as Generative AI strips"
+    bl_description = "Adds selected strips as inputs to Generative AI process"
 
     @classmethod
     def poll(cls, context):
@@ -1398,7 +1430,25 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     if type == "image":
                         sequencer.generate_image()
                     scene.generate_movie_prompt = prompt
-                    
+            if strip.type == "IMAGE":
+                strip_dirname = os.path.dirname(strip.directory)
+                image_path = bpy.path.abspath(os.path.join(strip_dirname, strip.elements[0].filename))
+                scene.image_path = image_path
+                if strip.name:
+                    strip_prompt = os.path.splitext(strip.name)[0]
+                    strip_prompt = (strip_prompt.replace("_", " "))[7:]
+                    print("Processing: " + strip_prompt +", "+prompt)
+                    scene.generate_movie_prompt = strip_prompt+", "+prompt
+                    scene.frame_current = strip.frame_final_start
+                    if type == "movie":
+                        sequencer.generate_movie()
+                    if type == "audio":
+                        sequencer.generate_audio()
+                    if type == "image":
+                        sequencer.generate_image()
+                    scene.generate_movie_prompt = prompt
+                scene.image_path = ""
+
         scene.frame_current = current_frame
         scene.generate_movie_prompt = prompt
         addon_prefs.playsound = play_sound
@@ -1411,7 +1461,7 @@ def panel_text_to_generatorAI(self, context):
     layout = self.layout
     layout.separator()
     layout.operator(
-        "sequencer.text_to_generator", text="Text to Generative AI", icon="SHADERFX"
+        "sequencer.text_to_generator", text="Strips as Generative AI Input", icon="SHADERFX"
     )
 
 
@@ -1570,6 +1620,16 @@ def register():
     bpy.types.Scene.refine_sd = bpy.props.BoolProperty(
         name="refine_sd",
         default=1,
+    )
+
+    # movie path
+    bpy.types.Scene.movie_path = bpy.props.StringProperty(
+        name="movie_path", default=""
+    )
+
+    # image path
+    bpy.types.Scene.image_path = bpy.props.StringProperty(
+        name="image_path", default=""
     )
 
     for cls in classes:
