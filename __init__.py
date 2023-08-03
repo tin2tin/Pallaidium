@@ -319,13 +319,15 @@ def install_modules(self):
     import_module(self, "transformers", "transformers")
     import_module(self, "sentencepiece", "sentencepiece")
     import_module(self, "safetensors", "safetensors")
-    import_module(self, "cv2", "opencv_python")
+    #import_module(self, "cv2", "opencv_python")
     import_module(self, "scipy", "scipy")
     import_module(self, "IPython", "IPython")
     import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
     import_module(self, "xformers", "xformers")
     import_module(self, "imageio", "imageio")
     import_module(self, "imwatermark", "invisible-watermark>=0.2.0")
+    #import_module(self, "audiocraft", "git+https://github.com/facebookresearch/audiocraft.git")
+    #import_module(self, "PIL", "pillow")
     #subprocess.check_call([pybin,"-m","pip","install","force-reinstall","no-deps","pre xformers"])
     subprocess.check_call([pybin,"-m","pip","install","numpy","--upgrade"])
     if os_platform == "Windows":
@@ -426,17 +428,17 @@ class GeneratorAddonPreferences(AddonPreferences):
         items=[
             ("strangeman3107/animov-0.1.1", "Animov (448x384)", "Animov (448x384)"),
             ("strangeman3107/animov-512x", "Animov (512x512)", "Animov (512x512)"),
+            ("camenduru/potat1", "Potat v1 (1024x576)", "Potat (1024x576)"),
+            ("cerspense/zeroscope_v2_dark_30x448x256", "Zeroscope (448x256x30)", "Zeroscope (448x256x30)"),
+            ("cerspense/zeroscope_v2_576w", "Zeroscope (576x320x24)", "Zeroscope (576x320x24)"),
+            ("cerspense/zeroscope_v2_XL", "Zeroscope XL (1024x576x24)", "Zeroscope XL (1024x576x24)"),
             #("camenduru/AnimateDiff/", "AnimateDiff", "AnimateDiff"),
             #("polyware-ai/longscope", "Longscope (384x216x94)", "Longscope ( 384x216x94)"),
             #("vdo/potat1-lotr-25000/", "LOTR (1024x576x24)", "LOTR (1024x576x24)"),
             #("damo-vilab/text-to-video-ms-1.7b", "Modelscope (256x256)", "Modelscope (256x256)"),
             #("polyware-ai/text-to-video-ms-stable-v1", "Polyware 1.7b (384x384)", "Polyware 1.7b (384x384)"),
-            ("camenduru/potat1", "Potat v1 (1024x576)", "Potat (1024x576)"),
-            # ("cerspense/zeroscope_v1-1_320s", "Zeroscope v1.1 (320x320)", "Zeroscope (320x320)"),
-            ("cerspense/zeroscope_v2_dark_30x448x256", "Zeroscope (448x256x30)", "Zeroscope (448x256x30)"),
-            ("cerspense/zeroscope_v2_576w", "Zeroscope (576x320x24)", "Zeroscope (576x320x24)"),
-            ("cerspense/zeroscope_v2_XL", "Zeroscope XL (1024x576x24)", "Zeroscope XL (1024x576x24)"),
             #("vdo/potat1-50000", "Potat v1 50000 (1024x576)", "Potat (1024x576)"),
+            #("cerspense/zeroscope_v1-1_320s", "Zeroscope v1.1 (320x320)", "Zeroscope (320x320)"),
         ],
 
         default="cerspense/zeroscope_v2_dark_30x448x256",
@@ -447,10 +449,10 @@ class GeneratorAddonPreferences(AddonPreferences):
         items=[
             ("runwayml/stable-diffusion-v1-5", "Stable Diffusion 1.5 (512x512)", "Stable Diffusion 1.5"),
             ("stabilityai/stable-diffusion-2", "Stable Diffusion 2 (768x768)", "Stable Diffusion 2"),
-            # ("stabilityai/stable-diffusion-xl-base-0.9", "Stable Diffusion XL Base 0.9", "Stable Diffusion XL Base 0.9"),
             ("stabilityai/stable-diffusion-xl-base-1.0", "Stable Diffusion XL 1.0 (1024x1024)", "Stable Diffusion XL 1.0"),
             ("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd"),
-            #("kandinsky-community/kandinsky-2-1", "Kandinsky 2.1 (768x768)", "Kandinsky 2.1 (768x768)"),
+            # ("stabilityai/stable-diffusion-xl-base-0.9", "Stable Diffusion XL Base 0.9", "Stable Diffusion XL Base 0.9"),
+            # ("kandinsky-community/kandinsky-2-1", "Kandinsky 2.1 (768x768)", "Kandinsky 2.1 (768x768)"),
         ],
         default="stabilityai/stable-diffusion-2",
     )
@@ -459,8 +461,9 @@ class GeneratorAddonPreferences(AddonPreferences):
         name="Audio Model Card",
         items=[
             ("cvssp/audioldm-s-full-v2", "AudioLDM S Full v2", "AudioLDM Small Full v2"),
-            #("cvssp/audioldm", "AudioLDM", "AudioLDM"),
             ("bark", "Bark", "Bark"),
+            #("facebook/audiogen-medium", "AudioGen", "AudioGen"), #I do not have enough VRAM to test if this is working...
+            # ("cvssp/audioldm", "AudioLDM", "AudioLDM"),
         ],
         default="bark",
     )
@@ -552,6 +555,7 @@ class GENERATOR_OT_uninstall(Operator):
         uninstall_module_with_dependencies("xformers")
         uninstall_module_with_dependencies("imageio")
         uninstall_module_with_dependencies("invisible-watermark")
+        uninstall_module_with_dependencies("pillow")
 
         self.report(
             {"INFO"},
@@ -706,6 +710,31 @@ class SEQEUNCER_PT_generate_ai(Panel):
             row.operator("sequencer.generate_audio", text="Generate")
 
 
+
+
+# Function to load a video as a NumPy array
+def load_video_as_np_array(video_path):
+    import cv2
+    import numpy as np
+    cap = cv2.VideoCapture(video_path)
+
+    if not cap.isOpened():
+        raise IOError("Error opening video file")
+
+    frames = []
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frames.append(frame)
+
+    cap.release()
+    return np.array(frames)
+
+
+
+
 class SEQUENCER_OT_generate_movie(Operator):
     """Generate Video"""
 
@@ -731,7 +760,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         try:
             import torch
-            from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler, TextToVideoSDPipeline
+            from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler, TextToVideoSDPipeline, VideoToVideoSDPipeline
             from diffusers.utils import export_to_video
         except ModuleNotFoundError:
             print("Dependencies needs to be installed in the add-on preferences.")
@@ -765,36 +794,67 @@ class SEQUENCER_OT_generate_movie(Operator):
         addon_prefs = preferences.addons[__name__].preferences
         movie_model_card = addon_prefs.movie_model_card
 
-        # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
-        #pipe = DiffusionPipeline.from_pretrained(
-        pipe = TextToVideoSDPipeline.from_pretrained(
-            movie_model_card,
-            torch_dtype=torch.float16,
-            variant="fp16",
-        )
-
-        pipe.scheduler = DPMSolverMultistepScheduler.from_config(
-            pipe.scheduler.config
-        )
-
-        # memory optimization
-        #pipe.to("cuda")
-        pipe.enable_model_cpu_offload()
-
-        # memory optimization
-        #pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
-        pipe.enable_vae_slicing()
-
-        if scene.video_to_video and (movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w"):
+        # Movie upscale
+        if scene.movie_path:
+            print("Running movie upscale: "+scene.movie_path)
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
+                #torch.cuda.set_per_process_memory_fraction(0.85)  # 6 GB VRAM
 
-            upscale = DiffusionPipeline.from_pretrained("cerspense/zeroscope_v2_XL", torch_dtype=torch.float16)
+            pipe = TextToVideoSDPipeline.from_pretrained(
+                movie_model_card,
+                torch_dtype=torch.float16,
+                #variant="fp16",
+            )
+            pipe.enable_model_cpu_offload()
+            pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
+            pipe.enable_vae_slicing()  
+
+            upscale = VideoToVideoSDPipeline.from_pretrained("cerspense/zeroscope_v2_XL", torch_dtype=torch.float16)
+            #upscale = VideoToVideoSDPipeline.from_pretrained("cerspense/zeroscope_v2_576w", torch_dtype=torch.float16)
+
             upscale.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
             # memory optimization
             upscale.enable_model_cpu_offload()
-            upscale.enable_vae_slicing()
+            upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)
+            upscale.enable_vae_slicing()            
+ 
+        # Movie generation           
+        else:
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
+            #pipe = DiffusionPipeline.from_pretrained(
+            pipe = TextToVideoSDPipeline.from_pretrained(
+                movie_model_card,
+                torch_dtype=torch.float16,
+                #variant="fp16",
+            )
+
+            pipe.scheduler = DPMSolverMultistepScheduler.from_config(
+                pipe.scheduler.config
+            )
+
+            # memory optimization
+            #pipe.to("cuda")
+            pipe.enable_model_cpu_offload()
+            pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
+            pipe.enable_vae_slicing()
+
+            if scene.video_to_video and (movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w"):
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                    #torch.cuda.set_per_process_memory_fraction(0.85)  # 6 GB VRAM
+
+                upscale = VideoToVideoSDPipeline.from_pretrained("cerspense/zeroscope_v2_XL", torch_dtype=torch.float16)
+                #upscale = VideoToVideoSDPipeline.from_pretrained("cerspense/zeroscope_v2_576w", torch_dtype=torch.float16)
+                upscale.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+
+                # memory optimization
+                upscale.enable_model_cpu_offload()
+                upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                upscale.enable_vae_slicing()
 
 
         for i in range(scene.movie_num_batch):
@@ -842,23 +902,20 @@ class SEQUENCER_OT_generate_movie(Operator):
                 else:
                     generator = None
 
-            video_frames = pipe(
-                prompt,
-                negative_prompt=negative_prompt,
-                num_inference_steps=movie_num_inference_steps,
-                guidance_scale=movie_num_guidance,
-                height=y,
-                width=x,
-                num_frames=duration,
-                generator=generator,
-            ).frames
-
-            movie_model_card = addon_prefs.movie_model_card
-
-            # upscale video
-            if scene.video_to_video and (movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w"):
+            # Upscale batch input
+            if scene.movie_path:
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
+                #import imageio
+                #import numpy as np
+                #from PIL import Image
+                #import cv2
+
+                # Path to the video file
+                video_path = scene.movie_path
+
+                video_frames = load_video_as_np_array(video_path)
+
                 video = [Image.fromarray(frame).resize((x*2, y*2)) for frame in video_frames]
 
                 video_frames = upscale(
@@ -869,6 +926,37 @@ class SEQUENCER_OT_generate_movie(Operator):
                 num_inference_steps=movie_num_inference_steps,
                 guidance_scale=movie_num_guidance,
                 generator=generator).frames
+            # Generation of movie               
+            else:
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                video_frames = pipe(
+                    prompt,
+                    negative_prompt=negative_prompt,
+                    num_inference_steps=movie_num_inference_steps,
+                    guidance_scale=movie_num_guidance,
+                    height=y,
+                    width=x,
+                    num_frames=duration,
+                    generator=generator,
+                ).frames
+
+                movie_model_card = addon_prefs.movie_model_card
+
+                # upscale video
+                if scene.video_to_video and (movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w"):
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                    video = [Image.fromarray(frame).resize((x*2, y*2)) for frame in video_frames]
+
+                    video_frames = upscale(
+                    prompt,
+                    video=video,
+                    strength=0.65,
+                    negative_prompt=negative_prompt,
+                    num_inference_steps=movie_num_inference_steps,
+                    guidance_scale=movie_num_guidance,
+                    generator=generator).frames
 
             # Move to folder
             src_path = export_to_video(video_frames)
@@ -913,6 +1001,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
+        bpy.types.Scene.movie_path = ""
         bpy.ops.renderreminder.play_notification()
         #wm.progress_end()
         scene.frame_current = current_frame
@@ -948,13 +1037,19 @@ class SEQUENCER_OT_generate_audio(Operator):
         audio_length_in_s = scene.audio_length_in_f/(scene.render.fps / scene.render.fps_base)
 
         try:
-            from diffusers import AudioLDMPipeline
             import torch
-            import scipy
-            #from bark import SAMPLE_RATE, generate_audio, preload_models
-            from IPython.display import Audio
-            from scipy.io.wavfile import write as write_wav
-            import xformers
+            if addon_prefs.audio_model_card == "cvssp/audioldm-s-full-v2":
+                from diffusers import AudioLDMPipeline
+                import scipy
+                #from bark import SAMPLE_RATE, generate_audio, preload_models
+                from IPython.display import Audio
+                from scipy.io.wavfile import write as write_wav
+                import xformers
+
+            if addon_prefs.audio_model_card == "facebook/audiogen-medium":
+                import torchaudio
+                from audiocraft.models import AudioGen
+                from audiocraft.data.audio import audio_write
 
             if addon_prefs.audio_model_card == "bark":
                 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
@@ -980,13 +1075,24 @@ class SEQUENCER_OT_generate_audio(Operator):
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-        if addon_prefs.audio_model_card != "bark":
+        if addon_prefs.audio_model_card == "cvssp/audioldm-s-full-v2":
             repo_id = addon_prefs.audio_model_card
             pipe = AudioLDMPipeline.from_pretrained(repo_id)  # , torch_dtype=torch.float16z
 
             # Use cuda if possible
-            if torch.cuda.is_available():
-                pipe = pipe.to("cuda")
+            #if torch.cuda.is_available():
+            #    pipe = pipe.to("cuda")
+            pipe.enable_model_cpu_offload()
+            pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
+            pipe.enable_vae_slicing() 
+
+        elif addon_prefs.audio_model_card == "facebook/audiogen-medium":
+            pipe = AudioGen.get_pretrained('facebook/audiogen-medium')
+            pipe = pipe.to("cuda")
+#            pipe.enable_model_cpu_offload()
+#            pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
+#            pipe.enable_vae_slicing() 
+
         else: #bark
             preload_models(
             text_use_small=True,
@@ -1179,7 +1285,7 @@ class SEQUENCER_OT_generate_image(Operator):
             # memory optimization
             #refiner.to("cuda")
             refiner.enable_model_cpu_offload()
-            # refiner.unet.enable_forward_chunking(chunk_size=1, dim=1)
+            refiner.unet.enable_forward_chunking(chunk_size=1, dim=1)
             refiner.enable_vae_slicing()
 
         # Model for generate
@@ -1227,7 +1333,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
                 # memory optimization
                 pipe.enable_model_cpu_offload()
-                #pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
                 pipe.enable_vae_slicing()       
 
               
@@ -1399,7 +1505,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
     bl_idname = "sequencer.text_to_generator"
     bl_label = "Strips as Generative AI input"
     bl_options = {"INTERNAL"}
-    bl_description = "Adds selected strips as inputs to Generative AI process"
+    bl_description = "Adds selected strips as inputs to the Generative AI process"
 
     @classmethod
     def poll(cls, context):
@@ -1433,7 +1539,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
             if strip.type == "IMAGE":
                 strip_dirname = os.path.dirname(strip.directory)
                 image_path = bpy.path.abspath(os.path.join(strip_dirname, strip.elements[0].filename))
-                scene.image_path = image_path
+                bpy.types.Scene.image_path = image_path
                 if strip.name:
                     strip_prompt = os.path.splitext(strip.name)[0]
                     strip_prompt = (strip_prompt.replace("_", " "))[7:]
@@ -1447,7 +1553,25 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     if type == "image":
                         sequencer.generate_image()
                     scene.generate_movie_prompt = prompt
-                scene.image_path = ""
+                bpy.types.Scene.image_path = ""
+            if strip.type == "MOVIE":
+                #strip_dirname = os.path.dirname(strip.directory)
+                movie_path = bpy.path.abspath(strip.filepath)#os.path.join(strip_dirname, strip.elements[0].filename))
+                bpy.types.Scene.movie_path = movie_path
+                if strip.name:
+                    strip_prompt = os.path.splitext(strip.name)[0]
+                    strip_prompt = (strip_prompt.replace("_", " "))[7:]
+                    print("Processing: " + strip_prompt +", "+prompt)
+                    scene.generate_movie_prompt = strip_prompt+", "+prompt
+                    scene.frame_current = strip.frame_final_start
+                    if type == "movie":
+                        sequencer.generate_movie()
+                    if type == "audio":
+                        sequencer.generate_audio()
+                    if type == "image":
+                        sequencer.generate_image()
+                    scene.generate_movie_prompt = prompt
+                bpy.types.Scene.movie_path = ""
 
         scene.frame_current = current_frame
         scene.generate_movie_prompt = prompt
@@ -1651,8 +1775,15 @@ def unregister():
     del bpy.types.Scene.movie_use_random
     del bpy.types.Scene.movie_num_guidance
     del bpy.types.Scene.generatorai_typeselect
+    del bpy.types.Scene.movie_path
+    del bpy.types.Scene.image_path
+    del bpy.types.Scene.refine_sd
+    del bpy.types.Scene.denoising_strength
+    del bpy.types.Scene.video_to_video
+    
     bpy.types.SEQUENCER_MT_add.remove(panel_text_to_generatorAI)
 
 
 if __name__ == "__main__":
+    unregister()
     register()
