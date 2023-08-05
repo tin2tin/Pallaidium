@@ -3,7 +3,7 @@
 bl_info = {
     "name": "Generative AI",
     "author": "tintwotin",
-    "version": (1, 3),
+    "version": (1, 4),
     "blender": (3, 4, 0),
     "location": "Video Sequence Editor > Sidebar > Generative AI",
     "description": "Generate media in the VSE",
@@ -20,21 +20,6 @@ import string
 from os.path import dirname, realpath, isdir, join, basename
 import shutil
 os_platform = platform.system()  # 'Linux', 'Darwin', 'Java', 'Windows'
-
-
-# not working
-def get_active_device_vram():
-    active_scene = bpy.context.scene
-    active_view_layer = active_scene.view_layers.active
-    active_view_layer.use_gpu_select = True  # Enable GPU selection in the view layer
-
-    # Iterate over available GPU devices
-    for gpu_device in bpy.context.preferences.system.compute_device:
-        if gpu_device.type == 'CUDA':  # Only consider CUDA devices
-            if gpu_device.use:
-                return gpu_device.memory_total
-
-    return None
 
 
 def show_system_console(show):
@@ -392,6 +377,37 @@ def uninstall_module_with_dependencies(module_name):
     subprocess.check_call([pybin,"-m","pip","install","numpy"])
 
 
+# Function to load a video as a NumPy array
+def load_video_as_np_array(video_path):
+    import cv2
+    import numpy as np
+    cap = cv2.VideoCapture(video_path)
+
+    if not cap.isOpened():
+        raise IOError("Error opening video file")
+
+    frames = []
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frames.append(frame)
+
+    cap.release()
+    return np.array(frames)
+
+
+def low_vram():
+    import torch
+    total_vram = 0
+    for i in range(torch.cuda.device_count()):
+        properties = torch.cuda.get_device_properties(i)
+        total_vram += properties.total_memory
+
+    return ((total_vram / (1024 ** 3)) < 6.1)
+
+
 class GeneratorAddonPreferences(AddonPreferences):
     bl_idname = __name__
 
@@ -621,7 +637,7 @@ class GENERATOR_OT_sound_notification(Operator):
         return {"FINISHED"}
 
 
-class SEQEUNCER_PT_generate_ai(Panel):
+class SEQEUNCER_PT_generate_ai(Panel): # UI
     """Generate Media using AI"""
 
     bl_idname = "SEQUENCER_PT_sequencer_generate_movie_panel"
@@ -692,13 +708,16 @@ class SEQEUNCER_PT_generate_ai(Panel):
             col = layout.column(heading="Upscale", align=True)
             col.prop(context.scene, "video_to_video", text="2x")
             sub_col = col.row()
-            sub_col.prop(context.scene, "denoising_strength", text="Denoising Strength")
+            sub_col.prop(context.scene, "denoising_strength", text="Denoising")
             sub_col.active = context.scene.video_to_video
 
         if type == "image" and (image_model_card == "stabilityai/stable-diffusion-xl-base-1.0"):
 
             col = layout.column(heading="Refine", align=True)
             col.prop(context.scene, "refine_sd", text="Image")
+            sub_col = col.row()
+            sub_col.prop(context.scene, "denoising_strength", text="Denoising")
+            sub_col.active = context.scene.refine_sd
 
         row = layout.row(align=True)
         row.scale_y = 1.1
@@ -710,29 +729,14 @@ class SEQEUNCER_PT_generate_ai(Panel):
             row.operator("sequencer.generate_audio", text="Generate")
 
 
-
-
-# Function to load a video as a NumPy array
-def load_video_as_np_array(video_path):
-    import cv2
-    import numpy as np
-    cap = cv2.VideoCapture(video_path)
-
-    if not cap.isOpened():
-        raise IOError("Error opening video file")
-
-    frames = []
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        frames.append(frame)
-
-    cap.release()
-    return np.array(frames)
-
-
+try:
+    import torch
+except ModuleNotFoundError:
+    print("In the add-on preferences, install dependencies.")
+    self.report(
+        {"INFO"},
+        "In the add-on preferences, install dependencies.",
+    )
 
 
 class SEQUENCER_OT_generate_movie(Operator):
@@ -750,6 +754,18 @@ class SEQUENCER_OT_generate_movie(Operator):
             self.report({"INFO"}, "Text prompt in the Generative AI tab is empty!")
             return {"CANCELLED"}
 
+        try:
+            from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler, TextToVideoSDPipeline, VideoToVideoSDPipeline
+            from diffusers.utils import export_to_video
+            from PIL import Image
+        except ModuleNotFoundError:
+            print("In the add-on preferences, install dependencies.")
+            self.report(
+                {"INFO"},
+                "In the add-on preferences, install dependencies.",
+            )
+            return {"CANCELLED"}
+
         show_system_console(True)
         set_system_console_topmost(True)
 
@@ -757,19 +773,6 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         if not seq_editor:
             scene.sequence_editor_create()
-
-        try:
-            import torch
-            from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler, TextToVideoSDPipeline, VideoToVideoSDPipeline
-            from diffusers.utils import export_to_video
-        except ModuleNotFoundError:
-            print("Dependencies needs to be installed in the add-on preferences.")
-            self.report(
-                {"INFO"},
-                "Dependencies needs to be installed in the add-on preferences.",
-            )
-            return {"CANCELLED"}
-        from PIL import Image
 
         # clear the VRAM
         if torch.cuda.is_available():
@@ -785,6 +788,7 @@ class SEQUENCER_OT_generate_movie(Operator):
         duration = scene.generate_movie_frames
         movie_num_inference_steps = scene.movie_num_inference_steps
         movie_num_guidance = scene.movie_num_guidance
+        denoising_strength = scene.denoising_strength
 
         #wm = bpy.context.window_manager
         #tot = scene.movie_num_batch
@@ -794,33 +798,41 @@ class SEQUENCER_OT_generate_movie(Operator):
         addon_prefs = preferences.addons[__name__].preferences
         movie_model_card = addon_prefs.movie_model_card
 
-        # Movie upscale
+        # Upscale imported movie
         if scene.movie_path:
             print("Running movie upscale: "+scene.movie_path)
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
-                #torch.cuda.set_per_process_memory_fraction(0.85)  # 6 GB VRAM
 
-            pipe = TextToVideoSDPipeline.from_pretrained(
-                movie_model_card,
-                torch_dtype=torch.float16,
-                #variant="fp16",
-            )
-            pipe.enable_model_cpu_offload()
-            pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
-            pipe.enable_vae_slicing()  
+#            pipe = TextToVideoSDPipeline.from_pretrained(
+#                movie_model_card,
+#                torch_dtype=torch.float16,
+#                #variant="fp16",
+#            )
+
+#            if low_vram:
+#                pipe.enable_model_cpu_offload()
+#                pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
+#                pipe.enable_vae_slicing()
+#            else:
+#                pipe.to("cuda")
 
             upscale = VideoToVideoSDPipeline.from_pretrained("cerspense/zeroscope_v2_XL", torch_dtype=torch.float16)
             #upscale = VideoToVideoSDPipeline.from_pretrained("cerspense/zeroscope_v2_576w", torch_dtype=torch.float16)
 
-            upscale.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+            #upscale.scheduler = DPMSolverMultistepScheduler.from_config(upscale.scheduler.config)
 
-            # memory optimization
-            upscale.enable_model_cpu_offload()
-            upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)
-            upscale.enable_vae_slicing()            
- 
-        # Movie generation           
+            if low_vram:
+                torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
+                upscale.enable_model_cpu_offload()
+                upscale.enable_attention_slicing(1)
+                #upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                upscale.enable_vae_slicing()
+                upscale.enable_xformers_memory_efficient_attention()
+            else:
+                upscale.to("cuda")
+
+        # Movie generation
         else:
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
@@ -836,29 +848,37 @@ class SEQUENCER_OT_generate_movie(Operator):
                 pipe.scheduler.config
             )
 
-            # memory optimization
-            #pipe.to("cuda")
-            pipe.enable_model_cpu_offload()
-            pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
-            pipe.enable_vae_slicing()
+            if low_vram:
+                pipe.enable_model_cpu_offload()
+                pipe.enable_attention_slicing(1)
+                # pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                pipe.enable_vae_slicing()
+                pipe.enable_xformers_memory_efficient_attention()
+            else:
+                pipe.to("cuda")
 
+            # Upscale generated movie
             if scene.video_to_video and (movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w"):
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
                     #torch.cuda.set_per_process_memory_fraction(0.85)  # 6 GB VRAM
-
                 upscale = VideoToVideoSDPipeline.from_pretrained("cerspense/zeroscope_v2_XL", torch_dtype=torch.float16)
                 #upscale = VideoToVideoSDPipeline.from_pretrained("cerspense/zeroscope_v2_576w", torch_dtype=torch.float16)
                 upscale.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
-                # memory optimization
-                upscale.enable_model_cpu_offload()
-                upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                upscale.enable_vae_slicing()
-
+                if low_vram:
+                    upscale.enable_model_cpu_offload()
+                    upscale.enable_attention_slicing(1)
+                    #upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                    upscale.enable_vae_slicing()
+                    upscale.enable_xformers_memory_efficient_attention()
+                else:
+                    upscale.to("cuda")
 
         for i in range(scene.movie_num_batch):
 
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
             # memory optimization
             # pipe.enable_model_cpu_offload()
             # pipe.enable_vae_slicing()
@@ -904,32 +924,26 @@ class SEQUENCER_OT_generate_movie(Operator):
 
             # Upscale batch input
             if scene.movie_path:
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-                #import imageio
-                #import numpy as np
-                #from PIL import Image
-                #import cv2
 
                 # Path to the video file
                 video_path = scene.movie_path
 
-                video_frames = load_video_as_np_array(video_path)
+                video = load_video_as_np_array(video_path)
 
-                video = [Image.fromarray(frame).resize((x*2, y*2)) for frame in video_frames]
+                if scene.video_to_video:
+                    video = [Image.fromarray(frame).resize((x*2, y*2)) for frame in video]
 
                 video_frames = upscale(
                 prompt,
                 video=video,
-                strength=0.65,
+                strength=denoising_strength,
                 negative_prompt=negative_prompt,
                 num_inference_steps=movie_num_inference_steps,
                 guidance_scale=movie_num_guidance,
                 generator=generator).frames
-            # Generation of movie               
+
+            # Generation of movie
             else:
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
                 video_frames = pipe(
                     prompt,
                     negative_prompt=negative_prompt,
@@ -943,7 +957,10 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 movie_model_card = addon_prefs.movie_model_card
 
-                # upscale video
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+
+                # Upscale video
                 if scene.video_to_video and (movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w"):
                     if torch.cuda.is_available():
                         torch.cuda.empty_cache()
@@ -952,7 +969,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     video_frames = upscale(
                     prompt,
                     video=video,
-                    strength=0.65,
+                    strength=denoising_strength,
                     negative_prompt=negative_prompt,
                     num_inference_steps=movie_num_inference_steps,
                     guidance_scale=movie_num_guidance,
@@ -997,9 +1014,9 @@ class SEQUENCER_OT_generate_movie(Operator):
                             bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
                             break
 
-            # clear the VRAM
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+        # clear the VRAM
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
         bpy.types.Scene.movie_path = ""
         bpy.ops.renderreminder.play_notification()
@@ -1050,6 +1067,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 import torchaudio
                 from audiocraft.models import AudioGen
                 from audiocraft.data.audio import audio_write
+                from scipy.io.wavfile import write as write_wav
 
             if addon_prefs.audio_model_card == "bark":
                 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
@@ -1060,6 +1078,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 )
                 from bark.api import semantic_to_waveform
                 from bark import generate_audio, SAMPLE_RATE
+                from scipy.io.wavfile import write as write_wav
         except ModuleNotFoundError:
             print("Dependencies needs to be installed in the add-on preferences.")
             self.report(
@@ -1079,19 +1098,22 @@ class SEQUENCER_OT_generate_audio(Operator):
             repo_id = addon_prefs.audio_model_card
             pipe = AudioLDMPipeline.from_pretrained(repo_id)  # , torch_dtype=torch.float16z
 
-            # Use cuda if possible
-            #if torch.cuda.is_available():
-            #    pipe = pipe.to("cuda")
-            pipe.enable_model_cpu_offload()
-            pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
-            pipe.enable_vae_slicing() 
+            if low_vram:
+                pipe.enable_model_cpu_offload()
+                # pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                pipe.enable_vae_slicing()
+            else:
+                pipe.to("cuda")
 
         elif addon_prefs.audio_model_card == "facebook/audiogen-medium":
             pipe = AudioGen.get_pretrained('facebook/audiogen-medium')
             pipe = pipe.to("cuda")
-#            pipe.enable_model_cpu_offload()
-#            pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
-#            pipe.enable_vae_slicing() 
+#            if low_vram:
+#                pipe.enable_model_cpu_offload()
+#                pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
+#                pipe.enable_vae_slicing()
+#            else:
+#                pipe.to("cuda")
 
         else: #bark
             preload_models(
@@ -1282,11 +1304,12 @@ class SEQUENCER_OT_generate_image(Operator):
             refiner = StableDiffusionXLImg2ImgPipeline.from_pretrained(
                 "stabilityai/stable-diffusion-xl-refiner-1.0", torch_dtype=torch.float16
             )
-            # memory optimization
-            #refiner.to("cuda")
-            refiner.enable_model_cpu_offload()
-            refiner.unet.enable_forward_chunking(chunk_size=1, dim=1)
-            refiner.enable_vae_slicing()
+            if low_vram:
+                refiner.enable_model_cpu_offload()
+                # refiner.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                refiner.enable_vae_slicing()
+            else:
+                refiner.to("cuda")
 
         # Model for generate
         else:
@@ -1298,16 +1321,23 @@ class SEQUENCER_OT_generate_image(Operator):
 
                 # stage 1
                 stage_1 = DiffusionPipeline.from_pretrained("DeepFloyd/IF-I-M-v1.0", variant="fp16", torch_dtype=torch.float16)
-                # stage_1.enable_model_cpu_offload()
-                stage_1.enable_sequential_cpu_offload() # 6 GB VRAM
+                if low_vram:
+                    stage_1.enable_model_cpu_offload()
+                    # stage_1.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                    stage_1.enable_vae_slicing()
+                else:
+                    stage_1.to("cuda")
 
                 # stage 2
                 stage_2 = DiffusionPipeline.from_pretrained(
                     "DeepFloyd/IF-II-M-v1.0", text_encoder=None, variant="fp16", torch_dtype=torch.float16
                 )
-                stage_2.enable_model_cpu_offload()
-                stage_2.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                stage_2.enable_vae_slicing()
+                if low_vram:
+                    stage_2.enable_model_cpu_offload()
+                    # stage_2.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                    stage_2.enable_vae_slicing()
+                else:
+                    stage_2.to("cuda")
 
                 # stage 3
                 safety_modules = {
@@ -1318,9 +1348,12 @@ class SEQUENCER_OT_generate_image(Operator):
                 stage_3 = DiffusionPipeline.from_pretrained(
                     "stabilityai/stable-diffusion-x4-upscaler", **safety_modules, torch_dtype=torch.float16
                 )
-                stage_3.enable_model_cpu_offload()
-                stage_3.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                stage_3.enable_vae_slicing()
+                if low_vram:
+                    stage_3.enable_model_cpu_offload()
+                    # stage_3.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                    stage_3.enable_vae_slicing()
+                else:
+                    stage_3.to("cuda")
 
             else: # model for stable diffusion
                 pipe = DiffusionPipeline.from_pretrained(
@@ -1331,12 +1364,14 @@ class SEQUENCER_OT_generate_image(Operator):
 
                 pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
-                # memory optimization
-                pipe.enable_model_cpu_offload()
-                pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                pipe.enable_vae_slicing()       
+                if low_vram:
+                    pipe.enable_model_cpu_offload()
+                    # pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                    pipe.enable_vae_slicing()
+                else:
+                    pipe.to("cuda")
 
-              
+
         # Add refiner model if chosen.
         if (scene.refine_sd and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0") and not scene.image_path:
             refiner = DiffusionPipeline.from_pretrained(
@@ -1348,11 +1383,12 @@ class SEQUENCER_OT_generate_image(Operator):
                 variant="fp16",
             )
 
-            # memory optimization
-            #refiner.to("cuda")
-            refiner.enable_model_cpu_offload()
-            # refiner.unet.enable_forward_chunking(chunk_size=1, dim=1)
-            refiner.enable_vae_slicing()
+            if low_vram:
+                refiner.enable_model_cpu_offload()
+                # refiner.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                refiner.enable_vae_slicing()
+            else:
+                refiner.to("cuda")
 
         # Main Generate Loop:
         for i in range(scene.movie_num_batch):
@@ -1445,13 +1481,13 @@ class SEQUENCER_OT_generate_image(Operator):
             # Add refiner
             if scene.refine_sd and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
 
-                n_steps = 50
-                high_noise_frac = 0.8
+                #n_steps = 50
+                denoising_strength = scene.denoising_strength
                 image = refiner(
                     prompt,
                     negative_prompt=negative_prompt,
                     num_inference_steps=image_num_inference_steps,
-                    denoising_start=high_noise_frac,
+                    denoising_start=denoising_strength,
                     image=image,
                 ).images[0]
 
@@ -1750,11 +1786,13 @@ def register():
     bpy.types.Scene.movie_path = bpy.props.StringProperty(
         name="movie_path", default=""
     )
+    bpy.types.Scene.movie_path = ""
 
     # image path
     bpy.types.Scene.image_path = bpy.props.StringProperty(
         name="image_path", default=""
     )
+    bpy.types.Scene.image_path = ""
 
     for cls in classes:
         bpy.utils.register_class(cls)
@@ -1780,7 +1818,7 @@ def unregister():
     del bpy.types.Scene.refine_sd
     del bpy.types.Scene.denoising_strength
     del bpy.types.Scene.video_to_video
-    
+
     bpy.types.SEQUENCER_MT_add.remove(panel_text_to_generatorAI)
 
 
