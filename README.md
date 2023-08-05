@@ -10,17 +10,18 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 ## Features
 * Text to video
 * Text to audio
+* Text to speech
 * Text to image
-* Seed, Quality Steps, Frames, Word Power. 
+* Seed, Quality Steps, Frames, Word Power, denoising. 
 * Batch operation of text strips into videos, audio, music, speech, or images.
 * Batch refinement of images.
 * Batch upscale & refinement of movies.
-* Model card selector
-* Render finished notification
-* Model Cards: Modelscope, Animov, Stable Diffusion 1.5 & 2, Deep Floyd IF, AudioLMD and Bark
-* One click install and uninstall dependencies
-* User-defined file path for generated files
-* Seed added to strip name
+* Model card selector.
+* Render finished notification.
+* Model Cards: Stable Diffusion 1.5, 2, XL, Deep Floyd IF, Zeroscope, Animov, AudioLMD and Bark.
+* One click install and uninstall dependencies.
+* User-defined file path for generated files.
+* Seed and prompt added to strip name.
 
 ## Requirements
 * A CUDA-supported Nvidia card with at least 4 GB VRAM.
@@ -94,11 +95,6 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/c1d86548-5e6b-46b7-80f2-
 
 # Text to Audio
 
-### AudioLDM
-Find AudioLDM documentation here: https://github.com/haoheliu/AudioLDM
-Try prompts like: Bag pipes playing a funeral dirge, punk rock band playing hardcore song, techno dj playing deep bass house music, and acid house loop with jazz.
-Or: Voice of God judging mankind, woman talking about celestial beings, hammer on wood.
-
 ### Bark
 Find Bark documentation here: https://github.com/suno-ai/bark
 * [laughter]
@@ -117,6 +113,11 @@ Speaker Library: https://suno-ai.notion.site/8b8e8749ed514b0cbf3f699013548683?v=
 Tip           |
 :------------- |
 If the audio breaks up, try processing longer sentences.      |
+
+### AudioLDM
+Find AudioLDM documentation here: https://github.com/haoheliu/AudioLDM
+Try prompts like: Bag pipes playing a funeral dirge, punk rock band playing hardcore song, techno dj playing deep bass house music, and acid house loop with jazz.
+Or: Voice of God judging mankind, woman talking about celestial beings, hammer on wood.
 
 ## Modules
 Diffusers: https://github.com/huggingface/diffusers
