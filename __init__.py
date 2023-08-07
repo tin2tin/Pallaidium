@@ -839,11 +839,11 @@ class SEQEUNCER_PT_generate_ai(Panel):  # UI
             sub_col.active = context.scene.refine_sd
         row = layout.row(align=True)
         row.scale_y = 1.1
-        if (
-            type == "movie"
-            and not movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
-        ):
-            row.operator("sequencer.generate_movie", text="Generate")
+        if type == "movie":
+            if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+                row.operator("sequencer.text_to_generator", text="Generate from Strips")
+            else:
+                row.operator("sequencer.generate_movie", text="Generate")
         if type == "image":
             row.operator("sequencer.generate_image", text="Generate")
         if type == "audio":
@@ -1715,6 +1715,11 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         prompt = scene.generate_movie_prompt
         current_frame = scene.frame_current
         type = scene.generatorai_typeselect
+
+        if not strips:
+            self.report({"INFO"}, "Select strips for batch processing.")
+            return {"CANCELLED"}
+        
         for strip in strips:
             if strip.type == "TEXT":
                 if strip.text:
@@ -1781,7 +1786,7 @@ def panel_text_to_generatorAI(self, context):
     layout.separator()
     layout.operator(
         "sequencer.text_to_generator",
-        text="Strips as Generative AI Input",
+        text="Generative AI",
         icon="SHADERFX",
     )
 
