@@ -15,6 +15,8 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 * Text to audio
 * Text to speech
 * Text to image
+* Img2img
+* Vid2vid
 * Seed, Quality Steps, Frames, Word Power, denoising. 
 * Batch operation of text strips into videos, audio, music, speech, or images.
 * Batch refinement of images.
