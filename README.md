@@ -29,10 +29,12 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 * Seed and prompt added to strip name.
 
 ## Requirements
+* Windows or Linux (Could maybe work on MacOS, but someone will have to contribute code to make it work).
 * A CUDA-supported Nvidia card with at least 4 GB VRAM.
+  
 
 ## How to install
-(As for Linux and MacOS, if anything differs in installation, then please share instructions.)
+(As for Linux, if anything differs in installation, then please share instructions.)
 
 * First you must download and install git for your platform(must be on PATH(or Bark will fail)): https://git-scm.com/downloads
 
