@@ -286,7 +286,7 @@ def process_video(input_video_path, output_video_path):
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
 
-    # Process and save each frame as an image in the temp folder
+    # Save each loaded frame as an image in the temp folder
     for i in range(frame_count):
         ret, frame = cap.read()
         if not ret:
@@ -306,6 +306,38 @@ def process_video(input_video_path, output_video_path):
     os.rmdir(temp_image_folder)
 
     return processed_frames
+
+
+def process_image(image_path, frames_nr):
+    from PIL import Image
+    import cv2
+
+    img = cv2.imread(image_path)
+    
+    # Create a temporary folder for storing frames
+    temp_image_folder = "temp_images"
+    if not os.path.exists(temp_image_folder):
+        os.makedirs(temp_image_folder)
+    
+    # Add zoom motion to the image and save frames
+    zoom_factor = 1.01
+    for i in range(frames_nr):
+        zoomed_img = cv2.resize(img, None, fx=zoom_factor, fy=zoom_factor)
+        output_path = os.path.join(temp_image_folder, f"frame_{i:04d}.png")
+        cv2.imwrite(output_path, zoomed_img)
+        zoom_factor += 0.01
+
+    # Process frames using the separate function
+    processed_frames = process_frames(temp_image_folder)
+
+    # Clean up: Delete the temporary image folder
+    for i in range(frames_nr):
+        image_path = os.path.join(temp_image_folder, f"frame_{i:04d}.png")
+        os.remove(image_path)
+    os.rmdir(temp_image_folder)
+
+    return processed_frames
+
 
 
 def low_vram():
@@ -932,8 +964,7 @@ class SEQUENCER_OT_generate_movie(Operator):
         # LOADING MODULES
 
         # Refine imported movie
-        if scene.movie_path:
-            print("Running movie upscale: " + scene.movie_path)
+        if scene.movie_path or scene.image_path:
 
             if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
                 print("\nImg2img processing:")
@@ -1060,7 +1091,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     generator = None
 
             # Process batch input
-            if scene.movie_path:
+            if scene.movie_path or scene.image_path:
                 # Path to the video file
                 video_path = scene.movie_path
 
@@ -1070,7 +1101,11 @@ class SEQUENCER_OT_generate_movie(Operator):
                     output_video_path = clean_path(
                         dirname(realpath(__file__) + "/temp_images")
                     )
-                    frames = process_video(input_video_path, output_video_path)
+                    if scene.movie_path:
+                        frames = process_video(input_video_path, output_video_path)
+                    elif scene.image_path:
+                        print(scene.image_path)
+                        frames = process_image(scene.image_path, int(scene.generate_movie_frames))                       
 
                     video_frames = []
                     # Iterate through the frames
@@ -1087,14 +1122,20 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                         video_frames.append(image)
 
-#                        if torch.cuda.is_available():
-#                            torch.cuda.empty_cache()
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
 
                     video_frames = np.array(video_frames)
 
                 # mov2mov
                 else:
-                    video = load_video_as_np_array(video_path)
+
+                    if scene.movie_path:
+                        video = load_video_as_np_array(video_path)
+                    elif scene.image_path:
+                        print(scene.image_path)
+                        frames = process_image(scene.image_path, int(scene.generate_movie_frames))                       
+                        video = np.array(frames)
 
                     if scene.video_to_video:
                         video = [
@@ -1663,7 +1704,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     prompt,
                     negative_prompt=negative_prompt,
                     num_inference_steps=image_num_inference_steps,
-                    strength=denoising_strength,
+                    denoising_start=0.8,
                     guidance_scale=image_num_guidance,
                     image=image,
                 ).images[0]
@@ -1774,12 +1815,13 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     print("Seed: "+str(file_seed))
                     scene.generate_movie_prompt = strip_prompt + ", " + prompt
                     scene.frame_current = strip.frame_final_start
-                    if type == "movie":
+                    if type == "movie": 
                         sequencer.generate_movie()
                     if type == "audio":
                         sequencer.generate_audio()
                     if type == "image":
                         sequencer.generate_image()
+                        
                     context.scene.generate_movie_prompt = prompt
                     context.scene.movie_use_random = use_random
                     context.scene.movie_num_seed = seed
