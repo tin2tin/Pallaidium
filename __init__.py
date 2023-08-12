@@ -313,12 +313,12 @@ def process_image(image_path, frames_nr):
     import cv2
 
     img = cv2.imread(image_path)
-    
+
     # Create a temporary folder for storing frames
     temp_image_folder = "temp_images"
     if not os.path.exists(temp_image_folder):
         os.makedirs(temp_image_folder)
-    
+
     # Add zoom motion to the image and save frames
     zoom_factor = 1.01
     for i in range(frames_nr):
@@ -979,7 +979,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 if low_vram:
                     torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
                     upscale.enable_model_cpu_offload()
-                    
+
                     # upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)
                     upscale.enable_vae_slicing()
                     upscale.enable_xformers_memory_efficient_attention()
@@ -988,7 +988,8 @@ class SEQUENCER_OT_generate_movie(Operator):
             else:
                 print("\nMov2mov processing:")
                 upscale = VideoToVideoSDPipeline.from_pretrained(
-                    "cerspense/zeroscope_v2_XL", torch_dtype=torch.float16
+                    movie_model_card, torch_dtype=torch.float16
+                    #"cerspense/zeroscope_v2_XL", torch_dtype=torch.float16
                 )
                 # upscale = VideoToVideoSDPipeline.from_pretrained("cerspense/zeroscope_v2_576w", torch_dtype=torch.float16)
 
@@ -997,7 +998,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 if low_vram:
                     torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
                     upscale.enable_model_cpu_offload()
-                    
+
                     upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)
                     upscale.enable_vae_slicing()
                     upscale.enable_xformers_memory_efficient_attention()
@@ -1105,7 +1106,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         frames = process_video(input_video_path, output_video_path)
                     elif scene.image_path:
                         print(scene.image_path)
-                        frames = process_image(scene.image_path, int(scene.generate_movie_frames))                       
+                        frames = process_image(scene.image_path, int(scene.generate_movie_frames))
 
                     video_frames = []
                     # Iterate through the frames
@@ -1134,7 +1135,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         video = load_video_as_np_array(video_path)
                     elif scene.image_path:
                         print(scene.image_path)
-                        frames = process_image(scene.image_path, int(scene.generate_movie_frames))                       
+                        frames = process_image(scene.image_path, int(scene.generate_movie_frames))
                         video = np.array(frames)
 
                     if scene.video_to_video:
@@ -1505,7 +1506,7 @@ class SEQUENCER_OT_generate_image(Operator):
         image_model_card = addon_prefs.image_model_card
 
         # Model for generate
-        
+
         # DeepFloyd
         if image_model_card == "DeepFloyd/IF-I-M-v1.0":
             from huggingface_hub.commands.user import login
@@ -1783,7 +1784,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         if not strips:
             self.report({"INFO"}, "Select strips for batch processing.")
             return {"CANCELLED"}
-        
+
         for strip in strips:
             if strip.type == "TEXT":
                 if strip.text:
@@ -1810,18 +1811,18 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                         strip_prompt = (strip_prompt.replace(str(file_seed)+"_", ""))
                         context.scene.movie_use_random = False
                         context.scene.movie_num_seed = file_seed
-                        
+
                     print("Processing: " + strip_prompt + ", " + prompt)
                     print("Seed: "+str(file_seed))
                     scene.generate_movie_prompt = strip_prompt + ", " + prompt
                     scene.frame_current = strip.frame_final_start
-                    if type == "movie": 
+                    if type == "movie":
                         sequencer.generate_movie()
                     if type == "audio":
                         sequencer.generate_audio()
                     if type == "image":
                         sequencer.generate_image()
-                        
+
                     context.scene.generate_movie_prompt = prompt
                     context.scene.movie_use_random = use_random
                     context.scene.movie_num_seed = seed
