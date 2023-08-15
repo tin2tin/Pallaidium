@@ -78,6 +78,9 @@ Converting Text strips into GeneratorAI strips:
 
 ![image](https://user-images.githubusercontent.com/1322593/232625894-6726d407-c802-4619-864a-0b8b7faeceff.png)
 
+This operator will batch-process all selected text, image and movie strips through the settings in the sidebar.
+
+
 # Text to Video/Image
 
 The Animov models have been trained on Anime material, so adding "anime" to the prompt is necessary, especially for the Animov-512x model. 
