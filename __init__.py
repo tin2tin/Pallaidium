@@ -301,7 +301,7 @@ def process_video(input_video_path, output_video_path):
     cap.release()
 
     # Process frames using the separate function
-    processed_frames = process_frames(temp_image_folder, 512)
+    processed_frames = process_frames(temp_image_folder, 1024)
     # print("Temp folder: "+temp_image_folder)
 
     # Clean up: Delete the temporary image folder
