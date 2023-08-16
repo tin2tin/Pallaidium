@@ -68,11 +68,10 @@ Install Dependencies, set Movie Model Card, and set Sound Notification in the ad
 
 ![image](https://user-images.githubusercontent.com/1322593/233810577-961de9ec-ce3f-433b-a43c-dd4583fb518c.png)
 
-Video Sequence Editor > Sidebar > Generative AI
+Video Sequence Editor > Sidebar > Generative AI:
 
-![image](https://user-images.githubusercontent.com/1322593/233038942-ae01ed61-9977-4478-b90a-af8282d6556c.png)
-![image](https://user-images.githubusercontent.com/1322593/233361486-e8fc96c3-1c3f-4077-af56-98bab66638c3.png)
-![image](https://user-images.githubusercontent.com/1322593/233155019-05c514a3-d7cc-4f4f-ba9c-7d77f957fd98.png)
+![image](https://github.com/tin2tin/Generative_AI/assets/1322593/67ce638a-d147-4e7a-81e1-bc81939dd5f0)
+
 
 Converting Text strips into GeneratorAI strips:
 
