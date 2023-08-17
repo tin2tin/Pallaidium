@@ -3,7 +3,7 @@
 bl_info = {
     "name": "Generative AI",
     "author": "tintwotin",
-    "version": (1, 4),
+    "version": (1, 5),
     "blender": (3, 4, 0),
     "location": "Video Sequence Editor > Sidebar > Generative AI",
     "description": "Generate media in the VSE",
@@ -19,7 +19,7 @@ from bpy.props import (
     IntProperty,
     FloatProperty,
 )
-import site, platform
+import site, platform, json
 import subprocess
 import sys, os, aud, re
 import string
@@ -146,6 +146,47 @@ def extract_numbers(input_string):
         return None
 
 
+def load_styles(json_filename):
+    styles_array = []
+
+    try:
+        with open(json_filename, "r") as json_file:
+            data = json.load(json_file)
+    except FileNotFoundError:
+        print(f"JSON file '{json_filename}' not found.")
+        data = []
+
+    for item in data:
+        name = item["name"]
+        prompt = item["prompt"]
+        negative_prompt = item["negative_prompt"]
+        styles_array.append((negative_prompt.lower().replace(" ", "_"), name.title(), prompt))
+
+    return styles_array
+
+
+def style_prompt(prompt):
+    selected_entry_key = bpy.context.scene.generatorai_styles
+
+    return_array = []
+   
+    if selected_entry_key:
+        styles_array = load_styles(os.path.dirname(os.path.abspath(__file__))+"/styles.json")
+
+        if selected_entry_key:
+            selected_entry = next((item for item in styles_array if item[0] == selected_entry_key), None)
+
+            if selected_entry:
+                selected_entry_list = list(selected_entry)
+                return_array.append(selected_entry_list[2].replace("{prompt}", prompt))
+                return_array.append(selected_entry_list[0].replace("_", " "))
+                return return_array
+
+    return_array.append(bpy.context.scene.generate_movie_prompt)
+    return_array.append(bpy.context.scene.generate_movie_negative_prompt)
+    return return_array
+
+
 def closest_divisible_64(num):
     # Determine the remainder when num is divided by 64
     remainder = num % 64
@@ -158,6 +199,13 @@ def closest_divisible_64(num):
     # Otherwise, return num + (64 - remainder)
     else:
         return num + (64 - remainder)
+
+
+#def ensure_divisible_by_64(value):
+#    remainder = value % 64
+#    if remainder != 0:
+#        value += 64 - remainder
+#    return value
 
 
 def find_first_empty_channel(start_frame, end_frame):
@@ -176,26 +224,31 @@ def find_first_empty_channel(start_frame, end_frame):
 
 def clean_filename(filename):
     filename = filename[:50]
-    valid_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
+    valid_chars = "-_,.() %s%s" % (string.ascii_letters, string.digits)
     clean_filename = "".join(c if c in valid_chars else "_" for c in filename)
     clean_filename = clean_filename.replace("\n", " ")
     clean_filename = clean_filename.replace("\r", " ")
+    clean_filename = clean_filename.replace(" ", "_")
 
     return clean_filename.strip()
 
 
 def create_folder(folderpath):
-    if not isdir(folderpath):
-        os.makedirs(folderpath, exist_ok=True)
-    return folderpath
+    try:
+        os.makedirs(folderpath)
+        return True
+    except FileExistsError:
+       # directory already exists
+        pass
+        return False
 
-
-def clean_path(full_path):
+def solve_path(full_path):
     preferences = bpy.context.preferences
     addon_prefs = preferences.addons[__name__].preferences
     name, ext = os.path.splitext(full_path)
     dir_path, filename = os.path.split(name)
-    dir_path = create_folder(addon_prefs.generator_ai)
+    dir_path = addon_prefs.generator_ai+"\\"+str(date.today())
+    create_folder(dir_path)
     cleaned_filename = clean_filename(filename)
     new_filename = cleaned_filename + ext
     i = 1
@@ -237,13 +290,6 @@ def load_video_as_np_array(video_path):
     return np.array(frames)
 
 
-#def ensure_divisible_by_64(value):
-#    remainder = value % 64
-#    if remainder != 0:
-#        value += 64 - remainder
-#    return value
-
-
 def process_frames(frame_folder_path, target_width):
     from PIL import Image
     import cv2
@@ -281,7 +327,7 @@ def process_video(input_video_path, output_video_path):
     import shutil
 
     # Create a temporary folder for storing frames
-    temp_image_folder = clean_path(dirname(realpath(__file__)) + "/temp_images")
+    temp_image_folder = solve_path("temp_images")
     if not os.path.exists(temp_image_folder):
         os.makedirs(temp_image_folder)
 
@@ -317,7 +363,7 @@ def process_image(image_path, frames_nr):
     img = cv2.imread(image_path)
 
     # Create a temporary folder for storing frames
-    temp_image_folder = clean_path(dirname(realpath(__file__)) + "/temp_images")
+    temp_image_folder = solve_path("/temp_images")
     if not os.path.exists(temp_image_folder):
         os.makedirs(temp_image_folder)
 
@@ -327,7 +373,7 @@ def process_image(image_path, frames_nr):
         zoomed_img = cv2.resize(img, None, fx=zoom_factor, fy=zoom_factor)
         output_path = os.path.join(temp_image_folder, f"frame_{i:04d}.png")
         cv2.imwrite(output_path, zoomed_img)
-        zoom_factor += 0.1
+        zoom_factor += 1.0
 
     # Process frames using the separate function
     processed_frames = process_frames(temp_image_folder, 1024)
@@ -846,6 +892,9 @@ class SEQEUNCER_PT_generate_ai(Panel):  # UI
             col.prop(
                 context.scene, "generate_movie_negative_prompt", text="", icon="REMOVE"
             )
+        
+        col.prop(context.scene, "generatorai_styles", text="Style")
+        
         layout = self.layout
         layout.use_property_split = True
         layout.use_property_decorate = False
@@ -969,8 +1018,10 @@ class SEQUENCER_OT_generate_movie(Operator):
             torch.cuda.empty_cache()
 
         current_frame = scene.frame_current
-        prompt = scene.generate_movie_prompt
-        negative_prompt = scene.generate_movie_negative_prompt + " nsfw nude nudity"
+        prompt = style_prompt(scene.generate_movie_prompt)[0]
+        #print("Positive "+prompt)
+        negative_prompt = scene.generate_movie_negative_prompt +", "+ style_prompt(scene.generate_movie_prompt)[1] +", nsfw nude nudity"
+        #print("Negative "+negative_prompt)
         movie_x = scene.generate_movie_x
         movie_y = scene.generate_movie_y
         x = scene.generate_movie_x = closest_divisible_64(movie_x)
@@ -1008,6 +1059,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 )
 
                 if low_vram:
+                    torch.cuda.set_per_process_memory_fraction(0.95)
                     pipe.enable_model_cpu_offload()
                     # pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
                     pipe.unet.added_cond_kwargs={}
@@ -1029,6 +1081,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 )
 
                 if low_vram:
+                    torch.cuda.set_per_process_memory_fraction(0.95)
                     refiner.enable_model_cpu_offload()
                     # refiner.unet.enable_forward_chunking(chunk_size=1, dim=1)
                     refiner.unet.added_cond_kwargs={}
@@ -1163,9 +1216,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     print("Frame by frame video with SD XL")
 
                     input_video_path = video_path
-                    output_video_path = clean_path(
-                        dirname(realpath(__file__) + "/temp_images")
-                    )
+                    output_video_path = solve_path("temp_images")
 
                     if scene.movie_path:
                         frames = process_video(input_video_path, output_video_path)
@@ -1262,10 +1313,9 @@ class SEQUENCER_OT_generate_movie(Operator):
 
             # Move to folder
             src_path = export_to_video(video_frames)
-            dst_path = clean_path(
-                dirname(realpath(__file__)) + "/"+ str(date.today()) + "/" + os.path.basename(src_path)
-            )
-            create_folder(clean_path(dirname(realpath(__file__)) + "/"+ str(date.today())))
+            dst_path = solve_path(clean_filename(str(seed)+"_"+prompt)+".mp4")
+            print(src_path)
+            print(dst_path)
             shutil.move(src_path, dst_path)
 
             # Add strip
@@ -1292,9 +1342,9 @@ class SEQUENCER_OT_generate_movie(Operator):
                             strip = scene.sequence_editor.active_strip
                             strip.transform.filter = "SUBSAMPLING_3x3"
                             scene.sequence_editor.active_strip = strip
-                            strip.use_proxy = True
                             strip.name = str(seed) + "_" + prompt
-                            bpy.ops.sequencer.rebuild_proxy()
+                            #strip.use_proxy = True
+                            #bpy.ops.sequencer.rebuild_proxy()
 
                             if i > 0:
                                 scene.frame_current = (
@@ -1464,10 +1514,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 audio = np.concatenate(
                     pieces
                 )  # Audio(np.concatenate(pieces), rate=rate)
-                filename = clean_path(
-                    dirname(realpath(__file__)) + "/"+ str(date.today()) + "/" + prompt + ".wav"
-                )
-                create_folder(clean_path(dirname(realpath(__file__)) + "/"+ str(date.today())))
+                filename = solve_path(clean_filename(prompt + ".wav"))
 
                 # Write the combined audio to a file
                 write_wav(filename, rate, audio.transpose())
@@ -1503,10 +1550,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 ).audios[0]
                 rate = 16000
 
-                filename = clean_path(
-                    dirname(realpath(__file__)) + "/"+ str(date.today()) + "/" + prompt + ".wav"
-                )
-                create_folder(clean_path(dirname(realpath(__file__)) + "/"+ str(date.today())))
+                filename = solve_path(prompt + ".wav")
 
                 write_wav(filename, rate, audio.transpose())  # .transpose()
             filepath = filename
@@ -1577,8 +1621,8 @@ class SEQUENCER_OT_generate_image(Operator):
             torch.cuda.empty_cache()
 
         current_frame = scene.frame_current
-        prompt = scene.generate_movie_prompt
-        negative_prompt = scene.generate_movie_negative_prompt + " nsfw nude nudity"
+        prompt = style_prompt(scene.generate_movie_prompt)[0]
+        negative_prompt = scene.generate_movie_negative_prompt +", "+ style_prompt(scene.generate_movie_prompt)[1] +", nsfw nude nudity"
         image_x = scene.generate_movie_x
         image_y = scene.generate_movie_y
         x = scene.generate_movie_x = closest_divisible_64(image_x)
@@ -1630,7 +1674,7 @@ class SEQUENCER_OT_generate_image(Operator):
             )
             if low_vram:
                 stage_1.enable_model_cpu_offload()
-                # stage_1.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                stage_1.unet.enable_forward_chunking(chunk_size=1, dim=1)
                 stage_1.enable_vae_slicing()
                 stage_1.enable_xformers_memory_efficient_attention()
             else:
@@ -1776,11 +1820,12 @@ class SEQUENCER_OT_generate_image(Operator):
                     num_inference_steps=image_num_inference_steps,
                     guidance_scale=image_num_guidance,
                     generator=generator,
+                    # output_type="latent" if scene.refine_sd else "pil",
                 ).images[0]
-                
+ 
             # Generate
             else:
-                print("Generating")
+                print("Generating ")
                 image = pipe(
                     prompt,
                     negative_prompt=negative_prompt,
@@ -1801,14 +1846,14 @@ class SEQUENCER_OT_generate_image(Operator):
                     denoising_start=0.8,
                     guidance_scale=image_num_guidance,
                     image=image,
+                    #image=image[None, :], 
                 ).images[0]
 
             # Move to folder
             filename = clean_filename(
                 str(seed) + "_" + context.scene.generate_movie_prompt
             )
-            out_path = clean_path(dirname(realpath(__file__)) + "/"+ str(date.today()) +"/" + filename + ".png")
-            create_folder(clean_path(dirname(realpath(__file__)) + "/"+ str(date.today())))
+            out_path = solve_path(filename+".png")
             
             image.save(out_path)
 
@@ -1829,8 +1874,8 @@ class SEQUENCER_OT_generate_image(Operator):
                     scene.frame_current = (
                         scene.sequence_editor.active_strip.frame_final_start
                     )
-                strip.use_proxy = True
-                bpy.ops.sequencer.rebuild_proxy()
+                #strip.use_proxy = True
+                #bpy.ops.sequencer.rebuild_proxy()
 
                 # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
                 bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
@@ -1911,9 +1956,10 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                             strip_prompt = (strip_prompt.replace(str(file_seed)+"_", ""))
                             context.scene.movie_use_random = False
                             context.scene.movie_num_seed = file_seed
-
-                    print("\n" + str(count+1) + "/"+ str(len(strips)) + " Prompt: " + strip_prompt + ", " + prompt)
-                    scene.generate_movie_prompt = strip_prompt + ", " + prompt
+                            
+                    styled_prompt = style_prompt(strip_prompt + ", " + prompt)[0]
+                    print("\n" + str(count+1) + "/"+ str(len(strips)) + " Prompt: " + styled_prompt)
+                    scene.generate_movie_prompt = styled_prompt
                     scene.frame_current = strip.frame_final_start
 
                     if type == "movie":
@@ -1945,8 +1991,9 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                             context.scene.movie_use_random = False
                             context.scene.movie_num_seed = file_seed
 
-                    print("\n" + str(count+1) + "/"+ str(len(strips)) + " Prompt: " + strip_prompt + ", " + prompt)
-                    scene.generate_movie_prompt = strip_prompt + ", " + prompt
+                    styled_prompt = style_prompt(strip_prompt + ", " + prompt)[0]
+                    print("\n" + str(count+1) + "/"+ str(len(strips)) + " Prompt: " + styled_prompt)
+                    scene.generate_movie_prompt = styled_prompt
                     scene.generate_movie_prompt = prompt
                     scene.frame_current = strip.frame_final_start
 
@@ -1975,16 +2022,6 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         print("Batch processing finished.")
 
         return {"FINISHED"}
-
-
-#def panel_text_to_generatorAI(self, context):
-#    layout = self.layout
-#    layout.separator()
-#    layout.operator(
-#        "sequencer.text_to_generator",
-#        text="Generative AI",
-#        icon="SHADERFX",
-#    )
 
 
 classes = (
@@ -2160,10 +2197,16 @@ def register():
         max=0.95,
     )
 
+    styles_array = load_styles(os.path.dirname(os.path.abspath(__file__))+"/styles.json")
+    if styles_array:
+        bpy.types.Scene.generatorai_styles = bpy.props.EnumProperty(
+            name="Generator AI Styles",
+            items=[("no_style", "No Style", "No Style")] + styles_array,
+            default="no_style",
+        )
 
     for cls in classes:
         bpy.utils.register_class(cls)
-    #bpy.types.SEQUENCER_MT_add.append(panel_text_to_generatorAI)
 
 
 def unregister():
@@ -2183,7 +2226,7 @@ def unregister():
     del bpy.types.Scene.image_path
     del bpy.types.Scene.refine_sd
     # del bpy.types.Scene.denoising_strength
-    del bpy.types.Scene.video_to_video
+    del bpy.types.Scene.generatorai_styles
 
     #bpy.types.SEQUENCER_MT_add.remove(panel_text_to_generatorAI)
 
