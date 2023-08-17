@@ -16,9 +16,11 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 * Text to speech
 * Text to image
 * Img2img(refinement)
+* Img2vid
 * Vid2vid(refinement)
-* Seed, Quality Steps, Frames, Word Power, denoising. 
-* Batch operation of text strips into videos, audio, music, speech, or images.
+* Style selector.
+* Seed, quality steps, frames, word power, denoising, strip power 
+* Batch conversion of text and media strips into videos, audio, music, speech, or images.
 * Batch refinement of images.
 * Batch upscale & refinement of movies.
 * Model card selector.
@@ -70,8 +72,7 @@ Install Dependencies, set Movie Model Card, and set Sound Notification in the ad
 
 Video Sequence Editor > Sidebar > Generative AI:
 
-![image](https://github.com/tin2tin/Generative_AI/assets/1322593/67ce638a-d147-4e7a-81e1-bc81939dd5f0)
-
+![image](https://github.com/tin2tin/Generative_AI/assets/1322593/36097ede-052c-4ab4-bd3a-f0401d3dd656)
 
 Converting Text strips into GeneratorAI strips:
 
