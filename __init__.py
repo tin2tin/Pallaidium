@@ -3,7 +3,7 @@
 bl_info = {
     "name": "Generative AI",
     "author": "tintwotin",
-    "version": (1, 5),
+    "version": (1, 4),
     "blender": (3, 4, 0),
     "location": "Video Sequence Editor > Sidebar > Generative AI",
     "description": "Generate media in the VSE",
@@ -640,6 +640,11 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Img2img SD XL 1.0 Refine (1024x1024)",
                 "Stable Diffusion XL 1.0",
             ),
+#            (
+#                "576-b2g8f5x4-36-18000/18000",
+#                "576-b2g8f5x4-36-18000 (576x320)",
+#                "576-b2g8f5x4-36-18000",
+#            ),
             # ("camenduru/AnimateDiff/", "AnimateDiff", "AnimateDiff"),
             # ("polyware-ai/longscope", "Longscope (384x216x94)", "Longscope ( 384x216x94)"),
             # ("vdo/potat1-lotr-25000/", "LOTR (1024x576x24)", "LOTR (1024x576x24)"),
@@ -675,9 +680,9 @@ class GeneratorAddonPreferences(AddonPreferences):
 #                "Stable Diffusion Tiny",
 #            ),
 #            (
-#                "segmind/small-sd",
-#                "Stable Diffusion Small (512x512)",
-#                "Stable Diffusion Small",
+#                "nota-ai/bk-sdm-small-2m",
+#                "BK SDM Small (512×512)",
+#                "BK SDM Small (512×512)",
 #            ),
             ("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd"),
             # ("stabilityai/stable-diffusion-xl-base-0.9", "Stable Diffusion XL Base 0.9", "Stable Diffusion XL Base 0.9"),
@@ -930,6 +935,7 @@ class SEQEUNCER_PT_generate_ai(Panel):  # UI
         if type == "movie" and (
             movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256"
             or movie_model_card == "cerspense/zeroscope_v2_576w"
+            or movie_model_card == "cerspense/zeroscope_v2_XL"
         ):
             col = layout.column(heading="Upscale", align=True)
             col.prop(context.scene, "video_to_video", text="2x")
@@ -1645,7 +1651,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 image_model_card,
                 torch_dtype=torch.float16,
                 variant="fp16",
-                use_safetensors=True,
+                #use_safetensors=True,
             )
 
             pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
