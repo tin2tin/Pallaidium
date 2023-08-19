@@ -583,6 +583,18 @@ def uninstall_module_with_dependencies(module_name):
     subprocess.check_call([pybin, "-m", "pip", "install", "numpy"])
 
 
+def input_strips_updated(self, context):
+    preferences = context.preferences
+    addon_prefs = preferences.addons[__name__].preferences
+    movie_model_card = addon_prefs.movie_model_card
+
+    scene = context.scene
+    input = scene.input_strips
+    
+    if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+        scene.input_strips = "input_strips"
+
+
 class GeneratorAddonPreferences(AddonPreferences):
     bl_idname = __name__
 
@@ -860,18 +872,6 @@ class GENERATOR_OT_sound_notification(Operator):
                     sound = aud.Sound(file)
                     handle = device.play(sound)
         return {"FINISHED"}
-
-
-def input_strips_updated(self, context):
-    preferences = context.preferences
-    addon_prefs = preferences.addons[__name__].preferences
-    movie_model_card = addon_prefs.movie_model_card
-
-    scene = context.scene
-    input = scene.input_strips
-    
-    if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
-        scene.input_strips = "input_strips"
 
 
 class SEQEUNCER_PT_generate_ai(Panel):  # UI
