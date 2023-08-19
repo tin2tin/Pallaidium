@@ -654,6 +654,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             # ("cerspense/zeroscope_v1-1_320s", "Zeroscope v1.1 (320x320)", "Zeroscope (320x320)"),
         ],
         default="cerspense/zeroscope_v2_XL",
+        update=input_strips_updated,
     )
 
     image_model_card: bpy.props.EnumProperty(
@@ -861,6 +862,18 @@ class GENERATOR_OT_sound_notification(Operator):
         return {"FINISHED"}
 
 
+def input_strips_updated(self, context):
+    preferences = context.preferences
+    addon_prefs = preferences.addons[__name__].preferences
+    movie_model_card = addon_prefs.movie_model_card
+
+    scene = context.scene
+    input = scene.input_strips
+    
+    if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+        scene.input_strips = "input_strips"
+
+
 class SEQEUNCER_PT_generate_ai(Panel):  # UI
     """Generate Media using AI"""
 
@@ -877,9 +890,6 @@ class SEQEUNCER_PT_generate_ai(Panel):  # UI
         movie_model_card = addon_prefs.movie_model_card
         image_model_card = addon_prefs.image_model_card
 
-        layout = self.layout
-        layout.use_property_split = False
-        layout.use_property_decorate = False
         scene = context.scene
         type = scene.generatorai_typeselect
         input = scene.input_strips
@@ -950,17 +960,17 @@ class SEQEUNCER_PT_generate_ai(Panel):  # UI
 
         col = layout.column()
         col.prop(context.scene, "input_strips", text="Input")
-        if input =="input_strips":
+        if input == "input_strips":
             col.prop(context.scene, "image_power", text="Strip Power")
 
         col = layout.column()
         col.prop(context.scene, "generatorai_typeselect", text="Output")
         col.prop(context.scene, "movie_num_batch", text="Batch Count")
 
-        if input =="input_strips":
+        if input == "input_strips":
             row = layout.row(align=True)
             row.scale_y = 1.1
-            row.operator("sequencer.text_to_generator", text="Generate")
+            row.operator("sequencer.text_to_generator", text="Generate from Strips")
         else:
             row = layout.row(align=True)
             row.scale_y = 1.1
@@ -1035,6 +1045,7 @@ class SEQUENCER_OT_generate_movie(Operator):
         duration = scene.generate_movie_frames
         movie_num_inference_steps = scene.movie_num_inference_steps
         movie_num_guidance = scene.movie_num_guidance
+        input = scene.input_strips
 
         preferences = context.preferences
         addon_prefs = preferences.addons[__name__].preferences
@@ -1048,7 +1059,7 @@ class SEQUENCER_OT_generate_movie(Operator):
         # LOADING MODULES
 
         # Models for refine imported movie
-        if scene.movie_path or scene.image_path:
+        if (scene.movie_path or scene.image_path) and input == "input_strips":
 
             if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
                 import torch
@@ -1213,7 +1224,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     generator = None
 
             # Process batch input
-            if scene.movie_path or scene.image_path:
+            if (scene.movie_path or scene.image_path) and input == "input_strips":
                 # Path to the video file
                 video_path = scene.movie_path
 
@@ -2046,11 +2057,11 @@ classes = (
 def register():
     bpy.types.Scene.generate_movie_prompt = bpy.props.StringProperty(
         name="generate_movie_prompt",
-        default="high quality, masterpiece, slow motion, 4k",
+        default="",
     )
     bpy.types.Scene.generate_movie_negative_prompt = bpy.props.StringProperty(
         name="generate_movie_negative_prompt",
-        default="low quality, windy, flicker, jitter",
+        default="",
     )
     bpy.types.Scene.generate_audio_prompt = bpy.props.StringProperty(
         name="generate_audio_prompt", default=""
@@ -2188,12 +2199,12 @@ def register():
     bpy.types.Scene.image_path = ""
 
     bpy.types.Scene.input_strips = bpy.props.EnumProperty(
-        name="Sound",
         items=[
             ("generate", "No Input", "No Input"),
             ("input_strips", "Strips", "Selected Strips"),
         ],
         default="generate",
+        update=input_strips_updated,
     )
 
     bpy.types.Scene.image_power = bpy.props.FloatProperty(
