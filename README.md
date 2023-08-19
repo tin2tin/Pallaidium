@@ -68,17 +68,11 @@ https://github.com/amb/blender_pip      |
 
 Install Dependencies, set Movie Model Card, and set Sound Notification in the add-on preferences:
 
-![image](https://user-images.githubusercontent.com/1322593/233810577-961de9ec-ce3f-433b-a43c-dd4583fb518c.png)
+![image](https://github.com/tin2tin/Generative_AI/assets/1322593/49ba0182-f8a0-4a1d-b24f-caca9741d033)
 
 Video Sequence Editor > Sidebar > Generative AI:
 
 ![image](https://github.com/tin2tin/Generative_AI/assets/1322593/36097ede-052c-4ab4-bd3a-f0401d3dd656)
-
-Converting Text strips into GeneratorAI strips:
-
-![image](https://user-images.githubusercontent.com/1322593/232625894-6726d407-c802-4619-864a-0b8b7faeceff.png)
-
-This operator will batch-process all selected text, image and movie strips through the settings in the sidebar.
 
 Styles:
 
