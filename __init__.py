@@ -1093,7 +1093,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     text_encoder_2=pipe.text_encoder_2,
                     vae=pipe.vae,
                     torch_dtype=torch.float16,
-                    use_safetensors=True,
+                    #use_safetensors=True,
                     variant="fp16",
                 )
 
@@ -1360,8 +1360,8 @@ class SEQUENCER_OT_generate_movie(Operator):
                             strip.transform.filter = "SUBSAMPLING_3x3"
                             scene.sequence_editor.active_strip = strip
                             strip.name = str(seed) + "_" + prompt
-                            #strip.use_proxy = True
-                            #bpy.ops.sequencer.rebuild_proxy()
+                            strip.use_proxy = True
+                            bpy.ops.sequencer.rebuild_proxy()
 
                             if i > 0:
                                 scene.frame_current = (
@@ -1738,7 +1738,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 text_encoder_2=pipe.text_encoder_2,
                 vae=pipe.vae,
                 torch_dtype=torch.float16,
-                use_safetensors=True,
+                #use_safetensors=True,
                 variant="fp16",
             )
 
@@ -1891,8 +1891,8 @@ class SEQUENCER_OT_generate_image(Operator):
                     scene.frame_current = (
                         scene.sequence_editor.active_strip.frame_final_start
                     )
-                #strip.use_proxy = True
-                #bpy.ops.sequencer.rebuild_proxy()
+                strip.use_proxy = True
+                bpy.ops.sequencer.rebuild_proxy()
 
                 # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
                 bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
