@@ -391,7 +391,7 @@ def low_vram():
     for i in range(torch.cuda.device_count()):
         properties = torch.cuda.get_device_properties(i)
         total_vram += properties.total_memory
-    return (total_vram / (1024**3)) < 6.1  # Y/N under 6.1 GB?
+    return (total_vram / (1024**3)) < 8.1  # Y/N under 6.1 GB?
 
 
 def import_module(self, module, install_module):
@@ -500,10 +500,10 @@ def install_modules(self):
         import_module(self, "sox", "sox")
     else:
         import_module(self, "soundfile", "PySoundFile")
-    import_module(self, "diffusers", "diffusers")
+    #import_module(self, "diffusers", "diffusers")
+    import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git@v0.19.3")
     # import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
     import_module(self, "accelerate", "accelerate")
-    # import_module(self, "diffusers", "git+https://github.com/huggingface/accelerate.git")
     import_module(self, "transformers", "transformers")
     # import_module(self, "optimum", "optimum")
     import_module(self, "sentencepiece", "sentencepiece")
@@ -1006,6 +1006,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             import torch
             from diffusers import (
                 DiffusionPipeline,
+                StableDiffusionXLPipeline,
                 DPMSolverMultistepScheduler,
                 TextToVideoSDPipeline,
                 VideoToVideoSDPipeline,
@@ -1065,8 +1066,9 @@ class SEQUENCER_OT_generate_movie(Operator):
                 import torch
                 from diffusers import StableDiffusionXLImg2ImgPipeline
 
-                pipe = DiffusionPipeline.from_pretrained(
-                    image_model_card,
+                pipe = StableDiffusionXLPipeline.from_pretrained(
+                    "stabilityai/stable-diffusion-xl-base-1.0",
+                    #image_model_card,
                     torch_dtype=torch.float16,
                     variant="fp16",
                 )
@@ -1079,9 +1081,9 @@ class SEQUENCER_OT_generate_movie(Operator):
                     torch.cuda.set_per_process_memory_fraction(0.95)
                     pipe.enable_model_cpu_offload()
                     # pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                    pipe.unet.added_cond_kwargs={}
+                    #pipe.unet.added_cond_kwargs={}
                     pipe.enable_vae_slicing()
-                    pipe.enable_xformers_memory_efficient_attention()
+                    #pipe.enable_xformers_memory_efficient_attention()
                 else:
                     pipe.to("cuda")
 
@@ -1101,19 +1103,21 @@ class SEQUENCER_OT_generate_movie(Operator):
                     torch.cuda.set_per_process_memory_fraction(0.95)
                     refiner.enable_model_cpu_offload()
                     # refiner.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                    refiner.unet.added_cond_kwargs={}
+                    #refiner.unet.added_cond_kwargs={}
                     refiner.enable_vae_slicing()
-                    refiner.enable_xformers_memory_efficient_attention()
+                    #refiner.enable_xformers_memory_efficient_attention()
                 else:
                     refiner.to("cuda")
 
             else:
-                if movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w":
-                    card = "stabilityai/stable-diffusion-xl-base-1.0"
-                else:
-                    card = movie_model_card
+#                if movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w":
+#                    card = "stabilityai/stable-diffusion-xl-base-1.0"
+#                else:
+#                    card = movie_model_card
+
                 upscale = VideoToVideoSDPipeline.from_pretrained(
-                    card,
+                    # "cerspense/zeroscope_v2_576w",
+                    "cerspense/zeroscope_v2_XL",
                     torch_dtype=torch.float16,
                     #text_encoder=upscale.text_encoder,
                     #vae=upscale.vae,
@@ -1123,20 +1127,21 @@ class SEQUENCER_OT_generate_movie(Operator):
                 upscale.scheduler = DPMSolverMultistepScheduler.from_config(upscale.scheduler.config)
 
                 if low_vram:
-                    torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
+                    # torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
                     upscale.enable_model_cpu_offload()
 
-                    # upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                    upscale.unet.added_cond_kwargs={}
+                    upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                    #upscale.unet.added_cond_kwargs={}
                     upscale.enable_vae_slicing()
-                    upscale.enable_xformers_memory_efficient_attention()
+                    #upscale.enable_xformers_memory_efficient_attention()
                 else:
                     upscale.to("cuda")
 
         # Models for movie generation
         else:
             # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
-            pipe = TextToVideoSDPipeline.from_pretrained(
+            #pipe = TextToVideoSDPipeline.from_pretrained(
+            pipe = DiffusionPipeline.from_pretrained(
                 movie_model_card,
                 torch_dtype=torch.float16,
                 # variant="fp16",
@@ -1149,33 +1154,35 @@ class SEQUENCER_OT_generate_movie(Operator):
             if low_vram:
                 pipe.enable_model_cpu_offload()
                 # pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                pipe.unet.added_cond_kwargs={}
+                #pipe.unet.added_cond_kwargs={}
                 pipe.enable_vae_slicing()
-                pipe.enable_xformers_memory_efficient_attention()
+                #pipe.enable_xformers_memory_efficient_attention()
             else:
                 pipe.to("cuda")
 
-            # Models for upscale generated movie
+            # Model for upscale generated movie
             if scene.video_to_video:
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
                     # torch.cuda.set_per_process_memory_fraction(0.85)  # 6 GB VRAM
 
-                upscale = VideoToVideoSDPipeline.from_pretrained(
+                # upscale = VideoToVideoSDPipeline.from_pretrained(
+                upscale = DiffusionPipeline.from_pretrained(
+                    #"cerspense/zeroscope_v2_576w", torch_dtype=torch.float16
                     "cerspense/zeroscope_v2_XL", torch_dtype=torch.float16
                 )
 
                 # upscale = VideoToVideoSDPipeline.from_pretrained("cerspense/zeroscope_v2_576w", torch_dtype=torch.float16)
                 upscale.scheduler = DPMSolverMultistepScheduler.from_config(
-                    pipe.scheduler.config
+                    upscale.scheduler.config
                 )
 
                 if low_vram:
                     upscale.enable_model_cpu_offload()
-                    # upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                    upscale.unet.added_cond_kwargs={}
+                    upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                    #upscale.unet.added_cond_kwargs={}
                     upscale.enable_vae_slicing()
-                    upscale.enable_xformers_memory_efficient_attention()
+                    #upscale.enable_xformers_memory_efficient_attention()
                 else:
                     upscale.to("cuda")
 
@@ -1275,7 +1282,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     # Upscale video
                     if scene.video_to_video:
                         video = [
-                            Image.fromarray(frame).resize((int(x * 2), int(y * 2)))
+                            Image.fromarray(frame).resize((closest_divisible_64(int(x * 2)), closest_divisible_64(int(y * 2))))
                             for frame in video
                         ]
 
@@ -1313,10 +1320,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     print("Upscale Video")
                     if torch.cuda.is_available():
                         torch.cuda.empty_cache()
-                    video = [
-                        Image.fromarray(frame).resize((x * 2, y * 2))
-                        for frame in video_frames
-                    ]
+                    video = [Image.fromarray(frame).resize((closest_divisible_64(x * 2), closest_divisible_64(y * 2))) for frame in video_frames]
 
                     video_frames = upscale(
                         prompt,
@@ -1465,9 +1469,9 @@ class SEQUENCER_OT_generate_audio(Operator):
             if low_vram:
                 pipe.enable_model_cpu_offload()
                 # pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                pipe.unet.added_cond_kwargs={}
+                # pipe.unet.added_cond_kwargs={}
                 pipe.enable_vae_slicing()
-                pipe.enable_xformers_memory_efficient_attention()
+                #pipe.enable_xformers_memory_efficient_attention()
             else:
                 pipe.to("cuda")
 
@@ -1671,9 +1675,9 @@ class SEQUENCER_OT_generate_image(Operator):
                 torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
                 pipe.enable_model_cpu_offload()
                 # pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                pipe.unet.added_cond_kwargs={}
+                #pipe.unet.added_cond_kwargs={}
                 pipe.enable_vae_slicing()
-                pipe.enable_xformers_memory_efficient_attention()
+                #pipe.enable_xformers_memory_efficient_attention()
             else:
                 pipe.to("cuda")
 
@@ -1745,9 +1749,9 @@ class SEQUENCER_OT_generate_image(Operator):
             if low_vram:
                 refiner.enable_model_cpu_offload()
                 # refiner.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                refiner.unet.added_cond_kwargs={}
+                #refiner.unet.added_cond_kwargs={}
                 refiner.enable_vae_slicing()
-                refiner.enable_xformers_memory_efficient_attention()
+                #refiner.enable_xformers_memory_efficient_attention()
             else:
                 refiner.to("cuda")
 
