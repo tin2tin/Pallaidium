@@ -80,6 +80,10 @@ Converting Text strips into GeneratorAI strips:
 
 This operator will batch-process all selected text, image and movie strips through the settings in the sidebar.
 
+Styles:
+
+![image](https://github.com/tin2tin/Generative_AI/assets/1322593/86807264-a377-4de1-875e-471aaa3011a7)
+
 
 # Text to Video/Image
 
