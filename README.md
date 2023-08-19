@@ -15,11 +15,11 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 * Text to audio
 * Text to speech
 * Text to image
-* Img2img(refinement)
-* Img2vid
-* Vid2vid(refinement)
+* Image to image (refinement+prompt)
+* Image to video (refinement+prompt)
+* Video to video (refinement+prompt)
 * Style selector.
-* Seed, quality steps, frames, word power, denoising, strip power 
+* Seed, quality steps, frames, word power, denoising, strip power. 
 * Batch conversion of text and media strips into videos, audio, music, speech, or images.
 * Batch refinement of images.
 * Batch upscale & refinement of movies.
