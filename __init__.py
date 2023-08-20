@@ -292,6 +292,7 @@ def load_video_as_np_array(video_path):
 
 def process_frames(frame_folder_path, target_width):
     from PIL import Image
+    Image.MAX_IMAGE_PIXELS = None
     import cv2
 
     processed_frames = []
@@ -323,6 +324,7 @@ def process_frames(frame_folder_path, target_width):
 
 def process_video(input_video_path, output_video_path):
     from PIL import Image
+    Image.MAX_IMAGE_PIXELS = None
     import cv2
     import shutil
 
@@ -347,7 +349,7 @@ def process_video(input_video_path, output_video_path):
     cap.release()
 
     # Process frames using the separate function
-    processed_frames = process_frames(temp_image_folder, 512)
+    processed_frames = process_frames(temp_image_folder, 1024)
     # print("Temp folder: "+temp_image_folder)
 
     # Clean up: Delete the temporary image folder
@@ -358,6 +360,7 @@ def process_video(input_video_path, output_video_path):
 
 def process_image(image_path, frames_nr):
     from PIL import Image
+    Image.MAX_IMAGE_PIXELS = None
     import cv2, shutil
 
     img = cv2.imread(image_path)
@@ -652,11 +655,11 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Img2img SD XL 1.0 Refine (1024x1024)",
                 "Stable Diffusion XL 1.0",
             ),
-#            (
-#                "576-b2g8f5x4-36-18000/18000",
-#                "576-b2g8f5x4-36-18000 (576x320)",
-#                "576-b2g8f5x4-36-18000",
-#            ),
+            (
+                "576-b2g8f5x4-36-18000/18000",
+                "576-b2g8f5x4-36-18000 (576x320)",
+                "576-b2g8f5x4-36-18000",
+            ),
             # ("camenduru/AnimateDiff/", "AnimateDiff", "AnimateDiff"),
             # ("polyware-ai/longscope", "Longscope (384x216x94)", "Longscope ( 384x216x94)"),
             # ("vdo/potat1-lotr-25000/", "LOTR (1024x576x24)", "LOTR (1024x576x24)"),
@@ -1013,6 +1016,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             )
             from diffusers.utils import export_to_video
             from PIL import Image
+            Image.MAX_IMAGE_PIXELS = None
             import numpy as np
         except ModuleNotFoundError:
             print("In the add-on preferences, install dependencies.")
@@ -1059,7 +1063,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         # LOADING MODULES
 
-        # Models for refine imported movie
+        # Models for refine imported image or movie
         if (scene.movie_path or scene.image_path) and input == "input_strips":
 
             if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
@@ -1128,13 +1132,13 @@ class SEQUENCER_OT_generate_movie(Operator):
                 upscale.scheduler = DPMSolverMultistepScheduler.from_config(upscale.scheduler.config)
 
                 if low_vram:
-                    # torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
+                    torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
                     upscale.enable_model_cpu_offload()
 
                     upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                    #upscale.unet.added_cond_kwargs={}
+                    # upscale.unet.added_cond_kwargs={}
                     upscale.enable_vae_slicing()
-                    #upscale.enable_xformers_memory_efficient_attention()
+                    #pscale.enable_xformers_memory_efficient_attention()
                 else:
                     upscale.to("cuda")
 
@@ -2140,7 +2144,7 @@ def register():
             ("image", "Image", "Generate Image"),
             ("audio", "Audio", "Generate Audio"),
         ],
-        default="movie",
+        default="image",
     )
 
     bpy.types.Scene.speakers = bpy.props.EnumProperty(
@@ -2211,7 +2215,7 @@ def register():
 
     bpy.types.Scene.image_power = bpy.props.FloatProperty(
         name="image_power",
-        default=0.95,
+        default=0.50,
         min=0.05,
         max=0.95,
     )
