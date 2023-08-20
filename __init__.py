@@ -347,7 +347,7 @@ def process_video(input_video_path, output_video_path):
     cap.release()
 
     # Process frames using the separate function
-    processed_frames = process_frames(temp_image_folder, 1024)
+    processed_frames = process_frames(temp_image_folder, 512)
     # print("Temp folder: "+temp_image_folder)
 
     # Clean up: Delete the temporary image folder
@@ -1110,14 +1110,15 @@ class SEQUENCER_OT_generate_movie(Operator):
                     refiner.to("cuda")
 
             else:
-#                if movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w":
-#                    card = "stabilityai/stable-diffusion-xl-base-1.0"
-#                else:
-#                    card = movie_model_card
+                if movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w":
+                    card = "cerspense/zeroscope_v2_XL"
+                else:
+                    card = movie_model_card
 
                 upscale = VideoToVideoSDPipeline.from_pretrained(
                     # "cerspense/zeroscope_v2_576w",
-                    "cerspense/zeroscope_v2_XL",
+                    #"cerspense/zeroscope_v2_XL",
+                    card,
                     torch_dtype=torch.float16,
                     #text_encoder=upscale.text_encoder,
                     #vae=upscale.vae,
@@ -1140,16 +1141,13 @@ class SEQUENCER_OT_generate_movie(Operator):
         # Models for movie generation
         else:
             # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
-            #pipe = TextToVideoSDPipeline.from_pretrained(
-            pipe = DiffusionPipeline.from_pretrained(
+            pipe = TextToVideoSDPipeline.from_pretrained(
+            #pipe = DiffusionPipeline.from_pretrained(
                 movie_model_card,
                 torch_dtype=torch.float16,
                 # variant="fp16",
             )
-
-            pipe.scheduler = DPMSolverMultistepScheduler.from_config(
-                pipe.scheduler.config
-            )
+            pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
             if low_vram:
                 pipe.enable_model_cpu_offload()
