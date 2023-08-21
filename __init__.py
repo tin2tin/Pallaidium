@@ -308,7 +308,8 @@ def process_frames(frame_folder_path, target_width):
 
         # Process the image (resize and convert to RGB)
         frame_width, frame_height = img.size
-        #target_width = 512
+
+        # Calculate the target height to maintain the original aspect ratio
         target_height = int((target_width / frame_width) * frame_height)
 
         # Ensure width and height are divisible by 64
@@ -320,6 +321,7 @@ def process_frames(frame_folder_path, target_width):
 
         processed_frames.append(img)
     return processed_frames
+
 
 
 def process_video(input_video_path, output_video_path):
@@ -376,7 +378,7 @@ def process_image(image_path, frames_nr):
         zoomed_img = cv2.resize(img, None, fx=zoom_factor, fy=zoom_factor)
         output_path = os.path.join(temp_image_folder, f"frame_{i:04d}.png")
         cv2.imwrite(output_path, zoomed_img)
-        zoom_factor += 1.0
+        zoom_factor += 0.04
 
     # Process frames using the separate function
     processed_frames = process_frames(temp_image_folder, 1024)
@@ -394,7 +396,7 @@ def low_vram():
     for i in range(torch.cuda.device_count()):
         properties = torch.cuda.get_device_properties(i)
         total_vram += properties.total_memory
-    return (total_vram / (1024**3)) < 8.1  # Y/N under 6.1 GB?
+    return (total_vram / (1024**3)) < 24.1  # Y/N under 6.1 GB?
 
 
 def import_module(self, module, install_module):
@@ -1135,7 +1137,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
                     upscale.enable_model_cpu_offload()
 
-                    upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                    # here: upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)
                     # upscale.unet.added_cond_kwargs={}
                     upscale.enable_vae_slicing()
                     #pscale.enable_xformers_memory_efficient_attention()
@@ -1181,7 +1183,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 if low_vram:
                     upscale.enable_model_cpu_offload()
-                    upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                    # here: upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)
                     #upscale.unet.added_cond_kwargs={}
                     upscale.enable_vae_slicing()
                     #upscale.enable_xformers_memory_efficient_attention()
@@ -1697,7 +1699,7 @@ class SEQUENCER_OT_generate_image(Operator):
             )
             if low_vram:
                 stage_1.enable_model_cpu_offload()
-                stage_1.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                # here: stage_1.unet.enable_forward_chunking(chunk_size=1, dim=1)
                 stage_1.enable_vae_slicing()
                 stage_1.enable_xformers_memory_efficient_attention()
             else:
