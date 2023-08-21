@@ -156,7 +156,7 @@ Hugging Face diffusers model is downloaded from the hub and saved to a local cac
 
 On Linux and macOS: ~/.cache/huggingface/transformers
 
-On Windows: %userprofile%\.cache\huggingface\transformers
+On Windows: %userprofile%\\.cache\huggingface\transformers
 
 Here you can locate and delete the individual models.
 
