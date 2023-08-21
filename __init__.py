@@ -169,20 +169,18 @@ def style_prompt(prompt):
     selected_entry_key = bpy.context.scene.generatorai_styles
 
     return_array = []
-   
+
     if selected_entry_key:
         styles_array = load_styles(os.path.dirname(os.path.abspath(__file__))+"/styles.json")
-
         if selected_entry_key:
             selected_entry = next((item for item in styles_array if item[0] == selected_entry_key), None)
-
             if selected_entry:
                 selected_entry_list = list(selected_entry)
                 return_array.append(selected_entry_list[2].replace("{prompt}", prompt))
                 return_array.append(selected_entry_list[0].replace("_", " "))
                 return return_array
 
-    return_array.append(bpy.context.scene.generate_movie_prompt)
+    return_array.append(prompt)
     return_array.append(bpy.context.scene.generate_movie_negative_prompt)
     return return_array
 
@@ -595,7 +593,7 @@ def input_strips_updated(self, context):
 
     scene = context.scene
     input = scene.input_strips
-    
+
     if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
         scene.input_strips = "input_strips"
 
@@ -657,11 +655,11 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Img2img SD XL 1.0 Refine (1024x1024)",
                 "Stable Diffusion XL 1.0",
             ),
-            (
-                "576-b2g8f5x4-36-18000/18000",
-                "576-b2g8f5x4-36-18000 (576x320)",
-                "576-b2g8f5x4-36-18000",
-            ),
+#            (
+#                "576-b2g8f5x4-36-18000/18000",
+#                "576-b2g8f5x4-36-18000 (576x320)",
+#                "576-b2g8f5x4-36-18000",
+#            ),
             # ("camenduru/AnimateDiff/", "AnimateDiff", "AnimateDiff"),
             # ("polyware-ai/longscope", "Longscope (384x216x94)", "Longscope ( 384x216x94)"),
             # ("vdo/potat1-lotr-25000/", "LOTR (1024x576x24)", "LOTR (1024x576x24)"),
@@ -912,9 +910,9 @@ class SEQEUNCER_PT_generate_ai(Panel):  # UI
             col.prop(
                 context.scene, "generate_movie_negative_prompt", text="", icon="REMOVE"
             )
-        
+
         col.prop(context.scene, "generatorai_styles", text="Style")
-        
+
         layout = self.layout
         layout.use_property_split = True
         layout.use_property_decorate = False
@@ -1042,9 +1040,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         current_frame = scene.frame_current
         prompt = style_prompt(scene.generate_movie_prompt)[0]
-        #print("Positive "+prompt)
         negative_prompt = scene.generate_movie_negative_prompt +", "+ style_prompt(scene.generate_movie_prompt)[1] +", nsfw nude nudity"
-        #print("Negative "+negative_prompt)
         movie_x = scene.generate_movie_x
         movie_y = scene.generate_movie_y
         x = scene.generate_movie_x = closest_divisible_64(movie_x)
@@ -1137,7 +1133,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
                     upscale.enable_model_cpu_offload()
 
-                    # here: upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                    # upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) # here:
                     # upscale.unet.added_cond_kwargs={}
                     upscale.enable_vae_slicing()
                     #pscale.enable_xformers_memory_efficient_attention()
@@ -1761,7 +1757,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
         # Main Generate Loop:
         for i in range(scene.movie_num_batch):
-            
+
             # Find free space for the strip in the timeline.
             if i > 0:
                 empty_channel = scene.sequence_editor.active_strip.channel
@@ -1778,7 +1774,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     (scene.movie_num_batch * duration) + scene.frame_current,
                 )
                 start_frame = scene.frame_current
-                
+
             # Generate seed.
             seed = context.scene.movie_num_seed
             seed = (
@@ -1800,7 +1796,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 else:
                     generator = None
 
-            # DeepFloyd process: 
+            # DeepFloyd process:
             if image_model_card == "DeepFloyd/IF-I-M-v1.0":
                 print("DeepFloyd")
                 prompt_embeds, negative_embeds = stage_1.encode_prompt(
@@ -1847,7 +1843,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     generator=generator,
                     # output_type="latent" if scene.refine_sd else "pil",
                 ).images[0]
- 
+
             # Generate
             else:
                 print("Generating ")
@@ -1871,7 +1867,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     denoising_start=0.8,
                     guidance_scale=image_num_guidance,
                     image=image,
-                    #image=image[None, :], 
+                    #image=image[None, :],
                 ).images[0]
 
             # Move to folder
@@ -1879,7 +1875,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 str(seed) + "_" + context.scene.generate_movie_prompt
             )
             out_path = solve_path(filename+".png")
-            
+
             image.save(out_path)
 
             # Add strip
@@ -1966,6 +1962,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     if type == "image":
                         sequencer.generate_image()
                     scene.generate_movie_prompt = prompt
+
             if strip.type == "IMAGE":
                 strip_dirname = os.path.dirname(strip.directory)
                 image_path = bpy.path.abspath(
@@ -1981,8 +1978,11 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                             strip_prompt = (strip_prompt.replace(str(file_seed)+"_", ""))
                             context.scene.movie_use_random = False
                             context.scene.movie_num_seed = file_seed
-                            
-                    styled_prompt = style_prompt(strip_prompt + ", " + prompt)[0]
+
+                    if len(strips) > 1:
+                        styled_prompt = style_prompt(strip_prompt + ", " + prompt)[0]
+                    else:
+                        styled_prompt = style_prompt(prompt)[0]
                     print("\n" + str(count+1) + "/"+ str(len(strips)) + " Prompt: " + styled_prompt)
                     scene.generate_movie_prompt = styled_prompt
                     scene.frame_current = strip.frame_final_start
@@ -2016,7 +2016,10 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                             context.scene.movie_use_random = False
                             context.scene.movie_num_seed = file_seed
 
-                    styled_prompt = style_prompt(strip_prompt + ", " + prompt)[0]
+                    if len(strips) > 1:
+                        styled_prompt = style_prompt(strip_prompt + ", " + prompt)[0]
+                    else:
+                        styled_prompt = style_prompt(prompt)[0]
                     print("\n" + str(count+1) + "/"+ str(len(strips)) + " Prompt: " + styled_prompt)
                     scene.generate_movie_prompt = styled_prompt
                     scene.generate_movie_prompt = prompt
@@ -2043,7 +2046,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
 
         addon_prefs.playsound = play_sound
         bpy.ops.renderreminder.play_notification()
-        
+
         print("Batch processing finished.")
 
         return {"FINISHED"}
