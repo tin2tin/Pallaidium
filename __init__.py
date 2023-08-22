@@ -504,8 +504,8 @@ def install_modules(self):
     else:
         import_module(self, "soundfile", "PySoundFile")
     #import_module(self, "diffusers", "diffusers")
-    import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git@v0.19.3")
-    # import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
+    #import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git@v0.19.3")
+    import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
     import_module(self, "accelerate", "accelerate")
     import_module(self, "transformers", "transformers")
     # import_module(self, "optimum", "optimum")
@@ -710,11 +710,16 @@ class GeneratorAddonPreferences(AddonPreferences):
     audio_model_card: bpy.props.EnumProperty(
         name="Audio Model",
         items=[
-            (
-                "cvssp/audioldm-s-full-v2",
-                "AudioLDM S Full v2",
-                "AudioLDM Small Full v2",
-            ),
+#            (
+#                "cvssp/audioldm-s-full-v2",
+#                "AudioLDM S Full v2",
+#                "AudioLDM Small Full v2",
+#            ),
+#            ( # added in the code, but there are problems with the models.
+#                "cvssp/audioldm2",
+#                "AudioLDM 2 Music",
+#                "AudioLDM 2 Music",
+#            ),
             ("bark", "Bark", "Bark"),
             # ("facebook/audiogen-medium", "AudioGen", "AudioGen"), #I do not have enough VRAM to test if this is working...
             # ("cvssp/audioldm", "AudioLDM", "AudioLDM"),
@@ -1133,7 +1138,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
                     upscale.enable_model_cpu_offload()
 
-                    # upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) # here:
+                    #upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) # here:
                     # upscale.unet.added_cond_kwargs={}
                     upscale.enable_vae_slicing()
                     #pscale.enable_xformers_memory_efficient_attention()
@@ -1142,12 +1147,9 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         # Models for movie generation
         else:
-            # Options: https://huggingface.co/docs/diffusers/api/pipelines/text_to_video
             pipe = TextToVideoSDPipeline.from_pretrained(
-            #pipe = DiffusionPipeline.from_pretrained(
                 movie_model_card,
                 torch_dtype=torch.float16,
-                # variant="fp16",
             )
             pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
@@ -1419,8 +1421,9 @@ class SEQUENCER_OT_generate_audio(Operator):
         try:
             import torch
 
-            if addon_prefs.audio_model_card == "cvssp/audioldm-s-full-v2":
-                from diffusers import AudioLDMPipeline
+            if addon_prefs.audio_model_card == "cvssp/audioldm2":
+                #from diffusers import AudioLDMPipeline
+                from diffusers import AudioLDM2Pipeline
                 import scipy
 
                 # from bark import SAMPLE_RATE, generate_audio, preload_models
@@ -1460,26 +1463,26 @@ class SEQUENCER_OT_generate_audio(Operator):
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-        if addon_prefs.audio_model_card == "cvssp/audioldm-s-full-v2":
+        if addon_prefs.audio_model_card == "cvssp/audioldm2":
             repo_id = addon_prefs.audio_model_card
-            pipe = AudioLDMPipeline.from_pretrained(
+            pipe = AudioLDM2Pipeline.from_pretrained(
                 repo_id
             )  # , torch_dtype=torch.float16z
 
             if low_vram:
-                pipe.enable_model_cpu_offload()
-                # pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
+                #pipe.enable_model_cpu_offload()
+                #pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
                 # pipe.unet.added_cond_kwargs={}
                 pipe.enable_vae_slicing()
-                #pipe.enable_xformers_memory_efficient_attention()
-            else:
+                pipe.enable_xformers_memory_efficient_attention()
+            #else:
                 pipe.to("cuda")
 
         elif addon_prefs.audio_model_card == "facebook/audiogen-medium":
             pipe = AudioGen.get_pretrained("facebook/audiogen-medium")
             pipe = pipe.to("cuda")
 
-        else:  # bark
+        elif addon_prefs.audio_model_card == "bark": # bark
             preload_models(
                 text_use_small=True,
                 coarse_use_small=True,
@@ -1655,8 +1658,7 @@ class SEQUENCER_OT_generate_image(Operator):
         preferences = context.preferences
         addon_prefs = preferences.addons[__name__].preferences
         image_model_card = addon_prefs.image_model_card
-        do_refine = (scene.refine_sd and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0") or scene.image_path
-
+        do_refine = (scene.refine_sd or scene.image_path) and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
 
         # LOADING MMODELS
 
@@ -1858,7 +1860,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 ).images[0]
 
             # Add refiner
-            if scene.refine_sd: # and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0") or scene.image_path:
+            if do_refine: # and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0") or scene.image_path:
                 print("Refining")
                 image = refiner(
                     prompt,
