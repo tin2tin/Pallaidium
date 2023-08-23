@@ -1,5 +1,5 @@
 # Generative AI - Text to Video, Image, and Audio in Blender
-AI generate video, image, and audio from text prompts or strips. 
+AI generate video, image, and audio from text prompts or video, image or text strips. 
 
 https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-455c77443535
 
@@ -24,8 +24,9 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 * Batch refinement of images.
 * Batch upscale & refinement of movies.
 * Model card selector.
+* Render-to-path selector.
 * Render finished notification.
-* Model Cards: Stable Diffusion 1.5, 2, XL, Deep Floyd IF, Zeroscope, Animov, AudioLMD and Bark.
+* Model Cards: Stable Diffusion 1.5, 2, XL, Deep Floyd IF, Zeroscope, Animov, AudioLMD2 and Bark.
 * One click install and uninstall dependencies.
 * User-defined file path for generated files.
 * Seed and prompt added to strip name.
@@ -48,9 +49,11 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 
 * In the Generative AI add-on preferences, hit the "Install all Dependencies" button.
 
-* Note that you can change what model cards are used in the various modes here(video, image, audio).
+* Note that you can change what model cards are used in the various modes here(video, image, and audio).
 
-* When it writes that it is finished(if any errors, let me know).
+* Then it writes that it is finished(if any errors, let me know).
+  
+* Restart Blender.
 
 * Open the add-on UI in the Sequencedr > Sidebar > Generative AI.
 
@@ -93,12 +96,14 @@ Tip           |
 :------------- |
 If the image of your playback stutters, then select a strip > Menu > Strip > Movie Strip > Set Render Size.     |
 
+Tip           |
+:------------- |
+If you get the message that CUDA is out of memory, then restart Blender to free up memory and make it stable again.     |
 
-# Text Strips to Video/Image/Audio/Speech
 
-Accessed through the Add menu > Text to GenerativeAI
+# Batch processing more strips
 
-https://github.com/tin2tin/Generative_AI/assets/1322593/c1d86548-5e6b-46b7-80f2-4d202685fc47
+Select multiple strips and hit Generate. When doing this, the file name, and if found the seed value, is automatically inserted into the prompt and seed value.
 
 
 # Text to Audio
@@ -113,8 +118,8 @@ Find Bark documentation here: https://github.com/suno-ai/bark
 * [clears throat]
 * — or ... for hesitations
 * ♪ for song lyrics
-* capitalization for emphasis of a word
-* MAN/WOMAN: for bias towards speaker
+* capitalization for emphasis on a word
+* MAN/WOMAN: for bias towards the speaker
 
 Speaker Library: https://suno-ai.notion.site/8b8e8749ed514b0cbf3f699013548683?v=bc67cff786b04b50b3ceb756fd05f68c
 
@@ -122,12 +127,12 @@ Tip           |
 :------------- |
 If the audio breaks up, try processing longer sentences.      |
 
-### AudioLDM
+### AudioLDM2
 Find AudioLDM documentation here: https://github.com/haoheliu/AudioLDM
 Try prompts like: Bag pipes playing a funeral dirge, punk rock band playing hardcore song, techno dj playing deep bass house music, and acid house loop with jazz.
 Or: Voice of God judging mankind, woman talking about celestial beings, hammer on wood.
 
-## Modules
+## AI Modules
 Diffusers: https://github.com/huggingface/diffusers
 
 ModelScope: https://modelscope.cn/models/damo/text-to-video-synthesis/summary
@@ -140,7 +145,7 @@ Zeroscope Dark: https://huggingface.co/cerspense/zeroscope_v2_dark_30x448x256
 
 Zeroscope XL: https://huggingface.co/cerspense/zeroscope_v2_XL
 
-AudioLDM: https://huggingface.co/cvssp/audioldm-s-full-v2 https://github.com/haoheliu/AudioLDM
+AudioLDM2 Music: [https://huggingface.co/cvssp/audioldm-s-full-v2 https://github.com/haoheliu/AudioLDM](https://huggingface.co/cvssp/audioldm2-music)
 
 Bark: https://github.com/suno-ai/bark
 
@@ -166,7 +171,7 @@ Here you can locate and delete the individual models.
 - The models can only be used for non-commercial purposes. The models are meant for research purposes.
 - The models was not trained to realistically represent people or events, so using it to generate such content is beyond the model's capabilities.
 - It is prohibited to generate content that is demeaning or harmful to people or their environment, culture, religion, etc.
-- Prohibited for pornographic, violent and bloody content generation.
+- Prohibited for pornographic, violent, and bloody content generation.
 - Prohibited for error and false information generation.
 
 
