@@ -268,7 +268,6 @@ def limit_string(my_string):
         return my_string
 
 
-# Function to load a video as a NumPy array
 def load_video_as_np_array(video_path):
     import cv2
     import numpy as np
@@ -516,11 +515,12 @@ def install_modules(self):
     import_module(self, "scipy", "scipy")
     import_module(self, "IPython", "IPython")
     import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
+    import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
     import_module(self, "xformers", "xformers")
     import_module(self, "imageio", "imageio")
     import_module(self, "imwatermark", "invisible-watermark>=0.2.0")
     # import_module(self, "triton", "C://Users//45239//Downloads//triton-2.0.0-cp310-cp310-win_amd64.whl")
-    # import_module(self, "audiocraft", "git+https://github.com/facebookresearch/audiocraft.git")
+    import_module(self, "audiocraft", "git+https://github.com/facebookresearch/audiocraft.git")
     # subprocess.check_call([pybin,"-m","pip","install","force-reinstall","no-deps","pre xformers"])
     subprocess.check_call([pybin, "-m", "pip", "install", "numpy", "--upgrade"])
     if os_platform == "Windows":
@@ -715,11 +715,16 @@ class GeneratorAddonPreferences(AddonPreferences):
 #                "AudioLDM S Full v2",
 #                "AudioLDM Small Full v2",
 #            ),
-#            ( # added in the code, but there are problems with the models.
-#                "cvssp/audioldm2",
-#                "AudioLDM 2 Music",
-#                "AudioLDM 2 Music",
-#            ),
+            (
+                "cvssp/audioldm2",
+                "Sound - AudioLDM 2",
+                "Sound - AudioLDM 2",
+            ),
+            (
+                "cvssp/audioldm2-music",
+                "Music - AudioLDM 2",
+                "Music - AudioLDM 2",
+            ),
             ("bark", "Bark", "Bark"),
             # ("facebook/audiogen-medium", "AudioGen", "AudioGen"), #I do not have enough VRAM to test if this is working...
             # ("cvssp/audioldm", "AudioLDM", "AudioLDM"),
@@ -1012,13 +1017,6 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         try:
             import torch
-            from diffusers import (
-                DiffusionPipeline,
-                StableDiffusionXLPipeline,
-                DPMSolverMultistepScheduler,
-                TextToVideoSDPipeline,
-                VideoToVideoSDPipeline,
-            )
             from diffusers.utils import export_to_video
             from PIL import Image
             Image.MAX_IMAGE_PIXELS = None
@@ -1063,19 +1061,16 @@ class SEQUENCER_OT_generate_movie(Operator):
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-
         # LOADING MODULES
+        print("\nModel:  " + movie_model_card)
 
         # Models for refine imported image or movie
         if (scene.movie_path or scene.image_path) and input == "input_strips":
 
             if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
-                import torch
                 from diffusers import StableDiffusionXLImg2ImgPipeline
-
-                pipe = StableDiffusionXLPipeline.from_pretrained(
-                    "stabilityai/stable-diffusion-xl-base-1.0",
-                    #image_model_card,
+                pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
+                    movie_model_card,
                     torch_dtype=torch.float16,
                     variant="fp16",
                 )
@@ -1085,80 +1080,62 @@ class SEQUENCER_OT_generate_movie(Operator):
                 )
 
                 if low_vram:
-                    torch.cuda.set_per_process_memory_fraction(0.95)
                     pipe.enable_model_cpu_offload()
-                    # pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                    #pipe.unet.added_cond_kwargs={}
+                    pipe.unet.enable_forward_chunking(chunk_size=1, dim=1) # Heavy
                     pipe.enable_vae_slicing()
-                    #pipe.enable_xformers_memory_efficient_attention()
                 else:
                     pipe.to("cuda")
 
-
                 from diffusers import StableDiffusionXLImg2ImgPipeline
                 refiner = StableDiffusionXLImg2ImgPipeline.from_pretrained(
-                    #"stabilityai/stable-diffusion-xl-base-1.0",
                     "stabilityai/stable-diffusion-xl-refiner-1.0",
                     text_encoder_2=pipe.text_encoder_2,
                     vae=pipe.vae,
                     torch_dtype=torch.float16,
-                    #use_safetensors=True,
                     variant="fp16",
                 )
 
                 if low_vram:
-                    torch.cuda.set_per_process_memory_fraction(0.95)
-                    refiner.enable_model_cpu_offload()
-                    # refiner.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                    #refiner.unet.added_cond_kwargs={}
+                    refiner.unet.enable_forward_chunking(chunk_size=1, dim=1) #Heavy
                     refiner.enable_vae_slicing()
-                    #refiner.enable_xformers_memory_efficient_attention()
                 else:
                     refiner.to("cuda")
 
             else:
-                if movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w":
+                if movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w" or scene.image_path:
                     card = "cerspense/zeroscope_v2_XL"
                 else:
                     card = movie_model_card
-
+                from diffusers import VideoToVideoSDPipeline
                 upscale = VideoToVideoSDPipeline.from_pretrained(
-                    # "cerspense/zeroscope_v2_576w",
-                    #"cerspense/zeroscope_v2_XL",
                     card,
                     torch_dtype=torch.float16,
-                    #text_encoder=upscale.text_encoder,
-                    #vae=upscale.vae,
-                    #"cerspense/zeroscope_v2_XL", torch_dtype=torch.float16
                 )
 
+                from diffusers import DPMSolverMultistepScheduler
                 upscale.scheduler = DPMSolverMultistepScheduler.from_config(upscale.scheduler.config)
 
                 if low_vram:
-                    torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
+                    torch.cuda.set_per_process_memory_fraction(0.98)
                     upscale.enable_model_cpu_offload()
-
-                    #upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) # here:
-                    # upscale.unet.added_cond_kwargs={}
+                    upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) # here:
                     upscale.enable_vae_slicing()
-                    #pscale.enable_xformers_memory_efficient_attention()
                 else:
                     upscale.to("cuda")
 
         # Models for movie generation
         else:
+            from diffusers import TextToVideoSDPipeline
             pipe = TextToVideoSDPipeline.from_pretrained(
                 movie_model_card,
                 torch_dtype=torch.float16,
             )
+            from diffusers import DPMSolverMultistepScheduler
             pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
             if low_vram:
                 pipe.enable_model_cpu_offload()
-                # pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                #pipe.unet.added_cond_kwargs={}
                 pipe.enable_vae_slicing()
-                #pipe.enable_xformers_memory_efficient_attention()
             else:
                 pipe.to("cuda")
 
@@ -1166,27 +1143,21 @@ class SEQUENCER_OT_generate_movie(Operator):
             if scene.video_to_video:
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
-                    # torch.cuda.set_per_process_memory_fraction(0.85)  # 6 GB VRAM
 
-                # upscale = VideoToVideoSDPipeline.from_pretrained(
+                from diffusers import DiffusionPipeline
                 upscale = DiffusionPipeline.from_pretrained(
-                    #"cerspense/zeroscope_v2_576w", torch_dtype=torch.float16
                     "cerspense/zeroscope_v2_XL", torch_dtype=torch.float16
                 )
 
-                # upscale = VideoToVideoSDPipeline.from_pretrained("cerspense/zeroscope_v2_576w", torch_dtype=torch.float16)
-                upscale.scheduler = DPMSolverMultistepScheduler.from_config(
-                    upscale.scheduler.config
-                )
+                upscale.scheduler = DPMSolverMultistepScheduler.from_config(upscale.scheduler.config)
 
                 if low_vram:
                     upscale.enable_model_cpu_offload()
-                    # here: upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                    #upscale.unet.added_cond_kwargs={}
+                    upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) #Heavy
                     upscale.enable_vae_slicing()
-                    #upscale.enable_xformers_memory_efficient_attention()
                 else:
                     upscale.to("cuda")
+
 
         # GENERATING
 
@@ -1218,6 +1189,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 if not context.scene.movie_use_random
                 else random.randint(0, 999999)
             )
+            print("Seed: "+str(seed))
             context.scene.movie_num_seed = seed
 
             # Use cuda if possible
@@ -1234,12 +1206,12 @@ class SEQUENCER_OT_generate_movie(Operator):
 
             # Process batch input
             if (scene.movie_path or scene.image_path) and input == "input_strips":
-                # Path to the video file
+
                 video_path = scene.movie_path
 
                 # img2img
                 if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
-                    print("Frame by frame video with SD XL")
+                    print("Process: Frame by frame (SD XL)")
 
                     input_video_path = video_path
                     output_video_path = solve_path("temp_images")
@@ -1250,6 +1222,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         frames = process_image(scene.image_path, int(scene.generate_movie_frames))
 
                     video_frames = []
+
                     # Iterate through the frames
                     for frame_idx, frame in enumerate(frames): # would love to get this flicker free
                         print(str(frame_idx+1) + "/" + str(len(frames)))
@@ -1274,12 +1247,11 @@ class SEQUENCER_OT_generate_movie(Operator):
                 else:
                     if scene.movie_path:
                         video = load_video_as_np_array(video_path)
-                        print("\nVid2vid processing")
+                        print("\nProcess: Video to video")
 
                     elif scene.image_path:
-                        print("\nImg2vid processing")
+                        print("\nProcess: Image to video")
                         video = process_image(scene.image_path, int(scene.generate_movie_frames))
-                        video = np.array(video)
 
                     # Upscale video
                     if scene.video_to_video:
@@ -1287,7 +1259,6 @@ class SEQUENCER_OT_generate_movie(Operator):
                             Image.fromarray(frame).resize((closest_divisible_64(int(x * 2)), closest_divisible_64(int(y * 2))))
                             for frame in video
                         ]
-
                     video_frames = upscale(
                         prompt,
                         video=video,
@@ -1300,7 +1271,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
             # Generation of movie
             else:
-                print("Generating Video")
+                print("Generate: Video")
                 video_frames = pipe(
                     prompt,
                     negative_prompt=negative_prompt,
@@ -1319,7 +1290,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 # Upscale video
                 if scene.video_to_video:
-                    print("Upscale Video")
+                    print("Upscale: Video")
                     if torch.cuda.is_available():
                         torch.cuda.empty_cache()
                     video = [Image.fromarray(frame).resize((closest_divisible_64(x * 2), closest_divisible_64(y * 2))) for frame in video_frames]
@@ -1337,8 +1308,6 @@ class SEQUENCER_OT_generate_movie(Operator):
             # Move to folder
             src_path = export_to_video(video_frames)
             dst_path = solve_path(clean_filename(str(seed)+"_"+prompt)+".mp4")
-            print(src_path)
-            print(dst_path)
             shutil.move(src_path, dst_path)
 
             # Add strip
@@ -1421,12 +1390,9 @@ class SEQUENCER_OT_generate_audio(Operator):
         try:
             import torch
 
-            if addon_prefs.audio_model_card == "cvssp/audioldm2":
-                #from diffusers import AudioLDMPipeline
+            if addon_prefs.audio_model_card == "cvssp/audioldm2" or addon_prefs.audio_model_card == "cvssp/audioldm2-music":
                 from diffusers import AudioLDM2Pipeline
                 import scipy
-
-                # from bark import SAMPLE_RATE, generate_audio, preload_models
                 from IPython.display import Audio
                 from scipy.io.wavfile import write as write_wav
                 import xformers
@@ -1463,26 +1429,21 @@ class SEQUENCER_OT_generate_audio(Operator):
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-        if addon_prefs.audio_model_card == "cvssp/audioldm2":
+        print("\nModel:  " + addon_prefs.audio_model_card)
+
+        if addon_prefs.audio_model_card == "cvssp/audioldm2" or addon_prefs.audio_model_card == "cvssp/audioldm2-music":
             repo_id = addon_prefs.audio_model_card
-            pipe = AudioLDM2Pipeline.from_pretrained(
-                repo_id
-            )  # , torch_dtype=torch.float16z
+            pipe = AudioLDM2Pipeline.from_pretrained(repo_id)
 
             if low_vram:
-                #pipe.enable_model_cpu_offload()
-                #pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                # pipe.unet.added_cond_kwargs={}
                 pipe.enable_vae_slicing()
-                pipe.enable_xformers_memory_efficient_attention()
-            #else:
-                pipe.to("cuda")
+
+            pipe.to("cuda")
 
         elif addon_prefs.audio_model_card == "facebook/audiogen-medium":
             pipe = AudioGen.get_pretrained("facebook/audiogen-medium")
-            pipe = pipe.to("cuda")
 
-        elif addon_prefs.audio_model_card == "bark": # bark
+        elif addon_prefs.audio_model_card == "bark":
             preload_models(
                 text_use_small=True,
                 coarse_use_small=True,
@@ -1509,9 +1470,10 @@ class SEQUENCER_OT_generate_audio(Operator):
                 start_frame = scene.frame_current
 
             if addon_prefs.audio_model_card == "bark":
+                print("Generate: Speech (Bark)")
                 rate = 24000
                 GEN_TEMP = 0.6
-                SPEAKER = "v2/" + scene.languages + "_" + scene.speakers  # "v2/"+
+                SPEAKER = "v2/" + scene.languages + "_" + scene.speakers
                 silence = np.zeros(int(0.25 * rate))  # quarter second of silence
 
                 prompt = context.scene.generate_movie_prompt
@@ -1523,7 +1485,7 @@ class SEQUENCER_OT_generate_audio(Operator):
 
                 pieces = []
                 for sentence in sentences:
-                    print(sentence)
+                    print("Sentence: "+sentence)
                     semantic_tokens = generate_text_semantic(
                         sentence,
                         history_prompt=SPEAKER,
@@ -1535,20 +1497,22 @@ class SEQUENCER_OT_generate_audio(Operator):
                         semantic_tokens, history_prompt=SPEAKER
                     )
                     pieces += [audio_array, silence.copy()]
-                audio = np.concatenate(
-                    pieces
-                )  # Audio(np.concatenate(pieces), rate=rate)
+
+                audio = np.concatenate(pieces)
                 filename = solve_path(clean_filename(prompt + ".wav"))
 
                 # Write the combined audio to a file
                 write_wav(filename, rate, audio.transpose())
+
             else:  # AudioLDM
+                print("Generate: Audio/music (AudioLDM)")
                 seed = context.scene.movie_num_seed
                 seed = (
                     seed
                     if not context.scene.movie_use_random
                     else random.randint(0, 999999)
                 )
+                print("Seed: "+str(seed))
                 context.scene.movie_num_seed = seed
 
                 # Use cuda if possible
@@ -1563,8 +1527,9 @@ class SEQUENCER_OT_generate_audio(Operator):
                     else:
                         generator = None
                 prompt = context.scene.generate_movie_prompt
+                print("Processing: "+prompt)
+                print("Seed: "+str(seed))
 
-                # Options: https://huggingface.co/docs/diffusers/main/en/api/pipelines/audioldm
                 audio = pipe(
                     prompt,
                     num_inference_steps=movie_num_inference_steps,
@@ -1574,9 +1539,10 @@ class SEQUENCER_OT_generate_audio(Operator):
                 ).audios[0]
                 rate = 16000
 
-                filename = solve_path(prompt + ".wav")
+                filename = solve_path(str(seed) +"_"+ prompt + ".wav")
 
-                write_wav(filename, rate, audio.transpose())  # .transpose()
+                write_wav(filename, rate, audio.transpose())
+
             filepath = filename
             if os.path.isfile(filepath):
                 empty_channel = empty_channel
@@ -1591,7 +1557,9 @@ class SEQUENCER_OT_generate_audio(Operator):
                     scene.frame_current = (
                         scene.sequence_editor.active_strip.frame_final_start
                     )
-                # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
+
+                # Redraw UI to display the new strip. Remove this if Blender crashes:
+                # https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
                 bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
             else:
                 print("No resulting file found!")
@@ -1660,15 +1628,16 @@ class SEQUENCER_OT_generate_image(Operator):
         image_model_card = addon_prefs.image_model_card
         do_refine = (scene.refine_sd or scene.image_path) and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
 
-        # LOADING MMODELS
+        # LOADING MODELS
+        print("\nModel:  " + image_model_card)
 
         # Models for stable diffusion
         if not image_model_card == "DeepFloyd/IF-I-M-v1.0":
+
             pipe = DiffusionPipeline.from_pretrained(
                 image_model_card,
                 torch_dtype=torch.float16,
                 variant="fp16",
-                #use_safetensors=True,
             )
 
             pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
@@ -1676,10 +1645,7 @@ class SEQUENCER_OT_generate_image(Operator):
             if low_vram:
                 torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
                 pipe.enable_model_cpu_offload()
-                # pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                #pipe.unet.added_cond_kwargs={}
                 pipe.enable_vae_slicing()
-                #pipe.enable_xformers_memory_efficient_attention()
             else:
                 pipe.to("cuda")
 
@@ -1738,22 +1704,19 @@ class SEQUENCER_OT_generate_image(Operator):
 
         # Add refiner model if chosen.
         if do_refine:
+            print("Refine Model:  " + "stabilityai/stable-diffusion-xl-refiner-1.0")
             from diffusers import StableDiffusionXLImg2ImgPipeline
             refiner = StableDiffusionXLImg2ImgPipeline.from_pretrained(
                 "stabilityai/stable-diffusion-xl-refiner-1.0",
                 text_encoder_2=pipe.text_encoder_2,
                 vae=pipe.vae,
                 torch_dtype=torch.float16,
-                #use_safetensors=True,
                 variant="fp16",
             )
 
             if low_vram:
                 refiner.enable_model_cpu_offload()
-                # refiner.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                #refiner.unet.added_cond_kwargs={}
                 refiner.enable_vae_slicing()
-                #refiner.enable_xformers_memory_efficient_attention()
             else:
                 refiner.to("cuda")
 
@@ -1784,6 +1747,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 if not context.scene.movie_use_random
                 else random.randint(0, 999999)
             )
+            print("Seed: "+str(seed))
             context.scene.movie_num_seed = seed
 
             # Use cuda if possible.
@@ -1800,7 +1764,6 @@ class SEQUENCER_OT_generate_image(Operator):
 
             # DeepFloyd process:
             if image_model_card == "DeepFloyd/IF-I-M-v1.0":
-                print("DeepFloyd")
                 prompt_embeds, negative_embeds = stage_1.encode_prompt(
                     prompt, negative_prompt
                 )
@@ -1833,7 +1796,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             # Img2img
             elif scene.image_path:
-                print("Img2img")
+                print("Process: Image to image")
                 init_image = load_image(scene.image_path).convert("RGB")
                 image = refiner(
                     prompt=prompt,
@@ -1843,12 +1806,11 @@ class SEQUENCER_OT_generate_image(Operator):
                     num_inference_steps=image_num_inference_steps,
                     guidance_scale=image_num_guidance,
                     generator=generator,
-                    # output_type="latent" if scene.refine_sd else "pil",
                 ).images[0]
 
             # Generate
             else:
-                print("Generating ")
+                print("Generate: Image ")
                 image = pipe(
                     prompt,
                     negative_prompt=negative_prompt,
@@ -1860,8 +1822,8 @@ class SEQUENCER_OT_generate_image(Operator):
                 ).images[0]
 
             # Add refiner
-            if do_refine: # and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0") or scene.image_path:
-                print("Refining")
+            if do_refine:
+                print("Refine: Image")
                 image = refiner(
                     prompt,
                     negative_prompt=negative_prompt,
@@ -1900,7 +1862,8 @@ class SEQUENCER_OT_generate_image(Operator):
                 strip.use_proxy = True
                 bpy.ops.sequencer.rebuild_proxy()
 
-                # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
+                # Redraw UI to display the new strip. Remove this if Blender crashes:
+                # https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
                 bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
             else:
                 print("No resulting file found.")
@@ -1940,30 +1903,45 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         sequences = bpy.context.sequences
         strips = context.selected_sequences
         prompt = scene.generate_movie_prompt
+        negative_prompt = scene.generate_movie_negative_prompt
         current_frame = scene.frame_current
         type = scene.generatorai_typeselect
         seed = scene.movie_num_seed
         use_random = scene.movie_use_random
 
         if not strips:
-            self.report({"INFO"}, "Select strips for batch processing.")
+            self.report({"INFO"}, "Select strip(s) for processing.")
             return {"CANCELLED"}
         else:
-            print("\nBatch processing started (ctrl+c to cancel).")
+            print("\nStrip input processing started (ctrl+c to cancel).")
+
+        for strip in strips:
+            if strip.type in {'MOVIE', 'IMAGE', 'TEXT'}:
+                break
+        else:
+            self.report({"INFO"}, "None of the selected strips are movie, image, or text types.")
+            return {"CANCELLED"}
 
         for count, strip in enumerate(strips):
             if strip.type == "TEXT":
                 if strip.text:
-                    print("\n" + str(count+1) + "/"+ str(len(strips)) + " Prompt: " + strip.text + ", " + prompt)
+                    print("\n" + str(count+1) + "/"+ str(len(strips)))
+                    print("Prompt: " + strip.text + ", " + prompt)
+                    print("Negative Prompt: " + negative_prompt)
                     scene.generate_movie_prompt = strip.text + ", " + prompt
                     scene.frame_current = strip.frame_final_start
+
                     if type == "movie":
                         sequencer.generate_movie()
                     if type == "audio":
                         sequencer.generate_audio()
                     if type == "image":
                         sequencer.generate_image()
-                    scene.generate_movie_prompt = prompt
+
+                    context.scene.generate_movie_prompt = prompt
+                    scene.generate_movie_negative_prompt = negative_prompt
+                    context.scene.movie_use_random = use_random
+                    context.scene.movie_num_seed = seed
 
             if strip.type == "IMAGE":
                 strip_dirname = os.path.dirname(strip.directory)
@@ -1983,10 +1961,17 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
 
                     if len(strips) > 1:
                         styled_prompt = style_prompt(strip_prompt + ", " + prompt)[0]
+                        styled_prompt = style_prompt(strip_prompt + ", " + prompt)[1]
                     else:
                         styled_prompt = style_prompt(prompt)[0]
-                    print("\n" + str(count+1) + "/"+ str(len(strips)) + " Prompt: " + styled_prompt)
+                        styled_negative_prompt = style_prompt(prompt)[1]
+
+                    print("\n" + str(count+1) + "/"+ str(len(strips)))
+                    print("Prompt: " + styled_prompt)
+                    print("Negative Prompt: " + styled_negative_prompt)
+
                     scene.generate_movie_prompt = styled_prompt
+                    scene.generate_movie_negative_prompt = styled_negative_prompt
                     scene.frame_current = strip.frame_final_start
 
                     if type == "movie":
@@ -1996,9 +1981,10 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     if type == "image":
                         sequencer.generate_image()
 
-                    context.scene.generate_movie_prompt = prompt
-                    context.scene.movie_use_random = use_random
-                    context.scene.movie_num_seed = seed
+                    scene.generate_movie_prompt = prompt
+                    scene.generate_movie_negative_prompt = negative_prompt
+                    scene.movie_use_random = use_random
+                    scene.movie_num_seed = seed
 
                 bpy.types.Scene.image_path = ""
 
@@ -2020,11 +2006,17 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
 
                     if len(strips) > 1:
                         styled_prompt = style_prompt(strip_prompt + ", " + prompt)[0]
+                        styled_prompt = style_prompt(strip_prompt + ", " + prompt)[1]
                     else:
                         styled_prompt = style_prompt(prompt)[0]
-                    print("\n" + str(count+1) + "/"+ str(len(strips)) + " Prompt: " + styled_prompt)
+                        styled_negative_prompt = style_prompt(prompt)[1]
+
+                    print("\n" + str(count+1) + "/"+ str(len(strips)))
+                    print("Prompt: " + styled_prompt)
+                    print("Negative Prompt: " + styled_negative_prompt)
+
                     scene.generate_movie_prompt = styled_prompt
-                    scene.generate_movie_prompt = prompt
+                    scene.generate_movie_negative_prompt = styled_negative_prompt
                     scene.frame_current = strip.frame_final_start
 
                     if type == "movie":
@@ -2035,21 +2027,23 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                         sequencer.generate_image()
 
                     scene.generate_movie_prompt = prompt
-                    context.scene.movie_use_random = use_random
-                    context.scene.movie_num_seed = seed
+                    scene.generate_movie_negative_prompt = negative_prompt
+                    scene.movie_use_random = use_random
+                    scene.movie_num_seed = seed
 
                 bpy.types.Scene.movie_path = ""
 
         scene.frame_current = current_frame
 
         scene.generate_movie_prompt = prompt
+        scene.generate_movie_negative_prompt = negative_prompt
         context.scene.movie_use_random = use_random
         context.scene.movie_num_seed = seed
 
         addon_prefs.playsound = play_sound
         bpy.ops.renderreminder.play_notification()
 
-        print("Batch processing finished.")
+        print("Processing finished.")
 
         return {"FINISHED"}
 
@@ -2255,11 +2249,7 @@ def unregister():
     del bpy.types.Scene.movie_path
     del bpy.types.Scene.image_path
     del bpy.types.Scene.refine_sd
-    # del bpy.types.Scene.denoising_strength
     del bpy.types.Scene.generatorai_styles
-
-    #bpy.types.SEQUENCER_MT_add.remove(panel_text_to_generatorAI)
-
 
 if __name__ == "__main__":
     unregister()
