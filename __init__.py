@@ -1075,13 +1075,15 @@ class SEQUENCER_OT_generate_movie(Operator):
                     variant="fp16",
                 )
 
+                from diffusers import DPMSolverMultistepScheduler
+
                 pipe.scheduler = DPMSolverMultistepScheduler.from_config(
                     pipe.scheduler.config
                 )
 
                 if low_vram:
                     pipe.enable_model_cpu_offload()
-                    pipe.unet.enable_forward_chunking(chunk_size=1, dim=1) # Heavy
+                    #pipe.unet.enable_forward_chunking(chunk_size=1, dim=1) # Heavy
                     pipe.enable_vae_slicing()
                 else:
                     pipe.to("cuda")
@@ -1096,7 +1098,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 )
 
                 if low_vram:
-                    refiner.unet.enable_forward_chunking(chunk_size=1, dim=1) #Heavy
+                    #refiner.unet.enable_forward_chunking(chunk_size=1, dim=1) #Heavy
                     refiner.enable_vae_slicing()
                 else:
                     refiner.to("cuda")
@@ -1643,7 +1645,7 @@ class SEQUENCER_OT_generate_image(Operator):
             pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
             if low_vram:
-                torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
+                #torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
                 pipe.enable_model_cpu_offload()
                 pipe.enable_vae_slicing()
             else:
