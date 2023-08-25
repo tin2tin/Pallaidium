@@ -519,8 +519,32 @@ def install_modules(self):
     import_module(self, "xformers", "xformers")
     import_module(self, "imageio", "imageio")
     import_module(self, "imwatermark", "invisible-watermark>=0.2.0")
-    # import_module(self, "triton", "C://Users//45239//Downloads//triton-2.0.0-cp310-cp310-win_amd64.whl")
-    import_module(self, "audiocraft", "git+https://github.com/facebookresearch/audiocraft.git")
+    if os_platform == "Windows":
+        subprocess.check_call(
+            [
+                pybin,
+                "-m",
+                "pip",
+                "install",
+                "libtorrent",
+                "--no-warn-script-location",
+                "--user",
+            ]
+        )
+        subprocess.check_call(
+            [
+                pybin,
+                "-m",
+                "pip",
+                "install",
+                "torchaudio",
+                "--index-url",
+                "https://huggingface.co/r4ziel/xformers_pre_built/resolve/main/triton-2.0.0-cp310-cp310-win_amd64.whl",
+                "--no-warn-script-location",
+                "--user",
+            ]
+        )
+    #import_module(self, "audiocraft", "git+https://github.com/facebookresearch/audiocraft.git")
     # subprocess.check_call([pybin,"-m","pip","install","force-reinstall","no-deps","pre xformers"])
     subprocess.check_call([pybin, "-m", "pip", "install", "numpy", "--upgrade"])
     if os_platform == "Windows":
@@ -1061,12 +1085,12 @@ class SEQUENCER_OT_generate_movie(Operator):
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-        # LOADING MODULES
+        # LOADING MODELS
         print("\nModel:  " + movie_model_card)
 
         # Models for refine imported image or movie
         if (scene.movie_path or scene.image_path) and input == "input_strips":
-
+            #img2img
             if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
                 from diffusers import StableDiffusionXLImg2ImgPipeline
                 pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
@@ -1108,7 +1132,9 @@ class SEQUENCER_OT_generate_movie(Operator):
                     card = "cerspense/zeroscope_v2_XL"
                 else:
                     card = movie_model_card
+                    
                 from diffusers import VideoToVideoSDPipeline
+                
                 upscale = VideoToVideoSDPipeline.from_pretrained(
                     card,
                     torch_dtype=torch.float16,
