@@ -3,13 +3,6 @@ AI generate video, image, and audio from text prompts or video, image, or text s
 
 https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-455c77443535
 
-## Video Examples
-### Zeroscope & Bark:
-[![Watch the video](https://img.youtube.com/vi/LejSJGmtEvE/0.jpg)](https://youtu.be/LejSJGmtEvE) [![Watch the video](https://img.youtube.com/vi/AAdQfQjENJU/0.jpg)](https://youtu.be/AAdQfQjENJU) 
-
-### Img2img:
-https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-ffce872b79c3
-
 ## Features
 * Text to video
 * Text to audio
@@ -164,6 +157,21 @@ On Linux and macOS: ~/.cache/huggingface/transformers
 On Windows: %userprofile%\\.cache\huggingface\transformers
 
 Here you can locate and delete the individual models.
+
+
+## Video Examples
+### Zeroscope & Bark:
+[![Watch the video](https://img.youtube.com/vi/LejSJGmtEvE/0.jpg)](https://youtu.be/LejSJGmtEvE) [![Watch the video](https://img.youtube.com/vi/AAdQfQjENJU/0.jpg)](https://youtu.be/AAdQfQjENJU) 
+
+### Video to video:
+
+https://github.com/tin2tin/Generative_AI/assets/1322593/c044a0b0-95c2-4b54-af0b-45bc0c670c89
+
+https://github.com/tin2tin/Generative_AI/assets/1322593/0105cd35-b3b2-49cf-91c1-0633dd484177
+
+### Img2img:
+https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-ffce872b79c3
+
 
 
 ## Restrictions for using the AI models:
