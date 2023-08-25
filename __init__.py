@@ -1090,9 +1090,10 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         # Models for refine imported image or movie
         if (scene.movie_path or scene.image_path) and input == "input_strips":
-            #img2img
-            if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+
+            if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0": #img2img
                 from diffusers import StableDiffusionXLImg2ImgPipeline
+
                 pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
                     movie_model_card,
                     torch_dtype=torch.float16,
@@ -1113,6 +1114,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     pipe.to("cuda")
 
                 from diffusers import StableDiffusionXLImg2ImgPipeline
+
                 refiner = StableDiffusionXLImg2ImgPipeline.from_pretrained(
                     "stabilityai/stable-diffusion-xl-refiner-1.0",
                     text_encoder_2=pipe.text_encoder_2,
@@ -1130,23 +1132,27 @@ class SEQUENCER_OT_generate_movie(Operator):
             else:
                 if movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w" or scene.image_path:
                     card = "cerspense/zeroscope_v2_XL"
+                    safe = False
                 else:
                     card = movie_model_card
-                    
+                    safe = True
+
                 from diffusers import VideoToVideoSDPipeline
-                
+
                 upscale = VideoToVideoSDPipeline.from_pretrained(
                     card,
                     torch_dtype=torch.float16,
+                    use_safetensors=safe,
                 )
 
                 from diffusers import DPMSolverMultistepScheduler
+
                 upscale.scheduler = DPMSolverMultistepScheduler.from_config(upscale.scheduler.config)
 
                 if low_vram:
                     torch.cuda.set_per_process_memory_fraction(0.98)
                     upscale.enable_model_cpu_offload()
-                    upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) # here:
+                    #upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) # here:
                     upscale.enable_vae_slicing()
                 else:
                     upscale.to("cuda")
@@ -1157,6 +1163,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             pipe = TextToVideoSDPipeline.from_pretrained(
                 movie_model_card,
                 torch_dtype=torch.float16,
+                use_safetensors=False,
             )
             from diffusers import DPMSolverMultistepScheduler
             pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
@@ -1174,14 +1181,15 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 from diffusers import DiffusionPipeline
                 upscale = DiffusionPipeline.from_pretrained(
-                    "cerspense/zeroscope_v2_XL", torch_dtype=torch.float16
+                    "cerspense/zeroscope_v2_XL", torch_dtype=torch.float16,
+                    use_safetensors=False,
                 )
 
                 upscale.scheduler = DPMSolverMultistepScheduler.from_config(upscale.scheduler.config)
 
                 if low_vram:
                     upscale.enable_model_cpu_offload()
-                    upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) #Heavy
+                    #upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) #Heavy
                     upscale.enable_vae_slicing()
                 else:
                     upscale.to("cuda")
