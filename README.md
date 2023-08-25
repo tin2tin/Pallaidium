@@ -94,7 +94,7 @@ Tip           |
 If you get the message that CUDA is out of memory, then restart Blender to free up memory and make it stable again.     |
 
 
-# Batch processing more strips
+# Batch Processing
 
 Select multiple strips and hit Generate. When doing this, the file name, and if found the seed value, is automatically inserted into the prompt and seed value.
 
