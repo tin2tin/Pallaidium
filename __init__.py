@@ -326,6 +326,9 @@ def process_video(input_video_path, output_video_path):
     Image.MAX_IMAGE_PIXELS = None
     import cv2
     import shutil
+    
+    scene = bpy.context.scene
+    movie_x = scene.generate_movie_x
 
     # Create a temporary folder for storing frames
     temp_image_folder = solve_path("temp_images")
@@ -348,7 +351,7 @@ def process_video(input_video_path, output_video_path):
     cap.release()
 
     # Process frames using the separate function
-    processed_frames = process_frames(temp_image_folder, 1024)
+    processed_frames = process_frames(temp_image_folder, movie_x)
     # print("Temp folder: "+temp_image_folder)
 
     # Clean up: Delete the temporary image folder
@@ -361,6 +364,9 @@ def process_image(image_path, frames_nr):
     from PIL import Image
     Image.MAX_IMAGE_PIXELS = None
     import cv2, shutil
+
+    scene = bpy.context.scene
+    movie_x = scene.generate_movie_x
 
     img = cv2.imread(image_path)
 
@@ -378,7 +384,7 @@ def process_image(image_path, frames_nr):
         zoom_factor += 0.04
 
     # Process frames using the separate function
-    processed_frames = process_frames(temp_image_folder, 1024)
+    processed_frames = process_frames(temp_image_folder, movie_x)
 
     # Clean up: Delete the temporary image folder
     shutil.rmtree(temp_image_folder)
@@ -1152,7 +1158,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 if low_vram:
                     torch.cuda.set_per_process_memory_fraction(0.98)
                     upscale.enable_model_cpu_offload()
-                    #upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) # here:
+                    upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) # here:
                     upscale.enable_vae_slicing()
                 else:
                     upscale.to("cuda")
@@ -1189,7 +1195,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 if low_vram:
                     upscale.enable_model_cpu_offload()
-                    #upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) #Heavy
+                    # upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) #Heavy
                     upscale.enable_vae_slicing()
                 else:
                     upscale.to("cuda")
