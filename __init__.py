@@ -2381,7 +2381,7 @@ def register():
         name="image_power",
         default=0.50,
         min=0.05,
-        max=0.98,
+        max=0.95,
     )
 
     styles_array = load_styles(os.path.dirname(os.path.abspath(__file__))+"/styles.json")
