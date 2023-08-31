@@ -529,10 +529,11 @@ def install_modules(self):
     import_module(self, "scipy", "scipy")
     import_module(self, "IPython", "IPython")
     import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
-    import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
+    #import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
     import_module(self, "xformers", "xformers")
     import_module(self, "imageio", "imageio")
     import_module(self, "imwatermark", "invisible-watermark>=0.2.0")
+    
     if os_platform == "Windows":
         subprocess.check_call(
             [
@@ -575,6 +576,21 @@ def install_modules(self):
                 "--user",
             ]
         )
+
+    import_module(self, "modelscope", "modelscope==1.8.4")
+    #import_module(self, "xformers", "xformers==0.0.20")
+    #import_module(self, "torch", "torch==2.0.1")
+    import_module(self, "open_clip_torch", "open_clip_torch>=2.0.2")
+    #import_module(self, "opencv_python_headless", "opencv-python-headless")
+    #import_module(self, "opencv_python", "opencv-python")
+    import_module(self, "einops", "einops>=0.4")
+    import_module(self, "rotary_embedding_torch", "rotary-embedding-torch")
+    import_module(self, "fairscale", "fairscale")
+    #import_module(self, "scipy", "scipy")
+    #import_module(self, "imageio", "imageio")
+    import_module(self, "pytorch_lightning", "pytorch-lightning")
+    import_module(self, "torchsde", "torchsde")
+    import_module(self, "easydict", "easydict")
 
 
 def get_module_dependencies(module_name):
@@ -715,11 +731,6 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "stabilityai/stable-diffusion-xl-base-1.0",
                 "Stable Diffusion XL 1.0 (1024x1024)",
                 "Stable Diffusion XL 1.0",
-            ),
-            (
-                "Yntec/RadiantCinemagic",
-                "Radiant Cinemagic (512x512)",
-                "Radiant Cinemagic (512x512)",
             ),
             ("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd"),
         ],
@@ -937,7 +948,7 @@ class SEQEUNCER_PT_generate_ai(Panel):  # UI
         if input == "input_strips":
             col.prop(context.scene, "image_power", text="Strip Power")
             
-        if type == "image":
+        if input == "input_strips" and type == "image":
             col.prop_search(scene, "inpaint_selected_strip", scene.sequence_editor, "sequences", text="Inpaint Mask", icon='SEQ_STRIP_DUPLICATE')
 
         col = layout.column(align=True)
@@ -1040,6 +1051,11 @@ class SEQEUNCER_PT_generate_ai(Panel):  # UI
                 row.operator("sequencer.generate_audio", text="Generate")
 
 
+class NoWatermark:
+    def apply_watermark(self, img):
+        return img
+
+
 class SEQUENCER_OT_generate_movie(Operator):
     """Generate Video"""
 
@@ -1122,7 +1138,9 @@ class SEQUENCER_OT_generate_movie(Operator):
                 pipe.scheduler = DPMSolverMultistepScheduler.from_config(
                     pipe.scheduler.config
                 )
-
+                
+                pipe.watermark = NoWatermark()
+                
                 if low_vram:
                     pipe.enable_model_cpu_offload()
                     #pipe.unet.enable_forward_chunking(chunk_size=1, dim=1) # Heavy
@@ -1146,12 +1164,28 @@ class SEQUENCER_OT_generate_movie(Operator):
                     refiner.enable_vae_slicing()
                 else:
                     refiner.to("cuda")
+            
+#            elif scene.image_path: #img2vid
 
-            else: #vid2vid
-#                if movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w" or scene.image_path:
-#                    card = "cerspense/zeroscope_v2_XL"
-#                else:
-                card = movie_model_card
+#                from modelscope.pipelines import pipeline
+#                from modelscope.outputs import OutputKeys
+
+#                #pipe = pipeline(task='image-to-video', model='damo-vilab/MS-Image2Video', model_revision='v1.1.0')
+#                pipe = pipeline(task='image-to-video', model='damo/Image-to-Video', model_revision='v1.1.0')
+#                #pipe = pipeline(task='image-to-video', model='https://dagshub.com/model/damo-video-to-video/src/main/data', model_revision='v1.1.0')
+
+##                if low_vram:
+##                    pipe.enable_model_cpu_offload()
+##                    pipe.enable_vae_tiling()
+##                    pipe.enable_vae_slicing()
+##                else:
+#                refiner.to("cuda")
+
+            else: # vid2vid / img2vid
+                if movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w" or scene.image_path:
+                    card = "cerspense/zeroscope_v2_XL"
+                else:
+                    card = movie_model_card
 
                 from diffusers import VideoToVideoSDPipeline
                 upscale = VideoToVideoSDPipeline.from_pretrained(
@@ -1322,7 +1356,34 @@ class SEQUENCER_OT_generate_movie(Operator):
                         guidance_scale=movie_num_guidance,
                         generator=generator,
                     ).frames
-                    
+
+#                elif scene.image_path:  #img2vid
+#                    print("\nProcess: Image to video")
+#                    
+#                    # IMG_PATH: your image path (url or local file)
+#                    video_frames = pipe(scene.image_path, output_video='./output.mp4').frames
+#                    output_video_path = pipe(scene.image_path, output_video='./output.mp4')[OutputKeys.OUTPUT_VIDEO]
+#                    print(output_video_path)
+#                    
+#                    #video = process_image(scene.image_path, int(scene.generate_movie_frames))
+
+                    # Upscale video
+#                    if scene.video_to_video:
+#                        video = [
+#                            Image.fromarray(frame).resize((closest_divisible_64(int(x * 2)), closest_divisible_64(int(y * 2))))
+#                            for frame in video
+#                        ]
+
+#                    video_frames = upscale(
+#                        prompt,
+#                        video=video,
+#                        strength=1.00 - scene.image_power,
+#                        negative_prompt=negative_prompt,
+#                        num_inference_steps=movie_num_inference_steps,
+#                        guidance_scale=movie_num_guidance,
+#                        generator=generator,
+#                    ).frames
+                   
                     #video_frames = np.array(video_frames)
 
             # Generation of movie
@@ -1726,6 +1787,9 @@ class SEQUENCER_OT_generate_image(Operator):
             #vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16) vae=vae, 
             pipe = StableDiffusionInpaintPipeline.from_pretrained("stabilityai/stable-diffusion-2-inpainting", torch_dtype=torch.float16, variant="fp16") #use_safetensors=True
             #pipe = StableDiffusionXLInpaintPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", vae=vae, torch_dtype=torch.float16, variant="fp16") #use_safetensors=True
+
+            pipe.watermark = NoWatermark()
+
             if low_vram:
                 #torch.cuda.set_per_process_memory_fraction(0.99)
                 pipe.enable_model_cpu_offload()
@@ -1843,6 +1907,8 @@ class SEQUENCER_OT_generate_image(Operator):
                 torch_dtype=torch.float16,
                 variant="fp16",
             )
+            
+            refiner.watermark = NoWatermark()
 
             if low_vram:
                 refiner.enable_model_cpu_offload()
