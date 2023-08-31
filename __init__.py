@@ -185,32 +185,18 @@ def style_prompt(prompt):
     return return_array
 
 
-#def closest_divisible_64(num):
-#    # Determine the remainder when num is divided by 64
-#    remainder = (num % 64) - 1 
-
-#    # If the remainder is less than or equal to 32, return num - remainder,
-#    # but ensure the result is not less than 64
-#    if remainder <= 32:
-#        result = num - remainder
-#        return max(result, 192)
-#    # Otherwise, return num + (64 - remainder)
-#    else:
-#        return num + (64 - remainder)
-
-
 def closest_divisible_64(num):
-    while num % 32 != 0:
-        num += 1
-    if num < 192:
-        num = 192
-    return num
+    # Determine the remainder when num is divided by 64
+    remainder = (num % 64)
 
-#def ensure_divisible_by_64(value):
-#    remainder = value % 64
-#    if remainder != 0:
-#        value += 64 - remainder
-#    return value
+    # If the remainder is less than or equal to 32, return num - remainder,
+    # but ensure the result is not less than 64
+    if remainder <= 32:
+        result = num - remainder
+        return max(result, 192)
+    # Otherwise, return num + (64 - remainder)
+    else:
+        return max(num + (64 - remainder), 192)
 
 
 def find_first_empty_channel(start_frame, end_frame):
@@ -359,12 +345,20 @@ def process_video(input_video_path, output_video_path):
 
     # Process frames using the separate function
     processed_frames = process_frames(temp_image_folder, movie_x)
-    # print("Temp folder: "+temp_image_folder)
 
     # Clean up: Delete the temporary image folder
     shutil.rmtree(temp_image_folder)
 
     return processed_frames
+
+
+#Define the function for zooming effect
+def zoomPan(img, zoom=1, angle=0, coord=None):
+    import cv2
+    cy, cx = [i/2 for i in img.shape[:-1]] if coord is None else coord[::-1]
+    rot = cv2.getRotationMatrix2D((cx, cy), angle, zoom)
+    res = cv2.warpAffine(img, rot, img.shape[1::-1], flags=cv2.INTER_LINEAR)
+    return res
 
 
 def process_image(image_path, frames_nr):
@@ -376,25 +370,32 @@ def process_image(image_path, frames_nr):
     movie_x = scene.generate_movie_x
 
     img = cv2.imread(image_path)
+    height, width, layers = img.shape
 
     # Create a temporary folder for storing frames
     temp_image_folder = solve_path("/temp_images")
     if not os.path.exists(temp_image_folder):
         os.makedirs(temp_image_folder)
 
-    # Add zoom motion to the image and save frames
-    zoom_factor = 1.0
-    for i in range(frames_nr):
-        zoomed_img = cv2.resize(img, None, fx=zoom_factor, fy=zoom_factor)
+    max_zoom = 2.0  #Maximum Zoom level (should be > 1.0)
+    max_rot = 30    #Maximum rotation in degrees, set '0' for no rotation
+    
+    #Make the loop for Zooming-in
+    i = 1
+    while i < frames_nr:
+        zLvl = 1.0 + ((i / (1/(max_zoom-1)) / frames_nr) * 0.01)
+        angle = 0 #i * max_rot / frames_nr
+        zoomedImg = zoomPan(img, zLvl, angle, coord=None)
         output_path = os.path.join(temp_image_folder, f"frame_{i:04d}.png")
-        cv2.imwrite(output_path, zoomed_img)
-        zoom_factor += 0.04
+        cv2.imwrite(output_path, zoomedImg)
+        i = i + 1
 
     # Process frames using the separate function
     processed_frames = process_frames(temp_image_folder, movie_x)
 
     # Clean up: Delete the temporary image folder
     shutil.rmtree(temp_image_folder)
+    cv2.destroyAllWindows()
 
     return processed_frames
 
@@ -692,20 +693,8 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Img2img SD XL 1.0 Refine (1024x1024)",
                 "Stable Diffusion XL 1.0",
             ),
-#            (
-#                "576-b2g8f5x4-36-18000/18000",
-#                "576-b2g8f5x4-36-18000 (576x320)",
-#                "576-b2g8f5x4-36-18000",
-#            ),
-            # ("camenduru/AnimateDiff/", "AnimateDiff", "AnimateDiff"),
-            # ("polyware-ai/longscope", "Longscope (384x216x94)", "Longscope ( 384x216x94)"),
-            # ("vdo/potat1-lotr-25000/", "LOTR (1024x576x24)", "LOTR (1024x576x24)"),
-            # ("damo-vilab/text-to-video-ms-1.7b", "Modelscope (256x256)", "Modelscope (256x256)"),
-            # ("polyware-ai/text-to-video-ms-stable-v1", "Polyware 1.7b (384x384)", "Polyware 1.7b (384x384)"),
-            # ("vdo/potat1-50000", "Potat v1 50000 (1024x576)", "Potat (1024x576)"),
-            # ("cerspense/zeroscope_v1-1_320s", "Zeroscope v1.1 (320x320)", "Zeroscope (320x320)"),
         ],
-        default="cerspense/zeroscope_v2_XL",
+        default="cerspense/zeroscope_v2_576w",
         update=input_strips_updated,
     )
 
@@ -727,19 +716,12 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Stable Diffusion XL 1.0 (1024x1024)",
                 "Stable Diffusion XL 1.0",
             ),
-#            (
-#                "segmind/tiny-sd",
-#                "Stable Diffusion Tiny (512x512)",
-#                "Stable Diffusion Tiny",
-#            ),
-#            (
-#                "nota-ai/bk-sdm-small-2m",
-#                "BK SDM Small (512×512)",
-#                "BK SDM Small (512×512)",
-#            ),
+            (
+                "Yntec/RadiantCinemagic",
+                "Radiant Cinemagic (512x512)",
+                "Radiant Cinemagic (512x512)",
+            ),
             ("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd"),
-            # ("stabilityai/stable-diffusion-xl-base-0.9", "Stable Diffusion XL Base 0.9", "Stable Diffusion XL Base 0.9"),
-            # ("kandinsky-community/kandinsky-2-1", "Kandinsky 2.1 (768x768)", "Kandinsky 2.1 (768x768)"),
         ],
         default="stabilityai/stable-diffusion-xl-base-1.0",
     )
@@ -747,11 +729,6 @@ class GeneratorAddonPreferences(AddonPreferences):
     audio_model_card: bpy.props.EnumProperty(
         name="Audio Model",
         items=[
-#            (
-#                "cvssp/audioldm-s-full-v2",
-#                "AudioLDM S Full v2",
-#                "AudioLDM Small Full v2",
-#            ),
             (
                 "cvssp/audioldm2",
                 "Sound - AudioLDM 2",
@@ -764,7 +741,6 @@ class GeneratorAddonPreferences(AddonPreferences):
             ),
             ("bark", "Bark", "Bark"),
             # ("facebook/audiogen-medium", "AudioGen", "AudioGen"), #I do not have enough VRAM to test if this is working...
-            # ("cvssp/audioldm", "AudioLDM", "AudioLDM"),
         ],
         default="bark",
     )
@@ -953,27 +929,29 @@ class SEQEUNCER_PT_generate_ai(Panel):  # UI
         col.use_property_split = True
         col.use_property_decorate = False
         col = col.box()
-        col = col.column()
+        col = col.column(align=True)
 
-        col.prop(context.scene, "input_strips", text="Input")
+        if type != "audio":
+            col.prop(context.scene, "input_strips", text="Input")
 
         if input == "input_strips":
             col.prop(context.scene, "image_power", text="Strip Power")
             
-#            if type == "image": # not working
-#                col.prop_search(scene, "inpaint_selected_strip", scene.sequence_editor, "sequences", text="Inpaint Mask", icon='SEQ_STRIP_DUPLICATE')
+        if type == "image":
+            col.prop_search(scene, "inpaint_selected_strip", scene.sequence_editor, "sequences", text="Inpaint Mask", icon='SEQ_STRIP_DUPLICATE')
 
-        #layout = self.layout
+        col = layout.column(align=True)
+        col = col.box()
         col = col.column(align=True)
-        col.use_property_split = True
+        col.use_property_split = False
         col.use_property_decorate = False        
-        col.prop(context.scene, "generate_movie_prompt", text="Prompt", icon="ADD")
+        col.prop(context.scene, "generate_movie_prompt", text="", icon="ADD")
 
         if type == "audio" and audio_model_card == "bark":
             pass
         else:
             col.prop(
-                context.scene, "generate_movie_negative_prompt", text="Negative Prompt", icon="REMOVE")
+                context.scene, "generate_movie_negative_prompt", text="", icon="REMOVE")
 
         layout = col.column()
         layout.use_property_split = True
@@ -1027,9 +1005,9 @@ class SEQEUNCER_PT_generate_ai(Panel):  # UI
             col = col.column(heading="Upscale", align=True)
             col.prop(context.scene, "video_to_video", text="2x")
 
-        if type == "image" and (
-            image_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
-        ):
+        if type == "image":# and (
+            #image_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
+        #):
             col = col.column(heading="Refine", align=True)
             col.prop(context.scene, "refine_sd", text="Image")
             sub_col = col.row()
@@ -1164,15 +1142,16 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 if low_vram:
                     refiner.enable_model_cpu_offload()
+                    refiner.enable_vae_tiling()
                     refiner.enable_vae_slicing()
                 else:
                     refiner.to("cuda")
 
             else: #vid2vid
-                if movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w" or scene.image_path:
-                    card = "cerspense/zeroscope_v2_XL"
-                else:
-                    card = movie_model_card
+#                if movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w" or scene.image_path:
+#                    card = "cerspense/zeroscope_v2_XL"
+#                else:
+                card = movie_model_card
 
                 from diffusers import VideoToVideoSDPipeline
                 upscale = VideoToVideoSDPipeline.from_pretrained(
@@ -1188,7 +1167,8 @@ class SEQUENCER_OT_generate_movie(Operator):
                 if low_vram:
                     #torch.cuda.set_per_process_memory_fraction(0.98)
                     upscale.enable_model_cpu_offload()
-                    # upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) # heavy:
+                    upscale.enable_vae_tiling()
+                    upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) # heavy:
                     upscale.enable_vae_slicing()
                 else:
                     upscale.to("cuda")
@@ -1332,6 +1312,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                             Image.fromarray(frame).resize((closest_divisible_64(int(x * 2)), closest_divisible_64(int(y * 2))))
                             for frame in video
                         ]
+
                     video_frames = upscale(
                         prompt,
                         video=video,
@@ -1341,6 +1322,8 @@ class SEQUENCER_OT_generate_movie(Operator):
                         guidance_scale=movie_num_guidance,
                         generator=generator,
                     ).frames
+                    
+                    #video_frames = np.array(video_frames)
 
             # Generation of movie
             else:
@@ -1464,7 +1447,7 @@ class SEQUENCER_OT_generate_audio(Operator):
             import torch
 
             if addon_prefs.audio_model_card == "cvssp/audioldm2" or addon_prefs.audio_model_card == "cvssp/audioldm2-music":
-                from diffusers import AudioLDM2Pipeline
+                from diffusers import AudioLDM2Pipeline, DPMSolverMultistepScheduler
                 import scipy
                 from IPython.display import Audio
                 from scipy.io.wavfile import write as write_wav
@@ -1507,6 +1490,8 @@ class SEQUENCER_OT_generate_audio(Operator):
         if addon_prefs.audio_model_card == "cvssp/audioldm2" or addon_prefs.audio_model_card == "cvssp/audioldm2-music":
             repo_id = addon_prefs.audio_model_card
             pipe = AudioLDM2Pipeline.from_pretrained(repo_id)
+            
+            pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
             if low_vram:
                 pipe.enable_vae_slicing()
@@ -1654,12 +1639,15 @@ def find_strip_by_name(scene, name):
 
 
 def get_strip_path(strip):
-    if strip:
+    if strip.type == "IMAGE":
         strip_dirname = os.path.dirname(strip.directory)
         image_path = bpy.path.abspath(
             os.path.join(strip_dirname, strip.elements[0].filename)
         )
         return image_path
+    if strip.type == "MOVIE":
+        movie_path = bpy.path.abspath(strip.filepath)
+        return movie_path
     return None
 
 
@@ -1719,7 +1707,7 @@ class SEQUENCER_OT_generate_image(Operator):
         addon_prefs = preferences.addons[__name__].preferences
         image_model_card = addon_prefs.image_model_card
         do_inpaint = (input == "input_strips" and scene.inpaint_selected_strip) #and type == "image" 
-        do_refine = (scene.refine_sd or scene.image_path) and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0" and not do_inpaint
+        do_refine = (scene.refine_sd or scene.image_path or image_model_card == "stabilityai/stable-diffusion-xl-base-1.0") and not do_inpaint
 
         # LOADING MODELS
         print("\nModel:  " + image_model_card)
@@ -1728,7 +1716,7 @@ class SEQUENCER_OT_generate_image(Operator):
         if do_inpaint:
 
             #from diffusers import StableDiffusionXLInpaintPipeline, AutoencoderKL
-            from diffusers import DiffusionPipeline, AutoencoderKL
+            from diffusers import StableDiffusionInpaintPipeline, AutoencoderKL, StableDiffusionXLInpaintPipeline
             from diffusers.utils import load_image
 
             # clear the VRAM
@@ -1736,12 +1724,12 @@ class SEQUENCER_OT_generate_image(Operator):
                 torch.cuda.empty_cache()
 
             #vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16) vae=vae, 
-            pipe = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2-inpainting", torch_dtype=torch.float16, variant="fp16") #use_safetensors=True
-            #pipe = StableDiffusionXLInpaintPipeline.from_pretrained("runwayml/stable-diffusion-inpainting", vae=vae, torch_dtype=torch.float16, variant="fp16") #use_safetensors=True
+            pipe = StableDiffusionInpaintPipeline.from_pretrained("stabilityai/stable-diffusion-2-inpainting", torch_dtype=torch.float16, variant="fp16") #use_safetensors=True
+            #pipe = StableDiffusionXLInpaintPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", vae=vae, torch_dtype=torch.float16, variant="fp16") #use_safetensors=True
             if low_vram:
                 #torch.cuda.set_per_process_memory_fraction(0.99)
                 pipe.enable_model_cpu_offload()
-                #pipe.enable_vae_slicing()
+                pipe.enable_vae_slicing()
             else:
                 pipe.to("cuda")
 
@@ -1764,14 +1752,20 @@ class SEQUENCER_OT_generate_image(Operator):
         # Models for stable diffusion
         elif not image_model_card == "DeepFloyd/IF-I-M-v1.0":
             from diffusers import AutoencoderKL
-            vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
-            pipe = DiffusionPipeline.from_pretrained(
-                image_model_card,
-                vae=vae,
-                torch_dtype=torch.float16,
-                variant="fp16",
-            )
-
+            if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+                vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
+                pipe = DiffusionPipeline.from_pretrained(
+                    image_model_card,
+                    vae=vae,
+                    torch_dtype=torch.float16,
+                    variant="fp16",
+                )
+            else:
+                pipe = DiffusionPipeline.from_pretrained(
+                    image_model_card,
+                    torch_dtype=torch.float16,
+                    variant="fp16",
+                )
             pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
             if low_vram:
@@ -1843,7 +1837,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             refiner = StableDiffusionXLImg2ImgPipeline.from_pretrained(
                 "stabilityai/stable-diffusion-xl-refiner-1.0",
-                text_encoder_2=pipe.text_encoder_2,
+                #text_encoder_2=pipe.text_encoder_2,
                 #vae=pipe.vae,
                 vae=vae,
                 torch_dtype=torch.float16,
@@ -1852,6 +1846,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             if low_vram:
                 refiner.enable_model_cpu_offload()
+                refiner.enable_vae_tiling()
                 refiner.enable_vae_slicing()
             else:
                 refiner.to("cuda")
@@ -1933,25 +1928,28 @@ class SEQUENCER_OT_generate_image(Operator):
             # Inpaint
             elif do_inpaint:
                 print("Process: Inpaint")
-                #img_path = load_image(scene.image_path).convert("RGB")
                 
                 mask_strip =find_strip_by_name(scene, scene.inpaint_selected_strip) 
                 if not mask_strip:
                     return
                 
                 mask_path = get_strip_path(mask_strip)
+                mask_image = load_image(mask_path).convert("RGB")
+                mask_image = mask_image.resize((x, y))
 
-                init_image = process_image(scene.image_path, 1)
-                mask_image = process_image(mask_path, 1)
-                #init_image = load_image(img_path).convert("RGB")
-                #mask_image = load_image(mask_path).convert("RGB")
+                init_image = load_image(scene.image_path).convert("RGB")
+                init_image = init_image.resize((x, y))
 
                 image = pipe(
                     prompt=prompt,
+                    negative_prompt=negative_prompt,
                     image=init_image,
                     mask_image=mask_image,
                     num_inference_steps=image_num_inference_steps,
+                    guidance_scale=image_num_guidance,
                     strength=1.00 - scene.image_power,
+                    height=y,
+                    width=x,
                 ).images[0]
 
             # Img2img
