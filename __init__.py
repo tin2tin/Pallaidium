@@ -27,8 +27,6 @@ from os.path import dirname, realpath, isdir, join, basename
 import shutil
 from datetime import date
 
-
-
 os_platform = platform.system()  # 'Linux', 'Darwin', 'Java', 'Windows'
 
 
@@ -283,7 +281,6 @@ def load_video_as_np_array(video_path):
 def load_first_frame(file_path):
     import cv2, PIL, os
     from diffusers.utils import load_image
-    print(file_path)
     extension = os.path.splitext(file_path)[-1].lower()  # Convert to lowercase for case-insensitive comparison
     valid_extensions = {'.sgi', '.rgb', '.bw', '.cin', '.dpx', '.png', '.jpg', '.jpeg', '.jp2', '.jp2', '.j2c', '.tga', '.exr', '.hdr', '.tif', '.tiff', '.webp'}
 
@@ -995,8 +992,9 @@ class SEQEUNCER_PT_generate_ai(Panel):  # UI
             if input == "input_strips" and not scene.inpaint_selected_strip:
                 col.prop(context.scene, "image_power", text="Strip Power")
 
-            if input == "input_strips" and type == "image":
-                col.prop_search(scene, "inpaint_selected_strip", scene.sequence_editor, "sequences", text="Inpaint Mask", icon='SEQ_STRIP_DUPLICATE')
+            if len(bpy.context.scene.sequence_editor.sequences) > 0:
+                if input == "input_strips" and type == "image":
+                    col.prop_search(scene, "inpaint_selected_strip", scene.sequence_editor, "sequences", text="Inpaint Mask", icon='SEQ_STRIP_DUPLICATE')
 
         col = layout.column(align=True)
         col = col.box()
@@ -1165,7 +1163,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             torch.cuda.empty_cache()
 
         # LOADING MODELS
-        print("\nModel:  " + movie_model_card)
+        print("Model:  " + movie_model_card)
 
         # Models for refine imported image or movie
         if (scene.movie_path or scene.image_path) and input == "input_strips":
@@ -1593,7 +1591,7 @@ class SEQUENCER_OT_generate_audio(Operator):
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-        print("\nModel:  " + addon_prefs.audio_model_card)
+        print("Model:  " + addon_prefs.audio_model_card)
 
         if addon_prefs.audio_model_card == "cvssp/audioldm2" or addon_prefs.audio_model_card == "cvssp/audioldm2-music":
             repo_id = addon_prefs.audio_model_card
@@ -1816,26 +1814,29 @@ class SEQUENCER_OT_generate_image(Operator):
         preferences = context.preferences
         addon_prefs = preferences.addons[__name__].preferences
         image_model_card = addon_prefs.image_model_card
-        do_inpaint = (input == "input_strips" and scene.inpaint_selected_strip) #and type == "image"
+        do_inpaint = input == "input_strips" and scene.inpaint_selected_strip and type == "image"
         do_refine = (scene.refine_sd or scene.image_path or image_model_card == "stabilityai/stable-diffusion-xl-base-1.0") and not do_inpaint
 
         # LOADING MODELS
-        print("\nModel:  " + image_model_card)
+        print("Model:  " + image_model_card)
 
         # models for inpaint
         if do_inpaint:
 
             #from diffusers import StableDiffusionXLInpaintPipeline, AutoencoderKL
-            from diffusers import StableDiffusionInpaintPipeline, AutoencoderKL, StableDiffusionXLInpaintPipeline
+            from diffusers import StableDiffusionInpaintPipeline#, AutoencoderKL#, StableDiffusionXLInpaintPipeline
+            #from diffusers import AutoPipelineForInpainting #, AutoencoderKL, StableDiffusionXLInpaintPipeline
             from diffusers.utils import load_image
 
             # clear the VRAM
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
-            #vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16) vae=vae,
-            pipe = StableDiffusionInpaintPipeline.from_pretrained("runwayml/stable-diffusion-inpainting", torch_dtype=torch.float16, variant="fp16") #use_safetensors=True
+            # vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16) #vae=vae,
             #pipe = StableDiffusionXLInpaintPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", vae=vae, torch_dtype=torch.float16, variant="fp16") #use_safetensors=True
+
+            pipe = StableDiffusionInpaintPipeline.from_pretrained("runwayml/stable-diffusion-inpainting", torch_dtype=torch.float16, variant="fp16") #use_safetensors=True
+            #pipe = AutoPipelineForInpainting.from_pretrained("diffusers/stable-diffusion-xl-1.0-inpainting-0.1", torch_dtype=torch.float16, variant="fp16") #use_safetensors=True
 
             pipe.watermark = NoWatermark()
 
