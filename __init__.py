@@ -236,7 +236,7 @@ def solve_path(full_path):
     addon_prefs = preferences.addons[__name__].preferences
     name, ext = os.path.splitext(full_path)
     dir_path, filename = os.path.split(name)
-    dir_path = addon_prefs.generator_ai+"\\"+str(date.today())
+    dir_path = addon_prefs.generator_ai+"/"+str(date.today())
     create_folder(dir_path)
     cleaned_filename = clean_filename(filename)
     new_filename = cleaned_filename + ext
