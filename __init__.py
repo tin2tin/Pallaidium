@@ -992,9 +992,10 @@ class SEQEUNCER_PT_generate_ai(Panel):  # UI
             if input == "input_strips" and not scene.inpaint_selected_strip:
                 col.prop(context.scene, "image_power", text="Strip Power")
 
-            if len(bpy.context.scene.sequence_editor.sequences) > 0:
-                if input == "input_strips" and type == "image":
-                    col.prop_search(scene, "inpaint_selected_strip", scene.sequence_editor, "sequences", text="Inpaint Mask", icon='SEQ_STRIP_DUPLICATE')
+            if bpy.context.scene.sequence_editor is not None:
+                if len(bpy.context.scene.sequence_editor.sequences) > 0:
+                    if input == "input_strips" and type == "image":
+                        col.prop_search(scene, "inpaint_selected_strip", scene.sequence_editor, "sequences", text="Inpaint Mask", icon='SEQ_STRIP_DUPLICATE')
 
         col = layout.column(align=True)
         col = col.box()
@@ -1844,6 +1845,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 #torch.cuda.set_per_process_memory_fraction(0.99)
                 pipe.enable_model_cpu_offload()
                 #pipe.enable_vae_slicing()
+                #pipe.enable_forward_chunking(chunk_size=1, dim=1)
             else:
                 pipe.to("cuda")
 
