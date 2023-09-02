@@ -812,6 +812,11 @@ class GeneratorAddonPreferences(AddonPreferences):
         default=join(bpy.utils.user_resource("DATAFILES"), "Generator AI"),
     )
 
+    use_strip_data: BoolProperty(
+        name="Use Input Strip Data",
+        default=True,
+    )
+
     def draw(self, context):
         layout = self.layout
         box = layout.box()
@@ -837,6 +842,13 @@ class GeneratorAddonPreferences(AddonPreferences):
             sub_row.prop(self, "usersound", text="")
         sub_row.operator("renderreminder.play_notification", text="", icon="PLAY")
         sub_row.active = self.playsound
+        
+        row_row = box.row(align=True)
+        row_row.label(text="Use Input Strip Data:")
+        row_row.prop(self, "use_strip_data", text="")
+        row_row.label(text="")
+        row_row.label(text="")
+        row_row.label(text="")
 
 
 class GENERATOR_OT_install(Operator):
@@ -1803,7 +1815,7 @@ class SEQUENCER_OT_generate_image(Operator):
         type = scene.generatorai_typeselect
         input = scene.input_strips
         prompt = style_prompt(scene.generate_movie_prompt)[0]
-        negative_prompt = scene.generate_movie_negative_prompt +", "+ style_prompt(scene.generate_movie_prompt)[1] +", nsfw nude nudity"
+        negative_prompt = scene.generate_movie_negative_prompt +", "+ style_prompt(scene.generate_movie_prompt)[1] +", nsfw, nude, nudity,"
         image_x = scene.generate_movie_x
         image_y = scene.generate_movie_y
         x = scene.generate_movie_x = closest_divisible_64(image_x)
@@ -1816,7 +1828,7 @@ class SEQUENCER_OT_generate_image(Operator):
         addon_prefs = preferences.addons[__name__].preferences
         image_model_card = addon_prefs.image_model_card
         do_inpaint = input == "input_strips" and scene.inpaint_selected_strip and type == "image"
-        do_refine = (scene.refine_sd or scene.image_path or image_model_card == "stabilityai/stable-diffusion-xl-base-1.0") and not do_inpaint
+        do_refine = (scene.refine_sd or scene.image_path or image_model_card == "stabilityai/stable-diffusion-xl-base-1.0") #and not do_inpaint
 
         # LOADING MODELS
         print("Model:  " + image_model_card)
@@ -2221,7 +2233,8 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         type = scene.generatorai_typeselect
         seed = scene.movie_num_seed
         use_random = scene.movie_use_random
-
+        use_strip_data = addon_prefs.use_strip_data
+        
         if not strips:
             self.report({"INFO"}, "Select strip(s) for processing.")
             return {"CANCELLED"}
@@ -2267,12 +2280,12 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     seed_nr = extract_numbers(str(strip_prompt))
                     if seed_nr:
                         file_seed = int(seed_nr)
-                        if file_seed:
+                        if file_seed and use_strip_data:
                             strip_prompt = (strip_prompt.replace(str(file_seed)+"_", ""))
                             context.scene.movie_use_random = False
                             context.scene.movie_num_seed = file_seed
 
-                    if len(strips) > 1:
+                    if use_strip_data:
                         styled_prompt = style_prompt(strip_prompt + ", " + prompt)[0]
                         styled_negative_prompt = style_prompt(strip_prompt + ", " + prompt)[1]
                     else:
@@ -2296,8 +2309,9 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
 
                     scene.generate_movie_prompt = prompt
                     scene.generate_movie_negative_prompt = negative_prompt
-                    scene.movie_use_random = use_random
-                    scene.movie_num_seed = seed
+                    if use_strip_data:
+                        scene.movie_use_random = use_random
+                        scene.movie_num_seed = seed
 
                 bpy.types.Scene.image_path = ""
 
@@ -2312,12 +2326,12 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     seed_nr = extract_numbers(str(strip_prompt))
                     if seed_nr:
                         file_seed = int(seed_nr)
-                        if file_seed:
+                        if file_seed and use_strip_data:
                             strip_prompt = (strip_prompt.replace(str(file_seed)+"_", ""))
                             context.scene.movie_use_random = False
                             context.scene.movie_num_seed = file_seed
 
-                    if len(strips) > 1:
+                    if use_strip_data:
                         styled_prompt = style_prompt(strip_prompt + ", " + prompt)[0]
                         styled_negative_prompt = style_prompt(strip_prompt + ", " + prompt)[1]
                     else:
@@ -2341,8 +2355,9 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
 
                     scene.generate_movie_prompt = prompt
                     scene.generate_movie_negative_prompt = negative_prompt
-                    scene.movie_use_random = use_random
-                    scene.movie_num_seed = seed
+                    if use_strip_data:
+                        scene.movie_use_random = use_random
+                        scene.movie_num_seed = seed
 
                 bpy.types.Scene.movie_path = ""
 
