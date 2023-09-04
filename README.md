@@ -160,6 +160,21 @@ On Windows: %userprofile%\\.cache\huggingface\transformers
 
 Here you can locate and delete the individual models.
 
+## Useful add-ons
+
+Since the Generative AI add-on only can input image or movie strips, you'll need to convert other strip types to movie-strip. For this purpose, this add-on can be used:
+
+https://github.com/tin2tin/Add_Rendered_Strips
+
+![image](https://github.com/tin2tin/Generative_AI/assets/1322593/d8c0a184-d812-440d-a5a8-501a1282d78d)
+
+For creating a mask on top of a clip in the Sequencer, this add-on can be used to input the clip as background in the Blender Image Editor. The created mask can then be added to the VSE as a strip, and converted to video with the above add-on:
+
+https://github.com/tin2tin/vse_masking_tools
+
+![image](https://github.com/tin2tin/Generative_AI/assets/1322593/f2afd36c-34b1-4779-957b-0eb8defed296)
+
+
 
 ## Video Examples
 ### Zeroscope & Bark:
