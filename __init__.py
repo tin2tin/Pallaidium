@@ -282,14 +282,16 @@ def load_first_frame(file_path):
     import cv2, PIL, os
     from diffusers.utils import load_image
     extension = os.path.splitext(file_path)[-1].lower()  # Convert to lowercase for case-insensitive comparison
-    valid_extensions = {'.sgi', '.rgb', '.bw', '.cin', '.dpx', '.png', '.jpg', '.jpeg', '.jp2', '.jp2', '.j2c', '.tga', '.exr', '.hdr', '.tif', '.tiff', '.webp'}
+    valid_image_extensions = {'.sgi', '.rgb', '.bw', '.cin', '.dpx', '.png', '.jpg', '.jpeg', '.jp2', '.jp2', '.j2c', '.tga', '.exr', '.hdr', '.tif', '.tiff', '.webp'}
+    valid_video_extensions = {".avi",  ".flc", ".mov", ".movie", ".mp4",  ".m4v",  ".m2v", ".m2t",  ".m2ts", ".mts", ".ts",   ".mv",  ".avs", ".wmv",   ".ogv",  ".ogg",  ".r3d", ".dv",   ".mpeg", ".mpg", ".mpg2", ".vob", ".mkv", ".flv",   ".divx", ".xvid", ".mxf", ".webm"}
 
-    if extension in valid_extensions:
+    if extension in valid_image_extensions:
         image = cv2.imread(file_path)
         #if image is not None:
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         return PIL.Image.fromarray(image)
-    else:
+
+    if extension in valid_video_extensions:
         # Try to open the file as a video
         cap = cv2.VideoCapture(file_path)
 
@@ -605,20 +607,21 @@ def install_modules(self):
             ]
         )
 
-    import_module(self, "modelscope", "modelscope==1.8.4")
-    #import_module(self, "xformers", "xformers==0.0.20")
-    #import_module(self, "torch", "torch==2.0.1")
-    import_module(self, "open_clip_torch", "open_clip_torch>=2.0.2")
-    #import_module(self, "opencv_python_headless", "opencv-python-headless")
-    #import_module(self, "opencv_python", "opencv-python")
-    import_module(self, "einops", "einops>=0.4")
-    import_module(self, "rotary_embedding_torch", "rotary-embedding-torch")
-    import_module(self, "fairscale", "fairscale")
-    #import_module(self, "scipy", "scipy")
-    #import_module(self, "imageio", "imageio")
-    import_module(self, "pytorch_lightning", "pytorch-lightning")
-    import_module(self, "torchsde", "torchsde")
-    import_module(self, "easydict", "easydict")
+# Modelscope img2vid
+#    import_module(self, "modelscope", "modelscope==1.8.4")
+#    #import_module(self, "xformers", "xformers==0.0.20")
+#    #import_module(self, "torch", "torch==2.0.1")
+#    import_module(self, "open_clip_torch", "open_clip_torch>=2.0.2")
+#    #import_module(self, "opencv_python_headless", "opencv-python-headless")
+#    #import_module(self, "opencv_python", "opencv-python")
+#    import_module(self, "einops", "einops>=0.4")
+#    import_module(self, "rotary_embedding_torch", "rotary-embedding-torch")
+#    import_module(self, "fairscale", "fairscale")
+#    #import_module(self, "scipy", "scipy")
+#    #import_module(self, "imageio", "imageio")
+#    import_module(self, "pytorch_lightning", "pytorch-lightning")
+#    import_module(self, "torchsde", "torchsde")
+#    import_module(self, "easydict", "easydict")
 
 
 def get_module_dependencies(module_name):
@@ -842,7 +845,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             sub_row.prop(self, "usersound", text="")
         sub_row.operator("renderreminder.play_notification", text="", icon="PLAY")
         sub_row.active = self.playsound
-        
+
         row_row = box.row(align=True)
         row_row.label(text="Use Input Strip Data:")
         row_row.prop(self, "use_strip_data", text="")
@@ -1228,16 +1231,16 @@ class SEQUENCER_OT_generate_movie(Operator):
 #                from modelscope.pipelines import pipeline
 #                from modelscope.outputs import OutputKeys
 
-                #pipe = pipeline(task='image-to-video', model='damo-vilab/MS-Image2Video', model_revision='v1.1.0')
-                #pipe = pipeline(task='image-to-video', model='damo/Image-to-Video', model_revision='v1.1.0')
-                #pipe = pipeline(task='image-to-video', model='https://dagshub.com/model/damo-video-to-video/src/main/data', model_revision='v1.1.0')
+#                #pipe = pipeline(task='image-to-video', model='damo-vilab/MS-Image2Video', model_revision='v1.1.0')
+#                #pipe = pipeline(task='image-to-video', model='damo/Image-to-Video', model_revision='v1.1.0')
+#                pipe = pipeline(task='image-to-video', model='C:/Users/45239/.cache/modelscope/hub/damo/Image-to-Video', model_revision='v1.1.0')
 
 #                if low_vram:
 #                    pipe.enable_model_cpu_offload()
 #                    pipe.enable_vae_tiling()
 #                    pipe.enable_vae_slicing()
 #                else:
-#                pipe.to("cuda")
+#                    pipe.to("cuda")
 
             else: # vid2vid / img2vid
                 if movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256" or movie_model_card == "cerspense/zeroscope_v2_576w" or scene.image_path:
@@ -1823,6 +1826,7 @@ class SEQUENCER_OT_generate_image(Operator):
         duration = scene.generate_movie_frames
         image_num_inference_steps = scene.movie_num_inference_steps
         image_num_guidance = scene.movie_num_guidance
+        active_strip = context.scene.sequence_editor.active_strip
 
         preferences = context.preferences
         addon_prefs = preferences.addons[__name__].preferences
@@ -1918,8 +1922,8 @@ class SEQUENCER_OT_generate_image(Operator):
             if low_vram:
                 stage_1.enable_model_cpu_offload()
                 # here: stage_1.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                stage_1.enable_vae_slicing()
-                stage_1.enable_xformers_memory_efficient_attention()
+                #stage_1.enable_vae_slicing()
+                #stage_1.enable_xformers_memory_efficient_attention()
             else:
                 stage_1.to("cuda")
             # stage 2
@@ -1932,8 +1936,8 @@ class SEQUENCER_OT_generate_image(Operator):
             if low_vram:
                 stage_2.enable_model_cpu_offload()
                 # stage_2.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                stage_2.enable_vae_slicing()
-                stage_2.enable_xformers_memory_efficient_attention()
+                #stage_2.enable_vae_slicing()
+                #stage_2.enable_xformers_memory_efficient_attention()
             else:
                 stage_2.to("cuda")
             # stage 3
@@ -1950,8 +1954,8 @@ class SEQUENCER_OT_generate_image(Operator):
             if low_vram:
                 stage_3.enable_model_cpu_offload()
                 # stage_3.unet.enable_forward_chunking(chunk_size=1, dim=1)
-                stage_3.enable_vae_slicing()
-                stage_3.enable_xformers_memory_efficient_attention()
+                #stage_3.enable_vae_slicing()
+                #stage_3.enable_xformers_memory_efficient_attention()
             else:
                 stage_3.to("cuda")
 
@@ -2061,6 +2065,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
                 mask_strip =find_strip_by_name(scene, scene.inpaint_selected_strip)
                 if not mask_strip:
+                    print("Selected mask not found!")
                     return
 
                 mask_path = get_strip_path(mask_strip)
@@ -2086,13 +2091,13 @@ class SEQUENCER_OT_generate_image(Operator):
                     mask_image=mask_image,
                     num_inference_steps=image_num_inference_steps,
                     guidance_scale=image_num_guidance,
-                    #strength=1.00 - scene.image_power, 
+                    #strength=1.00 - scene.image_power,
                     height=y,
                     width=x,
                     generator=generator,
                 ).images[0]
 
-
+# Limit inpaint to maske area:
                 # https://github.com/huggingface/diffusers/commit/5f740d0f55adec63ee2453f83f1c0d7d984e01e4
                 #init_image = load_image(img_url).resize((512, 512))
                 #mask_image = load_image(mask_url).resize((512, 512))
@@ -2227,6 +2232,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         sequencer = bpy.ops.sequencer
         sequences = bpy.context.sequences
         strips = context.selected_sequences
+        active_strip = context.scene.sequence_editor.active_strip
         prompt = scene.generate_movie_prompt
         negative_prompt = scene.generate_movie_negative_prompt
         current_frame = scene.frame_current
@@ -2234,7 +2240,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         seed = scene.movie_num_seed
         use_random = scene.movie_use_random
         use_strip_data = addon_prefs.use_strip_data
-        
+
         if not strips:
             self.report({"INFO"}, "Select strip(s) for processing.")
             return {"CANCELLED"}
@@ -2367,6 +2373,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         scene.generate_movie_negative_prompt = negative_prompt
         context.scene.movie_use_random = use_random
         context.scene.movie_num_seed = seed
+        context.scene.sequence_editor.active_strip = active_strip
 
         addon_prefs.playsound = play_sound
         bpy.ops.renderreminder.play_notification()
