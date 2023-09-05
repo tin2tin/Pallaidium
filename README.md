@@ -4,25 +4,25 @@ AI-generate video, image, and audio from text prompts or video, image, or text s
 ![PallAIdium](https://github.com/tin2tin/Generative_AI/assets/1322593/1b1b232f-00d9-4b0b-86fb-5f0f24136d2c)
 
 ## Features
-* Text to video
-* Text to audio
-* Text to speech
-* Text to image
-* Image to image
-* Image to video
-* Video to video
-* Style selector.
-* Seed, quality steps, frames, word power, denoising, strip power. 
-* Batch conversion of text and media strips into videos, audio, music, speech, or images.
-* Batch refinement of images.
-* Batch upscale & refinement of movies.
-* Model card selector.
-* Render-to-path selector.
-* Render finished notification.
-* Model Cards: Stable Diffusion 1.5, 2, XL, Deep Floyd IF, Zeroscope, Animov, AudioLMD2 and Bark.
-* One click install and uninstall dependencies.
-* User-defined file path for generated files.
-* Seed and prompt added to strip name.
+
+|                                                    |                                                     |
+|----------------------------------------------------|-----------------------------------------------------|
+| Text to video                                      | Text to audio                                       |
+| Text to speech                                     | Text to image                                      |
+| Image to image                                     | Image to video                                     |
+| Video to video                                     | Style selector                                     |
+| Seed                                               | Quality steps                                     |
+| Frames                                             | Word power                                         |
+| Denoising                                          | Strip power                                        |
+| Batch conversion                                   | Batch refinement of images.                         |
+| Batch upscale & refinement of movies.              | Model card selector.                               |
+| Render-to-path selector.                          | Render finished notification.                      |
+| Model Cards                                       | One-click install and uninstall dependencies. |
+| User-defined file path for generated files.        | Define the location for storing generated files.  |
+| Seed and prompt added to strip name.             | Include seed and prompt information in the strip name. |
+
+
+![image](https://github.com/tin2tin/Pallaidium/assets/1322593/09bba394-3188-49be-8ae1-37c0c43ec2fd)
 
 ## Requirements
 * Windows or Linux (Could maybe work on MacOS, but someone will have to contribute code to make it work).
