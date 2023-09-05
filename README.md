@@ -1,16 +1,16 @@
-# Generative AI for Blender VSE
-AI generate video, image, and audio from text prompts or video, image, or text strips. 
+# PALLAIDIUM - Generative AI for the Blender VSE
+AI-generate video, image, and audio from text prompts or video, image, or text strips. 
 
-https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-455c77443535
+![PallAIdium](https://github.com/tin2tin/Generative_AI/assets/1322593/1b1b232f-00d9-4b0b-86fb-5f0f24136d2c)
 
 ## Features
 * Text to video
 * Text to audio
 * Text to speech
 * Text to image
-* Image to image (refinement+prompt)
-* Image to video (refinement+prompt)
-* Video to video (refinement+prompt)
+* Image to image
+* Image to video
+* Video to video
 * Style selector.
 * Seed, quality steps, frames, word power, denoising, strip power. 
 * Batch conversion of text and media strips into videos, audio, music, speech, or images.
@@ -189,6 +189,8 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/0105cd35-b3b2-49cf-91c1-
 ### Img2img:
 https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-ffce872b79c3
 
+### Painting
+https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-455c77443535
 
 
 ## Restrictions for using the AI models:
