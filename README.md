@@ -40,15 +40,15 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 
 * Install the add-on as usual: Preferences > Add-ons > Install > select file > enable the add-on. 
 
-* In the Generative AI add-on preferences, hit the "Install all Dependencies" button.
+* In the Generative AI add-on preferences, hit the "Install Dependencies" button.
 
 * Note that you can change what model cards are used in the various modes here(video, image, and audio).
 
-* Then it writes that it is finished(if any errors, let me know).
+* Then it writes that it is finished(if any vital errors, let me know).
   
 * Restart Blender.
 
-* Open the add-on UI in the Sequencedr > Sidebar > Generative AI.
+* Open the add-on UI in the Sequencer > Sidebar > Generative AI.
 
 * The first time any model is executed many GB will have to be downloaded, so go grab lots of coffee. 
 
