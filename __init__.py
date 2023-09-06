@@ -62,9 +62,9 @@ def set_system_console_topmost(top):
         )
 
 
+    # normalize text, remove redundant whitespace and convert non-ascii quotes to ascii
 def split_and_recombine_text(text, desired_length=200, max_length=300):
     """Split text it into chunks of a desired length trying to keep sentences intact."""
-    # normalize text, remove redundant whitespace and convert non-ascii quotes to ascii
     text = re.sub(r"\n\n+", "\n", text)
     text = re.sub(r"\s+", " ", text)
     text = re.sub(r"[“”]", '"', text)
@@ -1707,8 +1707,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                     else:
                         generator = None
                 prompt = context.scene.generate_movie_prompt
-                print("Processing: "+prompt)
-                print("Seed: "+str(seed))
+                print("Prompt: "+prompt)
 
                 audio = pipe(
                     prompt,
@@ -1720,7 +1719,6 @@ class SEQUENCER_OT_generate_audio(Operator):
                 rate = 16000
 
                 filename = solve_path(str(seed) +"_"+ prompt + ".wav")
-
                 write_wav(filename, rate, audio.transpose())
 
             filepath = filename
@@ -2091,38 +2089,24 @@ class SEQUENCER_OT_generate_image(Operator):
                     mask_image=mask_image,
                     num_inference_steps=image_num_inference_steps,
                     guidance_scale=image_num_guidance,
-                    #strength=1.00 - scene.image_power,
+                    #strength=1.00 - scene.image_power, #not supported.
                     height=y,
                     width=x,
                     generator=generator,
                 ).images[0]
 
-# Limit inpaint to maske area:
-                # https://github.com/huggingface/diffusers/commit/5f740d0f55adec63ee2453f83f1c0d7d984e01e4
-                #init_image = load_image(img_url).resize((512, 512))
-                #mask_image = load_image(mask_url).resize((512, 512))
+                # Limit inpaint to maske area:
+                # Convert mask to grayscale NumPy array
+                mask_image_arr = np.array(mask_image.convert("L"))
+                # Add a channel dimension to the end of the grayscale mask
+                mask_image_arr = mask_image_arr[:, :, None]
+                mask_image_arr = mask_image_arr.astype(np.float32) / 255.0
+                mask_image_arr[mask_image_arr < 0.5] = 0
+                mask_image_arr[mask_image_arr >= 0.5] = 1
 
-                #repainted_image = pipe(prompt=prompt, image=init_image, mask_image=mask_image).images[0]
-                #repainted_image.save("repainted_image.png")
-
-#                # Convert mask to grayscale NumPy array
-#                mask_image_arr = np.array(mask_image.convert("L"))
-#                init_image_arr = np.array(init_image.convert("L"))
-#                repainted_image_arr = np.array(repainted_image.convert("L"))
-#                # Add a channel dimension to the end of the grayscale mask
-#                mask_image_arr = mask_image_arr[:, :, None]
-#                init_image_arr = init_image_arr[:, :, None]
-#                repainted_image_arr = repainted_image_arr[:, :, None]
-#                # Binarize the mask: 1s correspond to the pixels which are repainted
-#                mask_image_arr = mask_image_arr.astype(np.float32) / 255.0
-#                mask_image_arr[mask_image_arr < 0.5] = 0
-#                mask_image_arr[mask_image_arr >= 0.5] = 1
-
-#                # Take the masked pixels from the repainted image and the unmasked pixels from the initial image
-#                unmasked_unchanged_image_arr = (1 - mask_image_arr) * init_image_arr + mask_image_arr * repainted_image_arr
-#                image = PIL.Image.fromarray(unmasked_unchanged_image_arr.astype("uint8"))
-#                #unmasked_unchanged_image.save("force_unmasked_unchanged.png")
-
+                # Take the masked pixels from the repainted image and the unmasked pixels from the initial image
+                unmasked_unchanged_image_arr = (1 - mask_image_arr) * init_image + mask_image_arr * image
+                image = PIL.Image.fromarray(unmasked_unchanged_image_arr.astype("uint8"))
 
             # Img2img
             elif scene.image_path:
@@ -2165,11 +2149,8 @@ class SEQUENCER_OT_generate_image(Operator):
                 ).images[0]
 
             # Move to folder
-            filename = clean_filename(
-                str(seed) + "_" + context.scene.generate_movie_prompt
-            )
+            filename = clean_filename(str(seed) + "_" + context.scene.generate_movie_prompt)
             out_path = solve_path(filename+".png")
-
             image.save(out_path)
 
             # Add strip
