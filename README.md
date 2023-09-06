@@ -74,14 +74,22 @@ Styles:
 
 ![image](https://github.com/tin2tin/Generative_AI/assets/1322593/86807264-a377-4de1-875e-471aaa3011a7)
 
-Se SDXL handling most of the styles here: https://stable-diffusion-art.com/sdxl-styles/
+See SDXL handling most of the styles here: https://stable-diffusion-art.com/sdxl-styles/
 
 
-# Text to Video/Image
-
+## Text to Video
 The Animov models have been trained on Anime material, so adding "anime" to the prompt is necessary, especially for the Animov-512x model. 
+
+## Text to Image
 The Stable Diffusion models for generating images have been used a lot, so there are plenty of prompt suggestions out there if you google for them. 
-The Modelscope model has a watermark, since it's been trained on Shutterstock material, and can't be used for commercial purposes. 
+
+### Artists
+https://stablediffusion.fr/artists
+
+### Prompting:
+https://github.com/invoke-ai/InvokeAI/blob/main/docs/features/PROMPTS.md
+
+https://stablediffusion.fr/prompts
 
 Tip           |
 :------------- |
