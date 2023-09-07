@@ -1,12 +1,12 @@
 # https://modelscope.cn/models/damo/text-to-video-synthesis/summary
 
 bl_info = {
-    "name": "Generative AI",
+    "name": "Pallaidium - Generative AI",
     "author": "tintwotin",
-    "version": (1, 4),
+    "version": (1, 5),
     "blender": (3, 4, 0),
     "location": "Video Sequence Editor > Sidebar > Generative AI",
-    "description": "Generate media in the VSE",
+    "description": "AI Generate media in the VSE",
     "category": "Sequencer",
 }
 
@@ -185,16 +185,16 @@ def style_prompt(prompt):
 
 def closest_divisible_64(num):
     # Determine the remainder when num is divided by 64
-    remainder = (num % 64)
+    remainder = (num % 32)
 
     # If the remainder is less than or equal to 32, return num - remainder,
     # but ensure the result is not less than 64
-    if remainder <= 32:
+    if remainder <= 16:
         result = num - remainder
         return max(result, 192)
     # Otherwise, return num + (64 - remainder)
     else:
-        return max(num + (64 - remainder), 192)
+        return max(num + (32 - remainder), 192)
 
 
 def find_first_empty_channel(start_frame, end_frame):
@@ -607,7 +607,7 @@ def install_modules(self):
             ]
         )
 
-# Modelscope img2vid
+#    # Modelscope img2vid
 #    import_module(self, "modelscope", "modelscope==1.8.4")
 #    #import_module(self, "xformers", "xformers==0.0.20")
 #    #import_module(self, "torch", "torch==2.0.1")
@@ -679,7 +679,7 @@ def input_strips_updated(self, context):
     scene = context.scene
     input = scene.input_strips
 
-    if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+    if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0" and scene.generatorai_typeselect == "video":
         scene.input_strips = "input_strips"
     if scene.generatorai_typeselect == "video" or scene.generatorai_typeselect == "audio":
         scene.inpaint_selected_strip = ""
@@ -1230,10 +1230,14 @@ class SEQUENCER_OT_generate_movie(Operator):
 
 #                from modelscope.pipelines import pipeline
 #                from modelscope.outputs import OutputKeys
+#                from modelscope import snapshot_download
+#                model_dir = snapshot_download('damo/Image-to-Video', revision='v1.1.0')
+#                pipe = pipeline(task='image-to-video', model= model_dir, model_revision='v1.1.0')
 
 #                #pipe = pipeline(task='image-to-video', model='damo-vilab/MS-Image2Video', model_revision='v1.1.0')
 #                #pipe = pipeline(task='image-to-video', model='damo/Image-to-Video', model_revision='v1.1.0')
-#                pipe = pipeline(task='image-to-video', model='C:/Users/45239/.cache/modelscope/hub/damo/Image-to-Video', model_revision='v1.1.0')
+#                
+#                # local: pipe = pipeline(task='image-to-video', model='C:/Users/45239/.cache/modelscope/hub/damo/Image-to-Video', model_revision='v1.1.0')
 
 #                if low_vram:
 #                    pipe.enable_model_cpu_offload()
@@ -1262,8 +1266,8 @@ class SEQUENCER_OT_generate_movie(Operator):
                 if low_vram:
                     #torch.cuda.set_per_process_memory_fraction(0.98)
                     upscale.enable_model_cpu_offload()
-                    upscale.enable_vae_tiling()
-                    upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) # heavy:
+                    #upscale.enable_vae_tiling()
+                    #upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) # heavy:
                     upscale.enable_vae_slicing()
                 else:
                     upscale.to("cuda")
@@ -1301,7 +1305,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 if low_vram:
                     upscale.enable_model_cpu_offload()
-                    # upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) #Heavy
+                    upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) #Heavy
                     upscale.enable_vae_slicing()
                 else:
                     upscale.to("cuda")
@@ -1400,11 +1404,17 @@ class SEQUENCER_OT_generate_movie(Operator):
                     elif scene.image_path:
                         print("Process: Image to video")
                         video = process_image(scene.image_path, int(scene.generate_movie_frames))
+                        video = np.array(video)
 
                     # Upscale video
                     if scene.video_to_video:
                         video = [
                             Image.fromarray(frame).resize((closest_divisible_64(int(x * 2)), closest_divisible_64(int(y * 2))))
+                            for frame in video
+                        ]
+                    else:
+                        video = [
+                            Image.fromarray(frame).resize((closest_divisible_64(int(x)), closest_divisible_64(int(y))))
                             for frame in video
                         ]
 
@@ -1830,7 +1840,7 @@ class SEQUENCER_OT_generate_image(Operator):
         addon_prefs = preferences.addons[__name__].preferences
         image_model_card = addon_prefs.image_model_card
         do_inpaint = input == "input_strips" and scene.inpaint_selected_strip and type == "image"
-        do_refine = (scene.refine_sd or scene.image_path or image_model_card == "stabilityai/stable-diffusion-xl-base-1.0") #and not do_inpaint
+        do_refine = scene.refine_sd #and (scene.image_path or scene.movie_path) # or image_model_card == "stabilityai/stable-diffusion-xl-base-1.0") #and not do_inpaint
 
         # LOADING MODELS
         print("Model:  " + image_model_card)
@@ -1847,11 +1857,11 @@ class SEQUENCER_OT_generate_image(Operator):
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
-            # vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16) #vae=vae,
+            #vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16) #vae=vae,
             #pipe = StableDiffusionXLInpaintPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", vae=vae, torch_dtype=torch.float16, variant="fp16") #use_safetensors=True
 
             pipe = StableDiffusionInpaintPipeline.from_pretrained("runwayml/stable-diffusion-inpainting", torch_dtype=torch.float16, variant="fp16") #use_safetensors=True
-            #pipe = AutoPipelineForInpainting.from_pretrained("diffusers/stable-diffusion-xl-1.0-inpainting-0.1", torch_dtype=torch.float16, variant="fp16") #use_safetensors=True
+            #pipe = AutoPipelineForInpainting.from_pretrained("diffusers/stable-diffusion-xl-1.0-inpainting-0.1", torch_dtype=torch.float16, variant="fp16", vae=vae) #use_safetensors=True
 
             pipe.watermark = NoWatermark()
 
@@ -1880,13 +1890,13 @@ class SEQUENCER_OT_generate_image(Operator):
 
 
         # Models for stable diffusion
-        elif not image_model_card == "DeepFloyd/IF-I-M-v1.0":
+        elif not image_model_card == "DeepFloyd/IF-I-M-v1.0" and not scene.image_path and not scene.movie_path:
             from diffusers import AutoencoderKL
             if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
-                vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
+                #vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
                 pipe = DiffusionPipeline.from_pretrained(
                     image_model_card,
-                    vae=vae,
+                    #vae=vae,
                     torch_dtype=torch.float16,
                     variant="fp16",
                 )
@@ -1898,10 +1908,13 @@ class SEQUENCER_OT_generate_image(Operator):
                 )
             pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
+            pipe.watermark = NoWatermark()
+
             if low_vram:
                 #torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
                 pipe.enable_model_cpu_offload()
                 pipe.enable_vae_slicing()
+                #pipe.enable_forward_chunking(chunk_size=1, dim=1)
             else:
                 pipe.to("cuda")
 
@@ -1978,7 +1991,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             if low_vram:
                 refiner.enable_model_cpu_offload()
-                refiner.enable_vae_tiling()
+                #refiner.enable_vae_tiling()
                 refiner.enable_vae_slicing()
             else:
                 refiner.to("cuda")
@@ -2109,9 +2122,18 @@ class SEQUENCER_OT_generate_image(Operator):
                 image = PIL.Image.fromarray(unmasked_unchanged_image_arr.astype("uint8"))
 
             # Img2img
-            elif scene.image_path:
-                print("Process: Image to image")
-                init_image = load_image(scene.image_path).convert("RGB")
+            elif scene.image_path or scene.movie_path:
+                if scene.movie_path:
+                    print("Process: Video to image")
+                    init_image = load_first_frame(scene.movie_path)
+                    init_image = init_image.resize((x, y))
+
+                elif scene.image_path:
+                    print("Process: Image to image")
+                    init_image = load_first_frame(scene.image_path)
+                    init_image = init_image.resize((x, y))
+ 
+                #init_image = load_image(scene.image_path).convert("RGB")
                 image = refiner(
                     prompt=prompt,
                     image=init_image,
@@ -2234,6 +2256,9 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         else:
             self.report({"INFO"}, "None of the selected strips are movie, image, or text types.")
             return {"CANCELLED"}
+
+        if use_strip_data:
+            print("Use file seed and prompt: Yes")
 
         for count, strip in enumerate(strips):
             if strip.type == "TEXT":
