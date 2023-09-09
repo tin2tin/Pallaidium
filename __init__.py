@@ -183,16 +183,16 @@ def style_prompt(prompt):
     return return_array
 
 
-def closest_divisible_64(num):
+def closest_divisible_32(num):
     # Determine the remainder when num is divided by 64
     remainder = (num % 32)
 
-    # If the remainder is less than or equal to 32, return num - remainder,
-    # but ensure the result is not less than 64
+    # If the remainder is less than or equal to 16, return num - remainder,
+    # but ensure the result is not less than 192
     if remainder <= 16:
         result = num - remainder
         return max(result, 192)
-    # Otherwise, return num + (64 - remainder)
+    # Otherwise, return num + (32 - remainder)
     else:
         return max(num + (32 - remainder), 192)
 
@@ -333,8 +333,8 @@ def process_frames(frame_folder_path, target_width):
         target_height = int((target_width / frame_width) * frame_height)
 
         # Ensure width and height are divisible by 64
-        target_width = closest_divisible_64(target_width)
-        target_height = closest_divisible_64(target_height)
+        target_width = closest_divisible_32(target_width)
+        target_height = closest_divisible_32(target_height)
 
         img = img.resize((target_width, target_height), Image.ANTIALIAS)
         img = img.convert("RGB")
@@ -692,7 +692,6 @@ def output_strips_updated(self, context):
     scene = context.scene
     type = scene.generatorai_typeselect
     input = scene.input_strips
-    print(type)
 
     if type == "movie" or type == "audio":
         scene.inpaint_selected_strip = ""
@@ -1163,8 +1162,8 @@ class SEQUENCER_OT_generate_movie(Operator):
         negative_prompt = scene.generate_movie_negative_prompt +", "+ style_prompt(scene.generate_movie_prompt)[1] +", nsfw nude nudity"
         movie_x = scene.generate_movie_x
         movie_y = scene.generate_movie_y
-        x = scene.generate_movie_x = closest_divisible_64(movie_x)
-        y = scene.generate_movie_y = closest_divisible_64(movie_y)
+        x = scene.generate_movie_x = closest_divisible_32(movie_x)
+        y = scene.generate_movie_y = closest_divisible_32(movie_y)
         duration = scene.generate_movie_frames
         movie_num_inference_steps = scene.movie_num_inference_steps
         movie_num_guidance = scene.movie_num_guidance
@@ -1205,7 +1204,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 if low_vram:
                     pipe.enable_model_cpu_offload()
                     #pipe.unet.enable_forward_chunking(chunk_size=1, dim=1) # Heavy
-                    pipe.enable_vae_slicing()
+                    #pipe.enable_vae_slicing()
                 else:
                     pipe.to("cuda")
 
@@ -1221,8 +1220,8 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 if low_vram:
                     refiner.enable_model_cpu_offload()
-                    refiner.enable_vae_tiling()
-                    refiner.enable_vae_slicing()
+                    #refiner.enable_vae_tiling()
+                    #refiner.enable_vae_slicing()
                 else:
                     refiner.to("cuda")
 
@@ -1266,7 +1265,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 if low_vram:
                     #torch.cuda.set_per_process_memory_fraction(0.98)
                     upscale.enable_model_cpu_offload()
-                    #upscale.enable_vae_tiling()
+                    upscale.enable_vae_tiling()
                     #upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) # heavy:
                     upscale.enable_vae_slicing()
                 else:
@@ -1339,7 +1338,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             seed = (
                 seed
                 if not context.scene.movie_use_random
-                else random.randint(0, 999999)
+                else random.randint(-2147483647, 2147483647)
             )
             print("Seed: "+str(seed))
             context.scene.movie_num_seed = seed
@@ -1409,12 +1408,12 @@ class SEQUENCER_OT_generate_movie(Operator):
                     # Upscale video
                     if scene.video_to_video:
                         video = [
-                            Image.fromarray(frame).resize((closest_divisible_64(int(x * 2)), closest_divisible_64(int(y * 2))))
+                            Image.fromarray(frame).resize((closest_divisible_32(int(x * 2)), closest_divisible_32(int(y * 2))))
                             for frame in video
                         ]
                     else:
                         video = [
-                            Image.fromarray(frame).resize((closest_divisible_64(int(x)), closest_divisible_64(int(y))))
+                            Image.fromarray(frame).resize((closest_divisible_32(int(x)), closest_divisible_32(int(y))))
                             for frame in video
                         ]
 
@@ -1441,7 +1440,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     # Upscale video
 #                    if scene.video_to_video:
 #                        video = [
-#                            Image.fromarray(frame).resize((closest_divisible_64(int(x * 2)), closest_divisible_64(int(y * 2))))
+#                            Image.fromarray(frame).resize((closest_divisible_32(int(x * 2)), closest_divisible_32(int(y * 2))))
 #                            for frame in video
 #                        ]
 
@@ -1481,7 +1480,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     print("Upscale: Video")
                     if torch.cuda.is_available():
                         torch.cuda.empty_cache()
-                    video = [Image.fromarray(frame).resize((closest_divisible_64(x * 2), closest_divisible_64(y * 2))) for frame in video_frames]
+                    video = [Image.fromarray(frame).resize((closest_divisible_32(x * 2), closest_divisible_32(y * 2))) for frame in video_frames]
 
                     video_frames = upscale(
                         prompt,
@@ -1829,8 +1828,8 @@ class SEQUENCER_OT_generate_image(Operator):
         negative_prompt = scene.generate_movie_negative_prompt +", "+ style_prompt(scene.generate_movie_prompt)[1] +", nsfw, nude, nudity,"
         image_x = scene.generate_movie_x
         image_y = scene.generate_movie_y
-        x = scene.generate_movie_x = closest_divisible_64(image_x)
-        y = scene.generate_movie_y = closest_divisible_64(image_y)
+        x = scene.generate_movie_x = closest_divisible_32(image_x)
+        y = scene.generate_movie_y = closest_divisible_32(image_y)
         duration = scene.generate_movie_frames
         image_num_inference_steps = scene.movie_num_inference_steps
         image_num_guidance = scene.movie_num_guidance
@@ -1840,7 +1839,7 @@ class SEQUENCER_OT_generate_image(Operator):
         addon_prefs = preferences.addons[__name__].preferences
         image_model_card = addon_prefs.image_model_card
         do_inpaint = input == "input_strips" and scene.inpaint_selected_strip and type == "image"
-        do_refine = scene.refine_sd #and (scene.image_path or scene.movie_path) # or image_model_card == "stabilityai/stable-diffusion-xl-base-1.0") #and not do_inpaint
+        do_refine = scene.refine_sd or scene.image_path or scene.movie_path # or image_model_card == "stabilityai/stable-diffusion-xl-base-1.0") #and not do_inpaint
 
         # LOADING MODELS
         print("Model:  " + image_model_card)
@@ -2021,7 +2020,7 @@ class SEQUENCER_OT_generate_image(Operator):
             seed = (
                 seed
                 if not context.scene.movie_use_random
-                else random.randint(0, 999999)
+                else random.randint(-2147483647, 2147483647)
             )
             print("Seed: "+str(seed))
             context.scene.movie_num_seed = seed
@@ -2227,6 +2226,10 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         return context.scene and context.scene.sequence_editor
 
     def execute(self, context):
+
+        bpy.types.Scene.movie_path = ""
+        bpy.types.Scene.image_path = ""        
+        
         preferences = context.preferences
         addon_prefs = preferences.addons[__name__].preferences
         play_sound = addon_prefs.playsound
@@ -2453,7 +2456,7 @@ def register():
     bpy.types.Scene.movie_num_seed = bpy.props.IntProperty(
         name="movie_num_seed",
         default=1,
-        min=1,
+        min=-2147483647,
         max=2147483647,
     )
 
@@ -2563,7 +2566,7 @@ def register():
         name="image_power",
         default=0.50,
         min=0.05,
-        max=0.95,
+        max=0.82,
     )
 
     styles_array = load_styles(os.path.dirname(os.path.abspath(__file__))+"/styles.json")
