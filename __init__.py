@@ -2432,6 +2432,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         seed = scene.movie_num_seed
         use_random = scene.movie_use_random
         use_strip_data = addon_prefs.use_strip_data
+        temp_strip = None
 
         if not strips:
             self.report({"INFO"}, "Select strip(s) for processing.")
@@ -2474,6 +2475,13 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     context.scene.movie_use_random = use_random
                     context.scene.movie_num_seed = seed
 
+                    scene.generate_movie_prompt = prompt
+                    scene.generate_movie_negative_prompt = negative_prompt
+
+                    if use_strip_data:
+                        scene.movie_use_random = use_random
+                        scene.movie_num_seed = seed
+
             if strip.type == "IMAGE":
                 strip_dirname = os.path.dirname(strip.directory)
                 image_path = bpy.path.abspath(
@@ -2512,11 +2520,12 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     if type == "image":
                         sequencer.generate_image()
 
-                    scene.generate_movie_prompt = prompt
-                    scene.generate_movie_negative_prompt = negative_prompt
-                    if use_strip_data:
-                        scene.movie_use_random = use_random
-                        scene.movie_num_seed = seed
+                scene.generate_movie_prompt = prompt
+                scene.generate_movie_negative_prompt = negative_prompt
+                
+                if use_strip_data:
+                    scene.movie_use_random = use_random
+                    scene.movie_num_seed = seed
 
                 bpy.types.Scene.image_path = ""
 
@@ -2558,14 +2567,16 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     if type == "image":
                         sequencer.generate_image()
 
-                    scene.generate_movie_prompt = prompt
-                    scene.generate_movie_negative_prompt = negative_prompt
-                    if use_strip_data:
-                        scene.movie_use_random = use_random
-                        scene.movie_num_seed = seed
+                scene.generate_movie_prompt = prompt
+                scene.generate_movie_negative_prompt = negative_prompt
 
-                delete_strip(temp_strip)
-#                if temp_strip is not None:                      
+                if use_strip_data:
+                    scene.movie_use_random = use_random
+                    scene.movie_num_seed = seed
+
+
+                if temp_strip is not None:
+                    delete_strip(temp_strip)                     
 #                    sel_seq = context.selected_sequences
 #                    for des_strip in sel_seq:
 #                        des_strip.select = False
