@@ -259,6 +259,29 @@ def limit_string(my_string):
         return my_string
 
 
+def delete_strip(input_strip):
+
+    # Check if the input strip exists
+    if input_strip is None:
+        return
+    
+    # Store the originally selected strips
+    original_selection = [strip for strip in bpy.context.scene.sequence_editor.sequences_all if strip.select]
+
+    # Deselect all strips
+    bpy.ops.sequencer.select_all(action='DESELECT')
+
+    # Select the input strip
+    input_strip.select = True
+
+    # Delete the selected strip
+    bpy.ops.sequencer.delete()
+
+    # Reselect the original selected strips
+    for strip in original_selection:
+        strip.select = True
+
+
 def load_video_as_np_array(video_path):
     import cv2
     import numpy as np
@@ -968,6 +991,162 @@ class GENERATOR_OT_sound_notification(Operator):
         return {"FINISHED"}
 
 
+def get_render_strip(self, context, strip):#(bpy.types.Operator):
+    """Render selected strip to hard disk"""
+
+    # Check for the context and selected strips
+    if not context or not context.scene or not context.scene.sequence_editor:
+        self.report({"ERROR"}, "No valid context or selected strips")
+        return {"CANCELLED"}
+
+    # Get the current scene and sequencer
+    current_scene = context.scene
+    sequencer = current_scene.sequence_editor
+    current_frame_old = bpy.context.scene.frame_current
+
+    # Get the selected sequences in the sequencer
+    selected_sequences = strip
+
+    # Get the first empty channel above all strips
+    insert_channel_total = 1
+    for s in sequencer.sequences_all:
+        if s.channel >= insert_channel_total:
+            insert_channel_total = s.channel + 1
+
+    if strip.type in {"MOVIE", "IMAGE", "SOUND", "SCENE", "TEXT", "COLOR", "META", "MASK"}:
+
+        # Deselect all strips in the current scene
+        for s in sequencer.sequences_all:
+            s.select = False
+
+        # Select the current strip in the current scene
+        strip.select = True
+
+        # Store current frame for later
+        bpy.context.scene.frame_current = int(strip.frame_start)
+
+        # Copy the strip to the clipboard
+        bpy.ops.sequencer.copy()
+
+        # Create a new scene
+        #new_scene = bpy.data.scenes.new(name="New Scene")
+
+        # Create a new scene
+        new_scene = bpy.ops.scene.new(type='EMPTY')
+
+        # Get the newly created scene
+        new_scene = bpy.context.scene
+
+        # Add a sequencer to the new scene
+        new_scene.sequence_editor_create()
+
+        # Set the new scene as the active scene
+        context.window.scene = new_scene
+
+        # Copy the scene properties from the current scene to the new scene
+        new_scene.render.resolution_x = current_scene.render.resolution_x
+        new_scene.render.resolution_y = current_scene.render.resolution_y
+        new_scene.render.resolution_percentage = (current_scene.render.resolution_percentage)
+        new_scene.render.pixel_aspect_x = current_scene.render.pixel_aspect_x
+        new_scene.render.pixel_aspect_y = current_scene.render.pixel_aspect_y
+        new_scene.render.fps = current_scene.render.fps
+        new_scene.render.fps_base = current_scene.render.fps_base
+        new_scene.render.sequencer_gl_preview = (current_scene.render.sequencer_gl_preview)
+        new_scene.render.use_sequencer_override_scene_strip = (current_scene.render.use_sequencer_override_scene_strip)
+        new_scene.world = current_scene.world
+
+        area = [area for area in context.screen.areas if area.type == "SEQUENCE_EDITOR"][0]
+
+        with bpy.context.temp_override(area=area):
+
+            # Paste the strip from the clipboard to the new scene
+            bpy.ops.sequencer.paste()
+
+        # Get the new strip in the new scene
+        new_strip = (new_scene.sequence_editor.active_strip) = bpy.context.selected_sequences[0]
+
+        # Set the range in the new scene to fit the pasted strip
+        new_scene.frame_start = int(new_strip.frame_final_start)
+        new_scene.frame_end = (int(new_strip.frame_final_start + new_strip.frame_final_duration)-1)
+
+        # Set the name of the file
+        src_name = strip.name
+        src_dir = ""
+        src_ext = ".mp4"
+
+        # Set the path to the blend file
+        rendered_dir = blend_path = bpy.utils.user_resource("DATAFILES") + "/Rendered_Strips_" + str(date.today()) #bpy.data.filepath
+
+        # Set the render settings for rendering animation with FFmpeg and MP4 with sound
+        bpy.context.scene.render.image_settings.file_format = "FFMPEG"
+        bpy.context.scene.render.ffmpeg.format = "MPEG4"
+        bpy.context.scene.render.ffmpeg.audio_codec = "AAC"
+
+        # Create a new folder for the rendered files
+        if not os.path.exists(rendered_dir):
+            os.makedirs(rendered_dir)
+
+        # Set the output path for the rendering
+        output_path = os.path.join(
+            rendered_dir, src_name + "_rendered" + src_ext
+        )
+        new_scene.render.filepath = output_path
+
+        # Render the strip to hard disk
+        bpy.ops.render.opengl(animation=True, sequencer=True)
+
+        # Delete the new scene
+        bpy.data.scenes.remove(new_scene, do_unlink=True)
+
+        # Set the original scene as the active scene
+        context.window.scene = current_scene
+
+        # Reset to total top channel
+        insert_channel = insert_channel_total
+
+        area = [area for area in context.screen.areas if area.type == "SEQUENCE_EDITOR"][0]
+
+        with bpy.context.temp_override(area=area):
+
+            insert_channel = find_first_empty_channel(strip.frame_final_start, strip.frame_final_start+strip.frame_final_duration)
+
+            if strip.type == "SOUND":
+                # Insert the rendered file as a sound strip in the original scene without video.
+                bpy.ops.sequencer.sound_strip_add(
+                    channel=insert_channel,
+                    filepath=output_path,
+                    frame_start=int(strip.frame_final_start),
+                    overlap=0,
+                )
+            elif strip.type == "SCENE":
+                # Insert the rendered file as a movie strip and sound strip in the original scene.
+                bpy.ops.sequencer.movie_strip_add(
+                    channel=insert_channel,
+                    filepath=output_path,
+                    frame_start=int(strip.frame_final_start),
+                    overlap=0,
+                    sound=False,
+                )
+            else:
+                # Insert the rendered file as a movie strip in the original scene without sound.
+                bpy.ops.sequencer.movie_strip_add(
+                    channel=insert_channel,
+                    filepath=output_path,
+                    frame_start=int(strip.frame_final_start),
+                    overlap=0,
+                    sound=False,
+                )
+
+        resulting_strip = sequencer.active_strip
+
+        # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
+        #bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
+
+        # Reset current frame
+        bpy.context.scene.frame_current = current_frame_old
+    return resulting_strip
+
+
 class SEQEUNCER_PT_generate_ai(Panel):  # UI
     """Generate Media using AI"""
 
@@ -1396,6 +1575,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 # vid2vid / img2vid
                 else:
+                    
                     if scene.movie_path:
                         video = load_video_as_np_array(video_path)
                         print("Process: Video to video")
@@ -2073,17 +2253,22 @@ class SEQUENCER_OT_generate_image(Operator):
             elif do_inpaint:
                 print("Process: Inpaint")
 
-                mask_strip =find_strip_by_name(scene, scene.inpaint_selected_strip)
+                mask_strip = find_strip_by_name(scene, scene.inpaint_selected_strip)
                 if not mask_strip:
                     print("Selected mask not found!")
                     return
+
+                if mask_strip.type == "MASK" or mask_strip.type == "SCENE":
+                    mask_strip = get_render_strip(self, context, mask_strip)
 
                 mask_path = get_strip_path(mask_strip)
                 mask_image = load_first_frame(mask_path)
                 if not mask_image:
                     print("Loading mask failed!")
                     return
+
                 mask_image = mask_image.resize((x, y))
+
                 if scene.image_path:
                     init_image = load_first_frame(scene.image_path)
                 if scene.movie_path:
@@ -2119,6 +2304,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 # Take the masked pixels from the repainted image and the unmasked pixels from the initial image
                 unmasked_unchanged_image_arr = (1 - mask_image_arr) * init_image + mask_image_arr * image
                 image = PIL.Image.fromarray(unmasked_unchanged_image_arr.astype("uint8"))
+                delete_strip(mask_strip)
 
             # Img2img
             elif scene.image_path or scene.movie_path:
@@ -2254,16 +2440,20 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
             print("\nStrip input processing started (ctrl+c to cancel).")
 
         for strip in strips:
-            if strip.type in {'MOVIE', 'IMAGE', 'TEXT'}:
+            if strip.type in {'MOVIE', 'IMAGE', 'TEXT', 'SCENE'}:
                 break
         else:
-            self.report({"INFO"}, "None of the selected strips are movie, image, or text types.")
+            self.report({"INFO"}, "None of the selected strips are movie, image, text or scene types.")
             return {"CANCELLED"}
 
         if use_strip_data:
             print("Use file seed and prompt: Yes")
 
         for count, strip in enumerate(strips):
+
+            if strip.type == "SCENE":
+                temp_strip = strip = get_render_strip(self, context, strip)
+
             if strip.type == "TEXT":
                 if strip.text:
                     print("\n" + str(count+1) + "/"+ str(len(strips)))
@@ -2374,6 +2564,16 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                         scene.movie_use_random = use_random
                         scene.movie_num_seed = seed
 
+                delete_strip(temp_strip)
+#                if temp_strip is not None:                      
+#                    sel_seq = context.selected_sequences
+#                    for des_strip in sel_seq:
+#                        des_strip.select = False
+#                        temp_strip.select = True 
+#                        bpy.ops.sequencer.delete()
+#                    for des_strip in sel_seq:
+#                        des_strip.select = True
+                
                 bpy.types.Scene.movie_path = ""
 
         scene.frame_current = current_frame
