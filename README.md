@@ -135,6 +135,12 @@ Find AudioLDM documentation here: https://github.com/haoheliu/AudioLDM
 Try prompts like: Bag pipes playing a funeral dirge, punk rock band playing hardcore song, techno dj playing deep bass house music, and acid house loop with jazz.
 Or: Voice of God judging mankind, woman talking about celestial beings, hammer on wood.
 
+
+## Performance
+
+On 6 GB of VRAM I typically render images first with 1024x512 images with SDXL. And img2vid with Zeroscope XL in 768x384x10 or 640x320x17.
+
+
 ## AI Modules
 Diffusers: https://github.com/huggingface/diffusers
 
