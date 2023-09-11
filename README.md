@@ -168,9 +168,9 @@ Stable Diffusion XL: https://huggingface.co/stabilityai/stable-diffusion-xl-base
 
 Hugging Face diffusers model is downloaded from the hub and saved to a local cache directory. By default, the cache directory is located at:
 
-On Linux and macOS: ~/.cache/huggingface/transformers
+On Linux and macOS: ~/.cache/huggingface/hub
 
-On Windows: %userprofile%\\.cache\huggingface\transformers
+On Windows: %userprofile%\\.cache\huggingface\hub
 
 Here you can locate and delete the individual models.
 
