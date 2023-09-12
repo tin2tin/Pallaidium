@@ -264,7 +264,7 @@ def delete_strip(input_strip):
     # Check if the input strip exists
     if input_strip is None:
         return
-    
+
     # Store the originally selected strips
     original_selection = [strip for strip in bpy.context.scene.sequence_editor.sequences_all if strip.select]
 
@@ -586,6 +586,7 @@ def install_modules(self):
     import_module(self, "xformers", "xformers")
     import_module(self, "imageio", "imageio")
     import_module(self, "imwatermark", "invisible-watermark>=0.2.0")
+    import_module(self, "controlnet_aux", "controlnet_aux")
 
     if os_platform == "Windows":
         subprocess.check_call(
@@ -698,19 +699,26 @@ def input_strips_updated(self, context):
     preferences = context.preferences
     addon_prefs = preferences.addons[__name__].preferences
     movie_model_card = addon_prefs.movie_model_card
-
+    image_model_card = addon_prefs.image_model_card
+    type = scene.generatorai_typeselect
     scene = context.scene
     input = scene.input_strips
 
-    if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0" and scene.generatorai_typeselect == "video":
+    if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0" and type == "movie":
         scene.input_strips = "input_strips"
-    if scene.generatorai_typeselect == "video" or scene.generatorai_typeselect == "audio":
+              
+    if type == "movie" or type == "audio":
         scene.inpaint_selected_strip = ""
+        
+    if type=="image" and (image_model_card == "lllyasviel/sd-controlnet-canny" or image_model_card == "lllyasviel/sd-controlnet-openpose"):
+        scene.input_strips = "input_strips"
+
 
 def output_strips_updated(self, context):
     preferences = context.preferences
     addon_prefs = preferences.addons[__name__].preferences
     movie_model_card = addon_prefs.movie_model_card
+    image_model_card = addon_prefs.image_model_card
 
     scene = context.scene
     type = scene.generatorai_typeselect
@@ -718,6 +726,9 @@ def output_strips_updated(self, context):
 
     if type == "movie" or type == "audio":
         scene.inpaint_selected_strip = ""
+        
+    if (image_model_card == "lllyasviel/sd-controlnet-canny" or image_model_card == "lllyasviel/sd-controlnet-openpose") and type=="image":
+        scene.input_strips = "input_strips"
 
 
 class GeneratorAddonPreferences(AddonPreferences):
@@ -788,19 +799,21 @@ class GeneratorAddonPreferences(AddonPreferences):
             (
                 "runwayml/stable-diffusion-v1-5",
                 "Stable Diffusion 1.5 (512x512)",
-                "Stable Diffusion 1.5",
+                "runwayml/stable-diffusion-v1-5",
             ),
             (
                 "stabilityai/stable-diffusion-2",
                 "Stable Diffusion 2 (768x768)",
-                "Stable Diffusion 2",
+                "stabilityai/stable-diffusion-2",
             ),
             (
                 "stabilityai/stable-diffusion-xl-base-1.0",
                 "Stable Diffusion XL 1.0 (1024x1024)",
-                "Stable Diffusion XL 1.0",
+                "stabilityai/stable-diffusion-xl-base-1.0",
             ),
-            ("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd"),
+            ("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0"),
+            ("lllyasviel/sd-controlnet-canny", "ControlNet (512x512)", "lllyasviel/sd-controlnet-canny"),
+            ("lllyasviel/sd-controlnet-openpose", "OpenPose (512x512)", "lllyasviel/sd-controlnet-openpose"),
         ],
         default="stabilityai/stable-diffusion-xl-base-1.0",
     )
@@ -929,7 +942,7 @@ class GENERATOR_OT_uninstall(Operator):
 
         self.report(
             {"INFO"},
-            "\nRemove AI Models manually: \nLinux and macOS: ~/.cache/huggingface/transformers\nWindows: %userprofile%.cache\\huggingface\\transformers",
+            "\nRemove AI Models manually: \nLinux and macOS: ~/.cache/huggingface/hub\nWindows: %userprofile%.cache\\huggingface\\hub",
         )
         return {"FINISHED"}
 
@@ -1181,14 +1194,16 @@ class SEQEUNCER_PT_generate_ai(Panel):  # UI
             col = col.column()
 
             col.prop(context.scene, "input_strips", text="Input")
+            
+            if image_model_card != "lllyasviel/sd-controlnet-canny" and image_model_card != "lllyasviel/sd-controlnet-openpose":
 
-            if input == "input_strips" and not scene.inpaint_selected_strip:
-                col.prop(context.scene, "image_power", text="Strip Power")
+                if input == "input_strips" and not scene.inpaint_selected_strip:
+                    col.prop(context.scene, "image_power", text="Strip Power")
 
-            if bpy.context.scene.sequence_editor is not None:
-                if len(bpy.context.scene.sequence_editor.sequences) > 0:
-                    if input == "input_strips" and type == "image":
-                        col.prop_search(scene, "inpaint_selected_strip", scene.sequence_editor, "sequences", text="Inpaint Mask", icon='SEQ_STRIP_DUPLICATE')
+                if bpy.context.scene.sequence_editor is not None:
+                    if len(bpy.context.scene.sequence_editor.sequences) > 0:
+                        if input == "input_strips" and type == "image":
+                            col.prop_search(scene, "inpaint_selected_strip", scene.sequence_editor, "sequences", text="Inpaint Mask", icon='SEQ_STRIP_DUPLICATE')
 
         col = layout.column(align=True)
         col = col.box()
@@ -1414,7 +1429,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
 #                #pipe = pipeline(task='image-to-video', model='damo-vilab/MS-Image2Video', model_revision='v1.1.0')
 #                #pipe = pipeline(task='image-to-video', model='damo/Image-to-Video', model_revision='v1.1.0')
-#                
+#
 #                # local: pipe = pipeline(task='image-to-video', model='C:/Users/45239/.cache/modelscope/hub/damo/Image-to-Video', model_revision='v1.1.0')
 
 #                if low_vram:
@@ -1575,7 +1590,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 # vid2vid / img2vid
                 else:
-                    
+
                     if scene.movie_path:
                         video = load_video_as_np_array(video_path)
                         print("Process: Video to video")
@@ -1970,14 +1985,18 @@ class SEQUENCER_OT_generate_image(Operator):
 
     def execute(self, context):
         scene = context.scene
-        if scene.generate_movie_prompt == "":
+        seq_editor = scene.sequence_editor
+
+        preferences = context.preferences
+        addon_prefs = preferences.addons[__name__].preferences
+        image_model_card = addon_prefs.image_model_card
+
+        if scene.generate_movie_prompt == "" and not image_model_card == "lllyasviel/sd-controlnet-canny":
             self.report({"INFO"}, "Text prompt in the Generative AI tab is empty!")
             return {"CANCELLED"}
+
         show_system_console(True)
         set_system_console_topmost(True)
-
-        scene = context.scene
-        seq_editor = scene.sequence_editor
 
         if not seq_editor:
             scene.sequence_editor_create()
@@ -2015,11 +2034,9 @@ class SEQUENCER_OT_generate_image(Operator):
         image_num_guidance = scene.movie_num_guidance
         active_strip = context.scene.sequence_editor.active_strip
 
-        preferences = context.preferences
-        addon_prefs = preferences.addons[__name__].preferences
-        image_model_card = addon_prefs.image_model_card
         do_inpaint = input == "input_strips" and scene.inpaint_selected_strip and type == "image"
-        do_refine = scene.refine_sd or scene.image_path or scene.movie_path # or image_model_card == "stabilityai/stable-diffusion-xl-base-1.0") #and not do_inpaint
+        do_convert = (scene.image_path or scene.movie_path) and not image_model_card == "lllyasviel/sd-controlnet-canny" and not image_model_card == "lllyasviel/sd-controlnet-openpose" and not do_inpaint
+        do_refine = scene.refine_sd and not do_convert # or image_model_card == "stabilityai/stable-diffusion-xl-base-1.0") #and not do_inpaint
 
         # LOADING MODELS
         print("Model:  " + image_model_card)
@@ -2068,34 +2085,55 @@ class SEQUENCER_OT_generate_image(Operator):
 #                refiner.to("cuda")
 
 
-        # Models for stable diffusion
-        elif not image_model_card == "DeepFloyd/IF-I-M-v1.0" and not scene.image_path and not scene.movie_path:
-            from diffusers import AutoencoderKL
-            if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
-                #vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
-                pipe = DiffusionPipeline.from_pretrained(
-                    image_model_card,
-                    #vae=vae,
-                    torch_dtype=torch.float16,
-                    variant="fp16",
-                )
-            else:
-                pipe = DiffusionPipeline.from_pretrained(
-                    image_model_card,
-                    torch_dtype=torch.float16,
-                    variant="fp16",
-                )
-            pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+        # ControlNet
+        elif image_model_card == "lllyasviel/sd-controlnet-canny":
+            from diffusers import StableDiffusionControlNetPipeline, ControlNetModel, UniPCMultistepScheduler
+            import cv2
+            from PIL import Image
 
-            pipe.watermark = NoWatermark()
+            controlnet = ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-canny", torch_dtype=torch.float16)
+
+            pipe = StableDiffusionControlNetPipeline.from_pretrained("runwayml/stable-diffusion-v1-5", controlnet=controlnet, torch_dtype=torch.float16) #safety_checker=None,
+
+            pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
 
             if low_vram:
-                #torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
                 pipe.enable_model_cpu_offload()
                 pipe.enable_vae_slicing()
-                #pipe.enable_forward_chunking(chunk_size=1, dim=1)
             else:
                 pipe.to("cuda")
+
+
+        # OpenPose
+        elif image_model_card == "lllyasviel/sd-controlnet-openpose":
+            from diffusers import StableDiffusionControlNetPipeline, ControlNetModel, UniPCMultistepScheduler
+            import torch
+            from controlnet_aux import OpenposeDetector
+            import cv2
+            from PIL import Image
+
+            #controlnet = ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-canny", torch_dtype=torch.float16) #safety_checker=None)
+            #pipe = StableDiffusionControlNetPipeline.from_pretrained("runwayml/stable-diffusion-v1-5", controlnet=controlnet, torch_dtype=torch.float16)   #safety_checker=None,
+
+            openpose = OpenposeDetector.from_pretrained("lllyasviel/ControlNet")
+
+            controlnet = ControlNetModel.from_pretrained(
+                "lllyasviel/sd-controlnet-openpose", torch_dtype=torch.float16
+            )
+
+            pipe = StableDiffusionControlNetPipeline.from_pretrained(
+                "runwayml/stable-diffusion-v1-5", controlnet=controlnet, torch_dtype=torch.float16
+            ) #safety_checker=None, 
+
+            pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
+
+            if low_vram:
+                pipe.enable_xformers_memory_efficient_attention()
+                pipe.enable_model_cpu_offload()
+                pipe.enable_vae_slicing()
+            else:
+                pipe.to("cuda")
+
 
         # DeepFloyd
         elif image_model_card == "DeepFloyd/IF-I-M-v1.0":
@@ -2148,6 +2186,60 @@ class SEQUENCER_OT_generate_image(Operator):
                 #stage_3.enable_xformers_memory_efficient_attention()
             else:
                 stage_3.to("cuda")
+
+        # Conversion img2vid/vid2vid.
+        elif do_convert:
+            print("Conversion Model:  " + "stabilityai/stable-diffusion-xl-refiner-1.0")
+            from diffusers import StableDiffusionXLImg2ImgPipeline, AutoencoderKL
+
+            vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
+
+            converter = StableDiffusionXLImg2ImgPipeline.from_pretrained(
+                "stabilityai/stable-diffusion-xl-refiner-1.0",
+                #text_encoder_2=pipe.text_encoder_2,
+                #vae=pipe.vae,
+                vae=vae,
+                torch_dtype=torch.float16,
+                variant="fp16",
+            )
+
+            converter.watermark = NoWatermark()
+
+            if low_vram:
+                converter.enable_model_cpu_offload()
+                #refiner.enable_vae_tiling()
+                converter.enable_vae_slicing()
+            else:
+                converter.to("cuda")
+
+        # Stable diffusion
+        else:
+            from diffusers import AutoencoderKL
+            if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+                #vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
+                pipe = DiffusionPipeline.from_pretrained(
+                    image_model_card,
+                    #vae=vae,
+                    torch_dtype=torch.float16,
+                    variant="fp16",
+                )
+            else:
+                pipe = DiffusionPipeline.from_pretrained(
+                    image_model_card,
+                    torch_dtype=torch.float16,
+                    variant="fp16",
+                )
+            pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+
+            pipe.watermark = NoWatermark()
+
+            if low_vram:
+                #torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
+                pipe.enable_model_cpu_offload()
+                pipe.enable_vae_slicing()
+                #pipe.enable_forward_chunking(chunk_size=1, dim=1)
+            else:
+                pipe.to("cuda")
 
 
         # Add refiner model if chosen.
@@ -2249,6 +2341,70 @@ class SEQUENCER_OT_generate_image(Operator):
                 # image[0].save("./if_stage_III.png")
                 image = image[0]
 
+            # ControlNet
+            elif image_model_card == "lllyasviel/sd-controlnet-canny":
+                print("Process: ControlNet")
+                init_image = None
+
+                if scene.image_path:
+                    init_image = load_first_frame(scene.image_path)
+                if scene.movie_path:
+                    init_image = load_first_frame(scene.movie_path)
+                if not init_image:
+                    print("Loading strip failed!")
+                    return {"CANCELLED"}
+
+                init_image = init_image.resize((x, y))
+                image = np.array(init_image)
+
+                low_threshold = 100
+                high_threshold = 200
+
+                image = cv2.Canny(image, low_threshold, high_threshold)
+                image = image[:, :, None]
+                image = np.concatenate([image, image, image], axis=2)
+                canny_image = Image.fromarray(image)
+
+                image = pipe(
+                    prompt=prompt,
+                    negative_prompt=negative_prompt,
+                    image=canny_image,
+                    num_inference_steps=image_num_inference_steps, #Should be around 50
+                    guidance_scale=image_num_guidance, # Should be between 3 and 5.
+                    guess_mode=True,
+                    height=y,
+                    width=x,
+                    generator=generator,
+                ).images[0]
+
+
+            # OpenPose
+            elif image_model_card == "lllyasviel/sd-controlnet-openpose":
+                print("Process: OpenPose")
+                init_image = None
+
+                if scene.image_path:
+                    init_image = load_first_frame(scene.image_path)
+                if scene.movie_path:
+                    init_image = load_first_frame(scene.movie_path)
+                if not init_image:
+                    print("Loading strip failed!")
+                    return {"CANCELLED"}
+
+                image = init_image.resize((x, y))
+                image = openpose(image)
+
+                image = pipe(
+                    prompt=prompt,
+                    negative_prompt=negative_prompt,
+                    image=image,
+                    num_inference_steps=20, #image_num_inference_steps,
+                    guidance_scale=image_num_guidance,
+                    height=y,
+                    width=x,
+                    generator=generator,
+                ).images[0]
+
             # Inpaint
             elif do_inpaint:
                 print("Process: Inpaint")
@@ -2256,7 +2412,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 mask_strip = find_strip_by_name(scene, scene.inpaint_selected_strip)
                 if not mask_strip:
                     print("Selected mask not found!")
-                    return
+                    return {"CANCELLED"}
 
                 if mask_strip.type == "MASK" or mask_strip.type == "SCENE":
                     mask_strip = get_render_strip(self, context, mask_strip)
@@ -2275,7 +2431,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     init_image = load_first_frame(scene.movie_path)
                 if not init_image:
                     print("Loading strip failed!")
-                    return
+                    return {"CANCELLED"}
 
                 init_image = init_image.resize((x, y))
 
@@ -2307,7 +2463,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 delete_strip(mask_strip)
 
             # Img2img
-            elif scene.image_path or scene.movie_path:
+            elif do_convert:
                 if scene.movie_path:
                     print("Process: Video to image")
                     init_image = load_first_frame(scene.movie_path)
@@ -2317,9 +2473,9 @@ class SEQUENCER_OT_generate_image(Operator):
                     print("Process: Image to image")
                     init_image = load_first_frame(scene.image_path)
                     init_image = init_image.resize((x, y))
- 
+
                 #init_image = load_image(scene.image_path).convert("RGB")
-                image = refiner(
+                image = converter(
                     prompt=prompt,
                     image=init_image,
                     strength = 1.00 - scene.image_power,
@@ -2414,8 +2570,8 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
     def execute(self, context):
 
         bpy.types.Scene.movie_path = ""
-        bpy.types.Scene.image_path = ""        
-        
+        bpy.types.Scene.image_path = ""
+
         preferences = context.preferences
         addon_prefs = preferences.addons[__name__].preferences
         play_sound = addon_prefs.playsound
@@ -2522,7 +2678,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
 
                 scene.generate_movie_prompt = prompt
                 scene.generate_movie_negative_prompt = negative_prompt
-                
+
                 if use_strip_data:
                     scene.movie_use_random = use_random
                     scene.movie_num_seed = seed
@@ -2576,15 +2732,15 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
 
 
                 if temp_strip is not None:
-                    delete_strip(temp_strip)                     
+                    delete_strip(temp_strip)
 #                    sel_seq = context.selected_sequences
 #                    for des_strip in sel_seq:
 #                        des_strip.select = False
-#                        temp_strip.select = True 
+#                        temp_strip.select = True
 #                        bpy.ops.sequencer.delete()
 #                    for des_strip in sel_seq:
 #                        des_strip.select = True
-                
+
                 bpy.types.Scene.movie_path = ""
 
         scene.frame_current = current_frame
