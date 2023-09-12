@@ -460,7 +460,7 @@ def low_vram():
     for i in range(torch.cuda.device_count()):
         properties = torch.cuda.get_device_properties(i)
         total_vram += properties.total_memory
-    return (total_vram / (1024**3)) < 24.1  # Y/N under 6.1 GB?
+    return (total_vram / (1024**3)) < 6.1  # Y/N under 6.1 GB?
 
 
 def import_module(self, module, install_module):
