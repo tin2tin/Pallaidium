@@ -1395,7 +1395,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 pipe.watermark = NoWatermark()
 
-                if low_vram:
+                if low_vram():
                     pipe.enable_model_cpu_offload()
                     #pipe.unet.enable_forward_chunking(chunk_size=1, dim=1) # Heavy
                     #pipe.enable_vae_slicing()
@@ -1412,7 +1412,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     variant="fp16",
                 )
 
-                if low_vram:
+                if low_vram():
                     refiner.enable_model_cpu_offload()
                     #refiner.enable_vae_tiling()
                     #refiner.enable_vae_slicing()
@@ -1432,7 +1432,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 #
 #                # local: pipe = pipeline(task='image-to-video', model='C:/Users/45239/.cache/modelscope/hub/damo/Image-to-Video', model_revision='v1.1.0')
 
-#                if low_vram:
+#                if low_vram():
 #                    pipe.enable_model_cpu_offload()
 #                    pipe.enable_vae_tiling()
 #                    pipe.enable_vae_slicing()
@@ -1456,7 +1456,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 upscale.scheduler = DPMSolverMultistepScheduler.from_config(upscale.scheduler.config)
 
-                if low_vram:
+                if low_vram():
                     #torch.cuda.set_per_process_memory_fraction(0.98)
                     upscale.enable_model_cpu_offload()
                     upscale.enable_vae_tiling()
@@ -1477,7 +1477,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             from diffusers import DPMSolverMultistepScheduler
             pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
-            if low_vram:
+            if low_vram():
                 pipe.enable_model_cpu_offload()
                 pipe.enable_vae_slicing()
             else:
@@ -1496,7 +1496,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 upscale.scheduler = DPMSolverMultistepScheduler.from_config(upscale.scheduler.config)
 
-                if low_vram:
+                if low_vram():
                     upscale.enable_model_cpu_offload()
                     upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) #Heavy
                     upscale.enable_vae_slicing()
@@ -1819,7 +1819,7 @@ class SEQUENCER_OT_generate_audio(Operator):
 
             pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
-            if low_vram:
+            if low_vram():
                 pipe.enable_vae_slicing()
 
             pipe.to("cuda")
@@ -2061,7 +2061,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             pipe.watermark = NoWatermark()
 
-            if low_vram:
+            if low_vram():
                 #torch.cuda.set_per_process_memory_fraction(0.99)
                 pipe.enable_model_cpu_offload()
                 #pipe.enable_vae_slicing()
@@ -2078,7 +2078,7 @@ class SEQUENCER_OT_generate_image(Operator):
 #                use_safetensors=True,
 #                variant="fp16",
 #            )
-#            if low_vram:
+#            if low_vram():
 #                refiner.enable_model_cpu_offload()
 #                refiner.enable_vae_slicing()
 #            else:
@@ -2097,7 +2097,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
 
-            if low_vram:
+            if low_vram():
                 pipe.enable_model_cpu_offload()
                 pipe.enable_vae_slicing()
             else:
@@ -2127,7 +2127,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
 
-            if low_vram:
+            if low_vram():
                 pipe.enable_xformers_memory_efficient_attention()
                 pipe.enable_model_cpu_offload()
                 pipe.enable_vae_slicing()
@@ -2147,7 +2147,7 @@ class SEQUENCER_OT_generate_image(Operator):
             stage_1 = DiffusionPipeline.from_pretrained(
                 "DeepFloyd/IF-I-M-v1.0", variant="fp16", torch_dtype=torch.float16
             )
-            if low_vram:
+            if low_vram():
                 stage_1.enable_model_cpu_offload()
                 # here: stage_1.unet.enable_forward_chunking(chunk_size=1, dim=1)
                 #stage_1.enable_vae_slicing()
@@ -2161,7 +2161,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 variant="fp16",
                 torch_dtype=torch.float16,
             )
-            if low_vram:
+            if low_vram():
                 stage_2.enable_model_cpu_offload()
                 # stage_2.unet.enable_forward_chunking(chunk_size=1, dim=1)
                 #stage_2.enable_vae_slicing()
@@ -2179,7 +2179,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 **safety_modules,
                 torch_dtype=torch.float16,
             )
-            if low_vram:
+            if low_vram():
                 stage_3.enable_model_cpu_offload()
                 # stage_3.unet.enable_forward_chunking(chunk_size=1, dim=1)
                 #stage_3.enable_vae_slicing()
@@ -2205,7 +2205,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             converter.watermark = NoWatermark()
 
-            if low_vram:
+            if low_vram():
                 converter.enable_model_cpu_offload()
                 #refiner.enable_vae_tiling()
                 converter.enable_vae_slicing()
@@ -2233,7 +2233,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             pipe.watermark = NoWatermark()
 
-            if low_vram:
+            if low_vram():
                 #torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
                 pipe.enable_model_cpu_offload()
                 pipe.enable_vae_slicing()
@@ -2260,7 +2260,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             refiner.watermark = NoWatermark()
 
-            if low_vram:
+            if low_vram():
                 refiner.enable_model_cpu_offload()
                 #refiner.enable_vae_tiling()
                 refiner.enable_vae_slicing()
