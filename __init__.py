@@ -196,6 +196,19 @@ def closest_divisible_32(num):
     else:
         return max(num + (32 - remainder), 192)
 
+def closest_divisible_128(num):
+    # Determine the remainder when num is divided by 128
+    remainder = (num % 128)
+
+    # If the remainder is less than or equal to 16, return num - remainder,
+    # but ensure the result is not less than 192
+    if remainder <= 64:
+        result = num - remainder
+        return max(result, 256)
+    # Otherwise, return num + (32 - remainder)
+    else:
+        return max(num + (64 - remainder), 256)
+
 
 def find_first_empty_channel(start_frame, end_frame):
     for ch in range(1, len(bpy.context.scene.sequence_editor.sequences_all) + 1):
@@ -460,7 +473,7 @@ def low_vram():
     for i in range(torch.cuda.device_count()):
         properties = torch.cuda.get_device_properties(i)
         total_vram += properties.total_memory
-    return (total_vram / (1024**3)) < 24.1  # Y/N under 6.1 GB?
+    return (total_vram / (1024**3)) < 12.1  # Y/N under 6.1 GB?
 
 
 def import_module(self, module, install_module):
@@ -582,7 +595,6 @@ def install_modules(self):
     import_module(self, "scipy", "scipy")
     import_module(self, "IPython", "IPython")
     import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
-    #import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
     import_module(self, "xformers", "xformers")
     import_module(self, "imageio", "imageio")
     import_module(self, "imwatermark", "invisible-watermark>=0.2.0")
@@ -706,10 +718,10 @@ def input_strips_updated(self, context):
 
     if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0" and type == "movie":
         scene.input_strips = "input_strips"
-              
+
     if type == "movie" or type == "audio":
         scene.inpaint_selected_strip = ""
-        
+
     if type=="image" and (image_model_card == "lllyasviel/sd-controlnet-canny" or image_model_card == "lllyasviel/sd-controlnet-openpose"):
         scene.input_strips = "input_strips"
 
@@ -726,7 +738,7 @@ def output_strips_updated(self, context):
 
     if type == "movie" or type == "audio":
         scene.inpaint_selected_strip = ""
-        
+
     if (image_model_card == "lllyasviel/sd-controlnet-canny" or image_model_card == "lllyasviel/sd-controlnet-openpose") and type=="image":
         scene.input_strips = "input_strips"
 
@@ -811,6 +823,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Stable Diffusion XL 1.0 (1024x1024)",
                 "stabilityai/stable-diffusion-xl-base-1.0",
             ),
+            ("warp-ai/wuerstchen", "Würstchen (1024x1024)", "warp-ai/wuerstchen"),
             ("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0"),
             ("lllyasviel/sd-controlnet-canny", "ControlNet (512x512)", "lllyasviel/sd-controlnet-canny"),
             ("lllyasviel/sd-controlnet-openpose", "OpenPose (512x512)", "lllyasviel/sd-controlnet-openpose"),
@@ -1189,12 +1202,12 @@ class SEQEUNCER_PT_generate_ai(Panel):  # UI
         col.use_property_split = True
         col.use_property_decorate = False
 
-        if type != "audio":
-            col = col.box()
-            col = col.column()
+        col = col.box()
+        col = col.column()
 
-            col.prop(context.scene, "input_strips", text="Input")
-            
+        col.prop(context.scene, "input_strips", text="Input")
+
+        if type != "audio":
             if image_model_card != "lllyasviel/sd-controlnet-canny" and image_model_card != "lllyasviel/sd-controlnet-openpose":
 
                 if input == "input_strips" and not scene.inpaint_selected_strip:
@@ -1395,7 +1408,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 pipe.watermark = NoWatermark()
 
-                if low_vram:
+                if low_vram():
                     pipe.enable_model_cpu_offload()
                     #pipe.unet.enable_forward_chunking(chunk_size=1, dim=1) # Heavy
                     #pipe.enable_vae_slicing()
@@ -1412,7 +1425,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     variant="fp16",
                 )
 
-                if low_vram:
+                if low_vram():
                     refiner.enable_model_cpu_offload()
                     #refiner.enable_vae_tiling()
                     #refiner.enable_vae_slicing()
@@ -1432,7 +1445,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 #
 #                # local: pipe = pipeline(task='image-to-video', model='C:/Users/45239/.cache/modelscope/hub/damo/Image-to-Video', model_revision='v1.1.0')
 
-#                if low_vram:
+#                if low_vram():
 #                    pipe.enable_model_cpu_offload()
 #                    pipe.enable_vae_tiling()
 #                    pipe.enable_vae_slicing()
@@ -1456,7 +1469,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 upscale.scheduler = DPMSolverMultistepScheduler.from_config(upscale.scheduler.config)
 
-                if low_vram:
+                if low_vram():
                     #torch.cuda.set_per_process_memory_fraction(0.98)
                     upscale.enable_model_cpu_offload()
                     upscale.enable_vae_tiling()
@@ -1477,7 +1490,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             from diffusers import DPMSolverMultistepScheduler
             pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
-            if low_vram:
+            if low_vram():
                 pipe.enable_model_cpu_offload()
                 pipe.enable_vae_slicing()
             else:
@@ -1496,7 +1509,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 upscale.scheduler = DPMSolverMultistepScheduler.from_config(upscale.scheduler.config)
 
-                if low_vram:
+                if low_vram():
                     upscale.enable_model_cpu_offload()
                     upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) #Heavy
                     upscale.enable_vae_slicing()
@@ -1819,10 +1832,11 @@ class SEQUENCER_OT_generate_audio(Operator):
 
             pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
-            if low_vram:
+            if low_vram():
+                pipe.enable_model_cpu_offload()
                 pipe.enable_vae_slicing()
-
-            pipe.to("cuda")
+            else:
+                pipe.to("cuda")
 
         elif addon_prefs.audio_model_card == "facebook/audiogen-medium":
             pipe = AudioGen.get_pretrained("facebook/audiogen-medium")
@@ -1975,6 +1989,11 @@ def get_strip_path(strip):
     return None
 
 
+def clamp_value(value, min_value, max_value):
+    # Ensure value is within the specified range
+    return max(min(value, max_value), min_value)
+
+
 class SEQUENCER_OT_generate_image(Operator):
     """Generate Image"""
 
@@ -2061,7 +2080,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             pipe.watermark = NoWatermark()
 
-            if low_vram:
+            if low_vram():
                 #torch.cuda.set_per_process_memory_fraction(0.99)
                 pipe.enable_model_cpu_offload()
                 #pipe.enable_vae_slicing()
@@ -2078,7 +2097,7 @@ class SEQUENCER_OT_generate_image(Operator):
 #                use_safetensors=True,
 #                variant="fp16",
 #            )
-#            if low_vram:
+#            if low_vram():
 #                refiner.enable_model_cpu_offload()
 #                refiner.enable_vae_slicing()
 #            else:
@@ -2097,7 +2116,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
 
-            if low_vram:
+            if low_vram():
                 pipe.enable_model_cpu_offload()
                 pipe.enable_vae_slicing()
             else:
@@ -2123,14 +2142,29 @@ class SEQUENCER_OT_generate_image(Operator):
 
             pipe = StableDiffusionControlNetPipeline.from_pretrained(
                 "runwayml/stable-diffusion-v1-5", controlnet=controlnet, torch_dtype=torch.float16
-            ) #safety_checker=None, 
+            ) #safety_checker=None,
 
             pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
 
-            if low_vram:
+            if low_vram():
                 pipe.enable_xformers_memory_efficient_attention()
                 pipe.enable_model_cpu_offload()
                 pipe.enable_vae_slicing()
+            else:
+                pipe.to("cuda")
+
+        # Wuerstchen
+        elif image_model_card == "warp-ai/wuerstchen":
+            from diffusers import AutoPipelineForText2Image
+            from diffusers.pipelines.wuerstchen import DEFAULT_STAGE_C_TIMESTEPS
+
+            pipe = AutoPipelineForText2Image.from_pretrained("warp-ai/wuerstchen", torch_dtype=torch.float16)
+
+            if low_vram():
+                #torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
+                pipe.enable_model_cpu_offload()
+                #pipe.enable_vae_slicing()
+                #pipe.enable_forward_chunking(chunk_size=1, dim=1)
             else:
                 pipe.to("cuda")
 
@@ -2147,7 +2181,7 @@ class SEQUENCER_OT_generate_image(Operator):
             stage_1 = DiffusionPipeline.from_pretrained(
                 "DeepFloyd/IF-I-M-v1.0", variant="fp16", torch_dtype=torch.float16
             )
-            if low_vram:
+            if low_vram():
                 stage_1.enable_model_cpu_offload()
                 # here: stage_1.unet.enable_forward_chunking(chunk_size=1, dim=1)
                 #stage_1.enable_vae_slicing()
@@ -2161,7 +2195,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 variant="fp16",
                 torch_dtype=torch.float16,
             )
-            if low_vram:
+            if low_vram():
                 stage_2.enable_model_cpu_offload()
                 # stage_2.unet.enable_forward_chunking(chunk_size=1, dim=1)
                 #stage_2.enable_vae_slicing()
@@ -2179,7 +2213,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 **safety_modules,
                 torch_dtype=torch.float16,
             )
-            if low_vram:
+            if low_vram():
                 stage_3.enable_model_cpu_offload()
                 # stage_3.unet.enable_forward_chunking(chunk_size=1, dim=1)
                 #stage_3.enable_vae_slicing()
@@ -2205,7 +2239,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             converter.watermark = NoWatermark()
 
-            if low_vram:
+            if low_vram():
                 converter.enable_model_cpu_offload()
                 #refiner.enable_vae_tiling()
                 converter.enable_vae_slicing()
@@ -2216,10 +2250,10 @@ class SEQUENCER_OT_generate_image(Operator):
         else:
             from diffusers import AutoencoderKL
             if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
-                #vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
+                vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
                 pipe = DiffusionPipeline.from_pretrained(
                     image_model_card,
-                    #vae=vae,
+                    vae=vae,
                     torch_dtype=torch.float16,
                     variant="fp16",
                 )
@@ -2233,7 +2267,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             pipe.watermark = NoWatermark()
 
-            if low_vram:
+            if low_vram():
                 #torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
                 pipe.enable_model_cpu_offload()
                 pipe.enable_vae_slicing()
@@ -2247,25 +2281,23 @@ class SEQUENCER_OT_generate_image(Operator):
             print("Refine Model:  " + "stabilityai/stable-diffusion-xl-refiner-1.0")
             from diffusers import StableDiffusionXLImg2ImgPipeline, AutoencoderKL
 
-            vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
+            #vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
 
             refiner = StableDiffusionXLImg2ImgPipeline.from_pretrained(
                 "stabilityai/stable-diffusion-xl-refiner-1.0",
-                #text_encoder_2=pipe.text_encoder_2,
-                #vae=pipe.vae,
-                vae=vae,
+                #vae=vae,
                 torch_dtype=torch.float16,
                 variant="fp16",
             )
 
-            refiner.watermark = NoWatermark()
+            #refiner.watermark = NoWatermark()
 
-            if low_vram:
-                refiner.enable_model_cpu_offload()
-                #refiner.enable_vae_tiling()
-                refiner.enable_vae_slicing()
-            else:
-                refiner.to("cuda")
+#            if low_vram():
+            refiner.enable_model_cpu_offload()
+#                #refiner.enable_vae_tiling()
+#                #refiner.enable_vae_slicing()
+#            else:
+                #refiner.to("cuda")
 
         # Main Generate Loop:
         for i in range(scene.movie_num_batch):
@@ -2341,6 +2373,22 @@ class SEQUENCER_OT_generate_image(Operator):
                 # image[0].save("./if_stage_III.png")
                 image = image[0]
 
+            elif image_model_card == "warp-ai/wuerstchen":
+                scene.generate_movie_y = y = closest_divisible_128(y)
+                scene.generate_movie_x = x = closest_divisible_128(x)
+                print("Generate: Image with Würstchen")
+                image = pipe(
+                    prompt,
+                    negative_prompt=negative_prompt,
+                    num_inference_steps=image_num_inference_steps,
+                    decoder_guidance_scale=0.0,
+                    #prior_guidance_scale=image_num_guidance,
+                    prior_timesteps=DEFAULT_STAGE_C_TIMESTEPS,
+                    height=y,
+                    width=x,
+                    generator=generator,
+                ).images[0]
+
             # ControlNet
             elif image_model_card == "lllyasviel/sd-controlnet-canny":
                 print("Process: ControlNet")
@@ -2370,7 +2418,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     negative_prompt=negative_prompt,
                     image=canny_image,
                     num_inference_steps=image_num_inference_steps, #Should be around 50
-                    guidance_scale=image_num_guidance, # Should be between 3 and 5.
+                    guidance_scale=clamp_value(image_num_guidance, 3, 5), # Should be between 3 and 5.
                     guess_mode=True,
                     height=y,
                     width=x,
@@ -2442,7 +2490,6 @@ class SEQUENCER_OT_generate_image(Operator):
                     mask_image=mask_image,
                     num_inference_steps=image_num_inference_steps,
                     guidance_scale=image_num_guidance,
-                    #strength=1.00 - scene.image_power, #not supported.
                     height=y,
                     width=x,
                     generator=generator,
@@ -2504,7 +2551,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 image = refiner(
                     prompt,
                     negative_prompt=negative_prompt,
-                    num_inference_steps=image_num_inference_steps,
+                    num_inference_steps=clamp_value(int(image_num_inference_steps/2), 1, 5),
                     denoising_start=0.8,
                     guidance_scale=image_num_guidance,
                     image=image,
@@ -2534,17 +2581,33 @@ class SEQUENCER_OT_generate_image(Operator):
                         scene.sequence_editor.active_strip.frame_final_start
                     )
                 strip.use_proxy = True
-                bpy.ops.sequencer.rebuild_proxy()
-
-                # Redraw UI to display the new strip. Remove this if Blender crashes:
-                # https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
-                bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
+                #bpy.ops.sequencer.rebuild_proxy()
             else:
                 print("No resulting file found.")
 
             # clear the VRAM
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
+
+            # Redraw UI to display the new strip. Remove this if Blender crashes:
+            # https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
+            #bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
+
+            for window in bpy.context.window_manager.windows:
+                screen = window.screen
+                for area in screen.areas:
+                    if area.type == "SEQUENCE_EDITOR":
+                        from bpy import context
+
+                        with context.temp_override(window=window, area=area):
+                            if i > 0:
+                                scene.frame_current = (
+                                    scene.sequence_editor.active_strip.frame_final_start
+                                )
+
+                            # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
+                            bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
+                            break
 
         bpy.ops.renderreminder.play_notification()
         scene.frame_current = current_frame
@@ -2787,15 +2850,15 @@ def register():
     bpy.types.Scene.generate_movie_x = bpy.props.IntProperty(
         name="generate_movie_x",
         default=1024,
-        step=64,
-        min=192,
+        step=128,
+        min=256,
         max=1536,
     )
     bpy.types.Scene.generate_movie_y = bpy.props.IntProperty(
         name="generate_movie_y",
         default=512,
-        step=64,
-        min=192,
+        step=128,
+        min=256,
         max=1536,
     )
     # The number of frames to be generated.
