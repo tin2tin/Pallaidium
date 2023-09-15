@@ -1,5 +1,3 @@
-# https://modelscope.cn/models/damo/text-to-video-synthesis/summary
-
 bl_info = {
     "name": "Pallaidium - Generative AI",
     "author": "tintwotin",
@@ -200,8 +198,8 @@ def closest_divisible_128(num):
     # Determine the remainder when num is divided by 128
     remainder = (num % 128)
 
-    # If the remainder is less than or equal to 16, return num - remainder,
-    # but ensure the result is not less than 192
+    # If the remainder is less than or equal to 64, return num - remainder,
+    # but ensure the result is not less than 256
     if remainder <= 64:
         result = num - remainder
         return max(result, 256)
@@ -372,7 +370,7 @@ def process_frames(frame_folder_path, target_width):
         target_width = closest_divisible_32(target_width)
         target_height = closest_divisible_32(target_height)
 
-        img = img.resize((target_width, target_height), Image.ANTIALIAS)
+        img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
         img = img.convert("RGB")
 
         processed_frames.append(img)
@@ -582,12 +580,11 @@ def install_modules(self):
         import_module(self, "sox", "sox")
     else:
         import_module(self, "soundfile", "PySoundFile")
-    #import_module(self, "diffusers", "diffusers")
+    import_module(self, "diffusers", "diffusers")
     #import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git@v0.19.3")
-    import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
+    #import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
     import_module(self, "accelerate", "accelerate")
     import_module(self, "transformers", "transformers")
-    # import_module(self, "optimum", "optimum")
     import_module(self, "sentencepiece", "sentencepiece")
     import_module(self, "safetensors", "safetensors")
     import_module(self, "cv2", "opencv_python")
@@ -643,8 +640,9 @@ def install_modules(self):
             ]
         )
 
-#    # Modelscope img2vid
-#    import_module(self, "modelscope", "modelscope==1.8.4")
+##    # Modelscope img2vid
+#    import_module(self, "modelscope", "git+https://github.com/modelscope/modelscope.git")
+#    # import_module(self, "modelscope", "modelscope==1.9.0")
 #    #import_module(self, "xformers", "xformers==0.0.20")
 #    #import_module(self, "torch", "torch==2.0.1")
 #    import_module(self, "open_clip_torch", "open_clip_torch>=2.0.2")
@@ -707,13 +705,73 @@ def uninstall_module_with_dependencies(module_name):
     subprocess.check_call([pybin, "-m", "pip", "install", "numpy"])
 
 
+
+
+class GENERATOR_OT_install(Operator):
+    """Install all dependencies"""
+
+    bl_idname = "sequencer.install_generator"
+    bl_label = "Install Dependencies"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        preferences = context.preferences
+        addon_prefs = preferences.addons[__name__].preferences
+        install_modules(self)
+        self.report(
+            {"INFO"},
+            "Installation of dependencies is finished.",
+        )
+        return {"FINISHED"}
+
+
+class GENERATOR_OT_uninstall(Operator):
+    """Uninstall all dependencies"""
+
+    bl_idname = "sequencer.uninstall_generator"
+    bl_label = "Uninstall Dependencies"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        preferences = context.preferences
+        addon_prefs = preferences.addons[__name__].preferences
+
+        uninstall_module_with_dependencies("torch")
+        uninstall_module_with_dependencies("torchvision")
+        uninstall_module_with_dependencies("torchaudio")
+
+        if os_platform == "Darwin" or os_platform == "Linux":
+            uninstall_module_with_dependencies("sox")
+        else:
+            uninstall_module_with_dependencies("PySoundFile")
+        uninstall_module_with_dependencies("diffusers")
+        uninstall_module_with_dependencies("accelerate")
+        uninstall_module_with_dependencies("transformers")
+        uninstall_module_with_dependencies("sentencepiece")
+        uninstall_module_with_dependencies("safetensors")
+        uninstall_module_with_dependencies("opencv_python")
+        uninstall_module_with_dependencies("scipy")
+        uninstall_module_with_dependencies("IPython")
+        uninstall_module_with_dependencies("bark")
+        uninstall_module_with_dependencies("xformers")
+        uninstall_module_with_dependencies("imageio")
+        uninstall_module_with_dependencies("invisible-watermark")
+        uninstall_module_with_dependencies("pillow")
+
+        self.report(
+            {"INFO"},
+            "\nRemove AI Models manually: \nLinux and macOS: ~/.cache/huggingface/hub\nWindows: %userprofile%.cache\\huggingface\\hub",
+        )
+        return {"FINISHED"}
+
+
 def input_strips_updated(self, context):
     preferences = context.preferences
     addon_prefs = preferences.addons[__name__].preferences
     movie_model_card = addon_prefs.movie_model_card
     image_model_card = addon_prefs.image_model_card
-    type = scene.generatorai_typeselect
     scene = context.scene
+    type = scene.generatorai_typeselect
     input = scene.input_strips
 
     if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0" and type == "movie":
@@ -902,64 +960,6 @@ class GeneratorAddonPreferences(AddonPreferences):
         row_row.label(text="")
 
 
-class GENERATOR_OT_install(Operator):
-    """Install all dependencies"""
-
-    bl_idname = "sequencer.install_generator"
-    bl_label = "Install Dependencies"
-    bl_options = {"REGISTER", "UNDO"}
-
-    def execute(self, context):
-        preferences = context.preferences
-        addon_prefs = preferences.addons[__name__].preferences
-        install_modules(self)
-        self.report(
-            {"INFO"},
-            "Installation of dependencies is finished.",
-        )
-        return {"FINISHED"}
-
-
-class GENERATOR_OT_uninstall(Operator):
-    """Uninstall all dependencies"""
-
-    bl_idname = "sequencer.uninstall_generator"
-    bl_label = "Uninstall Dependencies"
-    bl_options = {"REGISTER", "UNDO"}
-
-    def execute(self, context):
-        preferences = context.preferences
-        addon_prefs = preferences.addons[__name__].preferences
-
-        uninstall_module_with_dependencies("torch")
-        uninstall_module_with_dependencies("torchvision")
-        uninstall_module_with_dependencies("torchaudio")
-
-        if os_platform == "Darwin" or os_platform == "Linux":
-            uninstall_module_with_dependencies("sox")
-        else:
-            uninstall_module_with_dependencies("PySoundFile")
-        uninstall_module_with_dependencies("diffusers")
-        uninstall_module_with_dependencies("accelerate")
-        uninstall_module_with_dependencies("transformers")
-        uninstall_module_with_dependencies("sentencepiece")
-        uninstall_module_with_dependencies("safetensors")
-        uninstall_module_with_dependencies("opencv_python")
-        uninstall_module_with_dependencies("scipy")
-        uninstall_module_with_dependencies("IPython")
-        uninstall_module_with_dependencies("bark")
-        uninstall_module_with_dependencies("xformers")
-        uninstall_module_with_dependencies("imageio")
-        uninstall_module_with_dependencies("invisible-watermark")
-        uninstall_module_with_dependencies("pillow")
-
-        self.report(
-            {"INFO"},
-            "\nRemove AI Models manually: \nLinux and macOS: ~/.cache/huggingface/hub\nWindows: %userprofile%.cache\\huggingface\\hub",
-        )
-        return {"FINISHED"}
-
-
 class GENERATOR_OT_sound_notification(Operator):
     """Test your notification settings"""
 
@@ -1017,7 +1017,7 @@ class GENERATOR_OT_sound_notification(Operator):
         return {"FINISHED"}
 
 
-def get_render_strip(self, context, strip):#(bpy.types.Operator):
+def get_render_strip(self, context, strip):
     """Render selected strip to hard disk"""
 
     # Check for the context and selected strips
@@ -1165,15 +1165,40 @@ def get_render_strip(self, context, strip):#(bpy.types.Operator):
 
         resulting_strip = sequencer.active_strip
 
-        # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
-        #bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
-
         # Reset current frame
         bpy.context.scene.frame_current = current_frame_old
+
     return resulting_strip
 
 
-class SEQEUNCER_PT_generate_ai(Panel):  # UI
+
+
+def find_strip_by_name(scene, name):
+    for sequence in scene.sequence_editor.sequences:
+        if sequence.name == name:
+            return sequence
+    return None
+
+
+def get_strip_path(strip):
+    if strip.type == "IMAGE":
+        strip_dirname = os.path.dirname(strip.directory)
+        image_path = bpy.path.abspath(
+            os.path.join(strip_dirname, strip.elements[0].filename)
+        )
+        return image_path
+    if strip.type == "MOVIE":
+        movie_path = bpy.path.abspath(strip.filepath)
+        return movie_path
+    return None
+
+
+def clamp_value(value, min_value, max_value):
+    # Ensure value is within the specified range
+    return max(min(value, max_value), min_value)
+
+
+class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
     """Generate Media using AI"""
 
     bl_idname = "SEQUENCER_PT_sequencer_generate_movie_panel"
@@ -1217,6 +1242,11 @@ class SEQEUNCER_PT_generate_ai(Panel):  # UI
                     if len(bpy.context.scene.sequence_editor.sequences) > 0:
                         if input == "input_strips" and type == "image":
                             col.prop_search(scene, "inpaint_selected_strip", scene.sequence_editor, "sequences", text="Inpaint Mask", icon='SEQ_STRIP_DUPLICATE')
+
+        if image_model_card == "lllyasviel/sd-controlnet-openpose" and type == "image":
+            col = col.column(heading=" ", align=True)
+            #col.prop(context.scene, "refine_sd", text="Image")
+            col.prop(context.scene, "openpose_use_bones", text="OpenPose Rig Image")#, icon="ARMATURE_DATA")
 
         col = layout.column(align=True)
         col = col.box()
@@ -1283,9 +1313,7 @@ class SEQEUNCER_PT_generate_ai(Panel):  # UI
             col = col.column(heading="Upscale", align=True)
             col.prop(context.scene, "video_to_video", text="2x")
 
-        if type == "image":# and (
-            #image_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
-        #):
+        if type == "image":
             col = col.column(heading="Refine", align=True)
             col.prop(context.scene, "refine_sd", text="Image")
             sub_col = col.row()
@@ -1438,11 +1466,11 @@ class SEQUENCER_OT_generate_movie(Operator):
 #                from modelscope.outputs import OutputKeys
 #                from modelscope import snapshot_download
 #                model_dir = snapshot_download('damo/Image-to-Video', revision='v1.1.0')
-#                pipe = pipeline(task='image-to-video', model= model_dir, model_revision='v1.1.0')
+#                pipe = pipeline(task='image-to-video', model= model_dir, model_revision='v1.1.0', torch_dtype=torch.float16, variant="fp16",)
 
 #                #pipe = pipeline(task='image-to-video', model='damo-vilab/MS-Image2Video', model_revision='v1.1.0')
 #                #pipe = pipeline(task='image-to-video', model='damo/Image-to-Video', model_revision='v1.1.0')
-#
+
 #                # local: pipe = pipeline(task='image-to-video', model='C:/Users/45239/.cache/modelscope/hub/damo/Image-to-Video', model_revision='v1.1.0')
 
 #                if low_vram():
@@ -1472,9 +1500,9 @@ class SEQUENCER_OT_generate_movie(Operator):
                 if low_vram():
                     #torch.cuda.set_per_process_memory_fraction(0.98)
                     upscale.enable_model_cpu_offload()
-                    upscale.enable_vae_tiling()
-                    #upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) # heavy:
+                    #upscale.enable_vae_tiling()
                     upscale.enable_vae_slicing()
+                    upscale.unet.enable_forward_chunking(chunk_size=1, dim=1) # heavy:
                 else:
                     upscale.to("cuda")
 
@@ -1516,10 +1544,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 else:
                     upscale.to("cuda")
 
-
-        # GENERATING
-
-        # Main Loop
+        # GENERATING - Main Loop
         for i in range(scene.movie_num_batch):
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
@@ -1635,6 +1660,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         generator=generator,
                     ).frames
 
+# Modelscope
 #                elif scene.image_path:  #img2vid
 #                    print("Process: Image to video")
 #
@@ -1664,7 +1690,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                     #video_frames = np.array(video_frames)
 
-            # Generation of movie
+            # Movie.
             else:
                 print("Generate: Video")
                 video_frames = pipe(
@@ -1683,7 +1709,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
 
-                # Upscale video
+                # Upscale video.
                 if scene.video_to_video:
                     print("Upscale: Video")
                     if torch.cuda.is_available():
@@ -1700,12 +1726,12 @@ class SEQUENCER_OT_generate_movie(Operator):
                         generator=generator,
                     ).frames
 
-            # Move to folder
+            # Move to folder.
             src_path = export_to_video(video_frames)
             dst_path = solve_path(clean_filename(str(seed)+"_"+prompt)+".mp4")
             shutil.move(src_path, dst_path)
 
-            # Add strip
+            # Add strip.
             if not os.path.isfile(dst_path):
                 print("No resulting file found.")
                 return {"CANCELLED"}
@@ -1722,7 +1748,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                                 frame_start=start_frame,
                                 channel=empty_channel,
                                 fit_method="FIT",
-                                adjust_playback_rate=True,
+                                adjust_playback_rate=False,
                                 sound=False,
                                 use_framerate=False,
                             )
@@ -1941,7 +1967,7 @@ class SEQUENCER_OT_generate_audio(Operator):
 
             filepath = filename
             if os.path.isfile(filepath):
-                empty_channel = empty_channel
+                empty_channel = find_first_empty_channel(start_frame, start_frame+scene.audio_length_in_f)
                 strip = scene.sequence_editor.sequences.new_sound(
                     name=prompt,
                     filepath=filepath,
@@ -1949,6 +1975,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                     frame_start=start_frame,
                 )
                 scene.sequence_editor.active_strip = strip
+
                 if i > 0:
                     scene.frame_current = (
                         scene.sequence_editor.active_strip.frame_final_start
@@ -1969,31 +1996,6 @@ class SEQUENCER_OT_generate_audio(Operator):
         return {"FINISHED"}
 
 
-def find_strip_by_name(scene, name):
-    for sequence in scene.sequence_editor.sequences:
-        if sequence.name == name:
-            return sequence
-    return None
-
-
-def get_strip_path(strip):
-    if strip.type == "IMAGE":
-        strip_dirname = os.path.dirname(strip.directory)
-        image_path = bpy.path.abspath(
-            os.path.join(strip_dirname, strip.elements[0].filename)
-        )
-        return image_path
-    if strip.type == "MOVIE":
-        movie_path = bpy.path.abspath(strip.filepath)
-        return movie_path
-    return None
-
-
-def clamp_value(value, min_value, max_value):
-    # Ensure value is within the specified range
-    return max(min(value, max_value), min_value)
-
-
 class SEQUENCER_OT_generate_image(Operator):
     """Generate Image"""
 
@@ -2003,12 +2005,15 @@ class SEQUENCER_OT_generate_image(Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
+
         scene = context.scene
         seq_editor = scene.sequence_editor
-
         preferences = context.preferences
         addon_prefs = preferences.addons[__name__].preferences
         image_model_card = addon_prefs.image_model_card
+        strips = context.selected_sequences
+        type = scene.generatorai_typeselect
+        use_strip_data = addon_prefs.use_strip_data
 
         if scene.generate_movie_prompt == "" and not image_model_card == "lllyasviel/sd-controlnet-canny":
             self.report({"INFO"}, "Text prompt in the Generative AI tab is empty!")
@@ -2057,11 +2062,25 @@ class SEQUENCER_OT_generate_image(Operator):
         do_convert = (scene.image_path or scene.movie_path) and not image_model_card == "lllyasviel/sd-controlnet-canny" and not image_model_card == "lllyasviel/sd-controlnet-openpose" and not do_inpaint
         do_refine = scene.refine_sd and not do_convert # or image_model_card == "stabilityai/stable-diffusion-xl-base-1.0") #and not do_inpaint
 
+        if do_inpaint or do_convert or image_model_card == "lllyasviel/sd-controlnet-canny" or image_model_card == "lllyasviel/sd-controlnet-openpose":
+            if not strips:
+                self.report({"INFO"}, "Select strip(s) for processing.")
+                return {"CANCELLED"}
+
+            for strip in strips:
+                if strip.type in {'MOVIE', 'IMAGE', 'TEXT', 'SCENE'}:
+                    break
+            else:
+                self.report({"INFO"}, "None of the selected strips are movie, image, text or scene types.")
+                return {"CANCELLED"}
+
         # LOADING MODELS
         print("Model:  " + image_model_card)
 
         # models for inpaint
         if do_inpaint:
+
+            # NOTE: need to test if I can get SDXL Inpainting working!
 
             #from diffusers import StableDiffusionXLInpaintPipeline, AutoencoderKL
             from diffusers import StableDiffusionInpaintPipeline#, AutoencoderKL#, StableDiffusionXLInpaintPipeline
@@ -2103,9 +2122,9 @@ class SEQUENCER_OT_generate_image(Operator):
 #            else:
 #                refiner.to("cuda")
 
-
         # ControlNet
         elif image_model_card == "lllyasviel/sd-controlnet-canny":
+            #NOTE: Not sure this is working as intented?
             from diffusers import StableDiffusionControlNetPipeline, ControlNetModel, UniPCMultistepScheduler
             import cv2
             from PIL import Image
@@ -2122,9 +2141,10 @@ class SEQUENCER_OT_generate_image(Operator):
             else:
                 pipe.to("cuda")
 
-
         # OpenPose
         elif image_model_card == "lllyasviel/sd-controlnet-openpose":
+
+            # NOTE: Is it working on Pose Rig Bones too?
             from diffusers import StableDiffusionControlNetPipeline, ControlNetModel, UniPCMultistepScheduler
             import torch
             from controlnet_aux import OpenposeDetector
@@ -2155,6 +2175,8 @@ class SEQUENCER_OT_generate_image(Operator):
 
         # Wuerstchen
         elif image_model_card == "warp-ai/wuerstchen":
+            if do_convert:
+                print(image_model_card+" does not support img2img or img2vid. Ignoring input strip.")
             from diffusers import AutoPipelineForText2Image
             from diffusers.pipelines.wuerstchen import DEFAULT_STAGE_C_TIMESTEPS
 
@@ -2171,6 +2193,8 @@ class SEQUENCER_OT_generate_image(Operator):
 
         # DeepFloyd
         elif image_model_card == "DeepFloyd/IF-I-M-v1.0":
+            if do_convert:
+                print(image_model_card+" does not support img2img or img2vid. Ignoring input strip.")
             from huggingface_hub.commands.user import login
 
             result = login(token=addon_prefs.hugginface_token)
@@ -2221,7 +2245,7 @@ class SEQUENCER_OT_generate_image(Operator):
             else:
                 stage_3.to("cuda")
 
-        # Conversion img2vid/vid2vid.
+        # Conversion img2vid/img2vid.
         elif do_convert:
             print("Conversion Model:  " + "stabilityai/stable-diffusion-xl-refiner-1.0")
             from diffusers import StableDiffusionXLImg2ImgPipeline, AutoencoderKL
@@ -2419,7 +2443,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     image=canny_image,
                     num_inference_steps=image_num_inference_steps, #Should be around 50
                     guidance_scale=clamp_value(image_num_guidance, 3, 5), # Should be between 3 and 5.
-                    guess_mode=True,
+                    #guess_mode=True, #NOTE: Maybe the individual methods should be selectable instead?
                     height=y,
                     width=x,
                     generator=generator,
@@ -2440,13 +2464,16 @@ class SEQUENCER_OT_generate_image(Operator):
                     return {"CANCELLED"}
 
                 image = init_image.resize((x, y))
-                image = openpose(image)
+
+                if not scene.openpose_use_bones:
+                    image = np.array(image)
+                    image = openpose(image)
 
                 image = pipe(
                     prompt=prompt,
                     negative_prompt=negative_prompt,
                     image=image,
-                    num_inference_steps=20, #image_num_inference_steps,
+                    num_inference_steps=image_num_inference_steps,
                     guidance_scale=image_num_guidance,
                     height=y,
                     width=x,
@@ -2668,10 +2695,12 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
 
         if use_strip_data:
             print("Use file seed and prompt: Yes")
+        else:
+            print("Use file seed and prompt: No")
 
         for count, strip in enumerate(strips):
 
-            if strip.type == "SCENE":
+            if strip.type == "SCENE" or strip.type == "MOVIE":
                 temp_strip = strip = get_render_strip(self, context, strip)
 
             if strip.type == "TEXT":
@@ -2827,7 +2856,7 @@ classes = (
     SEQUENCER_OT_generate_movie,
     SEQUENCER_OT_generate_audio,
     SEQUENCER_OT_generate_image,
-    SEQEUNCER_PT_generate_ai,
+    SEQUENCER_PT_pallaidium_panel,
     GENERATOR_OT_sound_notification,
     SEQUENCER_OT_strip_to_generatorAI,
     GENERATOR_OT_install,
@@ -3006,6 +3035,13 @@ def register():
             items=[("no_style", "No Style", "No Style")] + styles_array,
             default="no_style",
         )
+
+    # Refine SD
+    bpy.types.Scene.openpose_use_bones = bpy.props.BoolProperty(
+        name="openpose_use_bones",
+        default=0,
+    )
+
 
 
     for cls in classes:
