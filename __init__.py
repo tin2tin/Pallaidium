@@ -2314,7 +2314,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 variant="fp16",
             )
 
-            #refiner.watermark = NoWatermark()
+            refiner.watermark = NoWatermark()
 
 #            if low_vram():
             refiner.enable_model_cpu_offload()
