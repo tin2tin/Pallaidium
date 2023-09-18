@@ -1116,6 +1116,11 @@ def get_render_strip(self, context, strip):
         output_path = os.path.join(
             rendered_dir, src_name + "_rendered" + src_ext
         )
+
+#        print("before: "+str(output_path))
+#        output_path = ensure_unique_filename(output_path)
+#        print("after: "+str(output_path))
+
         new_scene.render.filepath = output_path
 
         # Render the strip to hard disk
@@ -1171,8 +1176,6 @@ def get_render_strip(self, context, strip):
     return resulting_strip
 
 
-
-
 def find_strip_by_name(scene, name):
     for sequence in scene.sequence_editor.sequences:
         if sequence.name == name:
@@ -1196,6 +1199,35 @@ def get_strip_path(strip):
 def clamp_value(value, min_value, max_value):
     # Ensure value is within the specified range
     return max(min(value, max_value), min_value)
+
+
+def find_overlapping_frame(strip, current_frame):
+    # Calculate the end frame of the strip
+    strip_end_frame = strip.frame_final_start + strip.frame_duration
+
+    # Check if the strip's frame range overlaps with the current frame
+    if strip.frame_final_start <= current_frame <= strip_end_frame:
+        # Calculate the overlapped frame by subtracting strip.frame_start from the current frame
+        return current_frame - strip.frame_start
+    else:
+        return None  # Return None if there is no overlap
+
+
+def ensure_unique_filename(file_name):
+    # Check if the file already exists
+    if os.path.exists(file_name):
+        base_name, extension = os.path.splitext(file_name)
+        index = 1
+
+        # Keep incrementing the index until a unique filename is found
+        while True:
+            unique_file_name = f"{base_name}_{index}{extension}"
+            if not os.path.exists(unique_file_name):
+                return unique_file_name
+            index += 1
+    else:
+        # File doesn't exist, return the original name
+        return file_name
 
 
 class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
@@ -2489,7 +2521,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     print("Selected mask not found!")
                     return {"CANCELLED"}
 
-                if mask_strip.type == "MASK" or mask_strip.type == "SCENE":
+                if mask_strip.type == "MASK" or mask_strip.type == "COLOR" or mask_strip.type == "SCENE":
                     mask_strip = get_render_strip(self, context, mask_strip)
 
                 mask_path = get_strip_path(mask_strip)
@@ -2539,12 +2571,12 @@ class SEQUENCER_OT_generate_image(Operator):
             # Img2img
             elif do_convert:
                 if scene.movie_path:
-                    print("Process: Video to image")
+                    print("Process: Video to Image")
                     init_image = load_first_frame(scene.movie_path)
                     init_image = init_image.resize((x, y))
 
                 elif scene.image_path:
-                    print("Process: Image to image")
+                    print("Process: Image to Image")
                     init_image = load_first_frame(scene.image_path)
                     init_image = init_image.resize((x, y))
 
@@ -2700,8 +2732,30 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
 
         for count, strip in enumerate(strips):
 
+            # render intermediate mp4 file
             if strip.type == "SCENE" or strip.type == "MOVIE":
-                temp_strip = strip = get_render_strip(self, context, strip)
+
+                # Make the current frame overlapped frame, the temp strip.
+                if type == "image":
+                    trim_frame = find_overlapping_frame(strip, current_frame)
+
+                    if trim_frame:
+                        bpy.ops.sequencer.copy()
+                        bpy.ops.sequencer.paste()
+
+                        intermediate_strip = bpy.context.selected_sequences[0]
+                        intermediate_strip.frame_start = strip.frame_start
+                        intermediate_strip.frame_offset_start = int(trim_frame)
+                        intermediate_strip.frame_final_duration = 1
+
+                        temp_strip = strip = get_render_strip(self, context, intermediate_strip)
+
+                        if intermediate_strip is not None:
+                            delete_strip(intermediate_strip)
+                    else:
+                        temp_strip = strip = get_render_strip(self, context, strip)
+                else:
+                    temp_strip = strip = get_render_strip(self, context, strip)
 
             if strip.type == "TEXT":
                 if strip.text:
@@ -3041,8 +3095,6 @@ def register():
         name="openpose_use_bones",
         default=0,
     )
-
-
 
     for cls in classes:
         bpy.utils.register_class(cls)
