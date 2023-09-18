@@ -795,53 +795,68 @@
         "negative_prompt": "Calm clear skies"
     },
     {
-        "name": "Wide Shot",
-        "prompt": "{prompt} with a wide shot, capturing the entire scene, using a wide angle lens",
+        "name": "Extreme Wide Shot",
+        "prompt": "Cinematic shot, (extreme wide shot: 1.5) (humans far away: 1.5) {prompt} with an extreme wide shot, capturing the entire scene, using an ultra wide angle lens",
+        "negative_prompt": "Close-up shot"
+    },
+    {
+        "name": "Full Shot",
+        "prompt": "Cinematic shot, (establishing shot: 1.5) (full body with feet: 1.5) {prompt} with a wide shot, capturing the entire scene, using a wide angle lens",
+        "negative_prompt": "Close-up shot"
+    },
+    {
+        "name": "Medium Full Shot",
+        "prompt": "Cinematic shot, (Medium Full Shot: 1.5) (full body from knees up: 1.5) {prompt} framing the subject from the knees up, using a standard lens",
         "negative_prompt": "Close-up shot"
     },
     {
         "name": "Medium Shot",
-        "prompt": "{prompt} with a medium shot, framing the subject from the waist up, using a standard lens",
+        "prompt": "Cinematic shot, (medium shot: 1.5) (upper body: 1.5) {prompt} framing the subject from the waist up, using a standard lens",
         "negative_prompt": "Extreme long shot"
     },
     {
+        "name": "Medium Close-up Shot",
+        "prompt": "Cinematic shot, (medium close-up shot: 1.5) (head and shoulders: 1.5) {prompt} focusing on specific details of the main character's head and shoulders, using a standard lens",
+        "negative_prompt": "Wide shot"
+    },
+    {
         "name": "Close-up Shot",
-        "prompt": "{prompt} with a close-up shot, focusing on specific details of the main character's face or object, using a macro lens",
+        "prompt": "Cinematic shot, (close-up shot: 1.5) (head and neck: 1.5) {prompt} focusing on specific details of the main character's face or object, using a long lens",
         "negative_prompt": "Wide shot"
     },
     {
         "name": "Extreme Close-up Shot",
-        "prompt": "{prompt} with an extreme close-up shot, emphasizing tiny details of the main character or object, using a macro lens",
+        "prompt": "Cinematic shot, (extreame close-up shot: 1.5) (eyes: 1.5) {prompt} emphasizing tiny details of the main character or object, using a macro lens",
         "negative_prompt": "Long shot"
     },
     {
         "name": "Over-the-Shoulder Shot",
-        "prompt": "{prompt} with an over-the-shoulder shot, showing one character's perspective and partially revealing the main character, using a standard lens",
+        "prompt": "Cinematic shot, (over the shoulder shot: 1.5) {prompt} showing one character's perspective and partially revealing another character, using a standard lens",
         "negative_prompt": "Frontal shot"
     },
     {
         "name": "Dutch Angle Shot",
-        "prompt": "{prompt} with a Dutch angle shot, creating a sense of unease around the main character, using a standard lens",
+        "prompt": "Cinematic shot, (Dutch angle shot: 1.5) {prompt} creating a sense of unease around the main character, using a standard lens",
         "negative_prompt": "Steady shot"
     },
     {
         "name": "Bird's-Eye View Shot",
-        "prompt": "{prompt} with a bird's-eye view shot, looking down from above and capturing the main character in the context, using a wide-angle lens",
+        "prompt": "Cinematic shot, (bird's-eye view shot: 1.5) {prompt} looking down from above and capturing the main character in the context, using a wide-angle lens",
         "negative_prompt": "Low-angle shot"
     },
     {
         "name": "Low-Angle Shot",
-        "prompt": "{prompt} with a low-angle shot, making the main character appear powerful and dominant, using a standard lens",
+        "prompt": "Cinematic shot, (low-angle shot: 1.5) {prompt} making the main character appear powerful and dominant, using a standard lens",
         "negative_prompt": "High-angle shot"
     },
     {
         "name": "High-Angle Shot",
-        "prompt": "{prompt} with a high-angle shot, making the main character appear vulnerable and smaller, using a standard lens",
+        "prompt": "Cinematic shot, (high-angle shot: 1.5) {prompt} making the main character appear vulnerable and smaller, using a standard lens",
         "negative_prompt": "Low-angle shot"
     },
     {
         "name": "Point-of-View (POV) Shot",
-        "prompt": "{prompt} with a point-of-view shot, showing the character's perspective and giving glimpses of the main character, using a wide angle lens",
+        "prompt": "Cinematic shot, (point-of-view shot: 1.5) {prompt} showing the character's perspective and giving glimpses of the main character, using a gopro lens",
         "negative_prompt": "External perspective shot"
     }
 ]
