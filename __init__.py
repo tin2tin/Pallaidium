@@ -1265,7 +1265,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         col.prop(context.scene, "input_strips", text="Input")
 
         if type != "audio":
-            if image_model_card != "lllyasviel/sd-controlnet-canny" and image_model_card != "lllyasviel/sd-controlnet-openpose":
+            if ((type != "image" and image_model_card != "lllyasviel/sd-controlnet-canny") and (type != "image" and image_model_card != "lllyasviel/sd-controlnet-openpose")):
 
                 if input == "input_strips" and not scene.inpaint_selected_strip:
                     col.prop(context.scene, "image_power", text="Strip Power")
