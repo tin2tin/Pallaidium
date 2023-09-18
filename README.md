@@ -78,6 +78,13 @@ Styles:
 See SDXL handling most of the styles here: https://stable-diffusion-art.com/sdxl-styles/
 
 
+## Updates
+
+Read about the updates here: 
+
+https://github.com/tin2tin/Pallaidium/discussions/categories/announcements
+
+
 ## Text to Video
 The Animov models have been trained on Anime material, so adding "anime" to the prompt is necessary, especially for the Animov-512x model. 
 
