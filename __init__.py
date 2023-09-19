@@ -777,10 +777,10 @@ def input_strips_updated(self, context):
     if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0" and type == "movie":
         scene.input_strips = "input_strips"
 
-    if type == "movie" or type == "audio":
+    if type == "movie" or type == "audio" or image_model_card == "lllyasviel/control_v11p_sd15_scribble":
         scene.inpaint_selected_strip = ""
 
-    if type=="image" and (image_model_card == "lllyasviel/sd-controlnet-canny" or image_model_card == "lllyasviel/sd-controlnet-openpose"):
+    if type=="image" and (image_model_card == "lllyasviel/sd-controlnet-canny" or image_model_card == "lllyasviel/sd-controlnet-openpose" or image_model_card == "lllyasviel/control_v11p_sd15_scribble"):
         scene.input_strips = "input_strips"
 
 
@@ -794,10 +794,10 @@ def output_strips_updated(self, context):
     type = scene.generatorai_typeselect
     input = scene.input_strips
 
-    if type == "movie" or type == "audio":
+    if type == "movie" or type == "audio" or image_model_card == "lllyasviel/control_v11p_sd15_scribble":
         scene.inpaint_selected_strip = ""
 
-    if (image_model_card == "lllyasviel/sd-controlnet-canny" or image_model_card == "lllyasviel/sd-controlnet-openpose") and type=="image":
+    if (image_model_card == "lllyasviel/sd-controlnet-canny" or image_model_card == "lllyasviel/sd-controlnet-openpose" or image_model_card == "lllyasviel/control_v11p_sd15_scribble") and type=="image":
         scene.input_strips = "input_strips"
 
 
@@ -885,6 +885,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             ("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0"),
             ("lllyasviel/sd-controlnet-canny", "ControlNet (512x512)", "lllyasviel/sd-controlnet-canny"),
             ("lllyasviel/sd-controlnet-openpose", "OpenPose (512x512)", "lllyasviel/sd-controlnet-openpose"),
+            ("lllyasviel/control_v11p_sd15_scribble", "Scribble (512x512)", "lllyasviel/control_v11p_sd15_scribble"),
         ],
         default="stabilityai/stable-diffusion-xl-base-1.0",
     )
@@ -1123,8 +1124,11 @@ def get_render_strip(self, context, strip):
 
         new_scene.render.filepath = output_path
 
+        if strip.type == "SCENE":
         # Render the strip to hard disk
-        bpy.ops.render.opengl(animation=True, sequencer=True)
+            bpy.ops.render.opengl(animation=False, sequencer=True)
+        else:
+            bpy.ops.render.opengl(animation=True, sequencer=True)
 
         # Delete the new scene
         bpy.data.scenes.remove(new_scene, do_unlink=True)
@@ -1150,7 +1154,7 @@ def get_render_strip(self, context, strip):
                     overlap=0,
                 )
             elif strip.type == "SCENE":
-                # Insert the rendered file as a movie strip and sound strip in the original scene.
+                # Insert the rendered file as a scene strip in the original scene.
                 bpy.ops.sequencer.movie_strip_add(
                     channel=insert_channel,
                     filepath=output_path,
@@ -1158,6 +1162,15 @@ def get_render_strip(self, context, strip):
                     overlap=0,
                     sound=False,
                 )
+#            elif strip.type == "IMAGE":
+#                # Insert the rendered file as an image strip in the original scene.
+#                bpy.ops.sequencer.image_strip_add(
+#                    channel=insert_channel,
+#                    filepath=output_path,
+#                    frame_start=int(strip.frame_final_start),
+#                    overlap=0,
+#                    sound=False,
+#                )
             else:
                 # Insert the rendered file as a movie strip in the original scene without sound.
                 bpy.ops.sequencer.movie_strip_add(
@@ -1265,7 +1278,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         col.prop(context.scene, "input_strips", text="Input")
 
         if type != "audio":
-            if ((type != "image" and image_model_card != "lllyasviel/sd-controlnet-canny") and (type != "image" and image_model_card != "lllyasviel/sd-controlnet-openpose")):
+            if (type == "movie" or (type == "image" and image_model_card != "lllyasviel/sd-controlnet-canny" and image_model_card != "lllyasviel/sd-controlnet-openpose" and image_model_card != "lllyasviel/control_v11p_sd15_scribble")):
 
                 if input == "input_strips" and not scene.inpaint_selected_strip:
                     col.prop(context.scene, "image_power", text="Strip Power")
@@ -1276,9 +1289,12 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                             col.prop_search(scene, "inpaint_selected_strip", scene.sequence_editor, "sequences", text="Inpaint Mask", icon='SEQ_STRIP_DUPLICATE')
 
         if image_model_card == "lllyasviel/sd-controlnet-openpose" and type == "image":
-            col = col.column(heading=" ", align=True)
-            #col.prop(context.scene, "refine_sd", text="Image")
-            col.prop(context.scene, "openpose_use_bones", text="OpenPose Rig Image")#, icon="ARMATURE_DATA")
+            col = col.column(heading="Read as", align=True)
+            col.prop(context.scene, "openpose_use_bones", text="OpenPose Rig Image")
+
+        if image_model_card == "lllyasviel/control_v11p_sd15_scribble" and type == "image":
+            col = col.column(heading="Read as", align=True)
+            col.prop(context.scene, "use_scribble_image", text="Scribble Image")
 
         col = layout.column(align=True)
         col = col.box()
@@ -2064,6 +2080,8 @@ class SEQUENCER_OT_generate_image(Operator):
             from diffusers.utils import load_image
             import numpy as np
             import PIL
+            import cv2
+            from PIL import Image
         except ModuleNotFoundError:
             print("Dependencies needs to be installed in the add-on preferences.")
             self.report(
@@ -2090,11 +2108,11 @@ class SEQUENCER_OT_generate_image(Operator):
         image_num_guidance = scene.movie_num_guidance
         active_strip = context.scene.sequence_editor.active_strip
 
-        do_inpaint = input == "input_strips" and scene.inpaint_selected_strip and type == "image"
-        do_convert = (scene.image_path or scene.movie_path) and not image_model_card == "lllyasviel/sd-controlnet-canny" and not image_model_card == "lllyasviel/sd-controlnet-openpose" and not do_inpaint
+        do_inpaint = (input == "input_strips" and scene.inpaint_selected_strip and type == "image")
+        do_convert = (scene.image_path or scene.movie_path) and not image_model_card == "lllyasviel/sd-controlnet-canny" and not image_model_card == "lllyasviel/sd-controlnet-openpose" and not image_model_card == "lllyasviel/control_v11p_sd15_scribble" and not do_inpaint
         do_refine = scene.refine_sd and not do_convert # or image_model_card == "stabilityai/stable-diffusion-xl-base-1.0") #and not do_inpaint
 
-        if do_inpaint or do_convert or image_model_card == "lllyasviel/sd-controlnet-canny" or image_model_card == "lllyasviel/sd-controlnet-openpose":
+        if do_inpaint or do_convert or image_model_card == "lllyasviel/sd-controlnet-canny" or image_model_card == "lllyasviel/sd-controlnet-openpose" or image_model_card == "lllyasviel/control_v11p_sd15_scribble":
             if not strips:
                 self.report({"INFO"}, "Select strip(s) for processing.")
                 return {"CANCELLED"}
@@ -2107,10 +2125,12 @@ class SEQUENCER_OT_generate_image(Operator):
                 return {"CANCELLED"}
 
         # LOADING MODELS
-        print("Model:  " + image_model_card)
+        #print("Model:  " + image_model_card)
 
         # models for inpaint
         if do_inpaint:
+
+            print("Load: Inpaint Model")
 
             # NOTE: need to test if I can get SDXL Inpainting working!
 
@@ -2156,10 +2176,9 @@ class SEQUENCER_OT_generate_image(Operator):
 
         # ControlNet
         elif image_model_card == "lllyasviel/sd-controlnet-canny":
+            print("Load: Canny Model")
             #NOTE: Not sure this is working as intented?
             from diffusers import StableDiffusionControlNetPipeline, ControlNetModel, UniPCMultistepScheduler
-            import cv2
-            from PIL import Image
 
             controlnet = ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-canny", torch_dtype=torch.float16)
 
@@ -2175,13 +2194,11 @@ class SEQUENCER_OT_generate_image(Operator):
 
         # OpenPose
         elif image_model_card == "lllyasviel/sd-controlnet-openpose":
+            print("Load: OpenPose Model")
 
             # NOTE: Is it working on Pose Rig Bones too?
             from diffusers import StableDiffusionControlNetPipeline, ControlNetModel, UniPCMultistepScheduler
-            import torch
             from controlnet_aux import OpenposeDetector
-            import cv2
-            from PIL import Image
 
             #controlnet = ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-canny", torch_dtype=torch.float16) #safety_checker=None)
             #pipe = StableDiffusionControlNetPipeline.from_pretrained("runwayml/stable-diffusion-v1-5", controlnet=controlnet, torch_dtype=torch.float16)   #safety_checker=None,
@@ -2205,8 +2222,39 @@ class SEQUENCER_OT_generate_image(Operator):
             else:
                 pipe.to("cuda")
 
+        # Scribble
+        elif image_model_card == "lllyasviel/control_v11p_sd15_scribble":
+            print("Load: Scribble Model")
+
+            from controlnet_aux import PidiNetDetector, HEDdetector
+            from diffusers import (
+                ControlNetModel,
+                StableDiffusionControlNetPipeline,
+                UniPCMultistepScheduler,
+            )
+            checkpoint = "lllyasviel/control_v11p_sd15_scribble"
+
+            processor = HEDdetector.from_pretrained('lllyasviel/Annotators')
+
+            controlnet = ControlNetModel.from_pretrained(checkpoint, torch_dtype=torch.float16)
+
+            pipe = StableDiffusionControlNetPipeline.from_pretrained(
+                "runwayml/stable-diffusion-v1-5", controlnet=controlnet, torch_dtype=torch.float16
+            )
+
+            pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
+
+            if low_vram():
+                #torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
+                pipe.enable_model_cpu_offload()
+                #pipe.enable_vae_slicing()
+                #pipe.enable_forward_chunking(chunk_size=1, dim=1)
+            else:
+                pipe.to("cuda")
+
         # Wuerstchen
         elif image_model_card == "warp-ai/wuerstchen":
+            print("Load: Würstchen Model")
             if do_convert:
                 print(image_model_card+" does not support img2img or img2vid. Ignoring input strip.")
             from diffusers import AutoPipelineForText2Image
@@ -2225,6 +2273,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
         # DeepFloyd
         elif image_model_card == "DeepFloyd/IF-I-M-v1.0":
+            print("Load: DeepFloyd Model")
             if do_convert:
                 print(image_model_card+" does not support img2img or img2vid. Ignoring input strip.")
             from huggingface_hub.commands.user import login
@@ -2279,6 +2328,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
         # Conversion img2vid/img2vid.
         elif do_convert:
+            print("Load: img2vid/img2vid Model")
             print("Conversion Model:  " + "stabilityai/stable-diffusion-xl-refiner-1.0")
             from diffusers import StableDiffusionXLImg2ImgPipeline, AutoencoderKL
 
@@ -2304,6 +2354,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
         # Stable diffusion
         else:
+            print("Load: "+image_model_card+" Model")
             from diffusers import AutoencoderKL
             if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
                 vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
@@ -2334,7 +2385,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
         # Add refiner model if chosen.
         if do_refine:
-            print("Refine Model:  " + "stabilityai/stable-diffusion-xl-refiner-1.0")
+            print("Load Refine Model:  " + "stabilityai/stable-diffusion-xl-refiner-1.0")
             from diffusers import StableDiffusionXLImg2ImgPipeline, AutoencoderKL
 
             #vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
@@ -2397,6 +2448,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 else:
                     generator = None
 
+
             # DeepFloyd process:
             if image_model_card == "DeepFloyd/IF-I-M-v1.0":
                 prompt_embeds, negative_embeds = stage_1.encode_prompt(
@@ -2445,6 +2497,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     generator=generator,
                 ).images[0]
 
+
             # ControlNet
             elif image_model_card == "lllyasviel/sd-controlnet-canny":
                 print("Process: ControlNet")
@@ -2466,8 +2519,9 @@ class SEQUENCER_OT_generate_image(Operator):
 
                 image = cv2.Canny(image, low_threshold, high_threshold)
                 image = image[:, :, None]
-                image = np.concatenate([image, image, image], axis=2)
-                canny_image = Image.fromarray(image)
+                canny_image = np.concatenate([image, image, image], axis=2)
+                canny_image = Image.fromarray(canny_image)
+                #canny_image = np.array(canny_image)
 
                 image = pipe(
                     prompt=prompt,
@@ -2512,6 +2566,43 @@ class SEQUENCER_OT_generate_image(Operator):
                     generator=generator,
                 ).images[0]
 
+
+            # Scribble
+            elif image_model_card == "lllyasviel/control_v11p_sd15_scribble":
+                print("Process: Scribble")
+                init_image = None
+
+                if scene.image_path:
+                    init_image = load_first_frame(scene.image_path)
+                if scene.movie_path:
+                    init_image = load_first_frame(scene.movie_path)
+                if not init_image:
+                    print("Loading strip failed!")
+                    return {"CANCELLED"}
+
+                image = init_image.resize((x, y))
+
+                if scene.use_scribble_image:
+                    image = np.array(image)
+                    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                    image = cv2.bitwise_not(image)
+                    image = processor(image, scribble=False)
+                else:
+                    image = np.array(image)
+                    image = processor(image, scribble=True)
+
+                image = pipe(
+                    prompt=prompt,
+                    negative_prompt=negative_prompt,
+                    image=image,
+                    num_inference_steps=image_num_inference_steps,
+                    guidance_scale=image_num_guidance,
+                    height=y,
+                    width=x,
+                    generator=generator,
+                ).images[0]
+
+
             # Inpaint
             elif do_inpaint:
                 print("Process: Inpaint")
@@ -2521,7 +2612,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     print("Selected mask not found!")
                     return {"CANCELLED"}
 
-                if mask_strip.type == "MASK" or mask_strip.type == "COLOR" or mask_strip.type == "SCENE":
+                if mask_strip.type == "MASK" or mask_strip.type == "COLOR" or mask_strip.type == "SCENE" or mask_strip.type == "META":
                     mask_strip = get_render_strip(self, context, mask_strip)
 
                 mask_path = get_strip_path(mask_strip)
@@ -2876,7 +2967,6 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     scene.movie_use_random = use_random
                     scene.movie_num_seed = seed
 
-
                 if temp_strip is not None:
                     delete_strip(temp_strip)
 #                    sel_seq = context.selected_sequences
@@ -2933,14 +3023,14 @@ def register():
     bpy.types.Scene.generate_movie_x = bpy.props.IntProperty(
         name="generate_movie_x",
         default=1024,
-        step=128,
+        step=64,
         min=256,
         max=1536,
     )
     bpy.types.Scene.generate_movie_y = bpy.props.IntProperty(
         name="generate_movie_y",
         default=512,
-        step=128,
+        step=64,
         min=256,
         max=1536,
     )
@@ -3090,11 +3180,17 @@ def register():
             default="no_style",
         )
 
-    # Refine SD
     bpy.types.Scene.openpose_use_bones = bpy.props.BoolProperty(
         name="openpose_use_bones",
         default=0,
     )
+
+    bpy.types.Scene.use_scribble_image = bpy.props.BoolProperty(
+        name="use_scribble_image",
+        default=0,
+    )
+
+
 
     for cls in classes:
         bpy.utils.register_class(cls)
