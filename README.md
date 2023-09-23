@@ -12,6 +12,7 @@ AI-generate video, image, and audio from text prompts or video, image, or text s
 | Image to image                                     | Image to video                                     |
 | Video to video                                     | Style selector                                     |
 | ControlNet                                         | OpenPose                                          |
+| Canny                                          | Illusion                                          |
 | Seed                                               | Quality steps                                     |
 | Frames                                             | Word power                                         |
 | Denoising                                          | Strip power                                        |
