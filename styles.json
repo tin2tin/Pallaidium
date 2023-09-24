@@ -30,6 +30,11 @@
         "negative_prompt": "photograph, deformed, glitch, noisy, realistic, stock photo"
     },
     {
+        "name": "Sai: storyboard",
+        "prompt": "storyboard drawing {prompt} . simplified sketch, gestural lines, water colors",
+        "negative_prompt": "photograph, deformed, glitch, noisy, realistic, stock photo"
+    },
+    {
         "name": "Sai: craft clay",
         "prompt": "play-doh style {prompt} . sculpture, clay art, centered composition, Claymation",
         "negative_prompt": "sloppy, messy, grainy, highly detailed, ultra textured, photo"
@@ -490,6 +495,11 @@
         "negative_prompt": "cluttered background, poor lighting, overexposed, underexposed, unsharp"
     },
     {
+        "name": "Portrait Photo: Imperfect Realism",
+        "prompt": "Photo of {prompt} . Rolleiflex photo, Portra 800 film, realistic skin texture, imperfect details, film grain, pensive stillness, film photography",
+        "negative_prompt": "ugly, deformed, noisy, blurry"
+    },
+    {
         "name": "Photojournalism Style: Reportage",
         "prompt": "gripping reportage of {prompt}. Wide-angle lens, f/8, focus on action, capture the moment",
         "negative_prompt": "blurred action, low light noise, unsteady shot, out of focus, distorted perspective"
@@ -860,5 +870,3 @@
         "negative_prompt": "External perspective shot"
     }
 ]
-
-
