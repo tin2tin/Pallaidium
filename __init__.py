@@ -843,7 +843,7 @@ def input_strips_updated(self, context):
         or image_model_card == "lllyasviel/sd-controlnet-openpose"
         or image_model_card == "lllyasviel/control_v11p_sd15_scribble"
         or image_model_card == "monster-labs/control_v1p_sd15_qrcode_monster"
-        # or image_model_card == "Salesforce/blipdiffusion"
+        or image_model_card == "Salesforce/blipdiffusion"
     ):
         scene.input_strips = "input_strips"
 
@@ -869,7 +869,7 @@ def output_strips_updated(self, context):
         or image_model_card == "lllyasviel/sd-controlnet-openpose"
         or image_model_card == "lllyasviel/control_v11p_sd15_scribble"
         or image_model_card == "monster-labs/control_v1p_sd15_qrcode_monster"
-        # or image_model_card == "Salesforce/blipdiffusion"
+        or image_model_card == "Salesforce/blipdiffusion"
     ) and type == "image":
         scene.input_strips = "input_strips"
 
@@ -976,11 +976,11 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Illusion (512x512)",
                 "monster-labs/control_v1p_sd15_qrcode_monster",
             ),
-#            (
-#                "Salesforce/blipdiffusion",
-#                "Zero Shot Subject (512x512)",
-#                "Salesforce/blipdiffusion",
-#            ),
+            (
+                "Salesforce/blipdiffusion",
+                "Subject Driven (512x512)",
+                "Salesforce/blipdiffusion",
+            ),
         ],
         default="stabilityai/stable-diffusion-xl-base-1.0",
     )
@@ -1387,7 +1387,23 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         col = col.box()
         col = col.column()
 
-        col.prop(context.scene, "input_strips", text="Input")
+        if image_model_card == "Salesforce/blipdiffusion" and type == "image":
+            col.prop(context.scene, "input_strips", text="Source Image")
+            col.prop(context.scene, "blip_cond_subject", text="Source Subject")
+            #col.prop(context.scene, "blip_subject_image", text="Target Image")
+            col.prop_search(
+                scene,
+                "blip_subject_image",
+                scene.sequence_editor,
+                "sequences",
+                text="Target Image",
+                icon="SEQ_STRIP_DUPLICATE",
+            )
+            col.prop(context.scene, "blip_tgt_subject", text="Target Subject")
+        else:
+            col.prop(context.scene, "input_strips", text="Input")
+            
+
 
         if type != "audio":
             if type == "movie" or (
@@ -1396,7 +1412,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 and image_model_card != "lllyasviel/sd-controlnet-openpose"
                 and image_model_card != "lllyasviel/control_v11p_sd15_scribble"
                 and image_model_card != "monster-labs/control_v1p_sd15_qrcode_monster"
-                #and image_model_card != "Salesforce/blipdiffusion"
+                and image_model_card != "Salesforce/blipdiffusion"
             ):
                 if input == "input_strips" and not scene.inpaint_selected_strip:
                     col.prop(context.scene, "image_power", text="Strip Power")
@@ -1420,6 +1436,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         ):
             col = col.column(heading="Read as", align=True)
             col.prop(context.scene, "use_scribble_image", text="Scribble Image")
+
         col = layout.column(align=True)
         col = col.box()
         col = col.column(align=True)
@@ -2190,7 +2207,7 @@ class SEQUENCER_OT_generate_image(Operator):
         if (
             scene.generate_movie_prompt == ""
             and not image_model_card == "lllyasviel/sd-controlnet-canny"
-            #and not image_model_card == "Salesforce/blipdiffusion"
+            and not image_model_card == "Salesforce/blipdiffusion"
             and not image_model_card == "monster-labs/control_v1p_sd15_qrcode_monster"
         ):
             self.report({"INFO"}, "Text prompt in the Generative AI tab is empty!")
@@ -2240,7 +2257,7 @@ class SEQUENCER_OT_generate_image(Operator):
         active_strip = context.scene.sequence_editor.active_strip
 
         do_inpaint = (
-            input == "input_strips" and scene.inpaint_selected_strip and type == "image"
+            input == "input_strips" and find_strip_by_name(scene, scene.inpaint_selected_strip) and type == "image"
         )
         do_convert = (
             (scene.image_path or scene.movie_path)
@@ -2248,7 +2265,7 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "lllyasviel/sd-controlnet-openpose"
             and not image_model_card == "lllyasviel/control_v11p_sd15_scribble"
             and not image_model_card == "monster-labs/control_v1p_sd15_qrcode_monster"
-            #and not image_model_card == "Salesforce/blipdiffusion"
+            and not image_model_card == "Salesforce/blipdiffusion"
             and not do_inpaint
         )
         do_refine = (
@@ -2262,7 +2279,7 @@ class SEQUENCER_OT_generate_image(Operator):
             or image_model_card == "lllyasviel/sd-controlnet-openpose"
             or image_model_card == "lllyasviel/control_v11p_sd15_scribble"
             or image_model_card == "monster-labs/control_v1p_sd15_qrcode_monster"
-            #or image_model_card == "Salesforce/blipdiffusion"
+            or image_model_card == "Salesforce/blipdiffusion"
         ):
             if not strips:
                 self.report({"INFO"}, "Select strip(s) for processing.")
@@ -2357,23 +2374,31 @@ class SEQUENCER_OT_generate_image(Operator):
             else:
                 pipe.to("cuda")
 
-#        # Blip    
-#        elif image_model_card == "Salesforce/blipdiffusion":
-#            print("Load: Blip Model")
-#            
-#            from diffusers.pipelines import BlipDiffusionPipeline
-#            from diffusers.utils import load_image
-#            import torch
+        # Blip
+        elif image_model_card == "Salesforce/blipdiffusion":
+            print("Load: Blip Model")
 
-#            pipe = BlipDiffusionPipeline.from_pretrained(
-#                "Salesforce/blipdiffusion", torch_dtype=torch.float16
-#            ).to("cuda")
-#            
-##            if low_vram():
-##                pipe.enable_model_cpu_offload()
-##                pipe.enable_vae_slicing()
-##            else:
-##                pipe.to("cuda")            
+            from diffusers.utils import load_image
+            import torch
+            
+            if not find_strip_by_name(scene, scene.blip_subject_image):
+                from diffusers.pipelines import BlipDiffusionPipeline
+
+                pipe = BlipDiffusionPipeline.from_pretrained(
+                    "Salesforce/blipdiffusion", torch_dtype=torch.float16
+                ).to("cuda")
+            else:
+                from controlnet_aux import CannyDetector
+                from diffusers.pipelines import BlipDiffusionControlNetPipeline
+                pipe = BlipDiffusionControlNetPipeline.from_pretrained(
+                    "Salesforce/blipdiffusion-controlnet", torch_dtype=torch.float16
+                ).to("cuda")
+
+#            if low_vram():
+#                pipe.enable_model_cpu_offload()
+#                pipe.enable_vae_slicing()
+#            else:
+#                pipe.to("cuda")
 
         # OpenPose
         elif image_model_card == "lllyasviel/sd-controlnet-openpose":
@@ -2715,7 +2740,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 if not init_image:
                     print("Loading strip failed!")
                     return {"CANCELLED"}
-                
+
                 init_image = init_image.resize((x, y))
 
                 if image_model_card == "lllyasviel/sd-controlnet-canny":
@@ -2806,39 +2831,70 @@ class SEQUENCER_OT_generate_image(Operator):
                     generator=generator,
                 ).images[0]
 
-#            # Blip
-#            elif image_model_card == "Salesforce/blipdiffusion":
-#                print("Process: Zero Shot Subject")
+            # Blip
+            elif image_model_card == "Salesforce/blipdiffusion":
+                print("Process: Subject Driven")
 
-#                init_image = None
+                text_prompt_input = prompt
+                style_subject = str(scene.blip_cond_subject)
+                tgt_subject = str(scene.blip_tgt_subject)
 
-#                if scene.image_path:
-#                    init_image = load_first_frame(scene.image_path)
-#                if scene.movie_path:
-#                    init_image = load_first_frame(scene.movie_path)
-#                if not init_image:
-#                    print("Loading strip failed!")
-#                    return {"CANCELLED"}
-#                
-#                init_image = init_image.resize((x, y))
+                init_image = None
 
-#                cond_subject = "a young wonam" 
-#                tgt_subject = "an old woman" 
-#                text_prompt_input = prompt
+                if scene.image_path:
+                    init_image = load_first_frame(scene.image_path)
+                if scene.movie_path:
+                    init_image = load_first_frame(scene.movie_path)
+                if not init_image:
+                    print("Loading strip failed!")
+                    return {"CANCELLED"}
 
-#                cond_image = init_image
+                init_image = init_image.resize((x, y))
+                style_image = init_image
 
-#                image = pipe(
-#                    text_prompt_input,
-#                    cond_image,
-#                    cond_subject,
-#                    tgt_subject,
-#                    guidance_scale=image_num_guidance,
-#                    num_inference_steps=image_num_inference_steps,
-#                    neg_prompt=negative_prompt,
-#                    height=y,
-#                    width=x,
-#                ).images[0]
+                subject_strip = find_strip_by_name(scene, scene.blip_subject_image)
+                if subject_strip:
+                    if (
+                        subject_strip.type == "MASK"
+                        or subject_strip.type == "COLOR"
+                        or subject_strip.type == "SCENE"
+                        or subject_strip.type == "META"
+                    ):
+                        subject_strip = get_render_strip(self, context, subject_strip)
+                    subject_path = get_strip_path(subject_strip)
+                    cldm_cond_image = load_first_frame(subject_path)
+                    canny = CannyDetector()
+                    cldm_cond_image = canny(cldm_cond_image, 30, 70, output_type="pil")
+                    if cldm_cond_image:
+                        cldm_cond_image = cldm_cond_image.resize((x, y))
+                        image = pipe(
+                            text_prompt_input,                            
+                            style_image,
+                            cldm_cond_image,
+                            style_subject,
+                            tgt_subject,
+                            guidance_scale=image_num_guidance,
+                            num_inference_steps=image_num_inference_steps,
+                            neg_prompt=negative_prompt,
+                            height=y,
+                            width=x,
+                        ).images[0]
+                    else:
+                        print("Subject strip loading failed!")
+                        subject_strip =""
+                    
+                if not subject_strip:
+                    image = pipe(
+                        text_prompt_input,
+                        style_image,
+                        style_subject,
+                        tgt_subject,
+                        guidance_scale=image_num_guidance,
+                        num_inference_steps=image_num_inference_steps,
+                        neg_prompt=negative_prompt,
+                        height=y,
+                        width=x,
+                    ).images[0]                   
 
             # Inpaint
             elif do_inpaint:
@@ -3423,6 +3479,21 @@ def register():
         default=0,
     )
 
+    # Blip
+    bpy.types.Scene.blip_cond_subject = bpy.props.StringProperty(
+        name="blip_cond_subject",
+        default="",
+    )
+
+    bpy.types.Scene.blip_tgt_subject = bpy.props.StringProperty(
+        name="blip_tgt_subject",
+        default="",
+    )
+
+    bpy.types.Scene.blip_subject_image = bpy.props.StringProperty(
+        name="blip_subject_image", default=""
+    )
+
     for cls in classes:
         bpy.utils.register_class(cls)
 
@@ -3447,6 +3518,9 @@ def unregister():
     del bpy.types.Scene.inpaint_selected_strip
     del bpy.types.Scene.openpose_use_bones
     del bpy.types.Scene.use_scribble_image
+    del bpy.types.Scene.blip_cond_subject
+    del bpy.types.Scene.blip_tgt_subject
+    del bpy.types.Scene.blip_subject_image
 
 
 if __name__ == "__main__":
