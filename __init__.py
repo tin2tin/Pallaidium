@@ -1402,8 +1402,6 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             col.prop(context.scene, "blip_tgt_subject", text="Target Subject")
         else:
             col.prop(context.scene, "input_strips", text="Input")
-            
-
 
         if type != "audio":
             if type == "movie" or (
@@ -1488,9 +1486,18 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         col = col.box()
 
         col.prop(context.scene, "generatorai_typeselect", text="Output")
-        
-        col = col.column(heading="Free Lunch", align=True)
-        col.prop(context.scene, "use_free_lunch", text=" (Experimental)")
+
+        if type != "audio":
+            if type == "movie" or (
+                type == "image"
+                and image_model_card != "lllyasviel/sd-controlnet-canny"
+                and image_model_card != "lllyasviel/sd-controlnet-openpose"
+                and image_model_card != "lllyasviel/control_v11p_sd15_scribble"
+                and image_model_card != "monster-labs/control_v1p_sd15_qrcode_monster"
+                and image_model_card != "Salesforce/blipdiffusion"
+            ):        
+                col = col.column(heading="Free Lunch", align=True)
+                col.prop(context.scene, "use_free_lunch", text=" (Experimental)")
 
         if type == "movie" and (
             movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256"
@@ -1596,6 +1603,7 @@ class SEQUENCER_OT_generate_movie(Operator):
         addon_prefs = preferences.addons[__name__].preferences
         movie_model_card = addon_prefs.movie_model_card
         image_model_card = addon_prefs.image_model_card
+        pipe = None
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -1745,6 +1753,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         if scene.use_free_lunch and pipe: #Free Lunch
             # -------- freeu block registration
+            print("Having a free lunch...")
             register_free_upblock2d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
             register_free_crossattn_upblock2d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
             # -------- freeu block registration                    
@@ -1789,6 +1798,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     generator.manual_seed(seed)
                 else:
                     generator = None
+
             # Process batch input
             if (scene.movie_path or scene.image_path) and input == "input_strips":
                 video_path = scene.movie_path
@@ -1902,6 +1912,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             # Movie.
             else:
                 print("Generate: Video")
+                
                 video_frames = pipe(
                     prompt,
                     negative_prompt=negative_prompt,
@@ -1917,6 +1928,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
+                    
                 # Upscale video.
                 if scene.video_to_video:
                     print("Upscale: Video")
@@ -1938,6 +1950,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         guidance_scale=movie_num_guidance,
                         generator=generator,
                     ).frames
+                    
             # Move to folder.
             src_path = export_to_video(video_frames)
             dst_path = solve_path(clean_filename(str(seed) + "_" + prompt) + ".mp4")
@@ -2628,6 +2641,13 @@ class SEQUENCER_OT_generate_image(Operator):
             else:
                 pipe.to("cuda")
 
+            if scene.use_free_lunch and pipe: #Free Lunch
+                # -------- freeu block registration
+                print("Having a free lunch...")
+                register_free_upblock2d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
+                register_free_crossattn_upblock2d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
+                # -------- freeu block registration
+
         # load refiner model if chosen.
         if do_refine:
             print(
@@ -2652,12 +2672,6 @@ class SEQUENCER_OT_generate_image(Operator):
         #                #refiner.enable_vae_slicing()
         #            else:
         # refiner.to("cuda")
-
-        if scene.use_free_lunch and pipe: #Free Lunch
-            # -------- freeu block registration
-            register_free_upblock2d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
-            register_free_crossattn_upblock2d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
-            # -------- freeu block registration
 
         # Main Generate Loop:
         for i in range(scene.movie_num_batch):
