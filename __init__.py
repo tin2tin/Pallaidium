@@ -1745,8 +1745,8 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         if scene.use_free_lunch and pipe: #Free Lunch
             # -------- freeu block registration
-            register_free_upblock2d(pipe)
-            register_free_crossattn_upblock2d(pipe)
+            register_free_upblock2d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
+            register_free_crossattn_upblock2d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
             # -------- freeu block registration                    
                     
         # GENERATING - Main Loop
@@ -2655,8 +2655,8 @@ class SEQUENCER_OT_generate_image(Operator):
 
         if scene.use_free_lunch and pipe: #Free Lunch
             # -------- freeu block registration
-            register_free_upblock2d(pipe)
-            register_free_crossattn_upblock2d(pipe)
+            register_free_upblock2d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
+            register_free_crossattn_upblock2d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
             # -------- freeu block registration
 
         # Main Generate Loop:
