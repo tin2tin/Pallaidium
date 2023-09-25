@@ -1488,6 +1488,9 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         col = col.box()
 
         col.prop(context.scene, "generatorai_typeselect", text="Output")
+        
+        col = col.column(heading="Free Lunch", align=True)
+        col.prop(context.scene, "use_free_lunch", text=" (Experimental)")
 
         if type == "movie" and (
             movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256"
@@ -1554,6 +1557,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
             Image.MAX_IMAGE_PIXELS = None
             import numpy as np
+            from .free_lunch_utils import register_free_upblock2d, register_free_crossattn_upblock2d
         except ModuleNotFoundError:
             print("In the add-on preferences, install dependencies.")
             self.report(
@@ -1738,6 +1742,13 @@ class SEQUENCER_OT_generate_movie(Operator):
                     upscale.enable_vae_slicing()
                 else:
                     upscale.to("cuda")
+
+        if scene.use_free_lunch and pipe: #Free Lunch
+            # -------- freeu block registration
+            register_free_upblock2d(pipe)
+            register_free_crossattn_upblock2d(pipe)
+            # -------- freeu block registration                    
+                    
         # GENERATING - Main Loop
         for i in range(scene.movie_num_batch):
             if torch.cuda.is_available():
@@ -2203,6 +2214,7 @@ class SEQUENCER_OT_generate_image(Operator):
         strips = context.selected_sequences
         type = scene.generatorai_typeselect
         use_strip_data = addon_prefs.use_strip_data
+        pipe = None
 
         if (
             scene.generate_movie_prompt == ""
@@ -2227,6 +2239,7 @@ class SEQUENCER_OT_generate_image(Operator):
             import PIL
             import cv2
             from PIL import Image
+            from .free_lunch_utils import register_free_upblock2d, register_free_crossattn_upblock2d
         except ModuleNotFoundError:
             print("Dependencies needs to be installed in the add-on preferences.")
             self.report(
@@ -2615,7 +2628,7 @@ class SEQUENCER_OT_generate_image(Operator):
             else:
                 pipe.to("cuda")
 
-        # Add refiner model if chosen.
+        # load refiner model if chosen.
         if do_refine:
             print(
                 "Load Refine Model:  " + "stabilityai/stable-diffusion-xl-refiner-1.0"
@@ -2639,6 +2652,12 @@ class SEQUENCER_OT_generate_image(Operator):
         #                #refiner.enable_vae_slicing()
         #            else:
         # refiner.to("cuda")
+
+        if scene.use_free_lunch and pipe: #Free Lunch
+            # -------- freeu block registration
+            register_free_upblock2d(pipe)
+            register_free_crossattn_upblock2d(pipe)
+            # -------- freeu block registration
 
         # Main Generate Loop:
         for i in range(scene.movie_num_batch):
@@ -2878,6 +2897,7 @@ class SEQUENCER_OT_generate_image(Operator):
                             neg_prompt=negative_prompt,
                             height=y,
                             width=x,
+                            generator=generator,
                         ).images[0]
                     else:
                         print("Subject strip loading failed!")
@@ -2894,6 +2914,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         neg_prompt=negative_prompt,
                         height=y,
                         width=x,
+                        generator=generator,
                     ).images[0]                   
 
             # Inpaint
@@ -3492,6 +3513,11 @@ def register():
 
     bpy.types.Scene.blip_subject_image = bpy.props.StringProperty(
         name="blip_subject_image", default=""
+    )
+
+    bpy.types.Scene.use_free_lunch = bpy.props.BoolProperty(
+        name="use_free_lunch",
+        default=0,
     )
 
     for cls in classes:
