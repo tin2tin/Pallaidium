@@ -70,7 +70,7 @@ Install Dependencies, set Movie Model Card, and set Sound Notification in the ad
 
 Video Sequence Editor > Sidebar > Generative AI:
 
-![image](https://github.com/tin2tin/Generative_AI/assets/1322593/318a4ec2-8d0f-4aaf-8fd8-9131f8b15918)
+![image](https://github.com/tin2tin/Pallaidium/assets/1322593/e3c1193d-5e0a-4ed2-acca-3f7a4413e4c1)
 
 Styles:
 
