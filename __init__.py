@@ -526,7 +526,7 @@ def low_vram():
     for i in range(torch.cuda.device_count()):
         properties = torch.cuda.get_device_properties(i)
         total_vram += properties.total_memory
-    return (total_vram / (1024**3)) < 12.1  # Y/N under 6.1 GB?
+    return (total_vram / (1024**3)) < 6.1  # Y/N under 6.1 GB?
 
 
 def import_module(self, module, install_module):
@@ -1412,8 +1412,12 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 and image_model_card != "monster-labs/control_v1p_sd15_qrcode_monster"
                 and image_model_card != "Salesforce/blipdiffusion"
             ):
+                col = col.column(heading="Use", align=True)
+                col.prop(addon_prefs, "use_strip_data", text=" Strip Name & Seed")
+
                 if input == "input_strips" and not scene.inpaint_selected_strip:
                     col.prop(context.scene, "image_power", text="Strip Power")
+
                 if bpy.context.scene.sequence_editor is not None:
                     if len(bpy.context.scene.sequence_editor.sequences) > 0:
                         if input == "input_strips" and type == "image":
@@ -1425,6 +1429,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                                 text="Inpaint Mask",
                                 icon="SEQ_STRIP_DUPLICATE",
                             )
+
         if image_model_card == "lllyasviel/sd-controlnet-openpose" and type == "image":
             col = col.column(heading="Read as", align=True)
             col.prop(context.scene, "openpose_use_bones", text="OpenPose Rig Image")
@@ -1479,25 +1484,17 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             sub_row.prop(context.scene, "movie_num_seed", text="Seed")
             row.prop(context.scene, "movie_use_random", text="", icon="QUESTION")
             sub_row.active = not context.scene.movie_use_random
-        layout = self.layout
-        layout.use_property_split = True
-        layout.use_property_decorate = False
-        col = layout.column(align=True)
-        col = col.box()
-
-        col.prop(context.scene, "generatorai_typeselect", text="Output")
 
         if type != "audio":
-            if type == "movie" or (
-                type == "image"
+            if (type == "image"
                 and image_model_card != "lllyasviel/sd-controlnet-canny"
                 and image_model_card != "lllyasviel/sd-controlnet-openpose"
                 and image_model_card != "lllyasviel/control_v11p_sd15_scribble"
                 and image_model_card != "monster-labs/control_v1p_sd15_qrcode_monster"
                 and image_model_card != "Salesforce/blipdiffusion"
-            ):        
-                col = col.column(heading="Free Lunch", align=True)
-                col.prop(context.scene, "use_free_lunch", text=" (Experimental)")
+            ):
+                col = col.column(heading="FreeU", align=True)
+                col.prop(context.scene, "use_freeU", text=" (Experimental)")
 
         if type == "movie" and (
             movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256"
@@ -1512,6 +1509,26 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             sub_col = col.row()
             sub_col.active = context.scene.refine_sd
         col.prop(context.scene, "movie_num_batch", text="Batch Count")
+
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+        col = layout.box()
+        col = col.column(align=True)
+
+        col.prop(context.scene, "generatorai_typeselect", text="Output")
+        if type == "image":
+            col.prop(addon_prefs, "image_model_card", text=" ")
+            if addon_prefs.image_model_card == "DeepFloyd/IF-I-M-v1.0":
+                row = col.row(align=True)
+                row.prop(addon_prefs, "hugginface_token")
+                row.operator(
+                    "wm.url_open", text="", icon="URL"
+                ).url = "https://huggingface.co/settings/tokens"
+        if type == "movie":
+            col.prop(addon_prefs, "movie_model_card", text=" ")
+        if type == "audio":
+            col.prop(addon_prefs, "audio_model_card", text=" ")
 
         col = layout.column()
         col = col.box()
@@ -1751,13 +1768,13 @@ class SEQUENCER_OT_generate_movie(Operator):
                 else:
                     upscale.to("cuda")
 
-        if scene.use_free_lunch and pipe: #Free Lunch
+        if scene.use_freeU and pipe: #Free Lunch
             # -------- freeu block registration
-            print("Having a free lunch...")
+            print("Process: FreeU")
             register_free_upblock2d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
             register_free_crossattn_upblock2d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
-            # -------- freeu block registration                    
-                    
+            # -------- freeu block registration
+
         # GENERATING - Main Loop
         for i in range(scene.movie_num_batch):
             if torch.cuda.is_available():
@@ -1912,7 +1929,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             # Movie.
             else:
                 print("Generate: Video")
-                
+
                 video_frames = pipe(
                     prompt,
                     negative_prompt=negative_prompt,
@@ -1928,7 +1945,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
-                    
+
                 # Upscale video.
                 if scene.video_to_video:
                     print("Upscale: Video")
@@ -1950,7 +1967,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         guidance_scale=movie_num_guidance,
                         generator=generator,
                     ).frames
-                    
+
             # Move to folder.
             src_path = export_to_video(video_frames)
             dst_path = solve_path(clean_filename(str(seed) + "_" + prompt) + ".mp4")
@@ -2406,7 +2423,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             from diffusers.utils import load_image
             import torch
-            
+
             if not find_strip_by_name(scene, scene.blip_subject_image):
                 from diffusers.pipelines import BlipDiffusionPipeline
 
@@ -2641,9 +2658,9 @@ class SEQUENCER_OT_generate_image(Operator):
             else:
                 pipe.to("cuda")
 
-            if scene.use_free_lunch and pipe: #Free Lunch
+            if scene.use_freeU and pipe: #Free Lunch
                 # -------- freeu block registration
-                print("Having a free lunch...")
+                print("Process: FreeU")
                 register_free_upblock2d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
                 register_free_crossattn_upblock2d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
                 # -------- freeu block registration
@@ -2901,7 +2918,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     if cldm_cond_image:
                         cldm_cond_image = cldm_cond_image.resize((x, y))
                         image = pipe(
-                            text_prompt_input,                            
+                            text_prompt_input,
                             style_image,
                             cldm_cond_image,
                             style_subject,
@@ -2916,7 +2933,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     else:
                         print("Subject strip loading failed!")
                         subject_strip =""
-                    
+
                 if not subject_strip:
                     image = pipe(
                         text_prompt_input,
@@ -2929,7 +2946,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         height=y,
                         width=x,
                         generator=generator,
-                    ).images[0]                   
+                    ).images[0]
 
             # Inpaint
             elif do_inpaint:
@@ -3149,6 +3166,16 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
             print("Use file seed and prompt: Yes")
         else:
             print("Use file seed and prompt: No")
+
+        import torch
+
+        total_vram = 0
+        for i in range(torch.cuda.device_count()):
+            properties = torch.cuda.get_device_properties(i)
+            total_vram += properties.total_memory
+        print("Total VRAM: "+str(total_vram))
+        print("Total GPU Cards: "+str(torch.cuda.device_count()))
+
         for count, strip in enumerate(strips):
             # render intermediate mp4 file
             if strip.type == "SCENE" or strip.type == "MOVIE":
@@ -3333,10 +3360,12 @@ def register():
     bpy.types.Scene.generate_movie_prompt = bpy.props.StringProperty(
         name="generate_movie_prompt",
         default="",
+        options={"TEXTEDIT_UPDATE"},
     )
     bpy.types.Scene.generate_movie_negative_prompt = bpy.props.StringProperty(
         name="generate_movie_negative_prompt",
         default="",
+        options={"TEXTEDIT_UPDATE"},
     )
     bpy.types.Scene.generate_audio_prompt = bpy.props.StringProperty(
         name="generate_audio_prompt", default=""
@@ -3529,8 +3558,8 @@ def register():
         name="blip_subject_image", default=""
     )
 
-    bpy.types.Scene.use_free_lunch = bpy.props.BoolProperty(
-        name="use_free_lunch",
+    bpy.types.Scene.use_freeU = bpy.props.BoolProperty(
+        name="use_freeU",
         default=0,
     )
 
