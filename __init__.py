@@ -1916,27 +1916,27 @@ class SEQUENCER_OT_generate_movie(Operator):
                         print("Loading of file failed")
                         return {"CANCELLED"}
 
-#                    # Upscale video
-#                    if scene.video_to_video:
-#                        video = [
-#                            Image.fromarray(frame).resize(
-#                                (
-#                                    closest_divisible_32(int(x * 2)),
-#                                    closest_divisible_32(int(y * 2)),
-#                                )
-#                            )
-#                            for frame in video
-#                        ]
-#                    else:
-#                        video = [
-#                            Image.fromarray(frame).resize(
-#                                (
-#                                    closest_divisible_32(int(x)),
-#                                    closest_divisible_32(int(y)),
-#                                )
-#                            )
-#                            for frame in video
-#                        ]
+                    # Upscale video
+                    if scene.video_to_video:
+                        video = [
+                            Image.fromarray(frame).resize(
+                                (
+                                    closest_divisible_32(int(x * 2)),
+                                    closest_divisible_32(int(y * 2)),
+                                )
+                            )
+                            for frame in video
+                        ]
+                    else:
+                        video = [
+                            Image.fromarray(frame).resize(
+                                (
+                                    closest_divisible_32(int(x)),
+                                    closest_divisible_32(int(y)),
+                                )
+                            )
+                            for frame in video
+                        ]
 
                     video_frames = upscale(
                         prompt,
@@ -2332,6 +2332,11 @@ class SEQUENCER_OT_generate_image(Operator):
             input == "input_strips"
             and find_strip_by_name(scene, scene.inpaint_selected_strip)
             and type == "image"
+            and not image_model_card == "lllyasviel/sd-controlnet-canny"
+            and not image_model_card == "lllyasviel/sd-controlnet-openpose"
+            and not image_model_card == "lllyasviel/control_v11p_sd15_scribble"
+            and not image_model_card == "monster-labs/control_v1p_sd15_qrcode_monster"
+            and not image_model_card == "Salesforce/blipdiffusion"
         )
         do_convert = (
             (scene.image_path or scene.movie_path)
