@@ -252,7 +252,7 @@ def solve_path(full_path):
     addon_prefs = preferences.addons[__name__].preferences
     name, ext = os.path.splitext(full_path)
     dir_path, filename = os.path.split(name)
-    dir_path = addon_prefs.generator_ai + "/" + str(date.today())
+    dir_path = os.path.join(addon_prefs.generator_ai, str(date.today()))
     create_folder(dir_path)
     cleaned_filename = clean_filename(filename)
     new_filename = cleaned_filename + ext
@@ -1120,12 +1120,10 @@ def get_render_strip(self, context, strip):
     if not context or not context.scene or not context.scene.sequence_editor:
         self.report({"ERROR"}, "No valid context or selected strips")
         return {"CANCELLED"}
-    # Get the current scene and sequencer
+
     current_scene = context.scene
     sequencer = current_scene.sequence_editor
     current_frame_old = bpy.context.scene.frame_current
-
-    # Get the selected sequences in the sequencer
     selected_sequences = strip
 
     # Get the first empty channel above all strips
@@ -1206,42 +1204,40 @@ def get_render_strip(self, context, strip):
             int(new_strip.frame_final_start + new_strip.frame_final_duration) - 1
         )
 
-        # Set the name of the file
-        src_name = strip.name
-        src_dir = ""
-        src_ext = ".mp4"
-
-        # Set the path to the blend file
-        rendered_dir = blend_path = (
-            bpy.utils.user_resource("DATAFILES")
-            + "/Rendered_Strips_"
-            + str(date.today())
-        )  # bpy.data.filepath
-
         # Set the render settings for rendering animation with FFmpeg and MP4 with sound
         bpy.context.scene.render.image_settings.file_format = "FFMPEG"
         bpy.context.scene.render.ffmpeg.format = "MPEG4"
         bpy.context.scene.render.ffmpeg.audio_codec = "AAC"
 
+        # Make dir
+        preferences = bpy.context.preferences
+        addon_prefs = preferences.addons[__name__].preferences
+        rendered_dir = os.path.join(addon_prefs.generator_ai, str(date.today()))
+        rendered_dir = os.path.join(rendered_dir, "Rendered_Strips")
+
+        # Set the name of the file
+        src_name = strip.name
+        src_dir = ""
+        src_ext = ".mp4"
+
         # Create a new folder for the rendered files
         if not os.path.exists(rendered_dir):
             os.makedirs(rendered_dir)
+
         # Set the output path for the rendering
         output_path = os.path.join(rendered_dir, src_name + "_rendered" + src_ext)
-
-        #        print("before: "+str(output_path))
-        #        output_path = ensure_unique_filename(output_path)
-        #        print("after: "+str(output_path))
-
+        output_path = ensure_unique_filename(output_path)
         new_scene.render.filepath = output_path
 
-        if strip.type == "SCENE":
-            # Render the strip to hard disk
-            bpy.ops.render.opengl(animation=False, sequencer=True)
-        else:
-            bpy.ops.render.opengl(animation=True, sequencer=True)
+        # Render the strip to hard disk
+        bpy.ops.render.opengl(animation=True, sequencer=True)
+
         # Delete the new scene
         bpy.data.scenes.remove(new_scene, do_unlink=True)
+
+        if not os.path.exists(output_path):
+            print("Render failed: "+output_path)
+            return {"CANCELLED"}
 
         # Set the original scene as the active scene
         context.window.scene = current_scene
@@ -1579,6 +1575,7 @@ class SEQUENCER_OT_generate_movie(Operator):
         if not scene.generate_movie_prompt:
             self.report({"INFO"}, "Text prompt in the Generative AI tab is empty!")
             return {"CANCELLED"}
+
         try:
             import torch
             from diffusers.utils import export_to_video
@@ -1614,7 +1611,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             scene.generate_movie_negative_prompt
             + ", "
             + style_prompt(scene.generate_movie_prompt)[1]
-            + ", nsfw nude nudity"
+            + ", nsfw, nude, nudity"
         )
         movie_x = scene.generate_movie_x
         movie_y = scene.generate_movie_y
@@ -1711,6 +1708,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     card = "cerspense/zeroscope_v2_XL"
                 else:
                     card = movie_model_card
+
                 from diffusers import VideoToVideoSDPipeline
 
                 upscale = VideoToVideoSDPipeline.from_pretrained(
@@ -1729,10 +1727,11 @@ class SEQUENCER_OT_generate_movie(Operator):
                     # torch.cuda.set_per_process_memory_fraction(0.98)
                     upscale.enable_model_cpu_offload()
                     # upscale.enable_vae_tiling()
-                    upscale.enable_vae_slicing()
+                    #upscale.enable_vae_slicing()
                     upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)  # heavy:
                 else:
                     upscale.to("cuda")
+
         # Models for movie generation
         else:
             from diffusers import TextToVideoSDPipeline
@@ -1750,9 +1749,10 @@ class SEQUENCER_OT_generate_movie(Operator):
 
             if low_vram():
                 pipe.enable_model_cpu_offload()
-                pipe.enable_vae_slicing()
+                #pipe.enable_vae_slicing()
             else:
                 pipe.to("cuda")
+
             # Model for upscale generated movie
             if scene.video_to_video:
                 if torch.cuda.is_available():
@@ -1772,15 +1772,15 @@ class SEQUENCER_OT_generate_movie(Operator):
                 if low_vram():
                     upscale.enable_model_cpu_offload()
                     upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)  # Heavy
-                    upscale.enable_vae_slicing()
+                    #upscale.enable_vae_slicing()
                 else:
                     upscale.to("cuda")
 
         if scene.use_freeU and pipe:  # Free Lunch
             # -------- freeu block registration
             print("Process: FreeU")
-            register_free_upblock3d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
-            register_free_crossattn_upblock3d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
+            register_free_upblock3d(pipe)#, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
+            register_free_crossattn_upblock3d(pipe)#, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
             # -------- freeu block registration
 
         # GENERATING - Main Loop
@@ -1896,35 +1896,48 @@ class SEQUENCER_OT_generate_movie(Operator):
                 # vid2vid / img2vid
                 else:
                     if scene.movie_path:
-                        video = load_video_as_np_array(video_path)
                         print("Process: Video to video")
+                        if not os.path.isfile(scene.movie_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        video = load_video_as_np_array(video_path)
+
                     elif scene.image_path:
                         print("Process: Image to video")
+                        if not os.path.isfile(scene.image_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
                         video = process_image(
                             scene.image_path, int(scene.generate_movie_frames)
                         )
                         video = np.array(video)
-                    # Upscale video
-                    if scene.video_to_video:
-                        video = [
-                            Image.fromarray(frame).resize(
-                                (
-                                    closest_divisible_32(int(x * 2)),
-                                    closest_divisible_32(int(y * 2)),
-                                )
-                            )
-                            for frame in video
-                        ]
-                    else:
-                        video = [
-                            Image.fromarray(frame).resize(
-                                (
-                                    closest_divisible_32(int(x)),
-                                    closest_divisible_32(int(y)),
-                                )
-                            )
-                            for frame in video
-                        ]
+
+                    if not video.any():
+                        print("Loading of file failed")
+                        return {"CANCELLED"}
+
+#                    # Upscale video
+#                    if scene.video_to_video:
+#                        video = [
+#                            Image.fromarray(frame).resize(
+#                                (
+#                                    closest_divisible_32(int(x * 2)),
+#                                    closest_divisible_32(int(y * 2)),
+#                                )
+#                            )
+#                            for frame in video
+#                        ]
+#                    else:
+#                        video = [
+#                            Image.fromarray(frame).resize(
+#                                (
+#                                    closest_divisible_32(int(x)),
+#                                    closest_divisible_32(int(y)),
+#                                )
+#                            )
+#                            for frame in video
+#                        ]
+
                     video_frames = upscale(
                         prompt,
                         video=video,
@@ -1934,6 +1947,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         guidance_scale=movie_num_guidance,
                         generator=generator,
                     ).frames
+
             # Movie.
             else:
                 print("Generate: Video")
@@ -2039,6 +2053,7 @@ class SEQUENCER_OT_generate_audio(Operator):
         if not scene.generate_movie_prompt:
             self.report({"INFO"}, "Text prompt in the Generative AI tab is empty!")
             return {"CANCELLED"}
+
         if not scene.sequence_editor:
             scene.sequence_editor_create()
         preferences = context.preferences
@@ -2108,7 +2123,7 @@ class SEQUENCER_OT_generate_audio(Operator):
 
             if low_vram():
                 pipe.enable_model_cpu_offload()
-                pipe.enable_vae_slicing()
+                #pipe.enable_vae_slicing()
             else:
                 pipe.to("cuda")
         elif addon_prefs.audio_model_card == "facebook/audiogen-medium":
@@ -2262,6 +2277,7 @@ class SEQUENCER_OT_generate_image(Operator):
         ):
             self.report({"INFO"}, "Text prompt in the Generative AI tab is empty!")
             return {"CANCELLED"}
+
         show_system_console(True)
         set_system_console_topmost(True)
 
@@ -2351,8 +2367,8 @@ class SEQUENCER_OT_generate_image(Operator):
                     "None of the selected strips are movie, image, text or scene types.",
                 )
                 return {"CANCELLED"}
+
         # LOADING MODELS
-        # print("Model:  " + image_model_card)
 
         # models for inpaint
         if do_inpaint:
@@ -2431,7 +2447,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             if low_vram():
                 pipe.enable_model_cpu_offload()
-                pipe.enable_vae_slicing()
+                #pipe.enable_vae_slicing()
             else:
                 pipe.to("cuda")
 
@@ -2494,7 +2510,7 @@ class SEQUENCER_OT_generate_image(Operator):
             if low_vram():
                 pipe.enable_xformers_memory_efficient_attention()
                 pipe.enable_model_cpu_offload()
-                pipe.enable_vae_slicing()
+                #pipe.enable_vae_slicing()
             else:
                 pipe.to("cuda")
 
@@ -2637,7 +2653,7 @@ class SEQUENCER_OT_generate_image(Operator):
             if low_vram():
                 converter.enable_model_cpu_offload()
                 # refiner.enable_vae_tiling()
-                converter.enable_vae_slicing()
+                # converter.enable_vae_slicing()
             else:
                 converter.to("cuda")
 
@@ -2671,7 +2687,7 @@ class SEQUENCER_OT_generate_image(Operator):
             if low_vram():
                 # torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
                 pipe.enable_model_cpu_offload()
-                pipe.enable_vae_slicing()
+                #pipe.enable_vae_slicing()
                 # pipe.enable_forward_chunking(chunk_size=1, dim=1)
             else:
                 pipe.to("cuda")
@@ -2704,10 +2720,10 @@ class SEQUENCER_OT_generate_image(Operator):
             if low_vram():
                 refiner.enable_model_cpu_offload()
                 #refiner.enable_vae_tiling()
-                refiner.enable_vae_slicing()
+                #refiner.enable_vae_slicing()
             else:
                 refiner.to("cuda")
-        
+
 
         # Main Generate Loop:
         for i in range(scene.movie_num_batch):
@@ -3227,9 +3243,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                         intermediate_strip.frame_offset_start = int(trim_frame)
                         intermediate_strip.frame_final_duration = 1
 
-                        temp_strip = strip = get_render_strip(
-                            self, context, intermediate_strip
-                        )
+                        temp_strip = strip = get_render_strip(self, context, intermediate_strip)
 
                         if intermediate_strip is not None:
                             delete_strip(intermediate_strip)
@@ -3237,6 +3251,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                         temp_strip = strip = get_render_strip(self, context, strip)
                 else:
                     temp_strip = strip = get_render_strip(self, context, strip)
+
             if strip.type == "TEXT":
                 if strip.text:
                     print("\n" + str(count + 1) + "/" + str(len(strips)))
@@ -3262,6 +3277,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     if use_strip_data:
                         scene.movie_use_random = use_random
                         scene.movie_num_seed = seed
+
             if strip.type == "IMAGE":
                 strip_dirname = os.path.dirname(strip.directory)
                 image_path = bpy.path.abspath(
@@ -3308,6 +3324,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     scene.movie_use_random = use_random
                     scene.movie_num_seed = seed
                 bpy.types.Scene.image_path = ""
+
             if strip.type == "MOVIE":
                 movie_path = bpy.path.abspath(strip.filepath)
                 bpy.types.Scene.movie_path = movie_path
@@ -3568,7 +3585,7 @@ def register():
             items=[("no_style", "No Style", "No Style")] + styles_array,
             default="no_style",
         )
-        
+
     bpy.types.Scene.openpose_use_bones = bpy.props.BoolProperty(
         name="openpose_use_bones",
         default=0,
