@@ -236,6 +236,10 @@ https://github.com/tin2tin/Pallaidium/assets/1322593/ac9f278e-9fc9-46fc-a4e7-562
 [![Watch the video](https://img.youtube.com/vi/LejSJGmtEvE/0.jpg)](https://youtu.be/LejSJGmtEvE) 
 
 
+### Würstchen
+[![Watch the video](https://img.youtube.com/vi/CDPmGs_JtSM/0.jpg)](https://youtu.be/CDPmGs_JtSM) 
+
+
 ### Bark
 [![Watch the video](https://img.youtube.com/vi/AAdQfQjENJU/0.jpg)](https://youtu.be/AAdQfQjENJU) 
 
