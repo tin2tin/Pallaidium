@@ -168,6 +168,8 @@ Zeroscope Dark: https://huggingface.co/cerspense/zeroscope_v2_dark_30x448x256
 
 Zeroscope XL: https://huggingface.co/cerspense/zeroscope_v2_XL
 
+Würstchen: https://github.com/dome272/Wuerstchen
+
 AudioLDM2 Music: [https://huggingface.co/cvssp/audioldm-s-full-v2 https://github.com/haoheliu/AudioLDM](https://huggingface.co/cvssp/audioldm2-music)
 
 Bark: https://github.com/suno-ai/bark
