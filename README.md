@@ -209,6 +209,10 @@ https://github.com/tin2tin/vse_masking_tools
 ![image](https://github.com/tin2tin/Generative_AI/assets/1322593/f2afd36c-34b1-4779-957b-0eb8defed296)
 
 
+## Useful Projects
+
+Generate LORAs: https://github.com/johnman3032/simple-lora-dreambooth-trainer
+
 
 ## Video Examples
 
