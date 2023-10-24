@@ -636,6 +636,7 @@ def install_modules(self):
         import_module(self, "soundfile", "PySoundFile")
     # import_module(self, "diffusers", "diffusers")
     # import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git@v0.19.3")
+    import_module(self, "diffusers", "git+https://github.com/huggingface/peft.git")
     import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
     import_module(self, "accelerate", "accelerate")
     import_module(self, "transformers", "transformers")
@@ -650,6 +651,7 @@ def install_modules(self):
     import_module(self, "imageio", "imageio")
     import_module(self, "imwatermark", "invisible-watermark>=0.2.0")
     import_module(self, "controlnet_aux", "controlnet_aux")
+    import_module(self, "compel", "compel")
 
     if os_platform == "Windows":
         subprocess.check_call(
@@ -908,6 +910,7 @@ class GeneratorAddonPreferences(AddonPreferences):
     movie_model_card: bpy.props.EnumProperty(
         name="Video Model",
         items=[
+            ("hotshotco/Hotshot-XL", "Hotshot-XL (512x512)", "Hotshot-XL (512x512)"),
             ("strangeman3107/animov-0.1.1", "Animov (448x384)", "Animov (448x384)"),
             ("strangeman3107/animov-512x", "Animov (512x512)", "Animov (512x512)"),
             ("camenduru/potat1", "Potat v1 (1024x576)", "Potat (1024x576)"),
@@ -954,6 +957,11 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Stable Diffusion XL 1.0 (1024x1024)",
                 "stabilityai/stable-diffusion-xl-base-1.0",
             ),
+            (
+                "segmind/SSD-1B",
+                "Segmind Stable Diffusion XL (1024x1024)",
+                "segmind/SSD-1B",
+            ),            
             ("warp-ai/wuerstchen", "Würstchen (1024x1024)", "warp-ai/wuerstchen"),
             ("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0"),
             (
@@ -1351,6 +1359,55 @@ def ensure_unique_filename(file_name):
         return file_name
 
 
+# LoRA.
+class LORABrowserFileItem(bpy.types.PropertyGroup):
+    name: bpy.props.StringProperty()
+    enabled: bpy.props.BoolProperty(default=True)
+    weight_value: bpy.props.FloatProperty(default=1.0)
+    index: bpy.props.IntProperty(name="Index", default=0)
+
+
+class LORABROWSER_UL_files(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        row = layout.row(align=True)
+        row.prop(item, "enabled", text="")
+        split = row.split(factor=0.7)
+        split.label(text=item.name)
+        split.prop(item, "weight_value", text="", emboss=False)
+
+
+def update_folder_callback(self, context):
+    if context.scene.lora_folder:
+        bpy.ops.lora.refresh_files()
+
+
+class LORA_OT_RefreshFiles(bpy.types.Operator):
+    bl_idname = "lora.refresh_files"
+    bl_label = "Refresh Files"
+
+    def execute(self, context):
+        scene = context.scene
+        directory = scene.lora_folder
+
+        if not directory:
+            self.report({'ERROR'}, "No folder selected")
+            return {'CANCELLED'}
+
+        lora_files = scene.lora_files
+        lora_files.clear()
+
+        for filename in os.listdir(directory):
+            if filename.endswith(".safetensors"):
+                file_item = lora_files.add()
+                file_item.name = filename.replace(".safetensors", "")
+                file_item.enabled = False
+                file_item.weight_value = 1.0
+            else:
+                print(filename)
+
+        return {'FINISHED'}
+
+
 class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
     """Generate Media using AI"""
 
@@ -1383,6 +1440,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         col = col.box()
         col = col.column()
 
+        # Input
         if image_model_card == "Salesforce/blipdiffusion" and type == "image":
             col.prop(context.scene, "input_strips", text="Source Image")
             col.prop(context.scene, "blip_cond_subject", text="Source Subject")
@@ -1411,7 +1469,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
 
                 if input == "input_strips" and not scene.inpaint_selected_strip:
                     col = col.column(heading="Use", align=True)
-                    col.prop(addon_prefs, "use_strip_data", text=" Strip Name & Seed")
+                    col.prop(addon_prefs, "use_strip_data", text=" Name & Seed")
                     col.prop(context.scene, "image_power", text="Strip Power")
 
                 if bpy.context.scene.sequence_editor is not None:
@@ -1436,6 +1494,30 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             col = col.column(heading="Read as", align=True)
             col.prop(context.scene, "use_scribble_image", text="Scribble Image")
 
+        # LoRA.
+        if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0" and type == "image":
+            col = layout.column(align=True)
+            col = col.box()
+            col = col.column(align=True)
+            col.use_property_split = False
+            col.use_property_decorate = False
+            
+            # Folder selection and refresh button
+            row = col.row(align=True)
+            row.prop(scene, "lora_folder", text="LoRA")
+            row.operator("lora.refresh_files", text="", icon="FILE_REFRESH")
+
+            # Custom UIList
+            lora_files = scene.lora_files
+            list_len = len(lora_files)
+
+            if list_len > 0:
+                col.template_list("LORABROWSER_UL_files", "The_List", scene, "lora_files", scene, "lora_files_index", rows=2)
+
+            if list_len == 0:
+                print("No LoRA files found in the selected folder.")          
+
+        # Prompts
         col = layout.column(align=True)
         col = col.box()
         col = col.column(align=True)
@@ -1491,7 +1573,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 and image_model_card != "Salesforce/blipdiffusion"
             ):
                 col = col.column(heading="FreeU", align=True)
-                col.prop(context.scene, "use_freeU", text=" (Experimental)")
+                col.prop(context.scene, "use_freeU", text="")
 
         if type == "movie" and (
             movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256"
@@ -1507,8 +1589,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             sub_col = col.row()
             sub_col.active = context.scene.refine_sd
 
-        col.prop(context.scene, "movie_num_batch", text="Batch Count")
-
+        # Output.
         layout = self.layout
         layout.use_property_split = True
         layout.use_property_decorate = False
@@ -1531,6 +1612,10 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         if type == "audio":
             col.prop(addon_prefs, "audio_model_card", text=" ")
 
+        col = col.column()
+        col.prop(context.scene, "movie_num_batch", text="Batch Count")
+
+        # Generate.
         col = layout.column()
         col = col.box()
 
@@ -1587,6 +1672,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 register_free_upblock3d,
                 register_free_crossattn_upblock3d,
             )
+            from compel import Compel
         except ModuleNotFoundError:
             print("In the add-on preferences, install dependencies.")
             self.report(
@@ -2095,6 +2181,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 from bark.api import semantic_to_waveform
                 from bark import generate_audio, SAMPLE_RATE
                 from scipy.io.wavfile import write as write_wav
+                from compel import Compel
         except ModuleNotFoundError:
             print("Dependencies needs to be installed in the add-on preferences.")
             self.report(
@@ -2268,6 +2355,8 @@ class SEQUENCER_OT_generate_image(Operator):
         type = scene.generatorai_typeselect
         use_strip_data = addon_prefs.use_strip_data
         pipe = None
+        refiner = None
+        converter = None
 
         if (
             scene.generate_movie_prompt == ""
@@ -2297,6 +2386,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 register_free_upblock2d,
                 register_free_crossattn_upblock2d,
             )
+            from compel import Compel
         except ModuleNotFoundError:
             print("Dependencies needs to be installed in the add-on preferences.")
             self.report(
@@ -2426,12 +2516,12 @@ class SEQUENCER_OT_generate_image(Operator):
         #            else:
         #                refiner.to("cuda")
 
-        # ControlNet
+        # ControlNet & Illusion
         elif (
             image_model_card == "lllyasviel/sd-controlnet-canny"
             or image_model_card == "monster-labs/control_v1p_sd15_qrcode_monster"
         ):
-            print("Load: ControlNet Model")
+            print("Load: ControlNet Model or Illusion")
             from diffusers import (
                 StableDiffusionControlNetPipeline,
                 ControlNetModel,
@@ -2572,6 +2662,7 @@ class SEQUENCER_OT_generate_image(Operator):
             if low_vram():
                 # torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
                 pipe.enable_model_cpu_offload()
+                # pipe.enable_vae_slicing()
                 # pipe.enable_forward_chunking(chunk_size=1, dim=1)
             else:
                 pipe.to("cuda")
@@ -2661,10 +2752,11 @@ class SEQUENCER_OT_generate_image(Operator):
             else:
                 converter.to("cuda")
 
-        # Stable diffusion
+        # Stable diffusion etc.
         else:
             print("Load: " + image_model_card + " Model")
             from diffusers import AutoencoderKL
+            enabled_items = None
 
             if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
                 vae = AutoencoderKL.from_pretrained(
@@ -2677,6 +2769,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     variant="fp16",
                 )
             else:
+                    
                 pipe = DiffusionPipeline.from_pretrained(
                     image_model_card,
                     torch_dtype=torch.float16,
@@ -2686,13 +2779,44 @@ class SEQUENCER_OT_generate_image(Operator):
                 pipe.scheduler.config
             )
 
+# LORA TESTS
+            if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+
+                scene = context.scene
+                lora_files = scene.lora_files
+                enabled_names = []
+                enabled_weights = []
+                
+                # Check if there are any enabled items before printing
+                enabled_items = [item for item in lora_files if item.enabled]
+                if enabled_items:
+                    for item in enabled_items:
+                        enabled_names.append((clean_filename(item.name)).replace(".",""))
+                        enabled_weights.append(item.weight_value)
+                        pipe.load_lora_weights(scene.lora_folder, weight_name=item.name+".safetensors", adapter_name=((clean_filename(item.name)).replace(".","")))
+
+                    pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)                      
+
+#                for item in lora_files:
+#                    print(f"Name: {item.name}, Enabled: {item.enabled}, Weight: {item.weight_value}")
+
+                #pipe.unet.load_attn_procs("C:/Users/45239/Documents/LORA/filmgrain_v1.safetensors")
+#            pipe.load_lora_weights("C:/Users/45239/Documents/LORA/", weight_name="DavidLynch-10.safetensors")
+#            pipe.fuse_lora(lora_scale=0.7)
+#            pipe.load_lora_weights("C:/Users/45239/Documents/LORA/", weight_name="KlausKinski-06.safetensors")
+#            pipe.fuse_lora(lora_scale=0.7)
+            #pipe.load_lora_weights("C:/Users/45239/Documents/LORA/", weight_name="Willem_Dafoev1.safetensors")
+#            pipe.load_lora_weights("C:/Users/45239/Documents/LORA/", weight_name="SDXL_Inkdrawing_v1.safetensors")
+#                pipe.load_lora_weights("C:/Users/45239/Documents/LORA/", weight_name="WH1.safetensors")
+#            pipe.load_lora_weights("C:/Users/45239/Documents/LORA/", weight_name="AnalogRedmondV2-Analog-AnalogRedmAF.safetensors")
+#            #pipe.fuse_lora(lora_scale=0.7)
+
             pipe.watermark = NoWatermark()
 
             if low_vram():
                 # torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
                 pipe.enable_model_cpu_offload()
                 pipe.enable_vae_slicing()
-                # pipe.enable_forward_chunking(chunk_size=1, dim=1)
             else:
                 pipe.to("cuda")
 
@@ -2728,6 +2852,16 @@ class SEQUENCER_OT_generate_image(Operator):
             else:
                 refiner.to("cuda")
 
+#        # Allow longer prompts.
+#        if image_model_card == "runwayml/stable-diffusion-v1-5":
+#            if pipe:
+#                compel = Compel(tokenizer=pipe.tokenizer, text_encoder=pipe.text_encoder)
+#            if refiner:
+#                compel = Compel(tokenizer=refiner.tokenizer, text_encoder=refiner.text_encoder)
+#            if converter:
+#                compel = Compel(tokenizer=converter.tokenizer, text_encoder=converter.text_encoder)
+
+#            prompt_embed = compel.build_conditioning_tensor(prompt)
 
         # Main Generate Loop:
         for i in range(scene.movie_num_batch):
@@ -3072,18 +3206,35 @@ class SEQUENCER_OT_generate_image(Operator):
                     generator=generator,
                 ).images[0]
 
-            # Generate
+            # Generate Stable Diffusion etc.
             else:
                 print("Generate: Image ")
-                image = pipe(
-                    prompt,
-                    negative_prompt=negative_prompt,
-                    num_inference_steps=image_num_inference_steps,
-                    guidance_scale=image_num_guidance,
-                    height=y,
-                    width=x,
-                    generator=generator,
-                ).images[0]
+                # LoRA.
+                if enabled_items:
+                    image = pipe(
+                        #prompt_embeds=prompt, # for compel - long prompts
+                        prompt,
+                        negative_prompt=negative_prompt,
+                        num_inference_steps=image_num_inference_steps,
+                        guidance_scale=image_num_guidance,
+                        height=y,
+                        width=x,
+                        cross_attention_kwargs={"scale": 1.0},
+                        generator=generator,
+                    ).images[0]
+                # No LoRA.                   
+                else:
+                    image = pipe(
+                        #prompt_embeds=prompt, # for compel - long prompts
+                        prompt,
+                        negative_prompt=negative_prompt,
+                        num_inference_steps=image_num_inference_steps,
+                        guidance_scale=image_num_guidance,
+                        height=y,
+                        width=x,
+                        generator=generator,
+                    ).images[0]
+
             # Add refiner
             if do_refine:
                 print("Refine: Image")
@@ -3108,6 +3259,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     guidance_scale=image_num_guidance,
                     generator=generator,
                 ).images[0]
+
             # Move to folder
             filename = clean_filename(
                 str(seed) + "_" + context.scene.generate_movie_prompt
@@ -3407,6 +3559,9 @@ classes = (
     SEQUENCER_PT_pallaidium_panel,
     GENERATOR_OT_sound_notification,
     SEQUENCER_OT_strip_to_generatorAI,
+    LORABrowserFileItem,
+    LORA_OT_RefreshFiles,
+    LORABROWSER_UL_files,
     GENERATOR_OT_install,
     GENERATOR_OT_uninstall,
 )
@@ -3623,6 +3778,19 @@ def register():
     for cls in classes:
         bpy.utils.register_class(cls)
 
+    # LoRA
+    bpy.types.Scene.lora_files = bpy.props.CollectionProperty(type=LORABrowserFileItem)
+    bpy.types.Scene.lora_files_index = bpy.props.IntProperty(name="Index", default=0)
+
+    bpy.types.Scene.lora_folder = bpy.props.StringProperty(
+        name="Folder",
+        description="Select a folder",
+        subtype='DIR_PATH',
+        default="",
+        update=update_folder_callback,
+    )
+
+
 
 def unregister():
     for cls in classes:
@@ -3647,6 +3815,8 @@ def unregister():
     del bpy.types.Scene.blip_cond_subject
     del bpy.types.Scene.blip_tgt_subject
     del bpy.types.Scene.blip_subject_image
+    del bpy.types.Scene.lora_files
+    del bpy.types.Scene.lora_files_index
 
 
 if __name__ == "__main__":
