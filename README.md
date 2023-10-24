@@ -101,6 +101,9 @@ https://github.com/invoke-ai/InvokeAI/blob/main/docs/features/PROMPTS.md
 
 https://stablediffusion.fr/prompts
 
+https://blog.segmind.com/generating-photographic-images-with-stable-diffusion/
+
+
 Tip           |
 :------------- |
 If the image of your renders breaks, then use the resolution from the Model Card in the Preferences.     |
