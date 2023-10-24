@@ -179,6 +179,8 @@ Deep Floyd IF: https://github.com/deep-floyd/IF
 
 Stable Diffusion XL: https://huggingface.co/stabilityai/stable-diffusion-xl-base-0.9
 
+Segmind SDXL: https://huggingface.co/segmind/SSD-1B
+
 
 
 ## Uninstall
