@@ -8,6 +8,8 @@ bl_info = {
     "category": "Sequencer",
 }
 
+# TO DO: Style title check, long prompts, SDXL controlnet, Modelscope.
+
 import bpy, ctypes, random
 from bpy.types import Operator, Panel, AddonPreferences
 from bpy.props import (
@@ -276,26 +278,20 @@ def limit_string(my_string):
 
 
 def delete_strip(input_strip):
-    # Check if the input strip exists
+
     if input_strip is None:
         return
-    # Store the originally selected strips
+
     original_selection = [
         strip
         for strip in bpy.context.scene.sequence_editor.sequences_all
         if strip.select
     ]
 
-    # Deselect all strips
     bpy.ops.sequencer.select_all(action="DESELECT")
-
-    # Select the input strip
     input_strip.select = True
-
-    # Delete the selected strip
     bpy.ops.sequencer.delete()
 
-    # Reselect the original selected strips
     for strip in original_selection:
         strip.select = True
 
@@ -1128,7 +1124,6 @@ def get_render_strip(self, context, strip):
     if not context or not context.scene or not context.scene.sequence_editor:
         self.report({"ERROR"}, "No valid context or selected strips")
         return {"CANCELLED"}
-
     current_scene = context.scene
     sequencer = current_scene.sequence_editor
     current_frame_old = bpy.context.scene.frame_current
@@ -1231,7 +1226,6 @@ def get_render_strip(self, context, strip):
         # Create a new folder for the rendered files
         if not os.path.exists(rendered_dir):
             os.makedirs(rendered_dir)
-
         # Set the output path for the rendering
         output_path = os.path.join(rendered_dir, src_name + "_rendered" + src_ext)
         output_path = ensure_unique_filename(output_path)
@@ -1244,9 +1238,8 @@ def get_render_strip(self, context, strip):
         bpy.data.scenes.remove(new_scene, do_unlink=True)
 
         if not os.path.exists(output_path):
-            print("Render failed: "+output_path)
+            print("Render failed: " + output_path)
             return {"CANCELLED"}
-
         # Set the original scene as the active scene
         context.window.scene = current_scene
 
@@ -1368,7 +1361,9 @@ class LORABrowserFileItem(bpy.types.PropertyGroup):
 
 
 class LORABROWSER_UL_files(bpy.types.UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+    def draw_item(
+        self, context, layout, data, item, icon, active_data, active_propname, index
+    ):
         row = layout.row(align=True)
         row.prop(item, "enabled", text="")
         split = row.split(factor=0.7)
@@ -1390,9 +1385,8 @@ class LORA_OT_RefreshFiles(bpy.types.Operator):
         directory = scene.lora_folder
 
         if not directory:
-            self.report({'ERROR'}, "No folder selected")
-            return {'CANCELLED'}
-
+            self.report({"ERROR"}, "No folder selected")
+            return {"CANCELLED"}
         lora_files = scene.lora_files
         lora_files.clear()
 
@@ -1404,8 +1398,7 @@ class LORA_OT_RefreshFiles(bpy.types.Operator):
                 file_item.weight_value = 1.0
             else:
                 print(filename)
-
-        return {'FINISHED'}
+        return {"FINISHED"}
 
 
 class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
@@ -1466,12 +1459,10 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 and image_model_card != "monster-labs/control_v1p_sd15_qrcode_monster"
                 and image_model_card != "Salesforce/blipdiffusion"
             ):
-
                 if input == "input_strips" and not scene.inpaint_selected_strip:
                     col = col.column(heading="Use", align=True)
                     col.prop(addon_prefs, "use_strip_data", text=" Name & Seed")
                     col.prop(context.scene, "image_power", text="Strip Power")
-
                 if bpy.context.scene.sequence_editor is not None:
                     if len(bpy.context.scene.sequence_editor.sequences) > 0:
                         if input == "input_strips" and type == "image":
@@ -1483,7 +1474,6 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                                 text="Inpaint Mask",
                                 icon="SEQ_STRIP_DUPLICATE",
                             )
-
         if image_model_card == "lllyasviel/sd-controlnet-openpose" and type == "image":
             col = col.column(heading="Read as", align=True)
             col.prop(context.scene, "openpose_use_bones", text="OpenPose Rig Image")
@@ -1495,7 +1485,10 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             col.prop(context.scene, "use_scribble_image", text="Scribble Image")
 
         # LoRA.
-        if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0" and type == "image":
+        if (
+            image_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
+            and type == "image"
+        ):
             col = layout.column(align=True)
             col = col.box()
             col = col.column(align=True)
@@ -1512,8 +1505,15 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             list_len = len(lora_files)
 
             if list_len > 0:
-                col.template_list("LORABROWSER_UL_files", "The_List", scene, "lora_files", scene, "lora_files_index", rows=2)
-
+                col.template_list(
+                    "LORABROWSER_UL_files",
+                    "The_List",
+                    scene,
+                    "lora_files",
+                    scene,
+                    "lora_files_index",
+                    rows=2,
+                )
             if list_len == 0:
                 print("No LoRA files found in the selected folder.")
 
@@ -1597,6 +1597,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         col = col.column(align=True)
 
         col.prop(context.scene, "generatorai_typeselect", text="Output")
+
         if type == "image":
             col.prop(addon_prefs, "image_model_card", text=" ")
             if addon_prefs.image_model_card == "DeepFloyd/IF-I-M-v1.0":
@@ -1660,7 +1661,6 @@ class SEQUENCER_OT_generate_movie(Operator):
         if not scene.generate_movie_prompt:
             self.report({"INFO"}, "Text prompt in the Generative AI tab is empty!")
             return {"CANCELLED"}
-
         try:
             import torch
             from diffusers.utils import export_to_video
@@ -1680,7 +1680,6 @@ class SEQUENCER_OT_generate_movie(Operator):
                 "In the add-on preferences, install dependencies.",
             )
             return {"CANCELLED"}
-
         show_system_console(True)
         set_system_console_topmost(True)
 
@@ -1715,6 +1714,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+
         # LOADING MODELS
         print("Model:  " + movie_model_card)
 
@@ -1794,7 +1794,6 @@ class SEQUENCER_OT_generate_movie(Operator):
                     card = "cerspense/zeroscope_v2_XL"
                 else:
                     card = movie_model_card
-
                 from diffusers import VideoToVideoSDPipeline
 
                 upscale = VideoToVideoSDPipeline.from_pretrained(
@@ -1813,7 +1812,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     # torch.cuda.set_per_process_memory_fraction(0.98)
                     upscale.enable_model_cpu_offload()
                     # upscale.enable_vae_tiling()
-                    #upscale.enable_vae_slicing()
+                    # upscale.enable_vae_slicing()
                     upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)  # heavy:
                 else:
                     upscale.to("cuda")
@@ -1835,10 +1834,9 @@ class SEQUENCER_OT_generate_movie(Operator):
 
             if low_vram():
                 pipe.enable_model_cpu_offload()
-                #pipe.enable_vae_slicing()
+                # pipe.enable_vae_slicing()
             else:
                 pipe.to("cuda")
-
             # Model for upscale generated movie
             if scene.video_to_video:
                 if torch.cuda.is_available():
@@ -1858,15 +1856,15 @@ class SEQUENCER_OT_generate_movie(Operator):
                 if low_vram():
                     upscale.enable_model_cpu_offload()
                     upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)  # Heavy
-                    #upscale.enable_vae_slicing()
+                    # upscale.enable_vae_slicing()
                 else:
                     upscale.to("cuda")
 
         if scene.use_freeU and pipe:  # Free Lunch
             # -------- freeu block registration
             print("Process: FreeU")
-            register_free_upblock3d(pipe)#, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
-            register_free_crossattn_upblock3d(pipe)#, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
+            register_free_upblock3d(pipe)  # , b1=1.1, b2=1.2, s1=0.6, s2=0.4)
+            register_free_crossattn_upblock3d(pipe)  # , b1=1.1, b2=1.2, s1=0.6, s2=0.4)
             # -------- freeu block registration
 
         # GENERATING - Main Loop
@@ -1888,6 +1886,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     (scene.movie_num_batch * duration) + scene.frame_current,
                 )
                 start_frame = scene.frame_current
+
             # Get seed
             seed = context.scene.movie_num_seed
             seed = (
@@ -1987,7 +1986,6 @@ class SEQUENCER_OT_generate_movie(Operator):
                             print("No file found.")
                             return {"CANCELLED"}
                         video = load_video_as_np_array(video_path)
-
                     elif scene.image_path:
                         print("Process: Image to video")
                         if not os.path.isfile(scene.image_path):
@@ -1997,11 +1995,9 @@ class SEQUENCER_OT_generate_movie(Operator):
                             scene.image_path, int(scene.generate_movie_frames)
                         )
                         video = np.array(video)
-
                     if not video.any():
                         print("Loading of file failed")
                         return {"CANCELLED"}
-
                     # Upscale video
                     if scene.video_to_video:
                         video = [
@@ -2023,7 +2019,6 @@ class SEQUENCER_OT_generate_movie(Operator):
                             )
                             for frame in video
                         ]
-
                     video_frames = upscale(
                         prompt,
                         video=video,
@@ -2053,7 +2048,6 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
-
                 # Upscale video.
                 if scene.video_to_video:
                     print("Upscale: Video")
@@ -2115,6 +2109,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                             # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
                             bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
                             break
+
         # clear the VRAM
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -2139,7 +2134,6 @@ class SEQUENCER_OT_generate_audio(Operator):
         if not scene.generate_movie_prompt:
             self.report({"INFO"}, "Text prompt in the Generative AI tab is empty!")
             return {"CANCELLED"}
-
         if not scene.sequence_editor:
             scene.sequence_editor_create()
         preferences = context.preferences
@@ -2210,7 +2204,7 @@ class SEQUENCER_OT_generate_audio(Operator):
 
             if low_vram():
                 pipe.enable_model_cpu_offload()
-                #pipe.enable_vae_slicing()
+                # pipe.enable_vae_slicing()
             else:
                 pipe.to("cuda")
         elif addon_prefs.audio_model_card == "facebook/audiogen-medium":
@@ -2238,6 +2232,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                     100000000000000000000,
                 )
                 start_frame = scene.frame_current
+
             if addon_prefs.audio_model_card == "bark":
                 print("Generate: Speech (Bark)")
                 rate = 24000
@@ -2271,6 +2266,7 @@ class SEQUENCER_OT_generate_audio(Operator):
 
                 # Write the combined audio to a file
                 write_wav(filename, rate, audio.transpose())
+
             else:  # AudioLDM
                 print("Generate: Audio/music (AudioLDM)")
                 seed = context.scene.movie_num_seed
@@ -2307,6 +2303,7 @@ class SEQUENCER_OT_generate_audio(Operator):
 
                 filename = solve_path(str(seed) + "_" + prompt + ".wav")
                 write_wav(filename, rate, audio.transpose())
+
             filepath = filename
             if os.path.isfile(filepath):
                 empty_channel = find_first_empty_channel(
@@ -2366,7 +2363,6 @@ class SEQUENCER_OT_generate_image(Operator):
         ):
             self.report({"INFO"}, "Text prompt in the Generative AI tab is empty!")
             return {"CANCELLED"}
-
         show_system_console(True)
         set_system_console_topmost(True)
 
@@ -2394,11 +2390,9 @@ class SEQUENCER_OT_generate_image(Operator):
                 "Dependencies needs to be installed in the add-on preferences.",
             )
             return {"CANCELLED"}
-
         # clear the VRAM
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-
         current_frame = scene.frame_current
         type = scene.generatorai_typeselect
         input = scene.input_strips
@@ -2462,7 +2456,6 @@ class SEQUENCER_OT_generate_image(Operator):
                     "None of the selected strips are movie, image, text or scene types.",
                 )
                 return {"CANCELLED"}
-
         # LOADING MODELS
 
         # models for inpaint
@@ -2542,7 +2535,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             if low_vram():
                 pipe.enable_model_cpu_offload()
-                #pipe.enable_vae_slicing()
+                # pipe.enable_vae_slicing()
             else:
                 pipe.to("cuda")
 
@@ -2566,12 +2559,6 @@ class SEQUENCER_OT_generate_image(Operator):
                 pipe = BlipDiffusionControlNetPipeline.from_pretrained(
                     "Salesforce/blipdiffusion-controlnet", torch_dtype=torch.float16
                 ).to("cuda")
-
-        #            if low_vram():
-        #                pipe.enable_model_cpu_offload()
-        #                pipe.enable_vae_slicing()
-        #            else:
-        #                pipe.to("cuda")
 
         # OpenPose
         elif image_model_card == "lllyasviel/sd-controlnet-openpose":
@@ -2605,7 +2592,7 @@ class SEQUENCER_OT_generate_image(Operator):
             if low_vram():
                 pipe.enable_xformers_memory_efficient_attention()
                 pipe.enable_model_cpu_offload()
-                #pipe.enable_vae_slicing()
+                # pipe.enable_vae_slicing()
             else:
                 pipe.to("cuda")
 
@@ -2756,6 +2743,7 @@ class SEQUENCER_OT_generate_image(Operator):
         else:
             print("Load: " + image_model_card + " Model")
             from diffusers import AutoencoderKL
+
             enabled_items = None
 
             if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
@@ -2769,7 +2757,6 @@ class SEQUENCER_OT_generate_image(Operator):
                     variant="fp16",
                 )
             else:
-
                 pipe = DiffusionPipeline.from_pretrained(
                     image_model_card,
                     torch_dtype=torch.float16,
@@ -2787,7 +2774,6 @@ class SEQUENCER_OT_generate_image(Operator):
                 pipe.enable_vae_slicing()
             else:
                 pipe.to("cuda")
-
             if scene.use_freeU and pipe:  # Free Lunch
                 # -------- freeu block registration
                 print("Process: FreeU")
@@ -2797,7 +2783,6 @@ class SEQUENCER_OT_generate_image(Operator):
 
         # LoRA SDXL
         if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
-
             scene = context.scene
             lora_files = scene.lora_files
             enabled_names = []
@@ -2807,17 +2792,18 @@ class SEQUENCER_OT_generate_image(Operator):
             enabled_items = [item for item in lora_files if item.enabled]
             if enabled_items:
                 for item in enabled_items:
-                    enabled_names.append((clean_filename(item.name)).replace(".",""))
+                    enabled_names.append((clean_filename(item.name)).replace(".", ""))
                     enabled_weights.append(item.weight_value)
-                    pipe.load_lora_weights(scene.lora_folder, weight_name=item.name+".safetensors", adapter_name=((clean_filename(item.name)).replace(".","")))
-
+                    pipe.load_lora_weights(
+                        scene.lora_folder,
+                        weight_name=item.name + ".safetensors",
+                        adapter_name=((clean_filename(item.name)).replace(".", "")),
+                    )
                 pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)
-                print("Load LoRAs: " + ' '.join(enabled_names))
-
+                print("Load LoRAs: " + " ".join(enabled_names))
             #            SD 1.5
             #            pipe.load_lora_weights("C:/Users/user_name/Documents/LORA/", weight_name="AnalogRedmondV2-Analog-AnalogRedmAF.safetensors")
             #            #pipe.fuse_lora(lora_scale=0.7)
-
 
         # load refiner model if chosen.
         if do_refine:
@@ -2826,7 +2812,9 @@ class SEQUENCER_OT_generate_image(Operator):
             )
             from diffusers import StableDiffusionXLImg2ImgPipeline, AutoencoderKL
 
-            vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
+            vae = AutoencoderKL.from_pretrained(
+                "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
+            )
 
             refiner = StableDiffusionXLImg2ImgPipeline.from_pretrained(
                 "stabilityai/stable-diffusion-xl-refiner-1.0",
@@ -2839,21 +2827,20 @@ class SEQUENCER_OT_generate_image(Operator):
 
             if low_vram():
                 refiner.enable_model_cpu_offload()
-                #refiner.enable_vae_tiling()
-                #refiner.enable_vae_slicing()
+                # refiner.enable_vae_tiling()
+                # refiner.enable_vae_slicing()
             else:
                 refiner.to("cuda")
+        #        # Allow longer prompts.
+        #        if image_model_card == "runwayml/stable-diffusion-v1-5":
+        #            if pipe:
+        #                compel = Compel(tokenizer=pipe.tokenizer, text_encoder=pipe.text_encoder)
+        #            if refiner:
+        #                compel = Compel(tokenizer=refiner.tokenizer, text_encoder=refiner.text_encoder)
+        #            if converter:
+        #                compel = Compel(tokenizer=converter.tokenizer, text_encoder=converter.text_encoder)
 
-#        # Allow longer prompts.
-#        if image_model_card == "runwayml/stable-diffusion-v1-5":
-#            if pipe:
-#                compel = Compel(tokenizer=pipe.tokenizer, text_encoder=pipe.text_encoder)
-#            if refiner:
-#                compel = Compel(tokenizer=refiner.tokenizer, text_encoder=refiner.text_encoder)
-#            if converter:
-#                compel = Compel(tokenizer=converter.tokenizer, text_encoder=converter.text_encoder)
-
-#            prompt_embed = compel.build_conditioning_tensor(prompt)
+        #            prompt_embed = compel.build_conditioning_tensor(prompt)
 
         # Main Generate Loop:
         for i in range(scene.movie_num_batch):
@@ -2926,7 +2913,6 @@ class SEQUENCER_OT_generate_image(Operator):
                 ).images
                 # image[0].save("./if_stage_III.png")
                 image = image[0]
-
             elif image_model_card == "warp-ai/wuerstchen":
                 scene.generate_movie_y = y = closest_divisible_128(y)
                 scene.generate_movie_x = x = closest_divisible_128(x)
@@ -2958,7 +2944,6 @@ class SEQUENCER_OT_generate_image(Operator):
                 if not init_image:
                     print("Loading strip failed!")
                     return {"CANCELLED"}
-
                 init_image = init_image.resize((x, y))
 
                 if image_model_card == "lllyasviel/sd-controlnet-canny":
@@ -2973,7 +2958,6 @@ class SEQUENCER_OT_generate_image(Operator):
                     # canny_image = np.array(canny_image)
                 else:
                     canny_image = init_image
-
                 image = pipe(
                     prompt=prompt,
                     negative_prompt=negative_prompt,
@@ -3066,7 +3050,6 @@ class SEQUENCER_OT_generate_image(Operator):
                 if not init_image:
                     print("Loading strip failed!")
                     return {"CANCELLED"}
-
                 init_image = init_image.resize((x, y))
                 style_image = init_image
 
@@ -3101,7 +3084,6 @@ class SEQUENCER_OT_generate_image(Operator):
                     else:
                         print("Subject strip loading failed!")
                         subject_strip = ""
-
                 if not subject_strip:
                     image = pipe(
                         text_prompt_input,
@@ -3204,7 +3186,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 # LoRA.
                 if enabled_items:
                     image = pipe(
-                        #prompt_embeds=prompt, # for compel - long prompts
+                        # prompt_embeds=prompt, # for compel - long prompts
                         prompt,
                         negative_prompt=negative_prompt,
                         num_inference_steps=image_num_inference_steps,
@@ -3217,7 +3199,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 # No LoRA.
                 else:
                     image = pipe(
-                        #prompt_embeds=prompt, # for compel - long prompts
+                        # prompt_embeds=prompt, # for compel - long prompts
                         prompt,
                         negative_prompt=negative_prompt,
                         num_inference_steps=image_num_inference_steps,
@@ -3231,17 +3213,17 @@ class SEQUENCER_OT_generate_image(Operator):
             if do_refine:
                 print("Refine: Image")
 
-#                image = refiner(
-#                    prompt,
-#                    negative_prompt=negative_prompt,
-#                    num_inference_steps=clamp_value(
-#                        int(image_num_inference_steps / 2), 1, 5
-#                    ),
-#                    denoising_start=0.8,
-#                    guidance_scale=image_num_guidance,
-#                    image=image,
-#                    # image=image[None, :],
-#                ).images[0]
+                #                image = refiner(
+                #                    prompt,
+                #                    negative_prompt=negative_prompt,
+                #                    num_inference_steps=clamp_value(
+                #                        int(image_num_inference_steps / 2), 1, 5
+                #                    ),
+                #                    denoising_start=0.8,
+                #                    guidance_scale=image_num_guidance,
+                #                    image=image,
+                #                    # image=image[None, :],
+                #                ).images[0]
                 image = refiner(
                     prompt=prompt,
                     image=image,
@@ -3285,10 +3267,6 @@ class SEQUENCER_OT_generate_image(Operator):
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
-            # Redraw UI to display the new strip. Remove this if Blender crashes:
-            # https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
-            # bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
-
             for window in bpy.context.window_manager.windows:
                 screen = window.screen
                 for area in screen.areas:
@@ -3310,6 +3288,7 @@ class SEQUENCER_OT_generate_image(Operator):
         # clear the VRAM
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+
         return {"FINISHED"}
 
 
@@ -3365,7 +3344,6 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
             print("Use file seed and prompt: Yes")
         else:
             print("Use file seed and prompt: No")
-
         import torch
 
         total_vram = 0
@@ -3391,7 +3369,9 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                         intermediate_strip.frame_offset_start = int(trim_frame)
                         intermediate_strip.frame_final_duration = 1
 
-                        temp_strip = strip = get_render_strip(self, context, intermediate_strip)
+                        temp_strip = strip = get_render_strip(
+                            self, context, intermediate_strip
+                        )
 
                         if intermediate_strip is not None:
                             delete_strip(intermediate_strip)
@@ -3518,13 +3498,6 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     scene.movie_num_seed = seed
                 if temp_strip is not None:
                     delete_strip(temp_strip)
-                #                    sel_seq = context.selected_sequences
-                #                    for des_strip in sel_seq:
-                #                        des_strip.select = False
-                #                        temp_strip.select = True
-                #                        bpy.ops.sequencer.delete()
-                #                    for des_strip in sel_seq:
-                #                        des_strip.select = True
 
                 bpy.types.Scene.movie_path = ""
         scene.frame_current = current_frame
@@ -3736,7 +3709,6 @@ def register():
             items=[("no_style", "No Style", "No Style")] + styles_array,
             default="no_style",
         )
-
     bpy.types.Scene.openpose_use_bones = bpy.props.BoolProperty(
         name="openpose_use_bones",
         default=0,
@@ -3769,7 +3741,6 @@ def register():
 
     for cls in classes:
         bpy.utils.register_class(cls)
-
     # LoRA
     bpy.types.Scene.lora_files = bpy.props.CollectionProperty(type=LORABrowserFileItem)
     bpy.types.Scene.lora_files_index = bpy.props.IntProperty(name="Index", default=0)
@@ -3777,11 +3748,10 @@ def register():
     bpy.types.Scene.lora_folder = bpy.props.StringProperty(
         name="Folder",
         description="Select a folder",
-        subtype='DIR_PATH',
+        subtype="DIR_PATH",
         default="",
         update=update_folder_callback,
     )
-
 
 
 def unregister():
