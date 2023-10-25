@@ -961,7 +961,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "segmind/SSD-1B",
                 "Segmind Stable Diffusion XL (1024x1024)",
                 "segmind/SSD-1B",
-            ),            
+            ),
             ("warp-ai/wuerstchen", "Würstchen (1024x1024)", "warp-ai/wuerstchen"),
             ("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0"),
             (
@@ -1501,7 +1501,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             col = col.column(align=True)
             col.use_property_split = False
             col.use_property_decorate = False
-            
+
             # Folder selection and refresh button
             row = col.row(align=True)
             row.prop(scene, "lora_folder", text="LoRA")
@@ -1515,7 +1515,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 col.template_list("LORABROWSER_UL_files", "The_List", scene, "lora_files", scene, "lora_files_index", rows=2)
 
             if list_len == 0:
-                print("No LoRA files found in the selected folder.")          
+                print("No LoRA files found in the selected folder.")
 
         # Prompts
         col = layout.column(align=True)
@@ -2769,7 +2769,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     variant="fp16",
                 )
             else:
-                    
+
                 pipe = DiffusionPipeline.from_pretrained(
                     image_model_card,
                     torch_dtype=torch.float16,
@@ -2778,38 +2778,6 @@ class SEQUENCER_OT_generate_image(Operator):
             pipe.scheduler = DPMSolverMultistepScheduler.from_config(
                 pipe.scheduler.config
             )
-
-# LORA TESTS
-            if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
-
-                scene = context.scene
-                lora_files = scene.lora_files
-                enabled_names = []
-                enabled_weights = []
-                
-                # Check if there are any enabled items before printing
-                enabled_items = [item for item in lora_files if item.enabled]
-                if enabled_items:
-                    for item in enabled_items:
-                        enabled_names.append((clean_filename(item.name)).replace(".",""))
-                        enabled_weights.append(item.weight_value)
-                        pipe.load_lora_weights(scene.lora_folder, weight_name=item.name+".safetensors", adapter_name=((clean_filename(item.name)).replace(".","")))
-
-                    pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)                      
-
-#                for item in lora_files:
-#                    print(f"Name: {item.name}, Enabled: {item.enabled}, Weight: {item.weight_value}")
-
-                #pipe.unet.load_attn_procs("C:/Users/45239/Documents/LORA/filmgrain_v1.safetensors")
-#            pipe.load_lora_weights("C:/Users/45239/Documents/LORA/", weight_name="DavidLynch-10.safetensors")
-#            pipe.fuse_lora(lora_scale=0.7)
-#            pipe.load_lora_weights("C:/Users/45239/Documents/LORA/", weight_name="KlausKinski-06.safetensors")
-#            pipe.fuse_lora(lora_scale=0.7)
-            #pipe.load_lora_weights("C:/Users/45239/Documents/LORA/", weight_name="Willem_Dafoev1.safetensors")
-#            pipe.load_lora_weights("C:/Users/45239/Documents/LORA/", weight_name="SDXL_Inkdrawing_v1.safetensors")
-#                pipe.load_lora_weights("C:/Users/45239/Documents/LORA/", weight_name="WH1.safetensors")
-#            pipe.load_lora_weights("C:/Users/45239/Documents/LORA/", weight_name="AnalogRedmondV2-Analog-AnalogRedmAF.safetensors")
-#            #pipe.fuse_lora(lora_scale=0.7)
 
             pipe.watermark = NoWatermark()
 
@@ -2826,6 +2794,30 @@ class SEQUENCER_OT_generate_image(Operator):
                 register_free_upblock2d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
                 register_free_crossattn_upblock2d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
                 # -------- freeu block registration
+
+        # LoRA SDXL
+        if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+
+            scene = context.scene
+            lora_files = scene.lora_files
+            enabled_names = []
+            enabled_weights = []
+
+            # Check if there are any enabled items before loading
+            enabled_items = [item for item in lora_files if item.enabled]
+            if enabled_items:
+                for item in enabled_items:
+                    enabled_names.append((clean_filename(item.name)).replace(".",""))
+                    enabled_weights.append(item.weight_value)
+                    pipe.load_lora_weights(scene.lora_folder, weight_name=item.name+".safetensors", adapter_name=((clean_filename(item.name)).replace(".","")))
+
+                pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)
+                print("Load LoRAs: " + ' '.join(enabled_names))
+
+            #            SD 1.5
+            #            pipe.load_lora_weights("C:/Users/user_name/Documents/LORA/", weight_name="AnalogRedmondV2-Analog-AnalogRedmAF.safetensors")
+            #            #pipe.fuse_lora(lora_scale=0.7)
+
 
         # load refiner model if chosen.
         if do_refine:
@@ -3222,7 +3214,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         cross_attention_kwargs={"scale": 1.0},
                         generator=generator,
                     ).images[0]
-                # No LoRA.                   
+                # No LoRA.
                 else:
                     image = pipe(
                         #prompt_embeds=prompt, # for compel - long prompts
