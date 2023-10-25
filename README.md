@@ -218,7 +218,7 @@ https://github.com/tin2tin/vse_masking_tools
 
 ## Useful Projects
 
-Generate LORAs: https://github.com/johnman3032/simple-lora-dreambooth-trainer
+Trainer for LoRAs: https://github.com/johnman3032/simple-lora-dreambooth-trainer
 
 
 ## Video Examples
