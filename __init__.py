@@ -8,10 +8,10 @@ bl_info = {
     "category": "Sequencer",
 }
 
-# TO DO: Style title check, long prompts, SDXL controlnet, Modelscope.
+# TO DO: Style title check, long prompts, SDXL controlnet, Modelscope, AudioGen, Move prints.
 
 import bpy, ctypes, random
-from bpy.types import Operator, Panel, AddonPreferences
+from bpy.types import Operator, Panel, AddonPreferences, UIList, PropertyGroup
 from bpy.props import (
     StringProperty,
     BoolProperty,
@@ -635,7 +635,8 @@ def install_modules(self):
     import_module(self, "diffusers", "git+https://github.com/huggingface/peft.git")
     import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
     import_module(self, "accelerate", "accelerate")
-    import_module(self, "transformers", "transformers")
+    #import_module(self, "transformers", "transformers")
+    import_module(self, "transformers", "git+https://github.com/huggingface/transformers.git")
     import_module(self, "sentencepiece", "sentencepiece")
     import_module(self, "safetensors", "safetensors")
     import_module(self, "cv2", "opencv_python")
@@ -1353,14 +1354,14 @@ def ensure_unique_filename(file_name):
 
 
 # LoRA.
-class LORABrowserFileItem(bpy.types.PropertyGroup):
+class LORABrowserFileItem(PropertyGroup):
     name: bpy.props.StringProperty()
     enabled: bpy.props.BoolProperty(default=True)
     weight_value: bpy.props.FloatProperty(default=1.0)
     index: bpy.props.IntProperty(name="Index", default=0)
 
 
-class LORABROWSER_UL_files(bpy.types.UIList):
+class LORABROWSER_UL_files(UIList):
     def draw_item(
         self, context, layout, data, item, icon, active_data, active_propname, index
     ):
@@ -1376,7 +1377,7 @@ def update_folder_callback(self, context):
         bpy.ops.lora.refresh_files()
 
 
-class LORA_OT_RefreshFiles(bpy.types.Operator):
+class LORA_OT_RefreshFiles(Operator):
     bl_idname = "lora.refresh_files"
     bl_label = "Refresh Files"
 
@@ -1486,7 +1487,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
 
         # LoRA.
         if (
-            image_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
+            (image_model_card == "stabilityai/stable-diffusion-xl-base-1.0" or image_model_card == "runwayml/stable-diffusion-v1-5")
             and type == "image"
         ):
             col = layout.column(align=True)
@@ -2781,8 +2782,8 @@ class SEQUENCER_OT_generate_image(Operator):
                 register_free_crossattn_upblock2d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
                 # -------- freeu block registration
 
-        # LoRA SDXL
-        if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+        # LoRA
+        if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0" or image_model_card == "runwayml/stable-diffusion-v1-5":
             scene = context.scene
             lora_files = scene.lora_files
             enabled_names = []
@@ -3500,6 +3501,12 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     delete_strip(temp_strip)
 
                 bpy.types.Scene.movie_path = ""
+                
+            scene.generate_movie_prompt = prompt
+            scene.generate_movie_negative_prompt = negative_prompt
+            context.scene.movie_use_random = use_random
+            context.scene.movie_num_seed = seed                
+                
         scene.frame_current = current_frame
 
         scene.generate_movie_prompt = prompt
@@ -3598,7 +3605,7 @@ def register():
     # The guidance number.
     bpy.types.Scene.movie_num_guidance = bpy.props.FloatProperty(
         name="movie_num_guidance",
-        default=9.0,
+        default=4.0,
         min=1,
         max=100,
     )
