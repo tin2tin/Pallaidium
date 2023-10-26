@@ -165,6 +165,7 @@ def load_styles(json_filename):
 
 def style_prompt(prompt):
     selected_entry_key = bpy.context.scene.generatorai_styles
+    print("selected_entry_key "+selected_entry_key)
 
     return_array = []
 
@@ -172,7 +173,7 @@ def style_prompt(prompt):
         styles_array = load_styles(
             os.path.dirname(os.path.abspath(__file__)) + "/styles.json"
         )
-        if selected_entry_key:
+        if styles_array:
             selected_entry = next(
                 (item for item in styles_array if item[0] == selected_entry_key), None
             )
@@ -845,6 +846,8 @@ def input_strips_updated(self, context):
         or image_model_card == "Salesforce/blipdiffusion"
     ):
         scene.input_strips = "input_strips"
+    if context.scene.lora_folder:
+        bpy.ops.lora.refresh_files()
 
 
 def output_strips_updated(self, context):
@@ -863,6 +866,8 @@ def output_strips_updated(self, context):
         or image_model_card == "lllyasviel/control_v11p_sd15_scribble"
     ):
         scene.inpaint_selected_strip = ""
+        if context.scene.lora_folder:
+            bpy.ops.lora.refresh_files()
     if (
         image_model_card == "lllyasviel/sd-controlnet-canny"
         or image_model_card == "lllyasviel/sd-controlnet-openpose"
@@ -907,7 +912,7 @@ class GeneratorAddonPreferences(AddonPreferences):
     movie_model_card: bpy.props.EnumProperty(
         name="Video Model",
         items=[
-            ("hotshotco/Hotshot-XL", "Hotshot-XL (512x512)", "Hotshot-XL (512x512)"),
+            #("hotshotco/Hotshot-XL", "Hotshot-XL (512x512)", "Hotshot-XL (512x512)"),
             ("strangeman3107/animov-0.1.1", "Animov (448x384)", "Animov (448x384)"),
             ("strangeman3107/animov-512x", "Animov (512x512)", "Animov (512x512)"),
             ("camenduru/potat1", "Potat v1 (1024x576)", "Potat (1024x576)"),
@@ -956,10 +961,10 @@ class GeneratorAddonPreferences(AddonPreferences):
             ),
             (
                 "segmind/SSD-1B",
-                "Segmind Stable Diffusion XL (1024x1024)",
+                "Segmind SSD-1B (1024x1024)",
                 "segmind/SSD-1B",
             ),
-            ("warp-ai/wuerstchen", "Würstchen (1024x1024)", "warp-ai/wuerstchen"),
+            #("warp-ai/wuerstchen", "Würstchen (1024x1024)", "warp-ai/wuerstchen"),
             ("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0"),
             (
                 "lllyasviel/sd-controlnet-canny",
@@ -988,6 +993,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             ),
         ],
         default="stabilityai/stable-diffusion-xl-base-1.0",
+        update=input_strips_updated,
     )
 
     audio_model_card: bpy.props.EnumProperty(
@@ -1007,6 +1013,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             # ("facebook/audiogen-medium", "AudioGen", "AudioGen"), #I do not have enough VRAM to test if this is working...
         ],
         default="bark",
+        update=input_strips_updated,
     )
 
     hugginface_token: bpy.props.StringProperty(
@@ -1488,7 +1495,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         # LoRA.
         if (
             (image_model_card == "stabilityai/stable-diffusion-xl-base-1.0" or image_model_card == "runwayml/stable-diffusion-v1-5")
-            and type == "image"
+            and type == "image" and input != "input_strips"
         ):
             col = layout.column(align=True)
             col = col.box()
@@ -2782,29 +2789,29 @@ class SEQUENCER_OT_generate_image(Operator):
                 register_free_crossattn_upblock2d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
                 # -------- freeu block registration
 
-        # LoRA
-        if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0" or image_model_card == "runwayml/stable-diffusion-v1-5":
-            scene = context.scene
-            lora_files = scene.lora_files
-            enabled_names = []
-            enabled_weights = []
+            # LoRA
+            if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0" or image_model_card == "runwayml/stable-diffusion-v1-5":
+                scene = context.scene
+                lora_files = scene.lora_files
+                enabled_names = []
+                enabled_weights = []
 
-            # Check if there are any enabled items before loading
-            enabled_items = [item for item in lora_files if item.enabled]
-            if enabled_items:
-                for item in enabled_items:
-                    enabled_names.append((clean_filename(item.name)).replace(".", ""))
-                    enabled_weights.append(item.weight_value)
-                    pipe.load_lora_weights(
-                        scene.lora_folder,
-                        weight_name=item.name + ".safetensors",
-                        adapter_name=((clean_filename(item.name)).replace(".", "")),
-                    )
-                pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)
-                print("Load LoRAs: " + " ".join(enabled_names))
-            #            SD 1.5
-            #            pipe.load_lora_weights("C:/Users/user_name/Documents/LORA/", weight_name="AnalogRedmondV2-Analog-AnalogRedmAF.safetensors")
-            #            #pipe.fuse_lora(lora_scale=0.7)
+                # Check if there are any enabled items before loading
+                enabled_items = [item for item in lora_files if item.enabled]
+                if enabled_items:
+                    for item in enabled_items:
+                        enabled_names.append((clean_filename(item.name)).replace(".", ""))
+                        enabled_weights.append(item.weight_value)
+                        pipe.load_lora_weights(
+                            scene.lora_folder,
+                            weight_name=item.name + ".safetensors",
+                            adapter_name=((clean_filename(item.name)).replace(".", "")),
+                        )
+                    pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)
+                    print("Load LoRAs: " + " ".join(enabled_names))
+                #            SD 1.5
+                #            pipe.load_lora_weights("C:/Users/user_name/Documents/LORA/", weight_name="AnalogRedmondV2-Analog-AnalogRedmAF.safetensors")
+                #            #pipe.fuse_lora(lora_scale=0.7)
 
         # load refiner model if chosen.
         if do_refine:
@@ -2914,6 +2921,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 ).images
                 # image[0].save("./if_stage_III.png")
                 image = image[0]
+                
             elif image_model_card == "warp-ai/wuerstchen":
                 scene.generate_movie_y = y = closest_divisible_128(y)
                 scene.generate_movie_x = x = closest_divisible_128(x)
@@ -3289,6 +3297,9 @@ class SEQUENCER_OT_generate_image(Operator):
         # clear the VRAM
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+            
+        if pipe:
+            pipe.disable_lora()
 
         return {"FINISHED"}
 
