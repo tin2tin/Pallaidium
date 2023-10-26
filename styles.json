@@ -2,7 +2,7 @@
 	{
 		"name": "Ads: Advertising",
 		"prompt": "Advertising poster style {prompt}. Professional, modern, product-focused, commercial, eye-catching, highly detailed",
-		"negative_prompt": "noisy, blurry, amateurish, sloppy, unattractive"
+		"negative_prompt": "noisy, blurry, amateurish, sloppy, unattractive, ugly"
 	},
 	{
 		"name": "Ads: Automotive",
@@ -137,7 +137,7 @@
 	{
 		"name": "Art: art deco",
 		"prompt": "Art Deco style {prompt}. geometric shapes, bold colors, luxurious, elegant, decorative, symmetrical, ornate, detailed",
-		"negative_prompt": "ugly, deformed, noisy, blurry, low contrast, realism, photorealistic, modernist, minimalist"
+		"negative_prompt": "ugly, deformed, noisy, blurry, low contrast, realism, photorealistic, modernist"
 	},
 	{
 		"name": "Art: art nouveau",
@@ -152,7 +152,7 @@
 	{
 		"name": "Art: cubist",
 		"prompt": "cubist artwork {prompt}. geometric shapes, abstract, innovative, revolutionary",
-		"negative_prompt": "anime, photorealistic, 35mm film, deformed, glitch, low contrast, noisy"
+		"negative_prompt": "anime, photorealistic, 35mm film, deformed, glitch, low contrast"
 	},
 	{
 		"name": "Art: dreamscape",
@@ -167,7 +167,7 @@
 	{
 		"name": "Art: graffiti",
 		"prompt": "graffiti style {prompt}. street art, vibrant, urban, detailed, tag, mural",
-		"negative_prompt": "ugly, deformed, noisy, blurry, low contrast, realism, photorealistic"
+		"negative_prompt": "ugly, deformed, noisy, blurry, low contrast, realism"
 	},
 	{
 		"name": "Art: hyperrealism",
@@ -177,7 +177,7 @@
 	{
 		"name": "Art: impressionist",
 		"prompt": "impressionist painting {prompt}. loose brushwork, vibrant color, light and shadow play, captures feeling over form",
-		"negative_prompt": "anime, photorealistic, 35mm film, deformed, glitch, low contrast, noisy"
+		"negative_prompt": "anime, photorealistic, 35mm film, deformed, low contrast, noisy"
 	},
 	{
 		"name": "Art: pointillism",
@@ -217,7 +217,7 @@
 	{
 		"name": "Art: typography",
 		"prompt": "typographic art {prompt}. stylized, intricate, detailed, artistic, text-based",
-		"negative_prompt": "ugly, deformed, noisy, blurry, low contrast, realism, photorealistic"
+		"negative_prompt": "ugly, deformed, noisy, blurry, low contrast, photorealistic"
 	},
 	{
 		"name": "Art: watercolor",
@@ -249,6 +249,11 @@
 		"prompt": "comic {prompt}. graphic illustration, comic art, graphic novel art, vibrant, highly detailed",
 		"negative_prompt": "photograph, deformed, glitch, noisy, realistic, stock photo"
 	},
+    {
+        "name": "Comic book: Ghoulpunk",
+        "prompt": "pulp comics {prompt}. dark cyan and red, suburban, ghoulpunk, highly detailed",
+        "negative_prompt": "photograph, deformed, glitch, noisy, realistic, stock photo, deformed"
+    },
 	{
 		"name": "Comic book: Manga",
 		"prompt": "manga style {prompt}. vibrant, high-energy, detailed, iconic, Japanese comic style, intricate, detailed",
@@ -287,7 +292,7 @@
 	{
 		"name": "Computer: Lowpoly",
 		"prompt": "low-poly style {prompt}. low-poly game art, polygon mesh, jagged, blocky, wireframe edges, centered composition",
-		"negative_prompt": "noisy, sloppy, messy, grainy, highly detailed, ultra textured, photo"
+		"negative_prompt": "noisy, sloppy, messy, grainy, highly detailed, ultra textured, photo, drawing"
 	},
 	{
 		"name": "Computer: Pixel art",
@@ -297,7 +302,7 @@
 	{
 		"name": "Computer: Texture",
 		"prompt": "texture {prompt} top down close-up",
-		"negative_prompt": "ugly, deformed, noisy, blurry"
+		"negative_prompt": "ugly, deformed, noisy, blurry, unsharp"
 	},
 	{
 		"name": "Drawn: Storyboard",
@@ -322,67 +327,67 @@
 	{
 		"name": "Film Genre: Atmospheric",
 		"prompt": "{prompt} in enchanting atmosphere, misty forests, lanterns, haunting shadows, deep blues, soft grays, intriguing shadows, wide establishing shots, ethereal appearance",
-		"negative_prompt": "Neon colors, harsh lighting, oversaturated visuals, inconsistent lighting, generic camera angles, look in the camera"
+		"negative_prompt": "Neon colors, harsh lighting, oversaturated visuals, inconsistent lighting, generic camera angles, look in the camera, centered"
 	},
 	{
 		"name": "Film Genre: Children's Movie",
 		"prompt": "{prompt} with enchanting craft, endearing characters, magical settings, exciting adventures, vibrant palette, fantastical elements, low-angle shots, child's perspective, playful appearance",
-		"negative_prompt": "Dark and scary themes, lack of whimsy, dull visuals, harsh lighting, unsettling camera angles, look in the camera"
+		"negative_prompt": "Dark and scary themes, lack of whimsy, dull visuals, harsh lighting, unsettling camera angles, look in the camera, centered"
 	},
 	{
 		"name": "Film Genre: Comedy",
 		"prompt": "{prompt} crafting hilarity, witty dialogues, slapstick humor, absurd situations, vibrant colors, energetic colors, comedic timing, wide shots, quick cuts, joyful expressions",
-		"negative_prompt": "Bleak tone, somber atmosphere, lack of humor, dim lighting, serious camera angles, look in the camera"
+		"negative_prompt": "Bleak tone, somber atmosphere, lack of humor, dim lighting, serious camera angles, look in the camera, centered"
 	},
 	{
 		"name": "Film Genre: Drama",
 		"prompt": "{prompt} delving into intense emotion, complex emotions, human experiences, character development, intricate relationships, powerful dialogues, diverse color palette, dramatic tension, close-ups, raw emotions",
-		"negative_prompt": "Superficial characters, lack of emotional depth, weak plot development, flat lighting, generic camera angles, look in the camera"
+		"negative_prompt": "Superficial characters, lack of emotional depth, weak plot development, flat lighting, generic camera angles, look in the camera, centered"
 	},
 	{
 		"name": "Film Genre: Ethereal",
 		"prompt": "{prompt} in surreal experience, otherworldly beauty, soft glows, dreamlike sequences, pastel color palette, gentle lighting, ethereal camera movements, dolly zooms, enchanting attire",
-		"negative_prompt": "Harsh lighting, chaotic visuals, dull colors, lack of softness, mundane camera angles, look in the camera"
+		"negative_prompt": "Harsh lighting, chaotic visuals, dull colors, lack of softness, mundane camera angles, look in the camera, centered"
 	},
 	{
 		"name": "Film Genre: Futuristic",
 		"prompt": "{prompt} on futuristic journey, hovering vehicles, neon skyscrapers, holographic displays, vibrant colors, metallic colors, advanced technology, dynamic low-angle shots, modern attire",
-		"negative_prompt": "Earthy tones, dim lighting, outdated visuals, lack of metallic sheen, conventional camera angles, look in the camera"
+		"negative_prompt": "Earthy tones, dim lighting, outdated visuals, lack of metallic sheen, conventional camera angles, look in the camera, centered"
 	},
 	{
 		"name": "Film Genre: Gritty",
 		"prompt": "{prompt} with gritty edge, raw realism, authentic grit, unfiltered emotion, desaturated tones, moody lighting, handheld camera movements, close-ups, rugged appearance",
-		"negative_prompt": "Soft lighting, pastel tones, polished visuals, lack of authenticity, ordinary camera angles, look in the camera"
+		"negative_prompt": "Soft lighting, pastel tones, polished visuals, lack of authenticity, ordinary camera angles, look in the camera, centered"
 	},
 	{
 		"name": "Film Genre: Musical",
 		"prompt": "{prompt} infused with magic of music, elaborate choreography, dazzling costumes, show-stopping performances, vibrant palette, musical numbers, dynamic camera movements, rhythm and energy, singing, dancing, radiant appearances",
-		"negative_prompt": "Lack of musical sequences, absence of dance, dull visuals, inappropriate lighting, conventional camera angles, look in the camera"
+		"negative_prompt": "Lack of musical sequences, absence of dance, dull visuals, inappropriate lighting, conventional camera angles, look in the camera, centered"
 	},
 	{
 		"name": "Film Genre: Noir",
 		"prompt": "{prompt} in captivating noir, moody shadows, smoky alleys, enigmatic characters, high-contrast black and white, dramatic chiaroscuro lighting, low-key lighting, suspenseful close-ups, classic attire",
-		"negative_prompt": "Bright colors, lack of shadows, inconsistent mood, overly bright lighting, standard camera angles, look in the camera"
+		"negative_prompt": "Bright colors, lack of shadows, inconsistent mood, overly bright lighting, standard camera angles, look in the camera, centered"
 	},
 	{
 		"name": "Film Genre: Romantic Comedy (Romcom)",
 		"prompt": "{prompt} for heartwarming creation, charming meet-cutes, quirky characters, delightful misunderstandings, warm colors, soft lighting, emotional connections, close-ups, affectionate interactions",
-		"negative_prompt": "Lack of chemistry, humorless interactions, dull visuals, cold lighting, distant camera angles, look in the camera"
+		"negative_prompt": "Lack of chemistry, humorless interactions, dull visuals, cold lighting, distant camera angles, look in the camera, centered"
 	},
 	{
 		"name": "Film Genre: War",
 		"prompt": "{prompt} immersing in intensity, heroism, sacrifice, grim atmosphere, desaturated palette, battlefield lighting, immersive tracking shots, combat scenes, determined looks",
-		"negative_prompt": "Lack of tension, absence of battle scenes, unrealistic portrayal, colorful visuals, inappropriate camera angles, look in the camera"
+		"negative_prompt": "Lack of tension, absence of battle scenes, unrealistic portrayal, colorful visuals, inappropriate camera angles, look in the camera, centered"
 	},
 	{
 		"name": "Film Genre: Whimsical",
 		"prompt": "{prompt} with whimsical twist, floating umbrellas, dancing flowers, flying books, bright colors, pastel colors, soft lighting, unconventional framing, Dutch angles, quirky costumes",
-		"negative_prompt": "Gloomy lighting, monochromatic tones, unbalanced fantasy, lack of playfulness, traditional camera angles, look in the camera"
+		"negative_prompt": "Gloomy lighting, monochromatic tones, unbalanced fantasy, lack of playfulness, traditional camera angles, look in the camera, centered"
 	},
 	{
 		"name": "Film Genre: Whodunit",
 		"prompt": "{prompt} unraveling mystery, intricate plots, suspenseful clues, unexpected twists, dark color palette, hidden details, tracking shots, creative framing, intriguing demeanor",
-		"negative_prompt": "Bright colors, even lighting, transparent mystery, lack of tension, conventional camera angles, look in the camera"
+		"negative_prompt": "Bright colors, even lighting, transparent mystery, lack of tension, conventional camera angles, look in the camera, centered"
 	},
 	{
 		"name": "Film Genre: dystopian",
@@ -412,7 +417,7 @@
 	{
 		"name": "Film: Cinematic",
 		"prompt": "cinematic film still {prompt}. shallow depth of field, vignette, highly detailed, high budget, bokeh, cinemascope, moody, epic, gorgeous, film grain, grainy",
-		"negative_prompt": "anime, cartoon, graphic, text, painting, crayon, graphite, abstract, glitch, deformed, mutated, ugly, disfigured"
+		"negative_prompt": "anime, cartoon, graphic, text, painting, crayon, graphite, abstract, deformed, mutated, ugly, disfigured"
 	},
 	{
 		"name": "Film: Default",
@@ -422,7 +427,7 @@
 	{
 		"name": "Futuristic: Neonpunk",
 		"prompt": "neonpunk style {prompt}. cyberpunk, vaporwave, neon, vibes, vibrant, stunningly beautiful, crisp, detailed, sleek, ultramodern, magenta highlights, dark purple shadows, high contrast, cinematic, ultra detailed, intricate, professional",
-		"negative_prompt": "painting, drawing, illustration, glitch, deformed, mutated, cross-eyed, ugly, disfigured"
+		"negative_prompt": "painting, drawing, illustration, deformed, mutated, cross-eyed, ugly, disfigured"
 	},
 	{
 		"name": "Futuristic: biomechanical",
@@ -467,7 +472,7 @@
 	{
 		"name": "Futuristic: sci-fi",
 		"prompt": "sci-fi style {prompt}. futuristic, technological, alien worlds, space themes, advanced civilizations",
-		"negative_prompt": "ugly, deformed, noisy, blurry, low contrast, realism, photorealistic, historical, medieval"
+		"negative_prompt": "ugly, deformed, noisy, blurry, low contrast, realism, photorealistic, historical"
 	},
 	{
 		"name": "Futuristic: steampunk",
@@ -512,7 +517,7 @@
 	{
 		"name": "Game: pokemon",
 		"prompt": "Pokémon style {prompt}. vibrant, cute, anime, fantasy, reminiscent of Pokémon series",
-		"negative_prompt": "realistic, modern, horror, dystopian, violent"
+		"negative_prompt": "realistic, modern, horror, dystopian, violent, drak, grey"
 	},
 	{
 		"name": "Game: retro arcade",
