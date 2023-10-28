@@ -165,7 +165,6 @@ def load_styles(json_filename):
 
 def style_prompt(prompt):
     selected_entry_key = bpy.context.scene.generatorai_styles
-    print("selected_entry_key "+selected_entry_key)
 
     return_array = []
 
@@ -592,7 +591,7 @@ def install_modules(self):
                     "install",
                     "torch",
                     "--index-url",
-                    "https://download.pytorch.org/whl/cu118",
+                    "https://download.pytorch.org/whl/cu121",
                     "--no-warn-script-location",
                     "--user",
                 ]
@@ -964,7 +963,8 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Segmind SSD-1B (1024x1024)",
                 "segmind/SSD-1B",
             ),
-            #("warp-ai/wuerstchen", "Würstchen (1024x1024)", "warp-ai/wuerstchen"),
+            ("SimianLuo/LCM_Dreamshaper_v7", "LCM Dreamshaper v7 (768 x 768)", "SimianLuo/LCM_Dreamshaper_v7"),
+            ("warp-ai/wuerstchen", "Würstchen (1024x1024)", "warp-ai/wuerstchen"),
             ("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0"),
             (
                 "lllyasviel/sd-controlnet-canny",
@@ -1522,8 +1522,6 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     "lora_files_index",
                     rows=2,
                 )
-            if list_len == 0:
-                print("No LoRA files found in the selected folder.")
 
         # Prompts
         col = layout.column(align=True)
@@ -2638,6 +2636,25 @@ class SEQUENCER_OT_generate_image(Operator):
                 # pipe.enable_forward_chunking(chunk_size=1, dim=1)
             else:
                 pipe.to("cuda")
+        
+        # Dreamshaper        
+        if image_model_card == "SimianLuo/LCM_Dreamshaper_v7":
+            if do_convert:
+                print(
+                    image_model_card
+                    + " does not support img2img or img2vid. Ignoring input strip."
+                )
+            from diffusers import DiffusionPipeline
+            
+            pipe = DiffusionPipeline.from_pretrained("SimianLuo/LCM_Dreamshaper_v7", custom_pipeline="latent_consistency_txt2img", torch_dtype=torch.float16)
+
+#            if low_vram():
+#                # torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
+#                pipe.enable_model_cpu_offload()
+#                # pipe.enable_vae_slicing()
+#                # pipe.enable_forward_chunking(chunk_size=1, dim=1)
+#            else:
+            pipe.to("cuda")
 
         # Wuerstchen
         elif image_model_card == "warp-ai/wuerstchen":
@@ -2981,6 +2998,18 @@ class SEQUENCER_OT_generate_image(Operator):
                     generator=generator,
                 ).images[0]
 
+            elif image_model_card == "SimianLuo/LCM_Dreamshaper_v7":
+                image = pipe(
+                    prompt=prompt,
+                    #negative_prompt=negative_prompt,
+                    num_inference_steps=image_num_inference_steps,
+                    guidance_scale=image_num_guidance,
+                    lcm_origin_steps=50,
+                    height=y,
+                    width=x,
+                    #generator=generator,
+                ).images[0]
+                
             # OpenPose
             elif image_model_card == "lllyasviel/sd-controlnet-openpose":
                 print("Process: OpenPose")
