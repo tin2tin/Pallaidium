@@ -119,7 +119,7 @@ If you get the message that CUDA is out of memory, then restart Blender to free 
 
 # Batch Processing
 
-Select multiple strips and hit Generate. When doing this, the file name, and if found the seed value, are automatically inserted into the prompt and seed value. However in the add-on preferences this behaviour can be switched off.
+Select multiple strips and hit Generate. When doing this, the file name, and if found the seed value, are automatically inserted into the prompt and seed value. However, in the add-on preferences, this behavior can be switched off.
 
 https://github.com/tin2tin/Pallaidium/assets/1322593/28098eb6-3a93-4bcb-bd6f-53b71faabd8d
 
@@ -152,7 +152,10 @@ Or: Voice of God judging mankind, woman talking about celestial beings, hammer o
 
 ## Performance
 
-On 6 GB of VRAM I typically render images first with 1024x512 images with SDXL. And img2vid with Zeroscope XL in 768x384x10 or 640x320x17.
+The performance can be improved by following this guide: https://nvidia.custhelp.com/app/answers/detail/a_id/5490/~/system-memory-fallback-for-stable-diffusion
+
+On 6 GB of VRAM I typically render images first with 1024x512 images with SDXL. And img2vid with Zeroscope XL in 768x384x10 or 640x320x17, with a low Quality Steps value.
+
 
 ## New to Blender?
 
