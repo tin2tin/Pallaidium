@@ -2971,15 +2971,12 @@ class SEQUENCER_OT_generate_image(Operator):
                         enabled_names.append((clean_filename(item.name)).replace(".", ""))
                         enabled_weights.append(item.weight_value)
                         pipe.load_lora_weights(
-                            scene.lora_folder,
+                            bpy.path.abspath(scene.lora_folder),
                             weight_name=item.name + ".safetensors",
                             adapter_name=((clean_filename(item.name)).replace(".", "")),
                         )
                     pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)
                     print("Load LoRAs: " + " ".join(enabled_names))
-                #            SD 1.5
-                #            pipe.load_lora_weights("C:/Users/user_name/Documents/LORA/", weight_name="AnalogRedmondV2-Analog-AnalogRedmAF.safetensors")
-                #            #pipe.fuse_lora(lora_scale=0.7)
 
         # load refiner model if chosen.
         if do_refine:
