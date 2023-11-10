@@ -999,7 +999,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Segmind SSD-1B (1024x1024)",
                 "segmind/SSD-1B",
             ),
-            #("SimianLuo/LCM_Dreamshaper_v7", "LCM Dreamshaper v7 (768 x 768)", "SimianLuo/LCM_Dreamshaper_v7"), Properly needs a torch update?
+            #("SimianLuo/LCM_Dreamshaper_v7", "LCM Dreamshaper v7 (768 x 768)", "SimianLuo/LCM_Dreamshaper_v7"), #Properly needs a torch update?
             ("warp-ai/wuerstchen", "Würstchen (1024x1024)", "warp-ai/wuerstchen"),
             ("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0"),
             (
@@ -1440,8 +1440,6 @@ class LORA_OT_RefreshFiles(Operator):
                 file_item.name = filename.replace(".safetensors", "")
                 file_item.enabled = False
                 file_item.weight_value = 1.0
-            else:
-                print(filename)
         return {"FINISHED"}
 
 
@@ -1605,18 +1603,6 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             row.prop(context.scene, "movie_use_random", text="", icon="QUESTION")
             sub_row.active = not context.scene.movie_use_random
 
-        if type != "audio":
-            if type == "movie" or (
-                type == "image"
-                and image_model_card != "lllyasviel/sd-controlnet-canny"
-                and image_model_card != "lllyasviel/sd-controlnet-openpose"
-                and image_model_card != "lllyasviel/control_v11p_sd15_scribble"
-                and image_model_card != "monster-labs/control_v1p_sd15_qrcode_monster"
-                and image_model_card != "Salesforce/blipdiffusion"
-            ):
-                col = col.column(heading="FreeU", align=True)
-                col.prop(context.scene, "use_freeU", text="")
-
         if type == "movie" and (
             movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256"
             or movie_model_card == "cerspense/zeroscope_v2_576w"
@@ -1626,10 +1612,25 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             col.prop(context.scene, "video_to_video", text="2x")
 
         if type == "image":
-            col = col.column(heading="Refine", align=True)
-            col.prop(context.scene, "refine_sd", text="Image")
+            col = col.column(heading="Enhance", align=True)
+            col.prop(context.scene, "refine_sd", text="SD Refine")
             sub_col = col.row()
             sub_col.active = context.scene.refine_sd
+
+        if type != "audio":
+            if type == "movie" or (
+                type == "image"
+                and image_model_card != "lllyasviel/sd-controlnet-canny"
+                and image_model_card != "lllyasviel/sd-controlnet-openpose"
+                and image_model_card != "lllyasviel/control_v11p_sd15_scribble"
+                and image_model_card != "monster-labs/control_v1p_sd15_qrcode_monster"
+                and image_model_card != "Salesforce/blipdiffusion"
+            ):
+                #col = col.column(heading="FreeU", align=True)
+                row = col.row()
+                row.prop(context.scene, "use_freeU", text="FreeU")
+            if type == "image":
+                row.prop(context.scene, "use_lcm", text="LCM")
 
         # Output.
         layout = self.layout
@@ -2485,28 +2486,29 @@ class SEQUENCER_OT_generate_image(Operator):
 
         if not seq_editor:
             scene.sequence_editor_create()
-#        try:
-        from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
-        from diffusers.utils import pt_to_pil
-        import torch
-        import requests
-        from diffusers.utils import load_image
-        import numpy as np
-        import PIL
-        import cv2
-        from PIL import Image
-        from .free_lunch_utils import (
-            register_free_upblock2d,
-            register_free_crossattn_upblock2d,
-        )
-#        from compel import Compel
-#        except ModuleNotFoundError:
-#            print("Dependencies needs to be installed in the add-on preferences.")
-#            self.report(
-#                {"INFO"},
-#                "Dependencies needs to be installed in the add-on preferences.",
-#            )
-#            return {"CANCELLED"}
+        try:
+            from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
+            from diffusers.utils import pt_to_pil
+            import torch
+            import requests
+            from diffusers.utils import load_image
+            import numpy as np
+            import PIL
+            import cv2
+            from PIL import Image
+            from .free_lunch_utils import (
+                register_free_upblock2d,
+                register_free_crossattn_upblock2d,
+            )
+            #from compel import Compel
+        except ModuleNotFoundError:
+            print("Dependencies needs to be installed in the add-on preferences.")
+            self.report(
+                {"INFO"},
+                "Dependencies needs to be installed in the add-on preferences.",
+            )
+            return {"CANCELLED"}
+        
         # clear the VRAM
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -2649,7 +2651,12 @@ class SEQUENCER_OT_generate_image(Operator):
                 safety_checker=None,
             )  # safety_checker=None,
 
-            pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
+            if scene.use_lcm:
+                from diffusers import LCMScheduler
+                pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
+                pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
+            else:
+                pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
 
             if low_vram():
                 pipe.enable_xformers_memory_efficient_attention()
@@ -2706,7 +2713,12 @@ class SEQUENCER_OT_generate_image(Operator):
                 torch_dtype=torch.float16,
             )  # safety_checker=None,
 
-            pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
+            if scene.use_lcm:
+                from diffusers import LCMScheduler
+                pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
+                pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
+            else:
+                pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
 
             if low_vram():
                 pipe.enable_xformers_memory_efficient_attention()
@@ -2725,22 +2737,22 @@ class SEQUENCER_OT_generate_image(Operator):
                 StableDiffusionControlNetPipeline,
                 UniPCMultistepScheduler,
             )
-
-            checkpoint = "lllyasviel/control_v11p_sd15_scribble"
-
             processor = HEDdetector.from_pretrained("lllyasviel/Annotators")
-
-            controlnet = ControlNetModel.from_pretrained(
-                checkpoint, torch_dtype=torch.float16
-            )
+            checkpoint = "lllyasviel/control_v11p_sd15_scribble"
+            controlnet = ControlNetModel.from_pretrained(checkpoint, torch_dtype=torch.float16)
 
             pipe = StableDiffusionControlNetPipeline.from_pretrained(
                 "runwayml/stable-diffusion-v1-5",
                 controlnet=controlnet,
                 torch_dtype=torch.float16,
             )
-
-            pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
+            
+            if scene.use_lcm:
+                from diffusers import LCMScheduler
+                pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
+                pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
+            else:
+                pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
 
             if low_vram():
                 # torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
@@ -2759,7 +2771,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 )
             from diffusers import DiffusionPipeline
 
-            pipe = DiffusionPipeline.from_pretrained("SimianLuo/LCM_Dreamshaper_v7", custom_pipeline="latent_consistency_txt2img", torch_dtype=torch.float32)
+            pipe = DiffusionPipeline.from_pretrained("SimianLuo/LCM_Dreamshaper_v7", custom_pipeline="latent_consistency_txt2img", torch_dtype=torch.float16)
 
 #            if low_vram():
 #                # torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
@@ -2768,7 +2780,7 @@ class SEQUENCER_OT_generate_image(Operator):
 #            else:
             #pipe.to(torch_device="cuda")
             #pipe.enable_vae_slicing()
-            pipe.to(torch_device="cuda")
+            pipe.to(torch_device="cuda", torch_dtype=torch.float16)
 #            if low_vram():
 #                # torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
 #                #pipe.enable_model_cpu_offload()
@@ -2896,7 +2908,6 @@ class SEQUENCER_OT_generate_image(Operator):
             enabled_items = None
 
             if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
-                #from diffusers import LCMScheduler
                 vae = AutoencoderKL.from_pretrained(
                     "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
                 )
@@ -2906,17 +2917,30 @@ class SEQUENCER_OT_generate_image(Operator):
                     torch_dtype=torch.float16,
                     variant="fp16",
                 )
-                #pipe.load_lora_weights("latent-consistency/lcm-lora-sdxl")
-                #pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
             else:
                 pipe = DiffusionPipeline.from_pretrained(
                     image_model_card,
                     torch_dtype=torch.float16,
                     variant="fp16",
                 )
-            pipe.scheduler = DPMSolverMultistepScheduler.from_config(
-                pipe.scheduler.config
-            )
+            if scene.use_lcm:
+                print("Use LCM: True")
+                from diffusers import LCMScheduler
+                if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+                    pipe.load_lora_weights("latent-consistency/lcm-lora-sdxl")
+                    
+                elif image_model_card == "segmind/SSD-1B":
+                    pipe.load_lora_weights("latent-consistency/lcm-lora-ssd-1b")
+                    pipe.fuse_lora()
+                else:
+                    pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
+
+                pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
+            else:
+                print("Use LCM: False")
+                pipe.scheduler = DPMSolverMultistepScheduler.from_config(
+                    pipe.scheduler.config
+                )
 
             pipe.watermark = NoWatermark()
 
@@ -3132,11 +3156,13 @@ class SEQUENCER_OT_generate_image(Operator):
                     #negative_prompt=negative_prompt,
                     num_inference_steps=image_num_inference_steps,
                     guidance_scale=image_num_guidance,
-                    #lcm_origin_steps=50,
-                    height=y,
-                    width=x,
+                    lcm_origin_steps=50,
+                    #height=y,
+                    #width=x,
                     #generator=generator,
-                ).images[0]
+                    output_type="pil",
+                ).images
+
 
             # OpenPose
             elif image_model_card == "lllyasviel/sd-controlnet-openpose":
@@ -3910,6 +3936,11 @@ def register():
 
     bpy.types.Scene.use_freeU = bpy.props.BoolProperty(
         name="use_freeU",
+        default=0,
+    )
+
+    bpy.types.Scene.use_lcm = bpy.props.BoolProperty(
+        name="use_lcm",
         default=0,
     )
 
