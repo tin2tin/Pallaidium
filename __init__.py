@@ -567,6 +567,7 @@ def import_module(self, module, install_module):
 
 
 def install_modules(self):
+    os_platform = platform.system()
     app_path = site.USER_SITE
 
     if app_path not in sys.path:
@@ -643,7 +644,8 @@ def install_modules(self):
     import_module(self, "tensorflow", "tensorflow")
     if os_platform == "Darwin" or os_platform == "Linux":
         import_module(self, "sox", "sox")
-    import_module(self, "soundfile", "PySoundFile")
+    else:
+        import_module(self, "soundfile", "PySoundFile")
     #import_module(self, "transformers", "transformers")
     import_module(self, "sentencepiece", "sentencepiece")
     import_module(self, "safetensors", "safetensors")
@@ -1593,22 +1595,23 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             col.prop(context.scene, "generate_movie_frames", text="Frames")
         if type == "audio" and audio_model_card != "bark":
             col.prop(context.scene, "audio_length_in_f", text="Frames")
+            
         if type == "audio" and audio_model_card == "bark":
             col = layout.column(align=True)
             col.prop(context.scene, "speakers", text="Speaker")
             col.prop(context.scene, "languages", text="Language")
+        elif type == "audio" and addon_prefs.audio_model_card == "facebook/musicgen-stereo-small":
+            col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")   
         else:
             col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
+            col.prop(context.scene, "movie_num_guidance", text="Word Power")
 
-            if addon_prefs.audio_model_card != "facebook/musicgen-stereo-small":
-                col.prop(context.scene, "movie_num_guidance", text="Word Power")
-
-            col = col.column()
-            row = col.row(align=True)
-            sub_row = row.row(align=True)
-            sub_row.prop(context.scene, "movie_num_seed", text="Seed")
-            row.prop(context.scene, "movie_use_random", text="", icon="QUESTION")
-            sub_row.active = not context.scene.movie_use_random
+        col = col.column()
+        row = col.row(align=True)
+        sub_row = row.row(align=True)
+        sub_row.prop(context.scene, "movie_num_seed", text="Seed")
+        row.prop(context.scene, "movie_use_random", text="", icon="QUESTION")
+        sub_row.active = not context.scene.movie_use_random
 
         if type == "movie" and (
             movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256"
@@ -2268,10 +2271,10 @@ class SEQUENCER_OT_generate_audio(Operator):
                 import xformers
 
             if addon_prefs.audio_model_card == "facebook/musicgen-stereo-small":
-                #import torchaudio
-                #from audiocraft.models import MusicGen
-                #from audiocraft.data.audio import audio_write
-                import soundfile as sf
+                if os_platform == "Darwin" or os_platform == "Linux":
+                    import sox
+                else:
+                    import soundfile as sf
 
             if addon_prefs.audio_model_card == "bark":
                 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
@@ -2318,10 +2321,11 @@ class SEQUENCER_OT_generate_audio(Operator):
 
         # Musicgen
         elif addon_prefs.audio_model_card == "facebook/musicgen-stereo-small":
-
-            #pipe = MusicGen.get_pretrained("facebook/musicgen-small", device='cuda')
             from transformers import pipeline
+            from transformers import set_seed
             pipe = pipeline("text-to-audio", "facebook/musicgen-stereo-small", device="cuda:0", torch_dtype=torch.float16)
+            if int(audio_length_in_s*50) > 1503:
+                self.report({"INFO"}, "Maximum output duration is 30 sec.")
 
         # Bark
         elif addon_prefs.audio_model_card == "bark":
@@ -2332,8 +2336,6 @@ class SEQUENCER_OT_generate_audio(Operator):
                 fine_use_small=True,
             )
 
-        if addon_prefs.audio_model_card == "facebook/musicgen-stereo-small" and audio_length_in_s*50 > 1503:
-            self.report({"INFO"}, "Maximum duration is 30 sec.")
 
         # Main loop
         for i in range(scene.movie_num_batch):
@@ -2389,12 +2391,31 @@ class SEQUENCER_OT_generate_audio(Operator):
 
             # Musicgen
             elif addon_prefs.audio_model_card == "facebook/musicgen-stereo-small":
-
-                descriptions = prompt
+                print("Generate: MusicGen Stereo")
+                print("Prompt: " + prompt)
+                seed = context.scene.movie_num_seed
+                seed = (
+                    seed
+                    if not context.scene.movie_use_random
+                    else random.randint(0, 999999)
+                )
+                print("Seed: " + str(seed))
+                context.scene.movie_num_seed = seed
+                set_seed(seed)
+                
                 music = pipe(prompt, forward_params={"max_new_tokens": int(min(audio_length_in_s*50, 1503))})
-                filename = solve_path(clean_filename(prompt) + ".wav")
+                filename = solve_path(clean_filename(str(seed)+"_"+prompt) + ".wav")
                 rate = 48000
-                sf.write(filename, music["audio"][0].T, music["sampling_rate"])
+                
+                if os_platform == "Darwin" or os_platform == "Linux":
+                    tfm = sox.Transformer()
+                    tfm.build_file(
+                    input_array=music["audio"][0].T, 
+                    sample_rate_in=music["sampling_rate"],
+                    output_filepath=filename
+                    )
+                else:
+                    sf.write(filename, music["audio"][0].T, music["sampling_rate"])
 
             else:  # AudioLDM
                 print("Generate: Audio/music (AudioLDM)")
