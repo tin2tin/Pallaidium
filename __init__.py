@@ -720,8 +720,8 @@ def install_modules(self):
     #import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
 
 
-##    # Modelscope img2vid
-#    import_module(self, "modelscope", "git+https://github.com/modelscope/modelscope.git")
+###    # Modelscope img2vid
+#    import_module(self, "modelscope", "modelscope")
 #    # import_module(self, "modelscope", "modelscope==1.9.0")
 #    #import_module(self, "xformers", "xformers==0.0.20")
 #    #import_module(self, "torch", "torch==2.0.1")
@@ -942,9 +942,19 @@ class GeneratorAddonPreferences(AddonPreferences):
     movie_model_card: bpy.props.EnumProperty(
         name="Video Model",
         items=[
+            (
+                "guoyww/animatediff-motion-adapter-v1-5-2",
+                "AnimateDiff",
+                "AnimateDiff",
+            ),
             #("hotshotco/Hotshot-XL", "Hotshot-XL (512x512)", "Hotshot-XL (512x512)"),
             ("strangeman3107/animov-0.1.1", "Animov (448x384)", "Animov (448x384)"),
             ("strangeman3107/animov-512x", "Animov (512x512)", "Animov (512x512)"),
+            (
+                "stabilityai/stable-diffusion-xl-base-1.0",
+                "Img2img SD XL 1.0 Refine (1024x1024)",
+                "Stable Diffusion XL 1.0",
+            ),
             ("camenduru/potat1", "Potat v1 (1024x576)", "Potat (1024x576)"),
             (
                 "cerspense/zeroscope_v2_dark_30x448x256",
@@ -961,16 +971,6 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Zeroscope XL (1024x576x24)",
                 "Zeroscope XL (1024x576x24)",
             ),
-            (
-                "stabilityai/stable-diffusion-xl-base-1.0",
-                "Img2img SD XL 1.0 Refine (1024x1024)",
-                "Stable Diffusion XL 1.0",
-            ),
-            (
-                "guoyww/animatediff-motion-adapter-v1-5-2",
-                "AnimateDiff",
-                "AnimateDiff",
-            ),
         ],
         default="cerspense/zeroscope_v2_576w",
         update=input_strips_updated,
@@ -979,6 +979,38 @@ class GeneratorAddonPreferences(AddonPreferences):
     image_model_card: bpy.props.EnumProperty(
         name="Image Model",
         items=[
+            (
+                "Salesforce/blipdiffusion",
+                "Blip Subject Driven (512x512)",
+                "Salesforce/blipdiffusion",
+            ),
+            (
+                "lllyasviel/sd-controlnet-canny",
+                "ControlNet (512x512)",
+                "lllyasviel/sd-controlnet-canny",
+            ),
+            ("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0"),
+            ("Lykon/dreamshaper-7", "Dreamshaper LCM v7 (768 x 768)", "Lykon/dreamshaper-7"),
+            (
+                "monster-labs/control_v1p_sd15_qrcode_monster",
+                "Illusion (512x512)",
+                "monster-labs/control_v1p_sd15_qrcode_monster",
+            ),
+            (
+                "lllyasviel/sd-controlnet-openpose",
+                "OpenPose (512x512)",
+                "lllyasviel/sd-controlnet-openpose",
+            ),
+            (
+                "lllyasviel/control_v11p_sd15_scribble",
+                "Scribble (512x512)",
+                "lllyasviel/control_v11p_sd15_scribble",
+            ),
+            (
+                "segmind/SSD-1B",
+                "Segmind SSD-1B (1024x1024)",
+                "segmind/SSD-1B",
+            ),
             (
                 "runwayml/stable-diffusion-v1-5",
                 "Stable Diffusion 1.5 (512x512)",
@@ -994,39 +1026,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Stable Diffusion XL 1.0 (1024x1024)",
                 "stabilityai/stable-diffusion-xl-base-1.0",
             ),
-            (
-                "segmind/SSD-1B",
-                "Segmind SSD-1B (1024x1024)",
-                "segmind/SSD-1B",
-            ),
-            #("SimianLuo/LCM_Dreamshaper_v7", "LCM Dreamshaper v7 (768 x 768)", "SimianLuo/LCM_Dreamshaper_v7"), #Properly needs a torch update?
             ("warp-ai/wuerstchen", "Würstchen (1024x1024)", "warp-ai/wuerstchen"),
-            ("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0"),
-            (
-                "lllyasviel/sd-controlnet-canny",
-                "ControlNet (512x512)",
-                "lllyasviel/sd-controlnet-canny",
-            ),
-            (
-                "lllyasviel/sd-controlnet-openpose",
-                "OpenPose (512x512)",
-                "lllyasviel/sd-controlnet-openpose",
-            ),
-            (
-                "lllyasviel/control_v11p_sd15_scribble",
-                "Scribble (512x512)",
-                "lllyasviel/control_v11p_sd15_scribble",
-            ),
-            (
-                "monster-labs/control_v1p_sd15_qrcode_monster",
-                "Illusion (512x512)",
-                "monster-labs/control_v1p_sd15_qrcode_monster",
-            ),
-            (
-                "Salesforce/blipdiffusion",
-                "Subject Driven (512x512)",
-                "Salesforce/blipdiffusion",
-            ),
         ],
         default="stabilityai/stable-diffusion-xl-base-1.0",
         update=input_strips_updated,
@@ -1036,17 +1036,18 @@ class GeneratorAddonPreferences(AddonPreferences):
         name="Audio Model",
         items=[
             (
-                "cvssp/audioldm2",
-                "Sound - AudioLDM 2",
-                "Sound - AudioLDM 2",
-            ),
-            (
                 "cvssp/audioldm2-music",
                 "Music - AudioLDM 2",
                 "Music - AudioLDM 2",
             ),
-            ("bark", "Bark", "Bark"),
+            (
+                "cvssp/audioldm2",
+                "Sound - AudioLDM 2",
+                "Sound - AudioLDM 2",
+            ),
+            ("bark", "Speech - Bark", "Bark"),
             # ("facebook/musicgen-small", "MusicGen", "MusicGen"), #not working...
+            #("facebook/musicgen-stereo-small", "MusicGen", "MusicGen"), #not working...
         ],
         default="bark",
         update=input_strips_updated,
@@ -1618,6 +1619,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             sub_col.active = context.scene.refine_sd
 
         if type != "audio":
+            row = col.row()
             if type == "movie" or (
                 type == "image"
                 and image_model_card != "lllyasviel/sd-controlnet-canny"
@@ -1626,8 +1628,6 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 and image_model_card != "monster-labs/control_v1p_sd15_qrcode_monster"
                 and image_model_card != "Salesforce/blipdiffusion"
             ):
-                #col = col.column(heading="FreeU", align=True)
-                row = col.row()
                 row.prop(context.scene, "use_freeU", text="FreeU")
             if type == "image":
                 row.prop(context.scene, "use_lcm", text="LCM")
@@ -1810,25 +1810,26 @@ class SEQUENCER_OT_generate_movie(Operator):
                     # refiner.enable_vae_slicing()
                 else:
                     refiner.to("cuda")
-            #            elif scene.image_path: #img2vid
+                    
+#            elif scene.image_path: #img2vid 
 
-            #                from modelscope.pipelines import pipeline
-            #                from modelscope.outputs import OutputKeys
-            #                from modelscope import snapshot_download
-            #                model_dir = snapshot_download('damo/Image-to-Video', revision='v1.1.0')
-            #                pipe = pipeline(task='image-to-video', model= model_dir, model_revision='v1.1.0', torch_dtype=torch.float16, variant="fp16",)
+#                from modelscope.pipelines import pipeline
+#                from modelscope.outputs import OutputKeys
+#                from modelscope import snapshot_download
+#                model_dir = snapshot_download('damo/Image-to-Video', revision='v1.1.0')
+#                pipe = pipeline(task='image-to-video', model= model_dir, model_revision='v1.1.0', torch_dtype=torch.float16, variant="fp16",)
 
-            #                #pipe = pipeline(task='image-to-video', model='damo-vilab/MS-Image2Video', model_revision='v1.1.0')
-            #                #pipe = pipeline(task='image-to-video', model='damo/Image-to-Video', model_revision='v1.1.0')
+#                #pipe = pipeline(task='image-to-video', model='damo-vilab/MS-Image2Video', model_revision='v1.1.0')
+#                #pipe = pipeline(task='image-to-video', model='damo/Image-to-Video', model_revision='v1.1.0')
 
-            #                # local: pipe = pipeline(task='image-to-video', model='C:/Users/45239/.cache/modelscope/hub/damo/Image-to-Video', model_revision='v1.1.0')
+#                # local: pipe = pipeline(task='image-to-video', model='C:/Users/45239/.cache/modelscope/hub/damo/Image-to-Video', model_revision='v1.1.0')
 
-            #                if low_vram():
-            #                    pipe.enable_model_cpu_offload()
-            #                    pipe.enable_vae_tiling()
-            #                    pipe.enable_vae_slicing()
-            #                else:
-            #                    pipe.to("cuda")
+##                if low_vram():
+##                    #pipe.enable_model_cpu_offload()
+##                    pipe.enable_vae_tiling()
+##                    pipe.enable_vae_slicing()
+##                else:
+#                #pipe.to("cuda")
 
             else:  # vid2vid / img2vid
                 if (
@@ -2021,35 +2022,35 @@ class SEQUENCER_OT_generate_movie(Operator):
                         if torch.cuda.is_available():
                             torch.cuda.empty_cache()
                     video_frames = np.array(video_frames)
-                # Modelscope
-                #                elif scene.image_path:  #img2vid
-                #                    print("Process: Image to video")
+#                # Modelscope
+#                elif scene.image_path:  #img2vid
+#                    print("Process: Image to video")
 
-                #                    # IMG_PATH: your image path (url or local file)
-                #                    video_frames = pipe(scene.image_path, output_video='./output.mp4').frames
-                #                    output_video_path = pipe(scene.image_path, output_video='./output.mp4')[OutputKeys.OUTPUT_VIDEO]
-                #                    print(output_video_path)
+#                    # IMG_PATH: your image path (url or local file)
+#                    video_frames = pipe(scene.image_path, output_video='./output.mp4').frames
+#                    output_video_path = pipe(scene.image_path, output_video='./output.mp4')[OutputKeys.OUTPUT_VIDEO]
+#                    print(output_video_path)
 
-                #                    #video = process_image(scene.image_path, int(scene.generate_movie_frames))
+#                    #video = process_image(scene.image_path, int(scene.generate_movie_frames))
 
-                #                    # Upscale video
-                #                    if scene.video_to_video:
-                #                        video = [
-                #                            Image.fromarray(frame).resize((closest_divisible_32(int(x * 2)), closest_divisible_32(int(y * 2))))
-                #                            for frame in video
-                #                        ]
+#                    # Upscale video
+#                    if scene.video_to_video:
+#                        video = [
+#                            Image.fromarray(frame).resize((closest_divisible_32(int(x * 2)), closest_divisible_32(int(y * 2))))
+#                            for frame in video
+#                        ]
 
-                #                    video_frames = upscale(
-                #                        prompt,
-                #                        video=video,
-                #                        strength=1.00 - scene.image_power,
-                #                        negative_prompt=negative_prompt,
-                #                        num_inference_steps=movie_num_inference_steps,
-                #                        guidance_scale=movie_num_guidance,
-                #                        generator=generator,
-                #                    ).frames
+#                    video_frames = upscale(
+#                        prompt,
+#                        video=video,
+#                        strength=1.00 - scene.image_power,
+#                        negative_prompt=negative_prompt,
+#                        num_inference_steps=movie_num_inference_steps,
+#                        guidance_scale=movie_num_guidance,
+#                        generator=generator,
+#                    ).frames
 
-                #                    #video_frames = np.array(video_frames)
+#                    #video_frames = np.array(video_frames)
 
                 # vid2vid / img2vid
                 elif movie_model_card != "guoyww/animatediff-motion-adapter-v1-5-2":
@@ -2248,6 +2249,8 @@ class SEQUENCER_OT_generate_audio(Operator):
 
         try:
             import torch
+            import scipy
+            from scipy.io.wavfile import write as write_wav
 
             if (
                 addon_prefs.audio_model_card == "cvssp/audioldm2"
@@ -2256,15 +2259,12 @@ class SEQUENCER_OT_generate_audio(Operator):
                 from diffusers import AudioLDM2Pipeline, DPMSolverMultistepScheduler
                 import scipy
                 from IPython.display import Audio
-                import scipy
-                #from scipy.io.wavfile import write as write_wav
                 import xformers
 
             if addon_prefs.audio_model_card == "facebook/musicgen-small":
                 import torchaudio
                 from audiocraft.models import MusicGen
                 from audiocraft.data.audio import audio_write
-                from scipy.io.wavfile import write as write_wav
 
             if addon_prefs.audio_model_card == "bark":
                 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
@@ -2275,8 +2275,6 @@ class SEQUENCER_OT_generate_audio(Operator):
                 )
                 from bark.api import semantic_to_waveform
                 from bark import generate_audio, SAMPLE_RATE
-                from scipy.io.wavfile import write as write_wav
-                #from compel import Compel
         except ModuleNotFoundError:
             print("Dependencies needs to be installed in the add-on preferences.")
             self.report(
@@ -2310,21 +2308,25 @@ class SEQUENCER_OT_generate_audio(Operator):
                 pipe.to("cuda")
 
         # Musicgen
-        elif addon_prefs.audio_model_card == "facebook/musicgen-small":
+        elif addon_prefs.audio_model_card == "facebook/musicgen-stereo-small":
 
-            pipe = MusicGen.get_pretrained("facebook/musicgen-small", device='cuda')
+            #pipe = MusicGen.get_pretrained("facebook/musicgen-small", device='cuda')
+            from transformers import pipeline
+            pipe = pipeline("text-to-audio", "facebook/musicgen-stereo-small", device="cuda:0", torch_dtype=torch.float16)
 
-            pipe.set_generation_params(duration=audio_length_in_s)
+            #pipe.set_generation_params(duration=audio_length_in_s)
             descriptions = prompt
-            wav = pipe.generate([descriptions], progress=True)
+            wav = pipe(prompt, forward_params={"max_new_tokens": 256})#, progress=True)
             #pipe = MusicGen.get_pretrained("facebook/musicgen-small")
             filename = solve_path(clean_filename(prompt + ".wav"))
             rate = 48000
             #write_wav(filename, rate, wav)
-            audio_write(filename, wav, pipe.sample_rate, strategy="loudness", loudness_compressor=True)
+            #audio_write(filename, wav, pipe.sample_rate, strategy="loudness", loudness_compressor=True)
             #sampling_rate = pipe.config.audio_encoder.sampling_rate
             #scipy.io.wavfile.write(filename, rate=rate, data=audio_values[0, 0].numpy())
 
+            filename = solve_path(prompt + ".wav")
+            write_wav(filename, rate, wav)
 
         # Bark
         elif addon_prefs.audio_model_card == "bark":
@@ -2472,6 +2474,7 @@ class SEQUENCER_OT_generate_image(Operator):
         pipe = None
         refiner = None
         converter = None
+        guidance = scene.movie_num_guidance
 
         if (
             scene.generate_movie_prompt == ""
@@ -2575,6 +2578,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     "None of the selected strips are movie, image, text or scene types.",
                 )
                 return {"CANCELLED"}
+
         # LOADING MODELS
 
         # models for inpaint
@@ -2627,6 +2631,37 @@ class SEQUENCER_OT_generate_image(Operator):
         #                refiner.enable_vae_slicing()
         #            else:
         #                refiner.to("cuda")
+        
+        # Conversion img2img/vid2img.
+        elif do_convert and image_model_card != "warp-ai/wuerstchen" and image_model_card != "Lykon/dreamshaper-7":
+            print("Load: img2img/vid2img Model")
+            print("Conversion Model:  " + image_model_card)
+            if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+                from diffusers import StableDiffusionXLImg2ImgPipeline, AutoencoderKL
+
+                vae = AutoencoderKL.from_pretrained(
+                    "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
+                )
+
+                converter = StableDiffusionXLImg2ImgPipeline.from_pretrained(
+                    "stabilityai/stable-diffusion-xl-refiner-1.0",
+                    # text_encoder_2=pipe.text_encoder_2,
+                    vae=vae,
+                    torch_dtype=torch.float16,
+                    variant="fp16",
+                )
+            else:
+                from diffusers import AutoPipelineForImage2Image
+                converter = AutoPipelineForImage2Image.from_pretrained(image_model_card)
+
+            converter.watermark = NoWatermark()
+
+            if low_vram():
+                converter.enable_model_cpu_offload()
+                # refiner.enable_vae_tiling()
+                # converter.enable_vae_slicing()
+            else:
+                converter.to("cuda")
 
         # ControlNet & Illusion
         elif (
@@ -2655,6 +2690,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 from diffusers import LCMScheduler
                 pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
                 pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
+                scene.movie_num_guidance = 0
             else:
                 pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
 
@@ -2717,6 +2753,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 from diffusers import LCMScheduler
                 pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
                 pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
+                scene.movie_num_guidance = 0
             else:
                 pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
 
@@ -2751,6 +2788,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 from diffusers import LCMScheduler
                 pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
                 pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
+                scene.movie_num_guidance = 0
             else:
                 pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
 
@@ -2763,7 +2801,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 pipe.to("cuda")
 
         # Dreamshaper
-        elif image_model_card == "SimianLuo/LCM_Dreamshaper_v7":
+        elif image_model_card == "Lykon/dreamshaper-7":
             if do_convert:
                 print(
                     image_model_card
@@ -2771,24 +2809,9 @@ class SEQUENCER_OT_generate_image(Operator):
                 )
             from diffusers import DiffusionPipeline
 
-            pipe = DiffusionPipeline.from_pretrained("SimianLuo/LCM_Dreamshaper_v7", custom_pipeline="latent_consistency_txt2img", torch_dtype=torch.float16)
+            pipe = DiffusionPipeline.from_pretrained("Lykon/dreamshaper-7", torch_dtype=torch.float16) # , custom_pipeline="latent_consistency_txt2img"
 
-#            if low_vram():
-#                # torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
-            #pipe.enable_model_cpu_offload()
-#                # pipe.enable_forward_chunking(chunk_size=1, dim=1)
-#            else:
-            #pipe.to(torch_device="cuda")
-            #pipe.enable_vae_slicing()
             pipe.to(torch_device="cuda", torch_dtype=torch.float16)
-#            if low_vram():
-#                # torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
-#                #pipe.enable_model_cpu_offload()
-#                # pipe.enable_vae_slicing()
-#                # pipe.enable_forward_chunking(chunk_size=1, dim=1)
-#            else:
-#                pipe.to("cuda")
-
 
         # Wuerstchen
         elif image_model_card == "warp-ai/wuerstchen":
@@ -2873,41 +2896,15 @@ class SEQUENCER_OT_generate_image(Operator):
             else:
                 stage_3.to("cuda")
 
-        # Conversion img2img/img2vid.
-        elif do_convert:
-            print("Load: img2img/img2vid Model")
-            print("Conversion Model:  " + "stabilityai/stable-diffusion-xl-refiner-1.0")
-            from diffusers import StableDiffusionXLImg2ImgPipeline, AutoencoderKL
-
-            vae = AutoencoderKL.from_pretrained(
-                "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
-            )
-
-            converter = StableDiffusionXLImg2ImgPipeline.from_pretrained(
-                "stabilityai/stable-diffusion-xl-refiner-1.0",
-                # text_encoder_2=pipe.text_encoder_2,
-                vae=vae,
-                torch_dtype=torch.float16,
-                variant="fp16",
-            )
-
-            converter.watermark = NoWatermark()
-
-            if low_vram():
-                converter.enable_model_cpu_offload()
-                # refiner.enable_vae_tiling()
-                # converter.enable_vae_slicing()
-            else:
-                converter.to("cuda")
 
         # Stable diffusion etc.
         else:
             print("Load: " + image_model_card + " Model")
-            from diffusers import AutoencoderKL
 
             enabled_items = None
 
             if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+                from diffusers import AutoencoderKL
                 vae = AutoencoderKL.from_pretrained(
                     "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
                 )
@@ -2917,8 +2914,18 @@ class SEQUENCER_OT_generate_image(Operator):
                     torch_dtype=torch.float16,
                     variant="fp16",
                 )
+            elif image_model_card == "runwayml/stable-diffusion-v1-5":
+                from diffusers import StableDiffusionPipeline, ConsistencyDecoderVAE
+                #from diffusers import AutoencoderKL
+                #vae = AutoencoderKL.from_pretrained("stabilityai/sd-vae-ft-ema", torch_dtype=torch.float16)
+                #vae = AutoencoderKL.from_single_file("https://huggingface.co/gemasai/vae-ft-mse-840000-ema-pruned/resolve/main/vae-ft-mse-840000-ema-pruned.ckpt", torch_dtype=torch.float16)
+                #vae = ConsistencyDecoderVAE.from_pretrained("openai/consistency-decoder", torch_dtype=torch.float16)
+                pipe = StableDiffusionPipeline.from_pretrained(
+                    "runwayml/stable-diffusion-v1-5", torch_dtype=torch.float16 #vae=vae,
+                )                    
             else:
-                pipe = DiffusionPipeline.from_pretrained(
+                from diffusers import AutoPipelineForText2Image
+                pipe = AutoPipelineForText2Image.from_pretrained(
                     image_model_card,
                     torch_dtype=torch.float16,
                     variant="fp16",
@@ -2927,12 +2934,15 @@ class SEQUENCER_OT_generate_image(Operator):
                 print("Use LCM: True")
                 from diffusers import LCMScheduler
                 if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+                    scene.movie_num_guidance = 0
                     pipe.load_lora_weights("latent-consistency/lcm-lora-sdxl")
                     
+                    
                 elif image_model_card == "segmind/SSD-1B":
+                    scene.movie_num_guidance = 0
                     pipe.load_lora_weights("latent-consistency/lcm-lora-ssd-1b")
-                    pipe.fuse_lora()
                 else:
+                    scene.movie_num_guidance = 0
                     pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
 
                 pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
@@ -3147,19 +3157,18 @@ class SEQUENCER_OT_generate_image(Operator):
 #                    generator=generator,
                 ).images[0]
 
-            elif image_model_card == "SimianLuo/LCM_Dreamshaper_v7":
+            elif image_model_card == "Lykon/dreamshaper-7":
                 image = pipe(
                     prompt=prompt,
-                    #negative_prompt=negative_prompt,
+                    negative_prompt=negative_prompt,
                     num_inference_steps=image_num_inference_steps,
                     guidance_scale=image_num_guidance,
                     lcm_origin_steps=50,
-                    #height=y,
-                    #width=x,
-                    #generator=generator,
+                    height=y,
+                    width=x,
+                    generator=generator,
                     output_type="pil",
-                ).images
-
+                ).images[0]
 
             # OpenPose
             elif image_model_card == "lllyasviel/sd-controlnet-openpose":
@@ -3402,17 +3411,6 @@ class SEQUENCER_OT_generate_image(Operator):
             if do_refine:
                 print("Refine: Image")
 
-                #                image = refiner(
-                #                    prompt,
-                #                    negative_prompt=negative_prompt,
-                #                    num_inference_steps=clamp_value(
-                #                        int(image_num_inference_steps / 2), 1, 5
-                #                    ),
-                #                    denoising_start=0.8,
-                #                    guidance_scale=image_num_guidance,
-                #                    image=image,
-                #                    # image=image[None, :],
-                #                ).images[0]
                 image = refiner(
                     prompt=prompt,
                     image=image,
@@ -3471,6 +3469,7 @@ class SEQUENCER_OT_generate_image(Operator):
                             bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
                             break
 
+        scene.movie_num_guidance = guidance
         bpy.ops.renderreminder.play_notification()
         scene.frame_current = current_frame
 
@@ -3796,7 +3795,7 @@ def register():
     bpy.types.Scene.movie_num_guidance = bpy.props.FloatProperty(
         name="movie_num_guidance",
         default=4.0,
-        min=1,
+        min=0,
         max=100,
     )
 
