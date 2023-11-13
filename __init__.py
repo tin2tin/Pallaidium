@@ -643,8 +643,7 @@ def install_modules(self):
     import_module(self, "tensorflow", "tensorflow")
     if os_platform == "Darwin" or os_platform == "Linux":
         import_module(self, "sox", "sox")
-    else:
-        import_module(self, "soundfile", "PySoundFile")
+    import_module(self, "soundfile", "PySoundFile")
     #import_module(self, "transformers", "transformers")
     import_module(self, "sentencepiece", "sentencepiece")
     import_module(self, "safetensors", "safetensors")
@@ -1042,18 +1041,18 @@ class GeneratorAddonPreferences(AddonPreferences):
     audio_model_card: bpy.props.EnumProperty(
         name="Audio Model",
         items=[
-            ("facebook/musicgen-stereo-small", "Music - MusicGen: Stereo", "facebook/musicgen-stereo-small"),
+            ("facebook/musicgen-stereo-small", "Music: MusicGen Stereo", "facebook/musicgen-stereo-small"),
             (
                 "cvssp/audioldm2-music",
-                "Music - AudioLDM 2",
-                "Music - AudioLDM 2",
+                "Music: AudioLDM 2",
+                "Music: AudioLDM 2",
             ),
             (
                 "cvssp/audioldm2",
-                "Sound - AudioLDM 2",
-                "Sound - AudioLDM 2",
+                "Sound: AudioLDM 2",
+                "Sound: AudioLDM 2",
             ),
-            ("bark", "Speech - Bark", "Bark"),
+            ("bark", "Speech: Bark", "Bark"),
         ],
         default="bark",
         update=input_strips_updated,
@@ -2392,7 +2391,7 @@ class SEQUENCER_OT_generate_audio(Operator):
             elif addon_prefs.audio_model_card == "facebook/musicgen-stereo-small":
 
                 descriptions = prompt
-                music = pipe(prompt, forward_params={"max_new_tokens": min(audio_length_in_s*50, 1503)})
+                music = pipe(prompt, forward_params={"max_new_tokens": int(min(audio_length_in_s*50, 1503))})
                 filename = solve_path(clean_filename(prompt) + ".wav")
                 rate = 48000
                 sf.write(filename, music["audio"][0].T, music["sampling_rate"])
