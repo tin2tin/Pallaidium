@@ -8,7 +8,7 @@ bl_info = {
     "category": "Sequencer",
 }
 
-# TO DO: Style title check, long prompts, SDXL controlnet, Modelscope.
+# TO DO: Style title check, long prompts, SDXL controlnet, Modelscope, AudioGen, Move prints.
 
 import bpy, ctypes, random
 from bpy.types import Operator, Panel, AddonPreferences, UIList, PropertyGroup
@@ -1572,10 +1572,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         col.use_property_decorate = False
         col.prop(context.scene, "generate_movie_prompt", text="", icon="ADD")
 
-        if (
-            (type == "audio" and audio_model_card == "bark") or
-            (type == "audio" and addon_prefs.audio_model_card == "facebook/musicgen-stereo-small")
-        ):
+        if ((type == "audio" and audio_model_card == "bark") or (type == "audio" and audio_model_card == "facebook/musicgen-stereo-small")):
             pass
         else:
             col.prop(context.scene, "generate_movie_negative_prompt", text="", icon="REMOVE")
