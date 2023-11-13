@@ -8,7 +8,7 @@ bl_info = {
     "category": "Sequencer",
 }
 
-# TO DO: Style title check, long prompts, SDXL controlnet, Modelscope, AudioGen, Move prints.
+# TO DO: Style title check, long prompts, SDXL controlnet, Modelscope.
 
 import bpy, ctypes, random
 from bpy.types import Operator, Panel, AddonPreferences, UIList, PropertyGroup
@@ -538,9 +538,11 @@ def import_module(self, module, install_module):
         if app_path not in sys.path:
             sys.path.append(app_path)
         pybin = sys.executable
-        target = os.path.join(sys.prefix, 'site-packages')
-        if target not in sys.path:
-            sys.path.append(target)
+
+#        target = os.path.join(sys.prefix, 'site-packages')
+#
+#        if target not in sys.path:
+#            sys.path.append(target)
 
         self.report({"INFO"}, "Installing: " + module + " module.")
         print("Installing: " + module + " module")
@@ -635,7 +637,7 @@ def install_modules(self):
     import_module(self, "huggingface_hub", "huggingface_hub")
     import_module(self, "accelerate", "git+https://github.com/huggingface/accelerate.git")
     import_module(self, "transformers", "git+https://github.com/huggingface/transformers")
-    import_module(self, "bark", "bark")#git+https://github.com/suno-ai/bark.git")
+    import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
     #import_module(self, "diffusers", "diffusers")
     import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git@v0.22.3")
     import_module(self, "tensorflow", "tensorflow")
@@ -651,6 +653,11 @@ def install_modules(self):
     import_module(self, "scipy", "scipy")
     import_module(self, "IPython", "IPython")
     import_module(self, "xformers", "xformers")
+    subprocess.check_call([pybin, "-m", "pip", "install", "mediapipe", "--upgrade"])
+#    try:
+#        import_module(self, "mediapipe", "git+https://github.com/google/mediapipe.git")
+#    except ImportError:
+#        pass
     subprocess.check_call(
         [
             pybin,
@@ -1035,6 +1042,7 @@ class GeneratorAddonPreferences(AddonPreferences):
     audio_model_card: bpy.props.EnumProperty(
         name="Audio Model",
         items=[
+            ("facebook/musicgen-stereo-small", "Music - MusicGen: Stereo", "facebook/musicgen-stereo-small"),
             (
                 "cvssp/audioldm2-music",
                 "Music - AudioLDM 2",
@@ -1046,8 +1054,6 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Sound - AudioLDM 2",
             ),
             ("bark", "Speech - Bark", "Bark"),
-            # ("facebook/musicgen-small", "MusicGen", "MusicGen"), #not working...
-            #("facebook/musicgen-stereo-small", "MusicGen", "MusicGen"), #not working...
         ],
         default="bark",
         update=input_strips_updated,
@@ -1566,12 +1572,14 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         col.use_property_decorate = False
         col.prop(context.scene, "generate_movie_prompt", text="", icon="ADD")
 
-        if type == "audio" and audio_model_card == "bark":
+        if (
+            (type == "audio" and audio_model_card == "bark") or
+            (type == "audio" and addon_prefs.audio_model_card == "facebook/musicgen-stereo-small")
+        ):
             pass
         else:
-            col.prop(
-                context.scene, "generate_movie_negative_prompt", text="", icon="REMOVE"
-            )
+            col.prop(context.scene, "generate_movie_negative_prompt", text="", icon="REMOVE")
+
         layout = col.column()
         layout.use_property_split = True
         layout.use_property_decorate = False
@@ -1595,7 +1603,9 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             col.prop(context.scene, "languages", text="Language")
         else:
             col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
-            col.prop(context.scene, "movie_num_guidance", text="Word Power")
+
+            if addon_prefs.audio_model_card != "facebook/musicgen-stereo-small":
+                col.prop(context.scene, "movie_num_guidance", text="Word Power")
 
             col = col.column()
             row = col.row(align=True)
@@ -1810,8 +1820,8 @@ class SEQUENCER_OT_generate_movie(Operator):
                     # refiner.enable_vae_slicing()
                 else:
                     refiner.to("cuda")
-                    
-#            elif scene.image_path: #img2vid 
+
+#            elif scene.image_path: #img2vid
 
 #                from modelscope.pipelines import pipeline
 #                from modelscope.outputs import OutputKeys
@@ -2261,10 +2271,11 @@ class SEQUENCER_OT_generate_audio(Operator):
                 from IPython.display import Audio
                 import xformers
 
-            if addon_prefs.audio_model_card == "facebook/musicgen-small":
-                import torchaudio
-                from audiocraft.models import MusicGen
-                from audiocraft.data.audio import audio_write
+            if addon_prefs.audio_model_card == "facebook/musicgen-stereo-small":
+                #import torchaudio
+                #from audiocraft.models import MusicGen
+                #from audiocraft.data.audio import audio_write
+                import soundfile as sf
 
             if addon_prefs.audio_model_card == "bark":
                 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
@@ -2290,6 +2301,8 @@ class SEQUENCER_OT_generate_audio(Operator):
             torch.cuda.empty_cache()
         print("Model:  " + addon_prefs.audio_model_card)
 
+
+        # Load models
         if (
             addon_prefs.audio_model_card == "cvssp/audioldm2"
             or addon_prefs.audio_model_card == "cvssp/audioldm2-music"
@@ -2314,20 +2327,6 @@ class SEQUENCER_OT_generate_audio(Operator):
             from transformers import pipeline
             pipe = pipeline("text-to-audio", "facebook/musicgen-stereo-small", device="cuda:0", torch_dtype=torch.float16)
 
-            #pipe.set_generation_params(duration=audio_length_in_s)
-            descriptions = prompt
-            wav = pipe(prompt, forward_params={"max_new_tokens": 256})#, progress=True)
-            #pipe = MusicGen.get_pretrained("facebook/musicgen-small")
-            filename = solve_path(clean_filename(prompt + ".wav"))
-            rate = 48000
-            #write_wav(filename, rate, wav)
-            #audio_write(filename, wav, pipe.sample_rate, strategy="loudness", loudness_compressor=True)
-            #sampling_rate = pipe.config.audio_encoder.sampling_rate
-            #scipy.io.wavfile.write(filename, rate=rate, data=audio_values[0, 0].numpy())
-
-            filename = solve_path(prompt + ".wav")
-            write_wav(filename, rate, wav)
-
         # Bark
         elif addon_prefs.audio_model_card == "bark":
             preload_models(
@@ -2336,6 +2335,11 @@ class SEQUENCER_OT_generate_audio(Operator):
                 fine_use_gpu=True,
                 fine_use_small=True,
             )
+
+        if addon_prefs.audio_model_card == "facebook/musicgen-stereo-small" and audio_length_in_s*50 > 1503:
+            self.report({"INFO"}, "Maximum duration is 30 sec.")
+
+        # Main loop
         for i in range(scene.movie_num_batch):
             if i > 0:
                 empty_channel = scene.sequence_editor.active_strip.channel
@@ -2386,6 +2390,15 @@ class SEQUENCER_OT_generate_audio(Operator):
 
                 # Write the combined audio to a file
                 write_wav(filename, rate, audio.transpose())
+
+            # Musicgen
+            elif addon_prefs.audio_model_card == "facebook/musicgen-stereo-small":
+
+                descriptions = prompt
+                music = pipe(prompt, forward_params={"max_new_tokens": min(audio_length_in_s*50, 1503)})
+                filename = solve_path(clean_filename(prompt) + ".wav")
+                rate = 48000
+                sf.write(filename, music["audio"][0].T, music["sampling_rate"])
 
             else:  # AudioLDM
                 print("Generate: Audio/music (AudioLDM)")
@@ -2441,14 +2454,17 @@ class SEQUENCER_OT_generate_audio(Operator):
                     scene.frame_current = (
                         scene.sequence_editor.active_strip.frame_final_start
                     )
+
                 # Redraw UI to display the new strip. Remove this if Blender crashes:
                 # https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
                 bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
             else:
                 print("No resulting file found!")
+
             # clear the VRAM
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
+
         bpy.ops.renderreminder.play_notification()
 
         return {"FINISHED"}
@@ -2511,7 +2527,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 "Dependencies needs to be installed in the add-on preferences.",
             )
             return {"CANCELLED"}
-        
+
         # clear the VRAM
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -2631,7 +2647,7 @@ class SEQUENCER_OT_generate_image(Operator):
         #                refiner.enable_vae_slicing()
         #            else:
         #                refiner.to("cuda")
-        
+
         # Conversion img2img/vid2img.
         elif do_convert and image_model_card != "warp-ai/wuerstchen" and image_model_card != "Lykon/dreamshaper-7":
             print("Load: img2img/vid2img Model")
@@ -2783,7 +2799,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 controlnet=controlnet,
                 torch_dtype=torch.float16,
             )
-            
+
             if scene.use_lcm:
                 from diffusers import LCMScheduler
                 pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
@@ -2922,7 +2938,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 #vae = ConsistencyDecoderVAE.from_pretrained("openai/consistency-decoder", torch_dtype=torch.float16)
                 pipe = StableDiffusionPipeline.from_pretrained(
                     "runwayml/stable-diffusion-v1-5", torch_dtype=torch.float16 #vae=vae,
-                )                    
+                )
             else:
                 from diffusers import AutoPipelineForText2Image
                 pipe = AutoPipelineForText2Image.from_pretrained(
@@ -2936,8 +2952,8 @@ class SEQUENCER_OT_generate_image(Operator):
                 if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
                     scene.movie_num_guidance = 0
                     pipe.load_lora_weights("latent-consistency/lcm-lora-sdxl")
-                    
-                    
+
+
                 elif image_model_card == "segmind/SSD-1B":
                     scene.movie_num_guidance = 0
                     pipe.load_lora_weights("latent-consistency/lcm-lora-ssd-1b")
