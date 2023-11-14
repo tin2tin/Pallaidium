@@ -33,7 +33,6 @@ AI-generate video, image, and audio from text prompts or video, image, or text s
   
 
 ## How to install
-(As for Linux, if anything differs in installation, then please share instructions.)
 
 * First you must download and install git for your platform(must be on PATH(or Bark will fail)): https://git-scm.com/downloads
 
