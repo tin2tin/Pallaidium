@@ -637,7 +637,8 @@ def install_modules(self):
 
     import_module(self, "huggingface_hub", "huggingface_hub")
     import_module(self, "accelerate", "git+https://github.com/huggingface/accelerate.git")
-    import_module(self, "transformers", "git+https://github.com/huggingface/transformers")
+    #import_module(self, "transformers", "git+https://github.com/huggingface/transformers")
+    subprocess.check_call([pybin, "-m", "pip", "install", "transformers", "--upgrade"])
     import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
     #import_module(self, "diffusers", "diffusers")
     import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git@v0.22.3")
@@ -724,7 +725,8 @@ def install_modules(self):
 
     import_module(self, "controlnet_aux", "controlnet_aux")
     #import_module(self, "compel", "compel")
-    import_module(self, "peft", "git+https://github.com/huggingface/peft.git")
+    #import_module(self, "peft", "git+https://github.com/huggingface/peft.git")
+    subprocess.check_call([pybin, "-m", "pip", "install", "peft", "--upgrade"])
     #import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
 
 
@@ -1034,6 +1036,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Stable Diffusion XL 1.0 (1024x1024)",
                 "stabilityai/stable-diffusion-xl-base-1.0",
             ),
+            ("ptx0/terminus-xl-gamma-v1", "Terminus XL Gamma v1", "ptx0/terminus-xl-gamma-v1"),
             ("warp-ai/wuerstchen", "Würstchen (1024x1024)", "warp-ai/wuerstchen"),
         ],
         default="stabilityai/stable-diffusion-xl-base-1.0",
