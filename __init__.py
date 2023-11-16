@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Pallaidium - Generative AI",
     "author": "tintwotin",
-    "version": (1, 6),
+    "version": (1, 7),
     "blender": (3, 4, 0),
     "location": "Video Sequence Editor > Sidebar > Generative AI",
     "description": "AI Generate media in the VSE",
@@ -888,6 +888,8 @@ def input_strips_updated(self, context):
         scene.input_strips = "input_strips"
     if context.scene.lora_folder:
         bpy.ops.lora.refresh_files()
+    if type == "text":
+        scene.input_strips = "input_strips"
 
 
 def output_strips_updated(self, context):
@@ -915,6 +917,8 @@ def output_strips_updated(self, context):
         or image_model_card == "monster-labs/control_v1p_sd15_qrcode_monster"
         or image_model_card == "Salesforce/blipdiffusion"
     ) and type == "image":
+        scene.input_strips = "input_strips"
+    if type == "text":
         scene.input_strips = "input_strips"
 
 
@@ -966,6 +970,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Stable Diffusion XL 1.0",
             ),
             ("camenduru/potat1", "Potat v1 (1024x576)", "Potat (1024x576)"),
+            #("VideoCrafter/Image2Video-512", "VideoCrafter v1 (512x512)", "VideoCrafter/Image2Video-512"),
             (
                 "cerspense/zeroscope_v2_dark_30x448x256",
                 "Zeroscope (448x256x30)",
@@ -981,6 +986,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Zeroscope XL (1024x576x24)",
                 "Zeroscope XL (1024x576x24)",
             ),
+            ("motexture/vseq2vseq", "VSEQ2VSEQ (384x192)", "motexture/vseq2vseq"),
         ],
         default="cerspense/zeroscope_v2_576w",
         update=input_strips_updated,
@@ -1000,7 +1006,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "lllyasviel/sd-controlnet-canny",
             ),
             ("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0"),
-            ("Lykon/dreamshaper-7", "Dreamshaper LCM v7 (768 x 768)", "Lykon/dreamshaper-7"),
+            ("Lykon/dreamshaper-7", "Dreamshaper LCM v7 (1024 x 1024)", "Lykon/dreamshaper-7"),
             (
                 "monster-labs/control_v1p_sd15_qrcode_monster",
                 "Illusion (512x512)",
@@ -1036,7 +1042,8 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Stable Diffusion XL 1.0 (1024x1024)",
                 "stabilityai/stable-diffusion-xl-base-1.0",
             ),
-            ("ptx0/terminus-xl-gamma-v1", "Terminus XL Gamma v1", "ptx0/terminus-xl-gamma-v1"),
+
+            #("ptx0/terminus-xl-gamma-v1", "Terminus XL Gamma v1", "ptx0/terminus-xl-gamma-v1"),
             ("warp-ai/wuerstchen", "Würstchen (1024x1024)", "warp-ai/wuerstchen"),
         ],
         default="stabilityai/stable-diffusion-xl-base-1.0",
@@ -1067,6 +1074,14 @@ class GeneratorAddonPreferences(AddonPreferences):
         name="Hugginface Token",
         default="hugginface_token",
         subtype="PASSWORD",
+    )
+
+    text_model_card: EnumProperty(
+        name="Text Model",
+        items={
+            ("Salesforce/blip-image-captioning-large", "Image Captioning", "Salesforce/blip-image-captioning-large"),
+        },
+        default="Salesforce/blip-image-captioning-large",
     )
 
     generator_ai: StringProperty(
@@ -1179,6 +1194,7 @@ def get_render_strip(self, context, strip):
     if not context or not context.scene or not context.scene.sequence_editor:
         self.report({"ERROR"}, "No valid context or selected strips")
         return {"CANCELLED"}
+    bpy.context.preferences.system.sequencer_proxy_setup = "MANUAL"
     current_scene = context.scene
     sequencer = current_scene.sequence_editor
     current_frame_old = bpy.context.scene.frame_current
@@ -1294,6 +1310,7 @@ def get_render_strip(self, context, strip):
 
         if not os.path.exists(output_path):
             print("Render failed: " + output_path)
+            bpy.context.preferences.system.sequencer_proxy_setup = "AUTOMATIC"
             return {"CANCELLED"}
         # Set the original scene as the active scene
         context.window.scene = current_scene
@@ -1347,9 +1364,11 @@ def get_render_strip(self, context, strip):
                     sound=False,
                 )
         resulting_strip = sequencer.active_strip
+        resulting_strip.use_proxy = False
 
         # Reset current frame
         bpy.context.scene.frame_current = current_frame_old
+        bpy.context.preferences.system.sequencer_proxy_setup = "AUTOMATIC"
     return resulting_strip
 
 
@@ -1503,146 +1522,147 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         else:
             col.prop(context.scene, "input_strips", text="Input")
 
-        if type != "audio":
-            if (type == "movie" and movie_model_card != "guoyww/animatediff-motion-adapter-v1-5-2") or (
-                type == "image"
-                and image_model_card != "lllyasviel/sd-controlnet-canny"
-                and image_model_card != "lllyasviel/sd-controlnet-openpose"
-                and image_model_card != "lllyasviel/control_v11p_sd15_scribble"
-                and image_model_card != "monster-labs/control_v1p_sd15_qrcode_monster"
-                and image_model_card != "Salesforce/blipdiffusion"
+        if type != "text":
+            if type != "audio":
+                if (type == "movie" and movie_model_card != "guoyww/animatediff-motion-adapter-v1-5-2") or (
+                    type == "image"
+                    and image_model_card != "lllyasviel/sd-controlnet-canny"
+                    and image_model_card != "lllyasviel/sd-controlnet-openpose"
+                    and image_model_card != "lllyasviel/control_v11p_sd15_scribble"
+                    and image_model_card != "monster-labs/control_v1p_sd15_qrcode_monster"
+                    and image_model_card != "Salesforce/blipdiffusion"
+                ):
+                    if input == "input_strips" and not scene.inpaint_selected_strip:
+                        col = col.column(heading="Use", align=True)
+                        col.prop(addon_prefs, "use_strip_data", text=" Name & Seed")
+                        col.prop(context.scene, "image_power", text="Strip Power")
+                    if bpy.context.scene.sequence_editor is not None:
+                        if len(bpy.context.scene.sequence_editor.sequences) > 0:
+                            if input == "input_strips" and type == "image":
+                                col.prop_search(
+                                    scene,
+                                    "inpaint_selected_strip",
+                                    scene.sequence_editor,
+                                    "sequences",
+                                    text="Inpaint Mask",
+                                    icon="SEQ_STRIP_DUPLICATE",
+                                )
+            if image_model_card == "lllyasviel/sd-controlnet-openpose" and type == "image":
+                col = col.column(heading="Read as", align=True)
+                col.prop(context.scene, "openpose_use_bones", text="OpenPose Rig Image")
+            if (
+                image_model_card == "lllyasviel/control_v11p_sd15_scribble"
+                and type == "image"
             ):
-                if input == "input_strips" and not scene.inpaint_selected_strip:
-                    col = col.column(heading="Use", align=True)
-                    col.prop(addon_prefs, "use_strip_data", text=" Name & Seed")
-                    col.prop(context.scene, "image_power", text="Strip Power")
-                if bpy.context.scene.sequence_editor is not None:
-                    if len(bpy.context.scene.sequence_editor.sequences) > 0:
-                        if input == "input_strips" and type == "image":
-                            col.prop_search(
-                                scene,
-                                "inpaint_selected_strip",
-                                scene.sequence_editor,
-                                "sequences",
-                                text="Inpaint Mask",
-                                icon="SEQ_STRIP_DUPLICATE",
-                            )
-        if image_model_card == "lllyasviel/sd-controlnet-openpose" and type == "image":
-            col = col.column(heading="Read as", align=True)
-            col.prop(context.scene, "openpose_use_bones", text="OpenPose Rig Image")
-        if (
-            image_model_card == "lllyasviel/control_v11p_sd15_scribble"
-            and type == "image"
-        ):
-            col = col.column(heading="Read as", align=True)
-            col.prop(context.scene, "use_scribble_image", text="Scribble Image")
+                col = col.column(heading="Read as", align=True)
+                col.prop(context.scene, "use_scribble_image", text="Scribble Image")
 
-        # LoRA.
-        if (
-            (image_model_card == "stabilityai/stable-diffusion-xl-base-1.0" or image_model_card == "runwayml/stable-diffusion-v1-5")
-            and type == "image" and input != "input_strips"
-        ):
+            # LoRA.
+            if (
+                (image_model_card == "stabilityai/stable-diffusion-xl-base-1.0" or image_model_card == "runwayml/stable-diffusion-v1-5")
+                and type == "image" and input != "input_strips"
+            ):
+                col = layout.column(align=True)
+                col = col.box()
+                col = col.column(align=True)
+                col.use_property_split = False
+                col.use_property_decorate = False
+
+                # Folder selection and refresh button
+                row = col.row(align=True)
+                row.prop(scene, "lora_folder", text="LoRA")
+                row.operator("lora.refresh_files", text="", icon="FILE_REFRESH")
+
+                # Custom UIList
+                lora_files = scene.lora_files
+                list_len = len(lora_files)
+
+                if list_len > 0:
+                    col.template_list(
+                        "LORABROWSER_UL_files",
+                        "The_List",
+                        scene,
+                        "lora_files",
+                        scene,
+                        "lora_files_index",
+                        rows=2,
+                    )
+
+            # Prompts
             col = layout.column(align=True)
             col = col.box()
             col = col.column(align=True)
             col.use_property_split = False
             col.use_property_decorate = False
+            col.prop(context.scene, "generate_movie_prompt", text="", icon="ADD")
 
-            # Folder selection and refresh button
+            if ((type == "audio" and audio_model_card == "bark") or (type == "audio" and audio_model_card == "facebook/musicgen-stereo-small")):
+                pass
+            else:
+                col.prop(context.scene, "generate_movie_negative_prompt", text="", icon="REMOVE")
+
+            layout = col.column()
+            layout.use_property_split = True
+            layout.use_property_decorate = False
+            col = layout.column(align=True)
+
+            if type != "audio":
+                col.prop(context.scene, "generatorai_styles", text="Style")
+            if type == "movie" or type == "image":
+                col = layout.column(align=True)
+                col.prop(context.scene, "generate_movie_x", text="X")
+                col.prop(context.scene, "generate_movie_y", text="Y")
+            col = layout.column(align=True)
+
+            if type == "movie" or type == "image":
+                col.prop(context.scene, "generate_movie_frames", text="Frames")
+            if type == "audio" and audio_model_card != "bark":
+                col.prop(context.scene, "audio_length_in_f", text="Frames")
+
+            if type == "audio" and audio_model_card == "bark":
+                col = layout.column(align=True)
+                col.prop(context.scene, "speakers", text="Speaker")
+                col.prop(context.scene, "languages", text="Language")
+            elif type == "audio" and addon_prefs.audio_model_card == "facebook/musicgen-stereo-small":
+                col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
+            else:
+                col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
+                col.prop(context.scene, "movie_num_guidance", text="Word Power")
+
+            col = col.column()
             row = col.row(align=True)
-            row.prop(scene, "lora_folder", text="LoRA")
-            row.operator("lora.refresh_files", text="", icon="FILE_REFRESH")
+            sub_row = row.row(align=True)
+            sub_row.prop(context.scene, "movie_num_seed", text="Seed")
+            row.prop(context.scene, "movie_use_random", text="", icon="QUESTION")
+            sub_row.active = not context.scene.movie_use_random
 
-            # Custom UIList
-            lora_files = scene.lora_files
-            list_len = len(lora_files)
-
-            if list_len > 0:
-                col.template_list(
-                    "LORABROWSER_UL_files",
-                    "The_List",
-                    scene,
-                    "lora_files",
-                    scene,
-                    "lora_files_index",
-                    rows=2,
-                )
-
-        # Prompts
-        col = layout.column(align=True)
-        col = col.box()
-        col = col.column(align=True)
-        col.use_property_split = False
-        col.use_property_decorate = False
-        col.prop(context.scene, "generate_movie_prompt", text="", icon="ADD")
-
-        if ((type == "audio" and audio_model_card == "bark") or (type == "audio" and audio_model_card == "facebook/musicgen-stereo-small")):
-            pass
-        else:
-            col.prop(context.scene, "generate_movie_negative_prompt", text="", icon="REMOVE")
-
-        layout = col.column()
-        layout.use_property_split = True
-        layout.use_property_decorate = False
-        col = layout.column(align=True)
-
-        if type != "audio":
-            col.prop(context.scene, "generatorai_styles", text="Style")
-        if type == "movie" or type == "image":
-            col = layout.column(align=True)
-            col.prop(context.scene, "generate_movie_x", text="X")
-            col.prop(context.scene, "generate_movie_y", text="Y")
-        col = layout.column(align=True)
-
-        if type == "movie" or type == "image":
-            col.prop(context.scene, "generate_movie_frames", text="Frames")
-        if type == "audio" and audio_model_card != "bark":
-            col.prop(context.scene, "audio_length_in_f", text="Frames")
-            
-        if type == "audio" and audio_model_card == "bark":
-            col = layout.column(align=True)
-            col.prop(context.scene, "speakers", text="Speaker")
-            col.prop(context.scene, "languages", text="Language")
-        elif type == "audio" and addon_prefs.audio_model_card == "facebook/musicgen-stereo-small":
-            col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")   
-        else:
-            col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
-            col.prop(context.scene, "movie_num_guidance", text="Word Power")
-
-        col = col.column()
-        row = col.row(align=True)
-        sub_row = row.row(align=True)
-        sub_row.prop(context.scene, "movie_num_seed", text="Seed")
-        row.prop(context.scene, "movie_use_random", text="", icon="QUESTION")
-        sub_row.active = not context.scene.movie_use_random
-
-        if type == "movie" and (
-            movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256"
-            or movie_model_card == "cerspense/zeroscope_v2_576w"
-            or movie_model_card == "cerspense/zeroscope_v2_XL"
-        ):
-            col = col.column(heading="Upscale", align=True)
-            col.prop(context.scene, "video_to_video", text="2x")
-
-        if type == "image":
-            col = col.column(heading="Enhance", align=True)
-            col.prop(context.scene, "refine_sd", text="SD Refine")
-            sub_col = col.row()
-            sub_col.active = context.scene.refine_sd
-
-        if type != "audio":
-            row = col.row()
-            if type == "movie" or (
-                type == "image"
-                and image_model_card != "lllyasviel/sd-controlnet-canny"
-                and image_model_card != "lllyasviel/sd-controlnet-openpose"
-                and image_model_card != "lllyasviel/control_v11p_sd15_scribble"
-                and image_model_card != "monster-labs/control_v1p_sd15_qrcode_monster"
-                and image_model_card != "Salesforce/blipdiffusion"
+            if type == "movie" and (
+                movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256"
+                or movie_model_card == "cerspense/zeroscope_v2_576w"
+                or movie_model_card == "cerspense/zeroscope_v2_XL"
             ):
-                row.prop(context.scene, "use_freeU", text="FreeU")
+                col = col.column(heading="Upscale", align=True)
+                col.prop(context.scene, "video_to_video", text="2x")
+
             if type == "image":
-                row.prop(context.scene, "use_lcm", text="LCM")
+                col = col.column(heading="Enhance", align=True)
+                col.prop(context.scene, "refine_sd", text="SD Refine")
+                sub_col = col.row()
+                sub_col.active = context.scene.refine_sd
+
+            if type != "audio":
+                row = col.row()
+                if type == "movie" or (
+                    type == "image"
+                    and image_model_card != "lllyasviel/sd-controlnet-canny"
+                    and image_model_card != "lllyasviel/sd-controlnet-openpose"
+                    and image_model_card != "lllyasviel/control_v11p_sd15_scribble"
+                    and image_model_card != "monster-labs/control_v1p_sd15_qrcode_monster"
+                    and image_model_card != "Salesforce/blipdiffusion"
+                ):
+                    row.prop(context.scene, "use_freeU", text="FreeU")
+                if type == "image":
+                    row.prop(context.scene, "use_lcm", text="LCM")
 
         # Output.
         layout = self.layout
@@ -1668,8 +1688,12 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         if type == "audio":
             col.prop(addon_prefs, "audio_model_card", text=" ")
 
-        col = col.column()
-        col.prop(context.scene, "movie_num_batch", text="Batch Count")
+        if type == "text":
+            col.prop(addon_prefs, "text_model_card", text=" ")
+
+        if type != "text":
+            col = col.column()
+            col.prop(context.scene, "movie_num_batch", text="Batch Count")
 
         # Generate.
         col = layout.column()
@@ -1900,6 +1924,22 @@ class SEQUENCER_OT_generate_movie(Operator):
                     #pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)  # heavy:
                 else:
                     upscale.to("cuda")
+
+            elif movie_model_card == "VideoCrafter/Image2Video-512":
+                from diffusers import StableDiffusionPipeline
+                pipe = StableDiffusionPipeline.from_single_file("https://huggingface.co/VideoCrafter/Image2Video-512/blob/main/model.ckpt",torch_dtype=torch.float16)
+
+                from diffusers import DPMSolverMultistepScheduler
+
+                pipe.scheduler = DPMSolverMultistepScheduler.from_config(
+                    pipe.scheduler.config
+                )
+
+                if low_vram():
+                    pipe.enable_model_cpu_offload()
+                    # pipe.enable_vae_slicing()
+                else:
+                    pipe.to("cuda")
 
             else:
 
@@ -2405,15 +2445,15 @@ class SEQUENCER_OT_generate_audio(Operator):
                 print("Seed: " + str(seed))
                 context.scene.movie_num_seed = seed
                 set_seed(seed)
-                
+
                 music = pipe(prompt, forward_params={"max_new_tokens": int(min(audio_length_in_s*50, 1503))})
                 filename = solve_path(clean_filename(str(seed)+"_"+prompt) + ".wav")
                 rate = 48000
-                
+
                 if os_platform == "Darwin" or os_platform == "Linux":
                     tfm = sox.Transformer()
                     tfm.build_file(
-                    input_array=music["audio"][0].T, 
+                    input_array=music["audio"][0].T,
                     sample_rate_in=music["sampling_rate"],
                     output_filepath=filename
                     )
@@ -2973,7 +3013,6 @@ class SEQUENCER_OT_generate_image(Operator):
                     scene.movie_num_guidance = 0
                     pipe.load_lora_weights("latent-consistency/lcm-lora-sdxl")
 
-
                 elif image_model_card == "segmind/SSD-1B":
                     scene.movie_num_guidance = 0
                     pipe.load_lora_weights("latent-consistency/lcm-lora-ssd-1b")
@@ -3516,6 +3555,135 @@ class SEQUENCER_OT_generate_image(Operator):
         return {"FINISHED"}
 
 
+class SEQUENCER_OT_generate_text(Operator):
+    """Generate Text"""
+
+    bl_idname = "sequencer.generate_text"
+    bl_label = "Prompt"
+    bl_description = "Generate texts from strips"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        scene = context.scene
+        seq_editor = scene.sequence_editor
+        preferences = context.preferences
+        addon_prefs = preferences.addons[__name__].preferences
+        guidance = scene.movie_num_guidance
+        current_frame = scene.frame_current
+        prompt = style_prompt(scene.generate_movie_prompt)[0]
+        x = scene.generate_movie_x = closest_divisible_32(scene.generate_movie_x)
+        y = scene.generate_movie_y = closest_divisible_32(scene.generate_movie_y)
+        duration = scene.generate_movie_frames
+        render = bpy.context.scene.render
+        fps = render.fps / render.fps_base
+
+        show_system_console(True)
+        set_system_console_topmost(True)
+
+        if not seq_editor:
+            scene.sequence_editor_create()
+
+        active_strip = context.scene.sequence_editor.active_strip
+
+        try:
+            import torch
+            from PIL import Image
+            from transformers import BlipProcessor, BlipForConditionalGeneration
+        except ModuleNotFoundError:
+            print("Dependencies need to be installed in the add-on preferences.")
+            self.report(
+                {"INFO"},
+                "Dependencies need to be installed in the add-on preferences.",
+            )
+            return {"CANCELLED"}
+
+        # clear the VRAM
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+        processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-large")
+        model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-large", torch_dtype=torch.float16).to("cuda")
+
+        init_image = load_first_frame(scene.movie_path) if scene.movie_path else load_first_frame(scene.image_path)
+        init_image = init_image.resize((x, y))
+
+        # unconditional image captioning
+        inputs = processor(init_image, return_tensors="pt").to("cuda", torch.float16)
+
+        out = model.generate(**inputs, max_new_tokens=256)
+        text = (processor.decode(out[0], skip_special_tokens=True)).capitalize() + "."
+        print("Generated text: " + text)
+
+        # Find free space for the strip in the timeline.
+        if active_strip.frame_final_start <= current_frame <= (active_strip.frame_final_start + active_strip.frame_final_duration):
+            empty_channel = find_first_empty_channel(
+                scene.frame_current,
+                (scene.sequence_editor.active_strip.frame_final_duration) + scene.frame_current,
+            )
+            start_frame = scene.frame_current
+        else:
+            empty_channel = find_first_empty_channel(
+                scene.sequence_editor.active_strip.frame_final_start,
+                scene.sequence_editor.active_strip.frame_final_end,
+            )
+            start_frame = (
+                scene.sequence_editor.active_strip.frame_final_start
+            )
+            scene.frame_current = (
+                scene.sequence_editor.active_strip.frame_final_start
+            )
+
+        # Add strip
+        if text:
+            print(str(start_frame))
+            strip = scene.sequence_editor.sequences.new_effect(
+                name=text,
+                type='TEXT',
+                frame_start=start_frame,
+                frame_end=int(start_frame + ((len(text)/12)*fps)),
+                channel=empty_channel,
+            )
+
+            strip.text = text
+            strip.wrap_width = 0.68
+            strip.font_size = 44
+            strip.location[0] = 0.5
+            strip.location[1] = 0.2
+            strip.align_x = "CENTER"
+            strip.align_y = "TOP"
+            strip.use_shadow = True
+            strip.use_box = True
+
+            scene.sequence_editor.active_strip = strip
+
+        for window in bpy.context.window_manager.windows:
+            screen = window.screen
+            for area in screen.areas:
+                if area.type == "SEQUENCE_EDITOR":
+                    from bpy import context
+
+                    with context.temp_override(window=window, area=area):
+                        if active_strip.frame_final_start <= scene.frame_current <= (active_strip.frame_final_start + active_strip.frame_final_duration):
+                            pass
+                        else:
+                            scene.frame_current = (
+                                scene.sequence_editor.active_strip.frame_final_start
+                            )
+                        # Redraw UI to display the new strip.
+                        bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
+                        break
+
+        scene.movie_num_guidance = guidance
+        bpy.ops.renderreminder.play_notification()
+        scene.frame_current = current_frame
+
+        # clear the VRAM
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+        return {"FINISHED"}
+
+
 class SEQUENCER_OT_strip_to_generatorAI(Operator):
     """Convert selected text strips to Generative AI"""
 
@@ -3564,6 +3732,19 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                 "None of the selected strips are movie, image, text or scene types.",
             )
             return {"CANCELLED"}
+
+        if type == "text":
+            for strip in strips:
+                if strip.type in {"MOVIE", "IMAGE"}:
+                    print("Process: Image Captioning")
+                    break
+            else:
+                self.report(
+                    {"INFO"},
+                    "None of the selected strips are movie or image.",
+                )
+                return {"CANCELLED"}
+
         if use_strip_data:
             print("Use file seed and prompt: Yes")
         else:
@@ -3580,19 +3761,42 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         print("Total GPU Cards: " + str(torch.cuda.device_count()))
 
         for count, strip in enumerate(strips):
+            for dsel_strip in bpy.context.scene.sequence_editor.sequences:
+                dsel_strip.select = False
+            strip.select = True
             # render intermediate mp4 file
             if strip.type == "SCENE" or strip.type == "MOVIE":
                 # Make the current frame overlapped frame, the temp strip.
-                if type == "image":
+                if type == "image" or type == "text":
                     trim_frame = find_overlapping_frame(strip, current_frame)
 
-                    if trim_frame:
+                    if trim_frame and len(strips)==1:
+
                         bpy.ops.sequencer.copy()
                         bpy.ops.sequencer.paste()
 
                         intermediate_strip = bpy.context.selected_sequences[0]
                         intermediate_strip.frame_start = strip.frame_start
                         intermediate_strip.frame_offset_start = int(trim_frame)
+
+                        intermediate_strip.frame_final_duration = 1
+
+                        temp_strip = strip = get_render_strip(
+                            self, context, intermediate_strip
+                        )
+
+                        if intermediate_strip is not None:
+                            delete_strip(intermediate_strip)
+
+                    elif type == "text":
+
+                        bpy.ops.sequencer.copy()
+                        bpy.ops.sequencer.paste(keep_offset=True)
+
+                        intermediate_strip = bpy.context.selected_sequences[0]
+                        intermediate_strip.frame_start = strip.frame_start
+                        #intermediate_strip.frame_offset_start = int(trim_frame)
+
                         intermediate_strip.frame_final_duration = 1
 
                         temp_strip = strip = get_render_strip(
@@ -3658,12 +3862,14 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                         styled_prompt = style_prompt(prompt)[0]
                         styled_negative_prompt = style_prompt(prompt)[1]
                     print("\n" + str(count + 1) + "/" + str(len(strips)))
-                    print("Prompt: " + styled_prompt)
-                    print("Negative Prompt: " + styled_negative_prompt)
+                    if type != "text":
+                        print("Prompt: " + styled_prompt)
+                        print("Negative Prompt: " + styled_negative_prompt)
 
                     scene.generate_movie_prompt = styled_prompt
                     scene.generate_movie_negative_prompt = styled_negative_prompt
                     scene.frame_current = strip.frame_final_start
+                    context.scene.sequence_editor.active_strip = strip
 
                     if type == "movie":
                         sequencer.generate_movie()
@@ -3671,6 +3877,8 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                         sequencer.generate_audio()
                     if type == "image":
                         sequencer.generate_image()
+                    if type == "text":
+                        sequencer.generate_text()
                 scene.generate_movie_prompt = prompt
                 scene.generate_movie_negative_prompt = negative_prompt
 
@@ -3703,12 +3911,14 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                         styled_prompt = style_prompt(prompt)[0]
                         styled_negative_prompt = style_prompt(prompt)[1]
                     print("\n" + str(count + 1) + "/" + str(len(strips)))
-                    print("Prompt: " + styled_prompt)
-                    print("Negative Prompt: " + styled_negative_prompt)
+                    if type != "text":
+                        print("Prompt: " + styled_prompt)
+                        print("Negative Prompt: " + styled_negative_prompt)
 
                     scene.generate_movie_prompt = styled_prompt
                     scene.generate_movie_negative_prompt = styled_negative_prompt
                     scene.frame_current = strip.frame_final_start
+                    context.scene.sequence_editor.active_strip = strip
 
                     if type == "movie":
                         sequencer.generate_movie()
@@ -3716,6 +3926,8 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                         sequencer.generate_audio()
                     if type == "image":
                         sequencer.generate_image()
+                    if type == "text":
+                        sequencer.generate_text()
                 scene.generate_movie_prompt = prompt
                 scene.generate_movie_negative_prompt = negative_prompt
 
@@ -3753,6 +3965,7 @@ classes = (
     SEQUENCER_OT_generate_movie,
     SEQUENCER_OT_generate_audio,
     SEQUENCER_OT_generate_image,
+    SEQUENCER_OT_generate_text,
     SEQUENCER_PT_pallaidium_panel,
     GENERATOR_OT_sound_notification,
     SEQUENCER_OT_strip_to_generatorAI,
@@ -3849,6 +4062,7 @@ def register():
             ("movie", "Video", "Generate Video"),
             ("image", "Image", "Generate Image"),
             ("audio", "Audio", "Generate Audio"),
+            ("text", "Text", "Generate Text"),
         ],
         default="image",
         update=output_strips_updated,
