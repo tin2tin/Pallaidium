@@ -3555,6 +3555,25 @@ class SEQUENCER_OT_generate_image(Operator):
         return {"FINISHED"}
 
 
+def clean_string(input_string):
+    
+    # Words to be removed
+    words_to_remove = ["araffe", "arafed", "there is", "there are "]
+
+    for word in words_to_remove:
+        input_string = input_string.replace(word, '')
+        
+    input_string = input_string.strip()
+
+    # Capitalize the first letter
+    input_string = input_string[:1].capitalize() + input_string[1:]
+
+    # Add a full stop at the end
+    input_string += '.'
+
+    return input_string
+
+
 class SEQUENCER_OT_generate_text(Operator):
     """Generate Text"""
 
@@ -3607,11 +3626,15 @@ class SEQUENCER_OT_generate_text(Operator):
         init_image = load_first_frame(scene.movie_path) if scene.movie_path else load_first_frame(scene.image_path)
         init_image = init_image.resize((x, y))
 
+        text = ""
+        inputs = processor(init_image, text, return_tensors="pt").to("cuda", torch.float16)
+
         # unconditional image captioning
-        inputs = processor(init_image, return_tensors="pt").to("cuda", torch.float16)
+        #inputs = processor(init_image, return_tensors="pt").to("cuda", torch.float16)
 
         out = model.generate(**inputs, max_new_tokens=256)
-        text = (processor.decode(out[0], skip_special_tokens=True)).capitalize() + "."
+        text = (processor.decode(out[0], skip_special_tokens=True))
+        text = clean_string(text)
         print("Generated text: " + text)
 
         # Find free space for the strip in the timeline.
