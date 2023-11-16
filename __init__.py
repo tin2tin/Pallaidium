@@ -2764,8 +2764,9 @@ class SEQUENCER_OT_generate_image(Operator):
 
             if scene.use_lcm:
                 from diffusers import LCMScheduler
-                pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
                 pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
+                pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
+                pipe.fuse_lora()
                 scene.movie_num_guidance = 0
             else:
                 pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
@@ -2827,8 +2828,9 @@ class SEQUENCER_OT_generate_image(Operator):
 
             if scene.use_lcm:
                 from diffusers import LCMScheduler
-                pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
                 pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
+                pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
+                pipe.fuse_lora()
                 scene.movie_num_guidance = 0
             else:
                 pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
@@ -2862,8 +2864,9 @@ class SEQUENCER_OT_generate_image(Operator):
 
             if scene.use_lcm:
                 from diffusers import LCMScheduler
-                pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
                 pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
+                pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
+                pipe.fuse_lora()
                 scene.movie_num_guidance = 0
             else:
                 pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
@@ -3012,13 +3015,16 @@ class SEQUENCER_OT_generate_image(Operator):
                 if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
                     scene.movie_num_guidance = 0
                     pipe.load_lora_weights("latent-consistency/lcm-lora-sdxl")
+                    pipe.fuse_lora()
 
                 elif image_model_card == "segmind/SSD-1B":
                     scene.movie_num_guidance = 0
                     pipe.load_lora_weights("latent-consistency/lcm-lora-ssd-1b")
+                    pipe.fuse_lora()
                 else:
                     scene.movie_num_guidance = 0
                     pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
+                    pipe.fuse_lora()
 
                 pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
             else:
