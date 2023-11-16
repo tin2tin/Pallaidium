@@ -10,19 +10,19 @@ AI-generate video, image, and audio from text prompts or video, image, or text s
 | Text to video                                      | Text to audio                                       |
 | Text to speech                                     | Text to image                                      |
 | Image to image                                     | Image to video                                     |
-| Video to video                                     | Style selector                                     |
+| Video to video                                     | Image to text                                    |
 | ControlNet                                         | OpenPose                                          |
-| Canny                                          | Illusion                                          |
-| Multiple LoRAs                                 | Segmind distilled SDXL                            |
+| Canny                                              | Illusion                                          |
+| Multiple LoRAs                                     | Segmind distilled SDXL                            |
 | Seed                                               | Quality steps                                     |
 | Frames                                             | Word power                                         |
-| Denoising                                          | Strip power                                        |
+| Style selector                                     | Strip power                                        |
 | Batch conversion                                   | Batch refinement of images.                         |
 | Batch upscale & refinement of movies.              | Model card selector.                               |
-| Render-to-path selector.                          | Render finished notification.                      |
-| Model Cards                                       | One-click install and uninstall dependencies. |
+| Render-to-path selector.                           | Render finished notification.                      |
+| Model Cards                                        | One-click install and uninstall dependencies. |
 | User-defined file path for generated files.        | Define the location for storing generated files.  |
-| Seed and prompt added to strip name.             | Include seed and prompt information in the strip name. |
+| Seed and prompt added to strip name.               | Include seed and prompt information in the strip name. |
 
 
 ![image](https://github.com/tin2tin/Pallaidium/assets/1322593/09bba394-3188-49be-8ae1-37c0c43ec2fd)
@@ -224,6 +224,10 @@ Trainer for LoRAs: https://github.com/johnman3032/simple-lora-dreambooth-trainer
 
 
 ## Video Examples
+
+### Image to Text
+https://github.com/tin2tin/Pallaidium/assets/1322593/91eb17e4-72d6-4c69-8e5c-a3d38af5a770
+
 
 ### Illusion Diffusion
 https://github.com/tin2tin/Pallaidium/assets/1322593/42eadfd8-3ebf-4747-b8e0-7b79fe8626b6
