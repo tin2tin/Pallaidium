@@ -261,6 +261,10 @@ https://github.com/tin2tin/Pallaidium/assets/1322593/ac9f278e-9fc9-46fc-a4e7-562
 [![Watch the video](https://img.youtube.com/vi/AAdQfQjENJU/0.jpg)](https://youtu.be/AAdQfQjENJU) 
 
 
+### Batch from Text Strips
+[![Watch the video](https://img.youtube.com/vi/gSFWGkgaNsE/0.jpg)](https://youtu.be/gSFWGkgaNsE)
+
+
 ### Video to video:
 https://github.com/tin2tin/Generative_AI/assets/1322593/c044a0b0-95c2-4b54-af0b-45bc0c670c89
 
