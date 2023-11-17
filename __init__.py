@@ -655,7 +655,7 @@ def install_modules(self):
     import_module(self, "scipy", "scipy")
     import_module(self, "IPython", "IPython")
     import_module(self, "xformers", "xformers")
-    subprocess.check_call([pybin, "-m", "pip", "install", "mediapipe", "--upgrade"])
+    #subprocess.check_call([pybin, "-m", "pip", "install", "mediapipe", "--upgrade"])
 #    try:
 #        import_module(self, "mediapipe", "git+https://github.com/google/mediapipe.git")
 #    except ImportError:
