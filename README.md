@@ -217,6 +217,26 @@ https://github.com/tin2tin/vse_masking_tools
 
 ![image](https://github.com/tin2tin/Generative_AI/assets/1322593/f2afd36c-34b1-4779-957b-0eb8defed296)
 
+### Subtitle Editor
+
+Edit and navigate in the generated text strips.
+
+https://github.com/tin2tin/Subtitle_Editor
+
+
+### Screenwriter Assistant
+
+Get chatGPT to generate stories, which can be used as prompts.
+
+https://github.com/tin2tin/Blender_Screenwriter_Assistant_chat_GPT
+
+
+### Text to Strip
+
+Convert text from the Text Editor to strips which can be used as prompts for batch generation.
+
+https://github.com/tin2tin/text_to_strip
+
 
 ## Useful Projects
 
