@@ -525,69 +525,105 @@ def low_vram():
     return (total_vram / (1024**3)) < 6.1  # Y/N under 6.1 GB?
 
 
+def isWindows():
+    return os.name == 'nt'
+
+def isMacOS():
+    return os.name == 'posix' and platform.system() == "Darwin"
+
+def isLinux():
+    return os.name == 'posix' and platform.system() == "Linux"
+
+def python_exec():
+    import sys
+    if isWindows():
+        return os.path.join(sys.prefix, 'bin', 'python.exe')
+    elif isMacOS():
+        try:
+            # 2.92 and older
+            path = bpy.app.binary_path_python
+        except AttributeError:
+            # 2.93 and later
+            import sys
+            path = sys.executable
+        return os.path.abspath(path)
+    elif isLinux():
+        return os.path.join(sys.prefix, 'sys.prefix/bin', 'python')
+    else:
+        print("sorry, still not implemented for ", os.name, " - ", platform.system)
+
+
 def import_module(self, module, install_module):
     show_system_console(True)
     set_system_console_topmost(True)
 
     module = str(module)
 
+    python_exe = python_exec()
     try:
-        exec("import " + module)
-    except ModuleNotFoundError:
-        app_path = site.USER_SITE
-        if app_path not in sys.path:
-            sys.path.append(app_path)
-        pybin = sys.executable
+        subprocess.call([python_exe, "import ", packageName])
+        #exec("import " + module)
+    except: # ModuleNotFoundError:
+#        app_path = site.USER_SITE
+#        if app_path not in sys.path:
+#            sys.path.append(app_path)
+#        pybin = sys.executable
 
 #        target = os.path.join(sys.prefix, 'site-packages')
-#
 #        if target not in sys.path:
 #            sys.path.append(target)
 
         self.report({"INFO"}, "Installing: " + module + " module.")
         print("Installing: " + module + " module")
-        subprocess.check_call(
-            [
-                pybin,
-                "-m",
-                "pip",
-                "install",
-                install_module,
-                "--no-warn-script-location",
-                "--user",
-                #'-t', target,
-            ]
-        )
+        subprocess.call([python_exe, "-m", "pip", "install", install_module])
+#        subprocess.check_call(
+#            [
+#                pybin,
+#                "-m",
+#                "pip",
+#                "install",
+#                install_module,
+#                "--no-warn-script-location",
+#                "--user",
+#                #'-t', target,
+#            ]
+#        )
 
-#        try:
-#            exec("import " + module)
-#        except ModuleNotFoundError:
-#            return False
+        try:
+            exec("import " + module)
+        except ModuleNotFoundError:
+            return False
     return True
 
 
 def install_modules(self):
     os_platform = platform.system()
-    app_path = site.USER_SITE
+#    app_path = site.USER_SITE
 
-    if app_path not in sys.path:
-        sys.path.append(app_path)
-    pybin = sys.executable
+#    if app_path not in sys.path:
+#        sys.path.append(app_path)
+#    pybin = sys.executable
 
-    target = os.path.join(sys.prefix, 'site-packages')
-    if target not in sys.path:
-        sys.path.append(target)
+#    target = os.path.join(sys.prefix, 'site-packages')
+#    if target not in sys.path:
+#        sys.path.append(target)
+    pybin = python_exec()
+
     print("Ensuring: pip")
-
     try:
         subprocess.call([pybin, "-m", "ensurepip"])
         subprocess.call([pybin, "-m", "pip", "install", "--upgrade", "pip"])
     except ImportError:
         pass
 
+#!pip install lmdb
+#!pip install torch==2.1.0+cu121 torchvision==0.16.0+cu121 torchaudio==2.1.0 torchtext==0.16.0+cpu torchdata==0.7.0 --index-url https://download.pytorch.org/whl/cu121
+
+    # import_module(self, "xformers", "xformers")
     try:
         exec("import torch")
     except ModuleNotFoundError:
+        subprocess.call([pybin, "-m", "pip", "install", "lmdb"])
         self.report({"INFO"}, "Installing: torch module.")
         print("Installing: torch module")
         if os_platform == "Windows":
@@ -597,11 +633,11 @@ def install_modules(self):
                     "-m",
                     "pip",
                     "install",
-                    "torch",
+                    "torch==2.1.0+cu121",
                     "--index-url",
-                    "https://download.pytorch.org/whl/cu118",
+                    "https://download.pytorch.org/whl/cu121",
                     "--no-warn-script-location",
-                    "--user",
+                    #"--user",
                 ]
             )
             subprocess.check_call(
@@ -610,11 +646,11 @@ def install_modules(self):
                     "-m",
                     "pip",
                     "install",
-                    "torchvision",
+                    "torchvision==0.16.0+cu121",
                     "--index-url",
-                    "https://download.pytorch.org/whl/cu118",
+                    "https://download.pytorch.org/whl/cu121",
                     "--no-warn-script-location",
-                    "--user",
+                    #"--user",
                 ]
             )
             subprocess.check_call(
@@ -623,11 +659,11 @@ def install_modules(self):
                     "-m",
                     "pip",
                     "install",
-                    "torchaudio",
+                    "torchaudio==2.1.0",
                     "--index-url",
-                    "https://download.pytorch.org/whl/cu118",
+                    "https://download.pytorch.org/whl/cu121",
                     "--no-warn-script-location",
-                    "--user",
+                    #"--user",
                 ]
             )
         else:
@@ -639,9 +675,9 @@ def install_modules(self):
     import_module(self, "accelerate", "git+https://github.com/huggingface/accelerate.git")
     #import_module(self, "transformers", "git+https://github.com/huggingface/transformers")
     subprocess.check_call([pybin, "-m", "pip", "install", "transformers", "--upgrade"])
-    import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
-    #import_module(self, "diffusers", "diffusers")
-    import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git@v0.22.3")
+    #import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
+    import_module(self, "diffusers", "diffusers")
+    #import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git@v0.22.3")
     import_module(self, "tensorflow", "tensorflow")
     if os_platform == "Darwin" or os_platform == "Linux":
         import_module(self, "sox", "sox")
@@ -654,12 +690,26 @@ def install_modules(self):
     import_module(self, "PIL", "pillow")
     import_module(self, "scipy", "scipy")
     import_module(self, "IPython", "IPython")
-    import_module(self, "xformers", "xformers")
+    #import_module(self, "mustango", "mustango")
+    #import_module(self, "mustango", "git+https://github.com/AMAAI-Lab/mustango.git")
     #subprocess.check_call([pybin, "-m", "pip", "install", "mediapipe", "--upgrade"])
 #    try:
 #        import_module(self, "mediapipe", "git+https://github.com/google/mediapipe.git")
 #    except ImportError:
 #        pass
+    subprocess.check_call(
+        [
+            pybin,
+            "-m",
+            "pip",
+            "install",
+            #"bark",
+            #"--index-url",
+            "git+https://github.com/suno-ai/bark.git",
+            "--no-warn-script-location",
+            "--user",
+        ]
+    )
     subprocess.check_call(
         [
             pybin,
@@ -753,10 +803,11 @@ def get_module_dependencies(module_name):
     Get the list of dependencies for a given module.
     """
 
-    app_path = site.USER_SITE
-    if app_path not in sys.path:
-        sys.path.append(app_path)
-    pybin = sys.executable
+#    app_path = site.USER_SITE
+#    if app_path not in sys.path:
+#        sys.path.append(app_path)
+#    pybin = sys.executable
+    pybin = python_exec()
 
     result = subprocess.run(
         [pybin, "-m", "pip", "show", module_name], capture_output=True, text=True
@@ -779,10 +830,11 @@ def uninstall_module_with_dependencies(module_name):
     show_system_console(True)
     set_system_console_topmost(True)
 
-    app_path = site.USER_SITE
-    if app_path not in sys.path:
-        sys.path.append(app_path)
-    pybin = sys.executable
+#    app_path = site.USER_SITE
+#    if app_path not in sys.path:
+#        sys.path.append(app_path)
+#    pybin = sys.executable
+    pybin = python_exec()
 
     dependencies = get_module_dependencies(module_name)
 
@@ -849,7 +901,7 @@ class GENERATOR_OT_uninstall(Operator):
         #uninstall_module_with_dependencies("compel")
         uninstall_module_with_dependencies("triton")
         uninstall_module_with_dependencies("cv2")
-        uninstall_module_with_dependencies("mediapipe")
+        #uninstall_module_with_dependencies("mediapipe")
 
         self.report(
             {"INFO"},
@@ -1053,7 +1105,7 @@ class GeneratorAddonPreferences(AddonPreferences):
     audio_model_card: bpy.props.EnumProperty(
         name="Audio Model",
         items=[
-            ("facebook/musicgen-stereo-small", "Music: MusicGen Stereo", "facebook/musicgen-stereo-small"),
+            #("facebook/musicgen-stereo-small", "Music: MusicGen Stereo", "facebook/musicgen-stereo-small"),
             (
                 "cvssp/audioldm2-music",
                 "Music: AudioLDM 2",
@@ -1065,6 +1117,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Sound: AudioLDM 2",
             ),
             ("bark", "Speech: Bark", "Bark"),
+            #("declare-lab/mustango", "Mustango", "declare-lab/mustango"),
         ],
         default="bark",
         update=input_strips_updated,
@@ -2299,42 +2352,42 @@ class SEQUENCER_OT_generate_audio(Operator):
             scene.render.fps / scene.render.fps_base
         )
 
-        try:
-            import torch
+#        try:
+        import torch
+        import scipy
+        from scipy.io.wavfile import write as write_wav
+
+        if (
+            addon_prefs.audio_model_card == "cvssp/audioldm2"
+            or addon_prefs.audio_model_card == "cvssp/audioldm2-music"
+        ):
+            from diffusers import AudioLDM2Pipeline, DPMSolverMultistepScheduler
             import scipy
-            from scipy.io.wavfile import write as write_wav
+            from IPython.display import Audio
+            import xformers
 
-            if (
-                addon_prefs.audio_model_card == "cvssp/audioldm2"
-                or addon_prefs.audio_model_card == "cvssp/audioldm2-music"
-            ):
-                from diffusers import AudioLDM2Pipeline, DPMSolverMultistepScheduler
-                import scipy
-                from IPython.display import Audio
-                import xformers
+        if addon_prefs.audio_model_card == "facebook/musicgen-stereo-small":
+            if os_platform == "Darwin" or os_platform == "Linux":
+                import sox
+            else:
+                import soundfile as sf
 
-            if addon_prefs.audio_model_card == "facebook/musicgen-stereo-small":
-                if os_platform == "Darwin" or os_platform == "Linux":
-                    import sox
-                else:
-                    import soundfile as sf
-
-            if addon_prefs.audio_model_card == "bark":
-                os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-                import numpy as np
-                from bark.generation import (
-                    generate_text_semantic,
-                    preload_models,
-                )
-                from bark.api import semantic_to_waveform
-                from bark import generate_audio, SAMPLE_RATE
-        except ModuleNotFoundError:
-            print("Dependencies needs to be installed in the add-on preferences.")
-            self.report(
-                {"INFO"},
-                "Dependencies needs to be installed in the add-on preferences.",
+        if addon_prefs.audio_model_card == "bark":
+            os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+            import numpy as np
+            from bark.generation import (
+                generate_text_semantic,
+                preload_models,
             )
-            return {"CANCELLED"}
+            from bark.api import semantic_to_waveform
+            from bark import generate_audio, SAMPLE_RATE
+#        except ModuleNotFoundError:
+#            print("Dependencies needs to be installed in the add-on preferences.")
+#            self.report(
+#                {"INFO"},
+#                "Dependencies needs to be installed in the add-on preferences.",
+#            )
+#            return {"CANCELLED"}
         show_system_console(True)
         set_system_console_topmost(True)
 
@@ -2378,6 +2431,22 @@ class SEQUENCER_OT_generate_audio(Operator):
                 fine_use_gpu=True,
                 fine_use_small=True,
             )
+
+        # Mustango
+        elif addon_prefs.audio_model_card == "declare-lab/mustango":
+            import IPython
+            import soundfile as sf
+            from diffusers import DiffusionPipeline
+            #from mustango import Mustango
+            #from transformers import pipeline
+            #from transformers import set_seed
+            model = DiffusionPipeline.from_pretrained("declare-lab/mustango")#, device="cuda:0", torch_dtype=torch.float16)
+
+        # Deadend
+        else:
+            print("Audio model not found.")
+            self.report({"INFO"}, "Audio model not found.")
+            return {"CANCELLED"}
 
 
         # Main loop
@@ -2459,6 +2528,11 @@ class SEQUENCER_OT_generate_audio(Operator):
                     )
                 else:
                     sf.write(filename, music["audio"][0].T, music["sampling_rate"])
+
+            elif addon_prefs.audio_model_card == "declare-lab/mustango":
+                music = model.generate(prompt)
+                sf.write(filename, audio, samplerate=16000)
+                IPython.display.Audio(data=audio, rate=16000)                
 
             else:  # AudioLDM
                 print("Generate: Audio/music (AudioLDM)")
@@ -2663,10 +2737,11 @@ class SEQUENCER_OT_generate_image(Operator):
 
             # NOTE: need to test if I can get SDXL Inpainting working!
 
-            # from diffusers import StableDiffusionXLInpaintPipeline, AutoencoderKL
-            from diffusers import (
-                StableDiffusionInpaintPipeline,
-            )  # , AutoencoderKL#, StableDiffusionXLInpaintPipeline
+            from diffusers import AutoPipelineForInpainting
+#            from diffusers import StableDiffusionXLInpaintPipeline, AutoencoderKL
+#            from diffusers import (
+#                StableDiffusionInpaintPipeline,
+#            )  # , AutoencoderKL#, StableDiffusionXLInpaintPipeline
 
             # from diffusers import AutoPipelineForInpainting #, AutoencoderKL, StableDiffusionXLInpaintPipeline
             from diffusers.utils import load_image
@@ -2674,14 +2749,28 @@ class SEQUENCER_OT_generate_image(Operator):
             # clear the VRAM
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
-            # vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16) #vae=vae,
-            # pipe = StableDiffusionXLInpaintPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", vae=vae, torch_dtype=torch.float16, variant="fp16") #use_safetensors=True
-
-            pipe = StableDiffusionInpaintPipeline.from_pretrained(
-                "runwayml/stable-diffusion-inpainting",
+                
+            #vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16) #vae=vae,
+            #pipe = StableDiffusionXLInpaintPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", vae=vae, torch_dtype=torch.float16, variant="fp16") #use_safetensors=True
+            pipe = AutoPipelineForInpainting.from_pretrained(
+                "diffusers/stable-diffusion-xl-1.0-inpainting-0.1",
                 torch_dtype=torch.float16,
                 variant="fp16",
-            )  # use_safetensors=True
+            ).to("cuda")
+            
+            # set scheduler
+
+            if scene.use_lcm:
+                from diffusers import LCMScheduler
+                pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
+                # load LCM-LoRA
+                pipe.load_lora_weights("latent-consistency/lcm-lora-sdxl")
+                pipe.fuse_lora()       
+#            pipe = StableDiffusionInpaintPipeline.from_pretrained(
+#                "runwayml/stable-diffusion-inpainting",
+#                torch_dtype=torch.float16,
+#                variant="fp16",
+#            )  # use_safetensors=True
             # pipe = AutoPipelineForInpainting.from_pretrained("diffusers/stable-diffusion-xl-1.0-inpainting-0.1", torch_dtype=torch.float16, variant="fp16", vae=vae) #use_safetensors=True
 
             pipe.watermark = NoWatermark()
