@@ -297,6 +297,16 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-455c77443535
 
 
+## Offside Info
+
+### LCM
+
+https://huggingface.co/blog/lcm_lora
+
+### FreeU
+
+https://github.com/ChenyangSi/FreeU
+
 ## Restrictions for using the AI models:
 
 - The models can only be used for non-commercial purposes. The models are meant for research purposes.
