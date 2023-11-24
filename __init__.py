@@ -1105,7 +1105,7 @@ class GeneratorAddonPreferences(AddonPreferences):
     audio_model_card: bpy.props.EnumProperty(
         name="Audio Model",
         items=[
-            #("facebook/musicgen-stereo-small", "Music: MusicGen Stereo", "facebook/musicgen-stereo-small"),
+            ("facebook/musicgen-stereo-small", "Music: MusicGen Stereo", "facebook/musicgen-stereo-small"),
             (
                 "cvssp/audioldm2-music",
                 "Music: AudioLDM 2",
