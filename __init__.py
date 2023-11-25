@@ -673,16 +673,18 @@ def install_modules(self):
 
     import_module(self, "huggingface_hub", "huggingface_hub")
     import_module(self, "accelerate", "git+https://github.com/huggingface/accelerate.git")
-    #import_module(self, "transformers", "git+https://github.com/huggingface/transformers")
-    subprocess.check_call([pybin, "-m", "pip", "install", "transformers", "--upgrade"])
+    #import_module(self, "transformers", "git+https://github.com/huggingface/transformers.git")
+    subprocess.check_call([pybin, "-m", "pip", "install", "git+https://github.com/huggingface/transformers.git", "--upgrade"])
+    #subprocess.check_call([pybin, "-m", "pip", "install", "transformers", "--upgrade"])
+    import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
     #import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
     import_module(self, "diffusers", "diffusers")
     #import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git@v0.22.3")
     import_module(self, "tensorflow", "tensorflow")
-    if os_platform == "Darwin" or os_platform == "Linux":
-        import_module(self, "sox", "sox")
-    else:
-        import_module(self, "soundfile", "PySoundFile")
+#    if os_platform == "Darwin" or os_platform == "Linux":
+#        import_module(self, "sox", "sox")
+#    else:
+    import_module(self, "soundfile", "PySoundFile")
     #import_module(self, "transformers", "transformers")
     import_module(self, "sentencepiece", "sentencepiece")
     import_module(self, "safetensors", "safetensors")
@@ -880,10 +882,10 @@ class GENERATOR_OT_uninstall(Operator):
         uninstall_module_with_dependencies("torchvision")
         uninstall_module_with_dependencies("torchaudio")
 
-        if os_platform == "Darwin" or os_platform == "Linux":
-            uninstall_module_with_dependencies("sox")
-        else:
-            uninstall_module_with_dependencies("PySoundFile")
+#        if os_platform == "Darwin" or os_platform == "Linux":
+#            uninstall_module_with_dependencies("sox")
+#        else:
+        uninstall_module_with_dependencies("PySoundFile")
         uninstall_module_with_dependencies("diffusers")
         uninstall_module_with_dependencies("accelerate")
         uninstall_module_with_dependencies("transformers")
@@ -1861,6 +1863,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 vae = AutoencoderKL.from_pretrained(
                     "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
+
                 )
                 pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
                     movie_model_card,
@@ -1997,6 +2000,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             else:
 
                 from diffusers import TextToVideoSDPipeline
+                import torch
 
                 pipe = TextToVideoSDPipeline.from_pretrained(
                     movie_model_card,
@@ -2014,7 +2018,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     # pipe.enable_vae_slicing()
                 else:
                     pipe.to("cuda")
-
+                    
             # Model for upscale generated movie
             if scene.video_to_video:
                 if torch.cuda.is_available():
@@ -2367,10 +2371,10 @@ class SEQUENCER_OT_generate_audio(Operator):
             import xformers
 
         if addon_prefs.audio_model_card == "facebook/musicgen-stereo-small":
-            if os_platform == "Darwin" or os_platform == "Linux":
-                import sox
-            else:
-                import soundfile as sf
+#            if os_platform == "Darwin" or os_platform == "Linux":
+#                import sox
+#            else:
+            import soundfile as sf
 
         if addon_prefs.audio_model_card == "bark":
             os.environ["CUDA_VISIBLE_DEVICES"] = "0"
@@ -2519,15 +2523,15 @@ class SEQUENCER_OT_generate_audio(Operator):
                 filename = solve_path(clean_filename(str(seed)+"_"+prompt) + ".wav")
                 rate = 48000
 
-                if os_platform == "Darwin" or os_platform == "Linux":
-                    tfm = sox.Transformer()
-                    tfm.build_file(
-                    input_array=music["audio"][0].T,
-                    sample_rate_in=music["sampling_rate"],
-                    output_filepath=filename
-                    )
-                else:
-                    sf.write(filename, music["audio"][0].T, music["sampling_rate"])
+#                if os_platform == "Darwin" or os_platform == "Linux":
+#                    tfm = sox.Transformer()
+#                    tfm.build_file(
+#                    input_array=music["audio"][0].T,
+#                    sample_rate_in=music["sampling_rate"],
+#                    output_filepath=filename
+#                    )
+#                else:
+                sf.write(filename, music["audio"][0].T, music["sampling_rate"])
 
             elif addon_prefs.audio_model_card == "declare-lab/mustango":
                 music = model.generate(prompt)
