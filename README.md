@@ -61,6 +61,9 @@ Tip           |
 If any Python modules are missing, use this add-on to manually install them:      |
 https://github.com/amb/blender_pip      |
 
+## Change Log
+
+* 2023-11-30: Add: SVD, SVD-XT, SDXL Turbo
 
 ## Location
 
