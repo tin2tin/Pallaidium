@@ -63,6 +63,7 @@ https://github.com/amb/blender_pip      |
 
 ## Change Log
 
+* 2023-12-1: Add SD Turbo & MusicGen Medium, MPS device for MacOS.
 * 2023-11-30: Add: SVD, SVD-XT, SDXL Turbo
 
 ## Location
