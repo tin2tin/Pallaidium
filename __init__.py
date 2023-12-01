@@ -26,8 +26,19 @@ import string
 from os.path import dirname, realpath, isdir, join, basename
 import shutil
 from datetime import date
+try:
+    exec("import torch")
+    if torch.cuda.is_available():
+      gfx_device = "cuda"
+    elif torch.backends.mps.is_available():
+      gfx_device = "mps"
+    else:
+      gfx_device = "cpu"
+except ModuleNotFoundError:
+    print("Pallaidium dependencies needs to be installed and then Blender needs to be restarted.")
 
 os_platform = platform.system()  # 'Linux', 'Darwin', 'Java', 'Windows'
+
 
 
 def show_system_console(show):
@@ -668,6 +679,20 @@ def install_modules(self):
                     # "--user",
                 ]
             )
+            subprocess.check_call(
+                [
+                    pybin,
+                    "-m",
+                    "pip",
+                    "install",
+                    "-U",
+                    "xformers",
+                    "--index-url",
+                    "https://download.pytorch.org/whl/cu121",
+                    "--no-warn-script-location",
+                    # "--user",
+                ]
+            )
         else:
             import_module(self, "torch", "torch")
             import_module(self, "torchvision", "torchvision")
@@ -1024,36 +1049,6 @@ class GeneratorAddonPreferences(AddonPreferences):
         name="Video Model",
         items=[
             (
-                "guoyww/animatediff-motion-adapter-v1-5-2",
-                "AnimateDiff",
-                "AnimateDiff",
-            ),
-            # ("hotshotco/Hotshot-XL", "Hotshot-XL (512x512)", "Hotshot-XL (512x512)"),
-            ("strangeman3107/animov-0.1.1", "Animov (448x384)", "Animov (448x384)"),
-            ("strangeman3107/animov-512x", "Animov (512x512)", "Animov (512x512)"),
-#            (
-#                "stabilityai/stable-diffusion-xl-base-1.0",
-#                "Img2img SD XL 1.0 Refine (1024x1024)",
-#                "Stable Diffusion XL 1.0",
-#            ),
-            ("camenduru/potat1", "Potat v1 (1024x576)", "Potat (1024x576)"),
-            # ("VideoCrafter/Image2Video-512", "VideoCrafter v1 (512x512)", "VideoCrafter/Image2Video-512"),
-            (
-                "cerspense/zeroscope_v2_dark_30x448x256",
-                "Zeroscope (448x256x30)",
-                "Zeroscope (448x256x30)",
-            ),
-            (
-                "cerspense/zeroscope_v2_576w",
-                "Zeroscope (576x320x24)",
-                "Zeroscope (576x320x24)",
-            ),
-            (
-                "cerspense/zeroscope_v2_XL",
-                "Zeroscope XL (1024x576x24)",
-                "Zeroscope XL (1024x576x24)",
-            ),
-            (
                 "stabilityai/stable-video-diffusion-img2vid-xt",
                 "Stable Video Diffusion XT (576x1024x24) ",
                 "stabilityai/stable-video-diffusion-img2vid-xt",
@@ -1063,6 +1058,36 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Stable Video Diffusion (576x1024x14)",
                 "stabilityai/stable-video-diffusion-img2vid",
             ),
+#            (
+#                "stabilityai/stable-diffusion-xl-base-1.0",
+#                "Img2img SD XL 1.0 Refine (1024x1024)",
+#                "Stable Diffusion XL 1.0",
+#            ),
+            #("camenduru/potat1", "Potat v1 (1024x576)", "Potat (1024x576)"),
+            # ("VideoCrafter/Image2Video-512", "VideoCrafter v1 (512x512)", "VideoCrafter/Image2Video-512"),
+            (
+                "cerspense/zeroscope_v2_XL",
+                "Zeroscope XL (1024x576x24)",
+                "Zeroscope XL (1024x576x24)",
+            ),
+            (
+                "cerspense/zeroscope_v2_576w",
+                "Zeroscope (576x320x24)",
+                "Zeroscope (576x320x24)",
+            ),
+            (
+                "cerspense/zeroscope_v2_dark_30x448x256",
+                "Zeroscope (448x256x30)",
+                "Zeroscope (448x256x30)",
+            ),
+            (
+                "guoyww/animatediff-motion-adapter-v1-5-2",
+                "AnimateDiff",
+                "AnimateDiff",
+            ),
+            # ("hotshotco/Hotshot-XL", "Hotshot-XL (512x512)", "Hotshot-XL (512x512)"),
+            ("strangeman3107/animov-512x", "Animov (512x512)", "Animov (512x512)"),
+            ("strangeman3107/animov-0.1.1", "Animov (448x384)", "Animov (448x384)"),
         ],
         default="cerspense/zeroscope_v2_576w",
         update=input_strips_updated,
@@ -1071,6 +1096,43 @@ class GeneratorAddonPreferences(AddonPreferences):
     image_model_card: bpy.props.EnumProperty(
         name="Image Model",
         items=[
+            (
+                "stabilityai/stable-diffusion-xl-base-1.0",
+                "Stable Diffusion XL 1.0 (1024x1024)",
+                "stabilityai/stable-diffusion-xl-base-1.0",
+            ),
+            (
+                "stabilityai/sdxl-turbo",
+                "Stable Diffusion XL Turbo (512x512)",
+                "stabilityai/sdxl-turbo",
+            ),
+            (
+                "stabilityai/sd-turbo",
+                "Stable Diffusion Turbo (512x512)",
+                "stabilityai/sd-turbo",
+            ),
+            (
+                "stabilityai/stable-diffusion-2",
+                "Stable Diffusion 2 (768x768)",
+                "stabilityai/stable-diffusion-2",
+            ),
+            (
+                "runwayml/stable-diffusion-v1-5",
+                "Stable Diffusion 1.5 (512x512)",
+                "runwayml/stable-diffusion-v1-5",
+            ),
+            (
+                "segmind/SSD-1B",
+                "Segmind SSD-1B (1024x1024)",
+                "segmind/SSD-1B",
+            ),
+            (
+                "Lykon/dreamshaper-7",
+                "Dreamshaper LCM v7 (1024 x 1024)",
+                "Lykon/dreamshaper-7",
+            ),
+            # ("ptx0/terminus-xl-gamma-v1", "Terminus XL Gamma v1", "ptx0/terminus-xl-gamma-v1"),
+            ("warp-ai/wuerstchen", "Würstchen (1024x1024)", "warp-ai/wuerstchen"),
             (
                 "Salesforce/blipdiffusion",
                 "Blip Subject Driven (512x512)",
@@ -1081,12 +1143,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "ControlNet (512x512)",
                 "lllyasviel/sd-controlnet-canny",
             ),
-            ("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0"),
-            (
-                "Lykon/dreamshaper-7",
-                "Dreamshaper LCM v7 (1024 x 1024)",
-                "Lykon/dreamshaper-7",
-            ),
+            #("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0"),
             (
                 "monster-labs/control_v1p_sd15_qrcode_monster",
                 "Illusion (512x512)",
@@ -1102,33 +1159,6 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Scribble (512x512)",
                 "lllyasviel/control_v11p_sd15_scribble",
             ),
-            (
-                "segmind/SSD-1B",
-                "Segmind SSD-1B (1024x1024)",
-                "segmind/SSD-1B",
-            ),
-            (
-                "runwayml/stable-diffusion-v1-5",
-                "Stable Diffusion 1.5 (512x512)",
-                "runwayml/stable-diffusion-v1-5",
-            ),
-            (
-                "stabilityai/stable-diffusion-2",
-                "Stable Diffusion 2 (768x768)",
-                "stabilityai/stable-diffusion-2",
-            ),
-            (
-                "stabilityai/sdxl-turbo",
-                "Stable Diffusion Turbo (512x512)",
-                "stabilityai/sdxl-turbo",
-            ),
-            (
-                "stabilityai/stable-diffusion-xl-base-1.0",
-                "Stable Diffusion XL 1.0 (1024x1024)",
-                "stabilityai/stable-diffusion-xl-base-1.0",
-            ),
-            # ("ptx0/terminus-xl-gamma-v1", "Terminus XL Gamma v1", "ptx0/terminus-xl-gamma-v1"),
-            ("warp-ai/wuerstchen", "Würstchen (1024x1024)", "warp-ai/wuerstchen"),
         ],
         default="stabilityai/stable-diffusion-xl-base-1.0",
         update=input_strips_updated,
@@ -1142,6 +1172,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Music: MusicGen Stereo",
                 "facebook/musicgen-stereo-small",
             ),
+            ("bark", "Speech: Bark", "Bark"),
             (
                 "cvssp/audioldm2-music",
                 "Music: AudioLDM 2",
@@ -1152,10 +1183,9 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Sound: AudioLDM 2",
                 "Sound: AudioLDM 2",
             ),
-            ("bark", "Speech: Bark", "Bark"),
             # ("declare-lab/mustango", "Mustango", "declare-lab/mustango"),
         ],
-        default="bark",
+        default="facebook/musicgen-stereo-small",
         update=input_strips_updated,
     )
 
@@ -1788,6 +1818,9 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     or (
                         type == "image" and image_model_card == "stabilityai/sdxl-turbo"
                     )
+                    or (
+                        type == "image" and image_model_card == "stabilityai/sd-turbo"
+                    )
                 ):
                     pass
                 else:
@@ -2000,7 +2033,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 #                    # pipe.unet.enable_forward_chunking(chunk_size=1, dim=1) # Heavy
 #                    # pipe.enable_vae_slicing()
 #                else:
-#                    pipe.to("cuda")
+#                    pipe.to(gfx_device)
 #                from diffusers import StableDiffusionXLImg2ImgPipeline
 
 #                refiner = StableDiffusionXLImg2ImgPipeline.from_pretrained(
@@ -2016,7 +2049,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 #                    # refiner.enable_vae_tiling()
 #                    # refiner.enable_vae_slicing()
 #                else:
-#                    refiner.to("cuda")
+#                    refiner.to(gfx_device)
             if (
                 movie_model_card == "stabilityai/stable-video-diffusion-img2vid"
                 or movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt"
@@ -2031,7 +2064,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 if low_vram():
                     refiner.enable_model_cpu_offload()
                 else:
-                    refiner.to("cuda")
+                    refiner.to(gfx_device)
             else:  # vid2vid / img2vid
                 if (
                     movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256"
@@ -2063,7 +2096,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     # upscale.enable_vae_slicing()
                     #upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)  # heavy:
                 else:
-                    upscale.to("cuda")
+                    upscale.to(gfx_device)
         # Models for movie generation
         else:
             if movie_model_card == "guoyww/animatediff-motion-adapter-v1-5-2":
@@ -2095,7 +2128,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     pipe.enable_model_cpu_offload()
                     # pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)  # heavy:
                 else:
-                    upscale.to("cuda")
+                    upscale.to(gfx_device)
             elif movie_model_card == "VideoCrafter/Image2Video-512":
                 from diffusers import StableDiffusionPipeline
 
@@ -2114,7 +2147,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     pipe.enable_model_cpu_offload()
                     # pipe.enable_vae_slicing()
                 else:
-                    pipe.to("cuda")
+                    pipe.to(gfx_device)
             elif (
                 movie_model_card == "stabilityai/stable-video-diffusion-img2vid"
                 or movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt"
@@ -2140,7 +2173,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     pipe.enable_model_cpu_offload()
                     # pipe.enable_vae_slicing()
                 else:
-                    pipe.to("cuda")
+                    pipe.to(gfx_device)
             # Model for upscale generated movie
             if scene.video_to_video:
                 if torch.cuda.is_available():
@@ -2162,7 +2195,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     #upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)  # Heavy
                     # upscale.enable_vae_slicing()
                 else:
-                    upscale.to("cuda")
+                    upscale.to(gfx_device)
         if scene.use_freeU and pipe:  # Free Lunch
             # -------- freeu block registration
             print("Process: FreeU")
@@ -2536,7 +2569,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 pipe.enable_model_cpu_offload()
                 # pipe.enable_vae_slicing()
             else:
-                pipe.to("cuda")
+                pipe.to(gfx_device)
 
         # Musicgen
         elif addon_prefs.audio_model_card == "facebook/musicgen-stereo-small":
@@ -2874,7 +2907,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 "diffusers/stable-diffusion-xl-1.0-inpainting-0.1",
                 torch_dtype=torch.float16,
                 variant="fp16",
-            ).to("cuda")
+            ).to(gfx_device)
 
             # Set scheduler
             if scene.use_lcm:
@@ -2890,7 +2923,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 # torch.cuda.set_per_process_memory_fraction(0.99)
                 pipe.enable_model_cpu_offload()
             else:
-                pipe.to("cuda")
+                pipe.to(gfx_device)
 
         # Conversion img2img/vid2img.
         elif (
@@ -2927,7 +2960,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 # refiner.enable_vae_tiling()
                 # converter.enable_vae_slicing()
             else:
-                converter.to("cuda")
+                converter.to(gfx_device)
 
         # ControlNet & Illusion
         elif (
@@ -2968,7 +3001,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 pipe.enable_model_cpu_offload()
                 # pipe.enable_vae_slicing()
             else:
-                pipe.to("cuda")
+                pipe.to(gfx_device)
 
         # Blip
         elif image_model_card == "Salesforce/blipdiffusion":
@@ -2982,14 +3015,14 @@ class SEQUENCER_OT_generate_image(Operator):
 
                 pipe = BlipDiffusionPipeline.from_pretrained(
                     "Salesforce/blipdiffusion", torch_dtype=torch.float16
-                ).to("cuda")
+                ).to(gfx_device)
             else:
                 from controlnet_aux import CannyDetector
                 from diffusers.pipelines import BlipDiffusionControlNetPipeline
 
                 pipe = BlipDiffusionControlNetPipeline.from_pretrained(
                     "Salesforce/blipdiffusion-controlnet", torch_dtype=torch.float16
-                ).to("cuda")
+                ).to(gfx_device)
 
         # OpenPose
         elif image_model_card == "lllyasviel/sd-controlnet-openpose":
@@ -3034,7 +3067,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 pipe.enable_model_cpu_offload()
                 # pipe.enable_vae_slicing()
             else:
-                pipe.to("cuda")
+                pipe.to(gfx_device)
 
         # Scribble
         elif image_model_card == "lllyasviel/control_v11p_sd15_scribble":
@@ -3076,7 +3109,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 # pipe.enable_vae_slicing()
                 # pipe.enable_forward_chunking(chunk_size=1, dim=1)
             else:
-                pipe.to("cuda")
+                pipe.to(gfx_device)
 
         # Dreamshaper
         elif image_model_card == "Lykon/dreamshaper-7":
@@ -3114,7 +3147,7 @@ class SEQUENCER_OT_generate_image(Operator):
             if low_vram():
                 pipe.enable_model_cpu_offload()
             else:
-                pipe.to("cuda")
+                pipe.to(gfx_device)
 
         # DeepFloyd
         elif image_model_card == "DeepFloyd/IF-I-M-v1.0":
@@ -3135,7 +3168,7 @@ class SEQUENCER_OT_generate_image(Operator):
             if low_vram():
                 stage_1.enable_model_cpu_offload()
             else:
-                stage_1.to("cuda")
+                stage_1.to(gfx_device)
 
             # stage 2
             stage_2 = DiffusionPipeline.from_pretrained(
@@ -3147,7 +3180,7 @@ class SEQUENCER_OT_generate_image(Operator):
             if low_vram():
                 stage_2.enable_model_cpu_offload()
             else:
-                stage_2.to("cuda")
+                stage_2.to(gfx_device)
 
             # stage 3
             safety_modules = {
@@ -3163,7 +3196,7 @@ class SEQUENCER_OT_generate_image(Operator):
             if low_vram():
                 stage_3.enable_model_cpu_offload()
             else:
-                stage_3.to("cuda")
+                stage_3.to(gfx_device)
 
         # Stable diffusion etc.
         else:
@@ -3197,6 +3230,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     torch_dtype=torch.float16,
                     variant="fp16",
                 )
+
             if scene.use_lcm:
                 print("Use LCM: True")
                 from diffusers import LCMScheduler
@@ -3224,9 +3258,10 @@ class SEQUENCER_OT_generate_image(Operator):
             if low_vram():
                 # torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
                 pipe.enable_model_cpu_offload()
-                pipe.enable_vae_slicing()
+                #pipe.enable_vae_slicing()
             else:
-                pipe.to("cuda")
+                pipe.to(gfx_device)
+
             if scene.use_freeU and pipe:  # Free Lunch
                 # -------- freeu block registration
                 print("Process: FreeU")
@@ -3282,10 +3317,10 @@ class SEQUENCER_OT_generate_image(Operator):
 
             if low_vram():
                 refiner.enable_model_cpu_offload()
-                # refiner.enable_vae_tiling()
-                # refiner.enable_vae_slicing()
+                #refiner.enable_vae_tiling()
+                #refiner.enable_vae_slicing()
             else:
-                refiner.to("cuda")
+                refiner.to(gfx_device)
         #        # Allow longer prompts.
         #        if image_model_card == "runwayml/stable-diffusion-v1-5":
         #            if pipe:
@@ -3632,7 +3667,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     init_image = init_image.resize((x, y))
                 # init_image = load_image(scene.image_path).convert("RGB")
 
-                if image_model_card == "stabilityai/sdxl-turbo":
+                if image_model_card == "stabilityai/sdxl-turbo" or image_model_card == "stabilityai/sd-turbo":
                     image = converter(
                         prompt=prompt,
                         image=init_image,
@@ -3715,10 +3750,10 @@ class SEQUENCER_OT_generate_image(Operator):
                 image = refiner(
                     prompt=prompt,
                     image=image,
-                    strength=1.00 - scene.image_power,
+                    strength=max(1.00 - scene.image_power, 0.1),
                     negative_prompt=negative_prompt,
                     num_inference_steps=image_num_inference_steps,
-                    guidance_scale=image_num_guidance,
+                    guidance_scale=max(image_num_guidance, 1.1),
                     generator=generator,
                 ).images[0]
             # Move to folder
@@ -3841,7 +3876,7 @@ class SEQUENCER_OT_generate_text(Operator):
         )
         model = BlipForConditionalGeneration.from_pretrained(
             "Salesforce/blip-image-captioning-large", torch_dtype=torch.float16
-        ).to("cuda")
+        ).to(gfx_device)
 
         init_image = (
             load_first_frame(scene.movie_path)
@@ -3852,7 +3887,7 @@ class SEQUENCER_OT_generate_text(Operator):
 
         text = ""
         inputs = processor(init_image, text, return_tensors="pt").to(
-            "cuda", torch.float16
+            gfx_device, torch.float16
         )
 
         out = model.generate(**inputs, max_new_tokens=256)
