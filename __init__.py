@@ -1011,11 +1011,11 @@ class GeneratorAddonPreferences(AddonPreferences):
             # ("hotshotco/Hotshot-XL", "Hotshot-XL (512x512)", "Hotshot-XL (512x512)"),
             ("strangeman3107/animov-0.1.1", "Animov (448x384)", "Animov (448x384)"),
             ("strangeman3107/animov-512x", "Animov (512x512)", "Animov (512x512)"),
-            (
-                "stabilityai/stable-diffusion-xl-base-1.0",
-                "Img2img SD XL 1.0 Refine (1024x1024)",
-                "Stable Diffusion XL 1.0",
-            ),
+#            (
+#                "stabilityai/stable-diffusion-xl-base-1.0",
+#                "Img2img SD XL 1.0 Refine (1024x1024)",
+#                "Stable Diffusion XL 1.0",
+#            ),
             ("camenduru/potat1", "Potat v1 (1024x576)", "Potat (1024x576)"),
             # ("VideoCrafter/Image2Video-512", "VideoCrafter v1 (512x512)", "VideoCrafter/Image2Video-512"),
             (
@@ -1088,11 +1088,6 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "segmind/SSD-1B",
             ),
             (
-                "stabilityai/sdxl-turbo",
-                "SDXL Turbo (512x512)",
-                "stabilityai/sdxl-turbo",
-            ),
-            (
                 "runwayml/stable-diffusion-v1-5",
                 "Stable Diffusion 1.5 (512x512)",
                 "runwayml/stable-diffusion-v1-5",
@@ -1101,6 +1096,11 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "stabilityai/stable-diffusion-2",
                 "Stable Diffusion 2 (768x768)",
                 "stabilityai/stable-diffusion-2",
+            ),
+            (
+                "stabilityai/sdxl-turbo",
+                "Stable Diffusion Turbo (512x512)",
+                "stabilityai/sdxl-turbo",
             ),
             (
                 "stabilityai/stable-diffusion-xl-base-1.0",
@@ -1857,11 +1857,11 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             row = col.row(align=True)
             row.scale_y = 1.2
             if type == "movie":
-                if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
-                    row.operator(
-                        "sequencer.text_to_generator", text="Generate from Strips"
-                    )
-                else:
+#                if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+#                    row.operator(
+#                        "sequencer.text_to_generator", text="Generate from Strips"
+#                    )
+#                else:
                     row.operator("sequencer.generate_movie", text="Generate")
             if type == "image":
                 row.operator("sequencer.generate_image", text="Generate")
@@ -1952,52 +1952,52 @@ class SEQUENCER_OT_generate_movie(Operator):
             and input == "input_strips"
             and movie_model_card != "guoyww/animatediff-motion-adapter-v1-5-2"
         ):
+#            if (
+#                movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
+#            ):  # img2img
+#                from diffusers import StableDiffusionXLImg2ImgPipeline, AutoencoderKL
+
+#                vae = AutoencoderKL.from_pretrained(
+#                    "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
+#                )
+#                pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
+#                    movie_model_card,
+#                    torch_dtype=torch.float16,
+#                    variant="fp16",
+#                    vae=vae,
+#                )
+
+#                from diffusers import DPMSolverMultistepScheduler
+
+#                pipe.scheduler = DPMSolverMultistepScheduler.from_config(
+#                    pipe.scheduler.config
+#                )
+
+#                pipe.watermark = NoWatermark()
+
+#                if low_vram():
+#                    pipe.enable_model_cpu_offload()
+#                    # pipe.unet.enable_forward_chunking(chunk_size=1, dim=1) # Heavy
+#                    # pipe.enable_vae_slicing()
+#                else:
+#                    pipe.to("cuda")
+#                from diffusers import StableDiffusionXLImg2ImgPipeline
+
+#                refiner = StableDiffusionXLImg2ImgPipeline.from_pretrained(
+#                    "stabilityai/stable-diffusion-xl-refiner-1.0",
+#                    text_encoder_2=pipe.text_encoder_2,
+#                    vae=pipe.vae,
+#                    torch_dtype=torch.float16,
+#                    variant="fp16",
+#                )
+
+#                if low_vram():
+#                    refiner.enable_model_cpu_offload()
+#                    # refiner.enable_vae_tiling()
+#                    # refiner.enable_vae_slicing()
+#                else:
+#                    refiner.to("cuda")
             if (
-                movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
-            ):  # img2img
-                from diffusers import StableDiffusionXLImg2ImgPipeline, AutoencoderKL
-
-                vae = AutoencoderKL.from_pretrained(
-                    "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
-                )
-                pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
-                    movie_model_card,
-                    torch_dtype=torch.float16,
-                    variant="fp16",
-                    vae=vae,
-                )
-
-                from diffusers import DPMSolverMultistepScheduler
-
-                pipe.scheduler = DPMSolverMultistepScheduler.from_config(
-                    pipe.scheduler.config
-                )
-
-                pipe.watermark = NoWatermark()
-
-                if low_vram():
-                    pipe.enable_model_cpu_offload()
-                    # pipe.unet.enable_forward_chunking(chunk_size=1, dim=1) # Heavy
-                    # pipe.enable_vae_slicing()
-                else:
-                    pipe.to("cuda")
-                from diffusers import StableDiffusionXLImg2ImgPipeline
-
-                refiner = StableDiffusionXLImg2ImgPipeline.from_pretrained(
-                    "stabilityai/stable-diffusion-xl-refiner-1.0",
-                    text_encoder_2=pipe.text_encoder_2,
-                    vae=pipe.vae,
-                    torch_dtype=torch.float16,
-                    variant="fp16",
-                )
-
-                if low_vram():
-                    refiner.enable_model_cpu_offload()
-                    # refiner.enable_vae_tiling()
-                    # refiner.enable_vae_slicing()
-                else:
-                    refiner.to("cuda")
-            elif (
                 movie_model_card == "stabilityai/stable-video-diffusion-img2vid"
                 or movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt"
             ):
@@ -2201,44 +2201,45 @@ class SEQUENCER_OT_generate_movie(Operator):
             ):
                 video_path = scene.movie_path
 
-                # img2img
-                if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
-                    print("Process: Frame by frame (SD XL)")
+#                # img2img
+#                if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+#                    print("Process: Frame by frame (SD XL)")
 
-                    input_video_path = video_path
-                    output_video_path = solve_path("temp_images")
+#                    input_video_path = video_path
+#                    output_video_path = solve_path("temp_images")
 
-                    if scene.movie_path:
-                        frames = process_video(input_video_path, output_video_path)
-                    elif scene.image_path:
-                        frames = process_image(
-                            scene.image_path, int(scene.generate_movie_frames)
-                        )
-                    video_frames = []
+#                    if scene.movie_path:
+#                        frames = process_video(input_video_path, output_video_path)
+#                    elif scene.image_path:
+#                        frames = process_image(
+#                            scene.image_path, int(scene.generate_movie_frames)
+#                        )
+#                    video_frames = []
 
-                    # Iterate through the frames
-                    for frame_idx, frame in enumerate(
-                        frames
-                    ):  # would love to get this flicker free
-                        print(str(frame_idx + 1) + "/" + str(len(frames)))
-                        image = refiner(
-                            prompt,
-                            negative_prompt=negative_prompt,
-                            num_inference_steps=movie_num_inference_steps,
-                            strength=1.00 - scene.image_power,
-                            guidance_scale=movie_num_guidance,
-                            image=frame,
-                            generator=generator,
-                        ).images[0]
+#                    # Iterate through the frames
+#                    for frame_idx, frame in enumerate(
+#                        frames
+#                    ):  # would love to get this flicker free
+#                        print(str(frame_idx + 1) + "/" + str(len(frames)))
+#                        image = refiner(
+#                            prompt,
+#                            negative_prompt=negative_prompt,
+#                            num_inference_steps=movie_num_inference_steps,
+#                            strength=1.00 - scene.image_power,
+#                            guidance_scale=movie_num_guidance,
+#                            image=frame,
+#                            generator=generator,
+#                        ).images[0]
 
-                        video_frames.append(image)
+#                        video_frames.append(image)
 
-                        if torch.cuda.is_available():
-                            torch.cuda.empty_cache()
-                    video_frames = np.array(video_frames)
+#                        if torch.cuda.is_available():
+#                            torch.cuda.empty_cache()
+#                    video_frames = np.array(video_frames)
+
                 # vid2vid / img2vid
 
-                elif (
+                if (
                     movie_model_card == "stabilityai/stable-video-diffusion-img2vid"
                     or movie_model_card
                     == "stabilityai/stable-video-diffusion-img2vid-xt"
@@ -4230,7 +4231,7 @@ def register():
     bpy.types.Scene.movie_num_inference_steps = bpy.props.IntProperty(
         name="movie_num_inference_steps",
         default=25,
-        min=2,
+        min=1,
         max=100,
     )
     # The number of videos to generate.
@@ -4414,9 +4415,9 @@ def register():
     # SVD motion_bucket_id
     bpy.types.Scene.svd_motion_bucket_id = bpy.props.IntProperty(
         name="svd_motion_bucket_id",
-        default=127,
+        default=30,
         min=1,
-        max=255,
+        max=512,
     )
 
     for cls in classes:
