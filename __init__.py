@@ -937,6 +937,16 @@ def input_strips_updated(self, context):
         bpy.ops.lora.refresh_files()
     if type == "text":
         scene.input_strips = "input_strips"
+    if (
+        type == "movie"
+        and movie_model_card
+        == "stabilityai/stable-video-diffusion-img2vid"
+    ) or (
+        type == "movie"
+        and movie_model_card
+        == "stabilityai/stable-video-diffusion-img2vid-xt"
+    ):
+        scene.input_strips = "input_strips"
 
 
 def output_strips_updated(self, context):
@@ -966,6 +976,16 @@ def output_strips_updated(self, context):
     ) and type == "image":
         scene.input_strips = "input_strips"
     if type == "text":
+        scene.input_strips = "input_strips"
+    if (
+        type == "movie"
+        and movie_model_card
+        == "stabilityai/stable-video-diffusion-img2vid"
+    ) or (
+        type == "movie"
+        and movie_model_card
+        == "stabilityai/stable-video-diffusion-img2vid-xt"
+    ):
         scene.input_strips = "input_strips"
 
 
@@ -2041,7 +2061,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     upscale.enable_model_cpu_offload()
                     # upscale.enable_vae_tiling()
                     # upscale.enable_vae_slicing()
-                    upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)  # heavy:
+                    #upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)  # heavy:
                 else:
                     upscale.to("cuda")
         # Models for movie generation
@@ -2139,7 +2159,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 if low_vram():
                     upscale.enable_model_cpu_offload()
-                    upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)  # Heavy
+                    #upscale.unet.enable_forward_chunking(chunk_size=1, dim=1)  # Heavy
                     # upscale.enable_vae_slicing()
                 else:
                     upscale.to("cuda")
@@ -2491,7 +2511,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 "Dependencies needs to be installed in the add-on preferences.",
             )
             return {"CANCELLED"}
-        
+
         show_system_console(True)
         set_system_console_topmost(True)
 
@@ -2517,7 +2537,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 # pipe.enable_vae_slicing()
             else:
                 pipe.to("cuda")
-                
+
         # Musicgen
         elif addon_prefs.audio_model_card == "facebook/musicgen-stereo-small":
             from transformers import pipeline
@@ -2531,7 +2551,7 @@ class SEQUENCER_OT_generate_audio(Operator):
             )
             if int(audio_length_in_s * 50) > 1503:
                 self.report({"INFO"}, "Maximum output duration is 30 sec.")
-                
+
         # Bark
         elif addon_prefs.audio_model_card == "bark":
             preload_models(
@@ -2540,7 +2560,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 fine_use_gpu=True,
                 fine_use_small=True,
             )
-            
+
         # Mustango
         elif addon_prefs.audio_model_card == "declare-lab/mustango":
             import IPython
@@ -2553,13 +2573,13 @@ class SEQUENCER_OT_generate_audio(Operator):
             model = DiffusionPipeline.from_pretrained(
                 "declare-lab/mustango"
             )  # , device="cuda:0", torch_dtype=torch.float16)
-            
+
         # Deadend
         else:
             print("Audio model not found.")
             self.report({"INFO"}, "Audio model not found.")
             return {"CANCELLED"}
-        
+
         # Main loop
         for i in range(scene.movie_num_batch):
             if i > 0:
@@ -2610,7 +2630,7 @@ class SEQUENCER_OT_generate_audio(Operator):
 
                 # Write the combined audio to a file
                 write_wav(filename, rate, audio.transpose())
-                
+
             # Musicgen
             elif addon_prefs.audio_model_card == "facebook/musicgen-stereo-small":
                 print("Generate: MusicGen Stereo")
@@ -2837,7 +2857,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     "None of the selected strips are movie, image, text or scene types.",
                 )
                 return {"CANCELLED"}
-            
+
         # LOADING MODELS
 
         # models for inpaint
@@ -2871,7 +2891,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 pipe.enable_model_cpu_offload()
             else:
                 pipe.to("cuda")
-                
+
         # Conversion img2img/vid2img.
         elif (
             do_convert
@@ -2908,7 +2928,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 # converter.enable_vae_slicing()
             else:
                 converter.to("cuda")
-                
+
         # ControlNet & Illusion
         elif (
             image_model_card == "lllyasviel/sd-controlnet-canny"
@@ -2949,7 +2969,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 # pipe.enable_vae_slicing()
             else:
                 pipe.to("cuda")
-                
+
         # Blip
         elif image_model_card == "Salesforce/blipdiffusion":
             print("Load: Blip Model")
@@ -2970,7 +2990,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 pipe = BlipDiffusionControlNetPipeline.from_pretrained(
                     "Salesforce/blipdiffusion-controlnet", torch_dtype=torch.float16
                 ).to("cuda")
-                
+
         # OpenPose
         elif image_model_card == "lllyasviel/sd-controlnet-openpose":
             print("Load: OpenPose Model")
@@ -3015,7 +3035,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 # pipe.enable_vae_slicing()
             else:
                 pipe.to("cuda")
-                
+
         # Scribble
         elif image_model_card == "lllyasviel/control_v11p_sd15_scribble":
             print("Load: Scribble Model")
@@ -3057,7 +3077,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 # pipe.enable_forward_chunking(chunk_size=1, dim=1)
             else:
                 pipe.to("cuda")
-                
+
         # Dreamshaper
         elif image_model_card == "Lykon/dreamshaper-7":
             if do_convert:
@@ -3072,7 +3092,7 @@ class SEQUENCER_OT_generate_image(Operator):
             )  # , custom_pipeline="latent_consistency_txt2img"
 
             pipe.to(torch_device="cuda", torch_dtype=torch.float16)
-            
+
         # Wuerstchen
         elif image_model_card == "warp-ai/wuerstchen":
             print("Load: Würstchen Model")
@@ -3095,7 +3115,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 pipe.enable_model_cpu_offload()
             else:
                 pipe.to("cuda")
-                
+
         # DeepFloyd
         elif image_model_card == "DeepFloyd/IF-I-M-v1.0":
             print("Load: DeepFloyd Model")
@@ -3116,7 +3136,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 stage_1.enable_model_cpu_offload()
             else:
                 stage_1.to("cuda")
-                
+
             # stage 2
             stage_2 = DiffusionPipeline.from_pretrained(
                 "DeepFloyd/IF-II-M-v1.0",
@@ -3128,7 +3148,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 stage_2.enable_model_cpu_offload()
             else:
                 stage_2.to("cuda")
-                
+
             # stage 3
             safety_modules = {
                 "feature_extractor": stage_1.feature_extractor,
@@ -3239,6 +3259,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         )
                     pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)
                     print("Load LoRAs: " + " ".join(enabled_names))
+
         # load refiner model if chosen.
         if do_refine:
             print(
