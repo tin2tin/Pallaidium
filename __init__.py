@@ -729,6 +729,7 @@ def install_modules(self):
     import_module(self, "PIL", "pillow")
     import_module(self, "scipy", "scipy")
     import_module(self, "IPython", "IPython")
+    import_module(self, "omegaconf", "omegaconf")
     # import_module(self, "mustango", "mustango")
     # import_module(self, "mustango", "git+https://github.com/AMAAI-Lab/mustango.git")
     # subprocess.check_call([pybin, "-m", "pip", "install", "mediapipe", "--upgrade"])
@@ -1063,6 +1064,11 @@ class GeneratorAddonPreferences(AddonPreferences):
 #                "Img2img SD XL 1.0 Refine (1024x1024)",
 #                "Stable Diffusion XL 1.0",
 #            ),
+#            (
+#                "stabilityai/sd-turbo",
+#                "Img2img SD Turbo (512x512)",
+#                "stabilityai/sd-turbo",
+#            ),
             #("camenduru/potat1", "Potat v1 (1024x576)", "Potat (1024x576)"),
             # ("VideoCrafter/Image2Video-512", "VideoCrafter v1 (512x512)", "VideoCrafter/Image2Video-512"),
             (
@@ -1133,6 +1139,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             ),
             # ("ptx0/terminus-xl-gamma-v1", "Terminus XL Gamma v1", "ptx0/terminus-xl-gamma-v1"),
             ("warp-ai/wuerstchen", "Würstchen (1024x1024)", "warp-ai/wuerstchen"),
+            ("playgroundai/playground-v2-1024px-aesthetic", "Playground v2 (1024x1024)", "playgroundai/playground-v2-1024px-aesthetic"),
             (
                 "Salesforce/blipdiffusion",
                 "Blip Subject Driven (512x512)",
@@ -1815,12 +1822,6 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         and movie_model_card
                         == "stabilityai/stable-video-diffusion-img2vid-xt"
                     )
-                    or (
-                        type == "image" and image_model_card == "stabilityai/sdxl-turbo"
-                    )
-                    or (
-                        type == "image" and image_model_card == "stabilityai/sd-turbo"
-                    )
                 ):
                     pass
                 else:
@@ -1915,6 +1916,11 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
 #                        "sequencer.text_to_generator", text="Generate from Strips"
 #                    )
 #                else:
+                if movie_model_card == "stabilityai/sd-turbo":
+                    row.operator(
+                        "sequencer.text_to_generator", text="Generate from Strips"
+                    )
+                else:
                     row.operator("sequencer.generate_movie", text="Generate")
             if type == "image":
                 row.operator("sequencer.generate_image", text="Generate")
@@ -2005,6 +2011,65 @@ class SEQUENCER_OT_generate_movie(Operator):
             and input == "input_strips"
             and movie_model_card != "guoyww/animatediff-motion-adapter-v1-5-2"
         ):
+
+            if (
+                movie_model_card == "stabilityai/sd-turbo"
+            ):  # img2img
+#                from diffusers import StableDiffusionXLImg2ImgPipeline, AutoencoderKL
+
+#                vae = AutoencoderKL.from_pretrained(
+#                    "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
+#                )
+                from diffusers import AutoPipelineForImage2Image
+                #from diffusers.utils import load_image
+
+                pipe = AutoPipelineForImage2Image.from_pretrained("stabilityai/sd-turbo", torch_dtype=torch.float16, variant="fp16")
+                #pipe.to("cuda")
+
+#init_image = load_image("https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/diffusers/cat.png").resize((512, 512))
+#prompt = "cat wizard, gandalf, lord of the rings, detailed, fantasy, cute, adorable, Pixar, Disney, 8k"
+
+#image = pipe(prompt, image=init_image, num_inference_steps=2, strength=0.5, guidance_scale=0.0).images[0]
+
+
+#                pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
+#                    movie_model_card,
+#                    torch_dtype=torch.float16,
+#                    variant="fp16",
+#                    vae=vae,
+#                )
+
+#                from diffusers import DPMSolverMultistepScheduler
+
+#                pipe.scheduler = DPMSolverMultistepScheduler.from_config(
+#                    pipe.scheduler.config
+#                )
+
+#                pipe.watermark = NoWatermark()
+
+                if low_vram():
+                    pipe.enable_model_cpu_offload()
+                    # pipe.unet.enable_forward_chunking(chunk_size=1, dim=1) # Heavy
+                    # pipe.enable_vae_slicing()
+                else:
+                    pipe.to(gfx_device)
+#                from diffusers import StableDiffusionXLImg2ImgPipeline
+
+#                refiner = StableDiffusionXLImg2ImgPipeline.from_pretrained(
+#                    "stabilityai/stable-diffusion-xl-refiner-1.0",
+#                    text_encoder_2=pipe.text_encoder_2,
+#                    vae=pipe.vae,
+#                    torch_dtype=torch.float16,
+#                    variant="fp16",
+#                )
+
+#                if low_vram():
+#                    refiner.enable_model_cpu_offload()
+#                    # refiner.enable_vae_tiling()
+#                    # refiner.enable_vae_slicing()
+#                else:
+#                    refiner.to(gfx_device)
+
 #            if (
 #                movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
 #            ):  # img2img
@@ -2050,7 +2115,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 #                    # refiner.enable_vae_slicing()
 #                else:
 #                    refiner.to(gfx_device)
-            if (
+            elif (
                 movie_model_card == "stabilityai/stable-video-diffusion-img2vid"
                 or movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt"
             ):
@@ -2290,9 +2355,44 @@ class SEQUENCER_OT_generate_movie(Operator):
 #                            torch.cuda.empty_cache()
 #                    video_frames = np.array(video_frames)
 
+
+                # img2img
+                if movie_model_card == "stabilityai/sd-turbo":
+                    print("Process: Frame by frame (SD Turbo)")
+
+                    input_video_path = video_path
+                    output_video_path = solve_path("temp_images")
+
+                    if scene.movie_path:
+                        frames = process_video(input_video_path, output_video_path)
+                    elif scene.image_path:
+                        frames = process_image(
+                            scene.image_path, int(scene.generate_movie_frames)
+                        )
+                    video_frames = []
+
+                    # Iterate through the frames
+                    for frame_idx, frame in enumerate(frames):  # would love to get this flicker free
+                        print(str(frame_idx + 1) + "/" + str(len(frames)))
+                        image = pipe(
+                            prompt,
+                            negative_prompt=negative_prompt,
+                            num_inference_steps=2, #movie_num_inference_steps,
+                            strength=0.5,#scene.image_power,
+                            guidance_scale=3.0,
+                            image=frame,
+                            generator=generator,
+                        ).images[0]
+
+                        video_frames.append(image)
+
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+                    video_frames = np.array(video_frames)
+
                 # vid2vid / img2vid
 
-                if (
+                elif (
                     movie_model_card == "stabilityai/stable-video-diffusion-img2vid"
                     or movie_model_card
                     == "stabilityai/stable-video-diffusion-img2vid-xt"
@@ -4007,7 +4107,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
             self.report({"INFO"}, "Select strip(s) for processing.")
             return {"CANCELLED"}
         else:
-            print("\nStrip input processing started (ctrl+c to cancel).")
+            print("\nStrip input processing started (Ctrl+C to Cancel).")
         for strip in strips:
             if strip.type in {"MOVIE", "IMAGE", "TEXT", "SCENE"}:
                 break
