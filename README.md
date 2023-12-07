@@ -28,7 +28,7 @@ AI-generate video, image, and audio from text prompts or video, image, or text s
 ![image](https://github.com/tin2tin/Pallaidium/assets/1322593/09bba394-3188-49be-8ae1-37c0c43ec2fd)
 
 ## Requirements
-* Windows (Could maybe work on Linux or MacOS, but someone will have to contribute code to make it work).
+* Windows (Unsupported: Linux and MacOS).
 * A CUDA-supported Nvidia card with at least 4 GB VRAM.
   
 
