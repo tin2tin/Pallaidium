@@ -30,6 +30,7 @@ AI-generate video, image, and audio from text prompts or video, image, or text s
 ## Requirements
 * Windows (Unsupported: Linux and MacOS).
 * A CUDA-supported Nvidia card with at least 4 GB VRAM.
+* 20+ GB HDD. (each model is 6+ GB)
   
 
 ## How to install
