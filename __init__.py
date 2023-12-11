@@ -973,6 +973,11 @@ def input_strips_updated(self, context):
         == "stabilityai/stable-video-diffusion-img2vid-xt"
     ):
         scene.input_strips = "input_strips"
+    if (
+        movie_model_card == "guoyww/animatediff-motion-adapter-v1-5-2"
+        and type == "movie"
+    ):
+        scene.input_strips = "input_prompt"
 
 
 def output_strips_updated(self, context):
@@ -1013,6 +1018,11 @@ def output_strips_updated(self, context):
         == "stabilityai/stable-video-diffusion-img2vid-xt"
     ):
         scene.input_strips = "input_strips"
+    if (
+        movie_model_card == "guoyww/animatediff-motion-adapter-v1-5-2"
+        and type == "movie"
+    ):
+        scene.input_strips = "input_prompt"
 
 
 class GeneratorAddonPreferences(AddonPreferences):
@@ -1139,6 +1149,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             ),
             # ("ptx0/terminus-xl-gamma-v1", "Terminus XL Gamma v1", "ptx0/terminus-xl-gamma-v1"),
             ("warp-ai/wuerstchen", "Würstchen (1024x1024)", "warp-ai/wuerstchen"),
+            #("lrzjason/playground-v2-1024px-aesthetic-fp16", "Playground v2 (1024x1024)", "lrzjason/playground-v2-1024px-aesthetic-fp16"),
             ("playgroundai/playground-v2-1024px-aesthetic", "Playground v2 (1024x1024)", "playgroundai/playground-v2-1024px-aesthetic"),
             (
                 "Salesforce/blipdiffusion",
@@ -2176,24 +2187,28 @@ class SEQUENCER_OT_generate_movie(Operator):
                 # load SD 1.5 based finetuned model
                 # model_id = "runwayml/stable-diffusion-v1-5"
                 model_id = "SG161222/Realistic_Vision_V5.1_noVAE"
+                #model_id = "pagebrain/majicmix-realistic-v7"
                 pipe = AnimateDiffPipeline.from_pretrained(
                     model_id, motion_adapter=adapter, torch_dtype=torch.float16
                 )
                 scheduler = DDIMScheduler.from_pretrained(
                     model_id,
                     subfolder="scheduler",
+                    beta_schedule="linear",
                     clip_sample=False,
                     timestep_spacing="linspace",
                     steps_offset=1,
                 )
+
                 pipe.scheduler = scheduler
 
                 if low_vram():
-                    pipe.enable_vae_slicing()
                     pipe.enable_model_cpu_offload()
+                    pipe.enable_vae_slicing()
                     # pipe.unet.enable_forward_chunking(chunk_size=1, dim=1)  # heavy:
                 else:
-                    upscale.to(gfx_device)
+                    pipe.to(gfx_device)
+
             elif movie_model_card == "VideoCrafter/Image2Video-512":
                 from diffusers import StableDiffusionPipeline
 
@@ -4503,10 +4518,10 @@ def register():
 
     bpy.types.Scene.input_strips = bpy.props.EnumProperty(
         items=[
-            ("generate", "No Input", "No Input"),
+            ("input_prompt", "Prompts", "Prompts"),
             ("input_strips", "Strips", "Selected Strips"),
         ],
-        default="generate",
+        default="input_prompt",
         update=input_strips_updated,
     )
 
