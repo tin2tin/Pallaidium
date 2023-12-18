@@ -662,7 +662,7 @@ def install_modules(self):
         exec("import torch")
     except ModuleNotFoundError:
         subprocess.call([pybin, "-m", "pip", "install", "lmdb"])
-        
+
         self.report({"INFO"}, "Installing: torch module.")
         print("Installing: torch module")
         if os_platform == "Windows":
@@ -758,7 +758,7 @@ def install_modules(self):
     import_module(self, "protobuf", "protobuf")
 
     if os_platform == "Windows":
-        # resemble_enhance    
+        # resemble_enhance
         try:
             exec("from resemble_enhance.enhancer.inference import denoise, enhance")
         except ModuleNotFoundError:
@@ -777,7 +777,7 @@ def install_modules(self):
             import_module(self, "gradio", "gradio==4.8.0")
     else:
         import_module(self, "resemble_enhance", "resemble-enhance")
-            
+
 
     try:
         exec("import bark")
@@ -947,7 +947,7 @@ class GENERATOR_OT_uninstall(Operator):
         uninstall_module_with_dependencies("protobuf")
         uninstall_module_with_dependencies("resemble_enhance")
         # uninstall_module_with_dependencies("mediapipe")
-        
+
         # "resemble-enhance":
         uninstall_module_with_dependencies("celluloid")
         uninstall_module_with_dependencies("omegaconf")
@@ -957,7 +957,7 @@ class GENERATOR_OT_uninstall(Operator):
         uninstall_module_with_dependencies("resampy")
         uninstall_module_with_dependencies("tabulate")
         uninstall_module_with_dependencies("gradio")
-        
+
         self.report(
             {"INFO"},
             "\nRemove AI Models manually: \nLinux and macOS: ~/.cache/huggingface/hub\nWindows: %userprofile%.cache\\huggingface\\hub",
@@ -1009,6 +1009,10 @@ def input_strips_updated(self, context):
         and type == "movie"
     ):
         scene.input_strips = "input_prompt"
+
+    if scene.input_strips == "input_prompt":
+        bpy.types.Scene.movie_path = ""
+        bpy.types.Scene.image_path = ""
 
 
 def output_strips_updated(self, context):
@@ -2639,7 +2643,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 filename = solve_path(clean_filename(prompt) + ".wav")
                 # Write the combined audio to a file
                 write_wav(filename, rate, audio.transpose())
-                
+
                 # resemble_enhance
                 dwav, sr = torchaudio.load(filename)
                 print("sr_load " + str(sr))
