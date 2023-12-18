@@ -41,7 +41,6 @@ import shutil
 from datetime import date
 import pathlib
 temp = pathlib.PosixPath
-pathlib.PosixPath = pathlib.WindowsPath
 
 try:
     exec("import torch")
@@ -57,7 +56,8 @@ except ModuleNotFoundError:
     )
 
 os_platform = platform.system()  # 'Linux', 'Darwin', 'Java', 'Windows'
-
+if os_platform == "Windows":
+    pathlib.PosixPath = pathlib.WindowsPath
 
 def show_system_console(show):
     if os_platform == "Windows":
