@@ -775,8 +775,8 @@ def install_modules(self):
             import_module(self, "resampy", "resampy")
             import_module(self, "tabulate", "tabulate")
             import_module(self, "gradio", "gradio==4.8.0")
-        else:
-            import_module(self, "resemble_enhance", "resemble-enhance")
+    else:
+        import_module(self, "resemble_enhance", "resemble-enhance")
             
 
     try:
