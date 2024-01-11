@@ -40,7 +40,9 @@ from os.path import dirname, realpath, isdir, join, basename
 import shutil
 from datetime import date
 import pathlib
+import gc
 temp = pathlib.PosixPath
+pathlib.PosixPath = pathlib.WindowsPath
 
 try:
     exec("import torch")
@@ -52,12 +54,13 @@ try:
         gfx_device = "cpu"
 except ModuleNotFoundError:
     print(
-        "Pallaidium dependencies needs to be installed and then Blender needs to be restarted."
+        "Pallaidium dependencies needs to be installed and Blender needs to be restarted."
     )
 
 os_platform = platform.system()  # 'Linux', 'Darwin', 'Java', 'Windows'
 if os_platform == "Windows":
     pathlib.PosixPath = pathlib.WindowsPath
+
 
 def show_system_console(show):
     if os_platform == "Windows":
@@ -200,7 +203,7 @@ def style_prompt(prompt):
             if selected_entry:
                 selected_entry_list = list(selected_entry)
                 return_array.append(selected_entry_list[2].replace("{prompt}", prompt))
-                return_array.append(selected_entry_list[0].replace("_", " "))
+                return_array.append(bpy.context.scene.generate_movie_negative_prompt+", "+selected_entry_list[0].replace("_", " "))
                 return return_array
     return_array.append(prompt)
     return_array.append(bpy.context.scene.generate_movie_negative_prompt)
@@ -518,6 +521,12 @@ def low_vram():
     return (total_vram / (1024**3)) < 6.1  # Y/N under 6.1 GB?
 
 
+def clear_cuda_cache():
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    gc.collect()
+
+
 def isWindows():
     return os.name == "nt"
 
@@ -724,29 +733,36 @@ def install_modules(self):
             import_module(self, "torchvision", "torchvision")
             import_module(self, "torchaudio", "torchaudio")
 
-    try:
-        exec("import xformers")
-    except ModuleNotFoundError:
+#    try:
+#        exec("import xformers")
+#    except ModuleNotFoundError:
+    if os_platform == "Windows":
         subprocess.check_call(
             [
                 pybin,
                 "-m",
                 "pip",
                 "install",
-                "xformers==0.0.22.post4",
+                "xformers",
+                #"xformers==0.0.22.post4",
                 "--index-url",
-                "https://download.pytorch.org/whl/cu118",
+                "https://download.pytorch.org/whl/cu121",
+                #"https://download.pytorch.org/whl/cu118",
                 "--no-warn-script-location",
                 "--user",
             ]
         )
+    else:
+        import_module(self, "xformers", "xformers")
+
     import_module(self, "huggingface_hub", "huggingface_hub")
     import_module(self, "accelerate", "git+https://github.com/huggingface/accelerate.git")
     import_module(self, "transformers", "git+https://github.com/huggingface/transformers.git")
     import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
     import_module(self, "diffusers", "diffusers")
+    subprocess.check_call([pybin, "-m", "pip", "install", "tensorflow"])
     # import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git@v0.22.3")
-    import_module(self, "tensorflow", "tensorflow")
+    #import_module(self, "tensorflow", "tensorflow")
     import_module(self, "soundfile", "PySoundFile")
     import_module(self, "sentencepiece", "sentencepiece")
     import_module(self, "safetensors", "safetensors")
@@ -757,26 +773,29 @@ def install_modules(self):
     import_module(self, "omegaconf", "omegaconf")
     import_module(self, "protobuf", "protobuf")
 
-    if os_platform == "Windows":
-        # resemble_enhance
-        try:
-            exec("from resemble_enhance.enhancer.inference import denoise, enhance")
-        except ModuleNotFoundError:
-            subprocess.call([pybin, "-m", "pip", "install", "resemble-enhance", "--no-dependencies"])
-            deep_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),"deepspeed/deepspeed-0.12.4+unknown-py3-none-any.whl")
-            import_module(self, "deepspeed", deep_path)
+#    if os_platform == "Windows":
+#        # resemble_enhance
+#        #import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
+##        subprocess.call([pybin, "-m", "pip", "install", "resemble-enhance", "--no-dependencies"])
+##        try:
+##            exec("resemble_enhance")
+##            #exec("from resemble_enhance.enhancer.inference import denoise, enhance")
+##        except ModuleNotFoundError:
+#        subprocess.call([pybin, "-m", "pip", "install", "resemble-enhance", "--no-dependencies", "--upgrade"])
+#        deep_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),"deepspeed/deepspeed-0.12.4+unknown-py3-none-any.whl")
+#        import_module(self, "deepspeed", deep_path)
 
-            # import_module(self, "resemble_enhance", "resemble-enhance")  "pip --no-dependencies"
-            import_module(self, "celluloid", "celluloid")
-            import_module(self, "omegaconf", "omegaconf")
-            import_module(self, "pandas", "pandas")
-            import_module(self, "ptflops", "ptflops")
-            import_module(self, "rich", "rich")
-            import_module(self, "resampy", "resampy")
-            import_module(self, "tabulate", "tabulate")
-            import_module(self, "gradio", "gradio==4.8.0")
-    else:
-        import_module(self, "resemble_enhance", "resemble-enhance")
+#        # import_module(self, "resemble_enhance", "resemble-enhance")  "pip --no-dependencies"
+#        import_module(self, "celluloid", "celluloid")
+#        import_module(self, "omegaconf", "omegaconf")
+#        import_module(self, "pandas", "pandas")
+#        import_module(self, "ptflops", "ptflops")
+#        import_module(self, "rich", "rich")
+#        import_module(self, "resampy", "resampy")
+#        import_module(self, "tabulate", "tabulate")
+#        import_module(self, "gradio", "gradio==4.8.0")
+#    else:
+#        import_module(self, "resemble_enhance", "resemble-enhance")
 
 
     try:
@@ -799,39 +818,21 @@ def install_modules(self):
     import_module(self, "imageio", "imageio")
     import_module(self, "imwatermark", "invisible-watermark>=0.2.0")
     if os_platform == "Windows":
-
-#        try:
-#            exec("import libtorrent")
-#        except ModuleNotFoundError:
-#            subprocess.check_call(
-#                [
-#                    pybin,
-#                    "-m",
-#                    "pip",
-#                    "install",
-#                    "libtorrent",
-#                    "--no-warn-script-location",
-#                    "--user",
-#                    #'-t', target,
-#                ]
-#            )
-        try:
-            exec("import triton")
-        except ModuleNotFoundError:
-            subprocess.check_call(
-                [
-                    pybin,
-                    "-m",
-                    "pip",
-                    "install",
-                    # "triton",
-                    # "--index-url",
-                    "https://huggingface.co/r4ziel/xformers_pre_built/resolve/main/triton-2.0.0-cp310-cp310-win_amd64.whl",
-                    "--no-warn-script-location",
-                    "--user",
-                    #'-t', target,
-                ]
-            )
+        pass
+#        subprocess.check_call(
+#            [
+#                pybin,
+#                "-m",
+#                "pip",
+#                "install",
+#                # "triton",
+#                # "--index-url",
+#                "https://huggingface.co/r4ziel/xformers_pre_built/resolve/main/triton-2.0.0-cp310-cp310-win_amd64.whl",
+#                "--no-warn-script-location",
+#                #"--user",
+#                #'-t', target,
+#            ]
+#        )
     else:
         try:
             exec("import triton")
@@ -843,8 +844,15 @@ def install_modules(self):
     subprocess.check_call([pybin, "-m", "pip", "install", "peft", "--upgrade"])
     # import_module(self, "mustango", "mustango")
     # import_module(self, "mustango", "git+https://github.com/AMAAI-Lab/mustango.git")
-    # subprocess.check_call([pybin, "-m", "pip", "install", "mediapipe", "--upgrade"])
-    # import_module(self, "mediapipe", "mediapipe")
+#    if os_platform == "Windows":
+#        subprocess.check_call([pybin, "-m", "pip", "install", "https://files.pythonhosted.org/packages/e2/a9/98e0197b24165113ac551aae5646005205f88347fb13ac59a75a9864e1d3/mediapipe-0.10.9-cp310-cp310-win_amd64.whl", "--no-warn-script-location"])
+#    else:
+#        import_module(self, "mediapipe", "mediapipe")
+#    if os_platform == "Windows":
+#        subprocess.check_call([pybin, "-m", "pip", "install", "git+https://github.com/deepinsight/insightface.git", "--no-warn-script-location"])
+#        #subprocess.check_call([pybin, "-m", "pip", "install", "https://github.com/Gourieff/Assets/raw/main/Insightface/insightface-0.7.3-cp311-cp311-win_amd64.whl", "--no-warn-script-location"])
+#    else:
+#        import_module(self, "insightface", "insightface")
     # import_module(self, "audiocraft", "git+https://github.com/facebookresearch/audiocraft.git")
     # subprocess.check_call([pybin,"-m","pip","install","force-reinstall","no-deps","pre xformers"])
     # import_module(self, "compel", "compel")
@@ -946,7 +954,7 @@ class GENERATOR_OT_uninstall(Operator):
         uninstall_module_with_dependencies("cv2")
         uninstall_module_with_dependencies("protobuf")
         uninstall_module_with_dependencies("resemble_enhance")
-        # uninstall_module_with_dependencies("mediapipe")
+        uninstall_module_with_dependencies("mediapipe")
 
         # "resemble-enhance":
         uninstall_module_with_dependencies("celluloid")
@@ -965,6 +973,12 @@ class GENERATOR_OT_uninstall(Operator):
         return {"FINISHED"}
 
 
+def lcm_updated(self, context):
+    scene = context.scene
+    if scene.use_lcm:
+        scene.movie_num_guidance = 0
+
+
 def input_strips_updated(self, context):
     preferences = context.preferences
     addon_prefs = preferences.addons[__name__].preferences
@@ -978,12 +992,14 @@ def input_strips_updated(self, context):
         and type == "movie"
     ):
         scene.input_strips = "input_strips"
+
     if (
         type == "movie"
         or type == "audio"
         or image_model_card == "lllyasviel/control_v11p_sd15_scribble"
     ):
         scene.inpaint_selected_strip = ""
+
     if type == "image" and (
         image_model_card == "lllyasviel/sd-controlnet-canny"
         or image_model_card == "lllyasviel/sd-controlnet-openpose"
@@ -992,10 +1008,13 @@ def input_strips_updated(self, context):
         or image_model_card == "Salesforce/blipdiffusion"
     ):
         scene.input_strips = "input_strips"
+
     if context.scene.lora_folder:
         bpy.ops.lora.refresh_files()
+
     if type == "text":
         scene.input_strips = "input_strips"
+
     if (
         type == "movie"
         and movie_model_card == "stabilityai/stable-video-diffusion-img2vid"
@@ -1004,6 +1023,7 @@ def input_strips_updated(self, context):
         and movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt"
     ):
         scene.input_strips = "input_strips"
+
     if (
         movie_model_card == "guoyww/animatediff-motion-adapter-v1-5-2"
         and type == "movie"
@@ -1031,6 +1051,7 @@ def output_strips_updated(self, context):
         scene.inpaint_selected_strip = ""
         if context.scene.lora_folder:
             bpy.ops.lora.refresh_files()
+
     if (
         image_model_card == "lllyasviel/sd-controlnet-canny"
         or image_model_card == "lllyasviel/sd-controlnet-openpose"
@@ -1039,8 +1060,10 @@ def output_strips_updated(self, context):
         or image_model_card == "Salesforce/blipdiffusion"
     ) and type == "image":
         scene.input_strips = "input_strips"
+
     if type == "text":
         scene.input_strips = "input_strips"
+
     if (
         type == "movie"
         and movie_model_card == "stabilityai/stable-video-diffusion-img2vid"
@@ -1049,12 +1072,15 @@ def output_strips_updated(self, context):
         and movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt"
     ):
         scene.input_strips = "input_strips"
+
     if (
         movie_model_card == "guoyww/animatediff-motion-adapter-v1-5-2"
         and type == "movie"
     ):
         scene.input_strips = "input_prompt"
 
+    if (image_model_card == "dataautogpt3/OpenDalleV1.1") and type == "image":
+        scene.lcm = False
 
 class GeneratorAddonPreferences(AddonPreferences):
     bl_idname = __name__
@@ -1145,6 +1171,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Stable Diffusion XL 1.0 (1024x1024)",
                 "stabilityai/stable-diffusion-xl-base-1.0",
             ),
+            ("thibaud/sdxl_dpo_turbo", "SDXL DPO TURBO (1024x1024)", "thibaud/sdxl_dpo_turbo"),
             (
                 "stabilityai/sdxl-turbo",
                 "Stable Diffusion XL Turbo (512x512)",
@@ -1176,10 +1203,11 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "segmind/Segmind-Vega",
             ),
             (
-                "Lykon/dreamshaper-7",
-                "Dreamshaper LCM v7 (1024 x 1024)",
-                "Lykon/dreamshaper-7",
+                "Lykon/dreamshaper-8",
+                "Dreamshaper v8 (1024 x 1024)",
+                "Lykon/dreamshaper-8",
             ),
+            ("dataautogpt3/OpenDalleV1.1", "OpenDalle (1024 x 1024)", "dataautogpt3/OpenDalleV1.1"),
             # ("ptx0/terminus-xl-gamma-v1", "Terminus XL Gamma v1", "ptx0/terminus-xl-gamma-v1"),
             ("warp-ai/wuerstchen", "Würstchen (1024x1024)", "warp-ai/wuerstchen"),
             # ("lrzjason/playground-v2-1024px-aesthetic-fp16", "Playground v2 (1024x1024)", "lrzjason/playground-v2-1024px-aesthetic-fp16"),
@@ -1216,7 +1244,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "lllyasviel/control_v11p_sd15_scribble",
             ),
         ],
-        default="stabilityai/stable-diffusion-xl-base-1.0",
+        default="dataautogpt3/OpenDalleV1.1",
         update=input_strips_updated,
     )
     audio_model_card: bpy.props.EnumProperty(
@@ -1271,6 +1299,11 @@ class GeneratorAddonPreferences(AddonPreferences):
         name="Use Input Strip Data",
         default=True,
     )
+    local_files_only: BoolProperty(
+        name="Use Local Files Only",
+        default=False,
+    )
+
 
     def draw(self, context):
         layout = self.layout
@@ -1297,9 +1330,17 @@ class GeneratorAddonPreferences(AddonPreferences):
             sub_row.prop(self, "usersound", text="")
         sub_row.operator("renderreminder.play_notification", text="", icon="PLAY")
         sub_row.active = self.playsound
+
         row_row = box.row(align=True)
         row_row.label(text="Use Input Strip Data:")
         row_row.prop(self, "use_strip_data", text="")
+        row_row.label(text="")
+        row_row.label(text="")
+        row_row.label(text="")
+
+        row_row = box.row(align=True)
+        row_row.label(text="Use Local Files Only:")
+        row_row.prop(self, "local_files_only", text="")
         row_row.label(text="")
         row_row.label(text="")
         row_row.label(text="")
@@ -1668,15 +1709,19 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             ):
                 col = col.column(heading="Read as", align=True)
                 col.prop(context.scene, "use_scribble_image", text="Scribble Image")
+
             # LoRA.
             if (
                 (
                     image_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
                     or image_model_card == "runwayml/stable-diffusion-v1-5"
                     or image_model_card == "stabilityai/sdxl-turbo"
+                    or image_model_card == "lllyasviel/sd-controlnet-openpose"
+                    or image_model_card == "lllyasviel/sd-controlnet-canny"
+                    or image_model_card == "lllyasviel/control_v11p_sd15_scribble"
                 )
                 and type == "image"
-                and input != "input_strips"
+                #and input != "input_strips"
             ):
                 col = layout.column(align=True)
                 col = col.box()
@@ -1768,6 +1813,8 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     type == "movie"
                     and movie_model_card
                     == "stabilityai/stable-video-diffusion-img2vid-xt"
+                ) or (
+                    scene.use_lcm
                 ):
                     pass
                 else:
@@ -1787,39 +1834,45 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 col.prop(context.scene, "video_to_video", text="2x")
             if type == "image":
                 col = col.column(heading="Enhance", align=True)
-                col.prop(context.scene, "refine_sd", text="SD Refine")
+                row = col.row()
+                row.prop(context.scene, "refine_sd", text="Quality")
                 sub_col = col.row()
                 sub_col.active = context.scene.refine_sd
-            if type != "audio":
-                row = col.row()
-                if type == "movie" or (
-                    type == "image"
-                    and image_model_card != "lllyasviel/sd-controlnet-canny"
-                    and image_model_card != "lllyasviel/sd-controlnet-openpose"
-                    and image_model_card != "lllyasviel/control_v11p_sd15_scribble"
-                    and image_model_card
-                    != "monster-labs/control_v1p_sd15_qrcode_monster"
-                    and image_model_card != "Salesforce/blipdiffusion"
+#            if type != "audio":
+#                row = col.row()
+##                if type == "movie" or (
+##                    type == "image"
+##                    and image_model_card != "lllyasviel/sd-controlnet-canny"
+##                    and image_model_card != "lllyasviel/sd-controlnet-openpose"
+##                    and image_model_card != "lllyasviel/control_v11p_sd15_scribble"
+##                    and image_model_card
+##                    != "monster-labs/control_v1p_sd15_qrcode_monster"
+##                    and image_model_card != "Salesforce/blipdiffusion"
+##                ):
+##                    row.prop(context.scene, "use_freeU", text="FreeU")
+#                if type == "image":
+                if (
+                    (
+                        type == "image"
+                        and image_model_card
+                        == "stabilityai/stable-diffusion-xl-base-1.0"
+                    )
+                    or (type == "image" and image_model_card == "segmind/SSD-1B")
+                    or (type == "image" and image_model_card == "lllyasviel/sd-controlnet-openpose")
+                    or (
+                        type == "image"
+                        and image_model_card == "segmind/Segmind-Vega"
+                    )
+                    or (
+                        type == "image"
+                        and image_model_card == "runwayml/stable-diffusion-v1-5"
+                    )
+                    or (
+                        type == "image"
+                        and image_model_card == "Lykon/dreamshaper-8"
+                    )
                 ):
-                    row.prop(context.scene, "use_freeU", text="FreeU")
-                if type == "image":
-                    if (
-                        (
-                            type == "image"
-                            and image_model_card
-                            == "stabilityai/stable-diffusion-xl-base-1.0"
-                        )
-                        or (type == "image" and image_model_card == "segmind/SSD-1B")
-                        or (
-                            type == "image"
-                            and image_model_card == "segmind/Segmind-Vega"
-                        )
-                        or (
-                            type == "image"
-                            and image_model_card == "runwayml/stable-diffusion-v1-5"
-                        )
-                    ):
-                        row.prop(context.scene, "use_lcm", text="LCM")
+                    row.prop(context.scene, "use_lcm", text="Speed")
         # Output.
         layout = self.layout
         layout.use_property_split = True
@@ -1900,10 +1953,10 @@ class SEQUENCER_OT_generate_movie(Operator):
 
             Image.MAX_IMAGE_PIXELS = None
             import numpy as np
-            from .free_lunch_utils import (
-                register_free_upblock3d,
-                register_free_crossattn_upblock3d,
-            )
+#            from .free_lunch_utils import (
+#                register_free_upblock3d,
+#                register_free_crossattn_upblock3d,
+#            )
 
             # from compel import Compel
         except ModuleNotFoundError:
@@ -1917,13 +1970,13 @@ class SEQUENCER_OT_generate_movie(Operator):
         show_system_console(True)
         set_system_console_topmost(True)
         seq_editor = scene.sequence_editor
+        input = scene.input_strips
 
         if not seq_editor:
             scene.sequence_editor_create()
 
         # clear the VRAM
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        clear_cuda_cache()
 
         current_frame = scene.frame_current
         prompt = style_prompt(scene.generate_movie_prompt)[0]
@@ -1943,6 +1996,7 @@ class SEQUENCER_OT_generate_movie(Operator):
         input = scene.input_strips
         preferences = context.preferences
         addon_prefs = preferences.addons[__name__].preferences
+        local_files_only = addon_prefs.local_files_only
         movie_model_card = addon_prefs.movie_model_card
         image_model_card = addon_prefs.image_model_card
         pipe = None
@@ -1958,7 +2012,10 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 # from diffusers.utils import load_image
                 pipe = AutoPipelineForImage2Image.from_pretrained(
-                    "stabilityai/sd-turbo", torch_dtype=torch.float16, variant="fp16"
+                    "stabilityai/sd-turbo",
+                    torch_dtype=torch.float16,
+                    variant="fp16",
+                    local_files_only=local_files_only,
                 )
 
                 from diffusers import DPMSolverMultistepScheduler
@@ -2030,7 +2087,10 @@ class SEQUENCER_OT_generate_movie(Operator):
                 from diffusers.utils import load_image, export_to_video
 
                 refiner = StableVideoDiffusionPipeline.from_pretrained(
-                    movie_model_card, torch_dtype=torch.float16, variant="fp16"
+                    movie_model_card,
+                    torch_dtype=torch.float16,
+                    variant="fp16",
+                    local_files_only=local_files_only,
                 )
                 if low_vram():
                     refiner.enable_model_cpu_offload()
@@ -2053,6 +2113,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     torch_dtype=torch.float16,
                     # variant="fp16",
                     # use_safetensors=True,
+                    local_files_only=local_files_only,
                 )
                 from diffusers import DPMSolverMultistepScheduler
 
@@ -2073,14 +2134,17 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 # Load the motion adapter
                 adapter = MotionAdapter.from_pretrained(
-                    "guoyww/animatediff-motion-adapter-v1-5-2"
+                    "guoyww/animatediff-motion-adapter-v1-5-2",
+                    local_files_only=local_files_only,
                 )
                 # load SD 1.5 based finetuned model
                 # model_id = "runwayml/stable-diffusion-v1-5"
                 model_id = "SG161222/Realistic_Vision_V5.1_noVAE"
                 # model_id = "pagebrain/majicmix-realistic-v7"
                 pipe = AnimateDiffPipeline.from_pretrained(
-                    model_id, motion_adapter=adapter, torch_dtype=torch.float16
+                    model_id,
+                    motion_adapter=adapter,
+                    torch_dtype=torch.float16,
                 )
                 scheduler = DDIMScheduler.from_pretrained(
                     model_id,
@@ -2128,6 +2192,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     movie_model_card,
                     torch_dtype=torch.float16,
                     use_safetensors=False,
+                    local_files_only=local_files_only,
                 )
                 from diffusers import DPMSolverMultistepScheduler
 
@@ -2150,6 +2215,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     "cerspense/zeroscope_v2_XL",
                     torch_dtype=torch.float16,
                     use_safetensors=False,
+                    local_files_only=local_files_only,
                 )
                 upscale.scheduler = DPMSolverMultistepScheduler.from_config(
                     upscale.scheduler.config
@@ -2159,12 +2225,12 @@ class SEQUENCER_OT_generate_movie(Operator):
                 else:
                     upscale.to(gfx_device)
 
-        if scene.use_freeU and pipe:  # Free Lunch
-            # -------- freeu block registration
-            print("Process: FreeU")
-            register_free_upblock3d(pipe)  # , b1=1.1, b2=1.2, s1=0.6, s2=0.4)
-            register_free_crossattn_upblock3d(pipe)  # , b1=1.1, b2=1.2, s1=0.6, s2=0.4)
-            # -------- freeu block registration
+#        if scene.use_freeU and pipe:  # Free Lunch
+#            # -------- freeu block registration
+#            print("Process: FreeU")
+#            register_free_upblock3d(pipe)  # , b1=1.1, b2=1.2, s1=0.6, s2=0.4)
+#            register_free_crossattn_upblock3d(pipe)  # , b1=1.1, b2=1.2, s1=0.6, s2=0.4)
+#            # -------- freeu block registration
 
         # GENERATING - Main Loop
         for i in range(scene.movie_num_batch):
@@ -2283,14 +2349,17 @@ class SEQUENCER_OT_generate_movie(Operator):
                 # vid2vid / img2vid
                 elif (movie_model_card == "stabilityai/stable-video-diffusion-img2vid" or movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt"):
                     if scene.movie_path:
-                        print("Only image strip as input supported!")
-                        return {"CANCELLED"}
+                        print("Process: Video Image to SVD Video")
+                        if not os.path.isfile(scene.movie_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        image = load_first_frame(bpy.path.abspath(scene.movie_path))
                     elif scene.image_path:
                         print("Process: Image to SVD Video")
                         if not os.path.isfile(scene.image_path):
                             print("No file found.")
                             return {"CANCELLED"}
-                    image = load_image(bpy.path.abspath(scene.image_path))
+                        image = load_image(bpy.path.abspath(scene.image_path))
                     image = image.resize(
                         (closest_divisible_32(int(x)), closest_divisible_32(int(y)))
                     )
@@ -2461,9 +2530,12 @@ class SEQUENCER_OT_generate_movie(Operator):
                             # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
                             bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
                             break
+
+        pipe = None
+        refiner = None
+        converter = None
         # clear the VRAM
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        clear_cuda_cache()
 
         bpy.types.Scene.movie_path = ""
         bpy.ops.renderreminder.play_notification()
@@ -2488,6 +2560,7 @@ class SEQUENCER_OT_generate_audio(Operator):
             scene.sequence_editor_create()
         preferences = context.preferences
         addon_prefs = preferences.addons[__name__].preferences
+        local_files_only = addon_prefs.local_files_only
         current_frame = scene.frame_current
         prompt = scene.generate_movie_prompt
         negative_prompt = scene.generate_movie_negative_prompt
@@ -2523,7 +2596,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 )
                 from bark.api import semantic_to_waveform
                 from bark import generate_audio, SAMPLE_RATE
-                from resemble_enhance.enhancer.inference import denoise, enhance
+                #from resemble_enhance.enhancer.inference import denoise, enhance
             except ModuleNotFoundError:
                 print("Dependencies needs to be installed in the add-on preferences.")
                 self.report(
@@ -2534,8 +2607,8 @@ class SEQUENCER_OT_generate_audio(Operator):
         show_system_console(True)
         set_system_console_topmost(True)
         # clear the VRAM
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        clear_cuda_cache()
+
         print("Model:  " + addon_prefs.audio_model_card)
 
         # Load models
@@ -2624,7 +2697,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 prompt = context.scene.generate_movie_prompt
                 prompt = prompt.replace("\n", " ").strip()
                 sentences = split_and_recombine_text(
-                    prompt, desired_length=90, max_length=150
+                    prompt, desired_length=130, max_length=150
                 )
                 pieces = []
                 for sentence in sentences:
@@ -2644,27 +2717,27 @@ class SEQUENCER_OT_generate_audio(Operator):
                 # Write the combined audio to a file
                 write_wav(filename, rate, audio.transpose())
 
-                # resemble_enhance
-                dwav, sr = torchaudio.load(filename)
-                print("sr_load " + str(sr))
-                dwav = dwav.mean(dim=0)
-                # transform = torchaudio.transforms.Resample(orig_freq=sr, new_freq=44100)
-                # dwav = transform(dwav)
-                # dwav = audio
-                # sr = rate
-                if torch.cuda.is_available():
-                    device = "cuda"
-                else:
-                    device = "cpu"
-                # wav1, new_sr = denoise(dwav, sr, device)
-                wav2, new_sr = enhance(
-                    dwav, sr, device, nfe=64, solver="midpoint", lambd=0.1, tau=0.5
-                )
-                print("sr_save " + str(new_sr))
-                # wav1 = wav1.cpu().numpy()
-                wav2 = wav2.cpu().numpy()
-                # Write the combined audio to a file
-                write_wav(filename, sr, wav2)
+#                # resemble_enhance
+#                dwav, sr = torchaudio.load(filename)
+#                print("sr_load " + str(sr))
+#                dwav = dwav.mean(dim=0)
+#                # transform = torchaudio.transforms.Resample(orig_freq=sr, new_freq=44100)
+#                # dwav = transform(dwav)
+#                # dwav = audio
+#                # sr = rate
+#                if torch.cuda.is_available():
+#                    device = "cuda"
+#                else:
+#                    device = "cpu"
+#                # wav1, new_sr = denoise(dwav, sr, device)
+#                wav2, new_sr = enhance(
+#                    dwav, sr, device, nfe=64, solver="midpoint", lambd=0.1, tau=0.5
+#                )
+#                print("sr_save " + str(new_sr))
+#                # wav1 = wav1.cpu().numpy()
+#                wav2 = wav2.cpu().numpy()
+#                # Write the combined audio to a file
+#                write_wav(filename, sr, wav2)
 
             # Musicgen.
             elif addon_prefs.audio_model_card == "facebook/musicgen-stereo-medium":
@@ -2760,11 +2833,12 @@ class SEQUENCER_OT_generate_audio(Operator):
             else:
                 print("No resulting file found!")
 
-            # clear the VRAM
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+        pipe = None
+        # clear the VRAM
+        clear_cuda_cache()
 
-        bpy.ops.renderreminder.play_notification()
+        if input != "input_strips":
+            bpy.ops.renderreminder.play_notification()
         return {"FINISHED"}
 
 
@@ -2781,14 +2855,17 @@ class SEQUENCER_OT_generate_image(Operator):
         seq_editor = scene.sequence_editor
         preferences = context.preferences
         addon_prefs = preferences.addons[__name__].preferences
+        use_strip_data = addon_prefs.use_strip_data
+        local_files_only = addon_prefs.local_files_only
         image_model_card = addon_prefs.image_model_card
         strips = context.selected_sequences
         type = scene.generatorai_typeselect
-        use_strip_data = addon_prefs.use_strip_data
+
         pipe = None
         refiner = None
         converter = None
         guidance = scene.movie_num_guidance
+        enabled_items = None
 
         if (
             scene.generate_movie_prompt == ""
@@ -2814,10 +2891,10 @@ class SEQUENCER_OT_generate_image(Operator):
             import PIL
             import cv2
             from PIL import Image
-            from .free_lunch_utils import (
-                register_free_upblock2d,
-                register_free_crossattn_upblock2d,
-            )
+#            from .free_lunch_utils import (
+#                register_free_upblock2d,
+#                register_free_crossattn_upblock2d,
+#            )
 
             # from compel import Compel
         except ModuleNotFoundError:
@@ -2829,8 +2906,7 @@ class SEQUENCER_OT_generate_image(Operator):
             return {"CANCELLED"}
 
         # clear the VRAM
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        clear_cuda_cache()
 
         current_frame = scene.frame_current
         type = scene.generatorai_typeselect
@@ -2900,12 +2976,13 @@ class SEQUENCER_OT_generate_image(Operator):
             from diffusers.utils import load_image
 
             # clear the VRAM
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            clear_cuda_cache()
+
             pipe = AutoPipelineForInpainting.from_pretrained(
                 "diffusers/stable-diffusion-xl-1.0-inpainting-0.1",
                 torch_dtype=torch.float16,
                 variant="fp16",
+                local_files_only=local_files_only,
             ).to(gfx_device)
             # Set scheduler
             if scene.use_lcm:
@@ -2926,7 +3003,7 @@ class SEQUENCER_OT_generate_image(Operator):
         elif (
             do_convert
             and image_model_card != "warp-ai/wuerstchen"
-            and image_model_card != "Lykon/dreamshaper-7"
+            and image_model_card != "Lykon/dreamshaper-8"
         ):
             print("Load: img2img/vid2img Model")
             print("Conversion Model:  " + image_model_card)
@@ -2934,7 +3011,10 @@ class SEQUENCER_OT_generate_image(Operator):
                 from diffusers import StableDiffusionXLImg2ImgPipeline, AutoencoderKL
 
                 vae = AutoencoderKL.from_pretrained(
-                    "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
+                    "madebyollin/sdxl-vae-fp16-fix",
+                    torch_dtype=torch.float16,
+                    local_files_only=local_files_only,
+
                 )
                 converter = StableDiffusionXLImg2ImgPipeline.from_pretrained(
                     "stabilityai/stable-diffusion-xl-refiner-1.0",
@@ -2942,12 +3022,16 @@ class SEQUENCER_OT_generate_image(Operator):
                     vae=vae,
                     torch_dtype=torch.float16,
                     variant="fp16",
+                    local_files_only=local_files_only,
                 )
             else:
                 from diffusers import AutoPipelineForImage2Image
 
                 converter = AutoPipelineForImage2Image.from_pretrained(
-                    image_model_card, torch_dtype=torch.float16, variant="fp16"
+                    image_model_card,
+                    torch_dtype=torch.float16,
+                    variant="fp16",
+                    local_files_only=local_files_only,
                 )
             converter.watermark = NoWatermark()
             if low_vram():
@@ -2970,13 +3054,16 @@ class SEQUENCER_OT_generate_image(Operator):
             )
 
             controlnet = ControlNetModel.from_pretrained(
-                image_model_card, torch_dtype=torch.float16
+                image_model_card,
+                torch_dtype=torch.float16,
+                local_files_only=local_files_only,
             )
             pipe = StableDiffusionControlNetPipeline.from_pretrained(
                 "runwayml/stable-diffusion-v1-5",
                 controlnet=controlnet,
                 torch_dtype=torch.float16,
                 safety_checker=None,
+                local_files_only=local_files_only,
             )  # safety_checker=None,
             if scene.use_lcm:
                 from diffusers import LCMScheduler
@@ -2990,7 +3077,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     pipe.scheduler.config
                 )
             if low_vram():
-                pipe.enable_xformers_memory_efficient_attention()
+                #pipe.enable_xformers_memory_efficient_attention()
                 pipe.enable_model_cpu_offload()
             else:
                 pipe.to(gfx_device)
@@ -3005,40 +3092,60 @@ class SEQUENCER_OT_generate_image(Operator):
                 from diffusers.pipelines import BlipDiffusionPipeline
 
                 pipe = BlipDiffusionPipeline.from_pretrained(
-                    "Salesforce/blipdiffusion", torch_dtype=torch.float16
+                    "Salesforce/blipdiffusion",
+                    torch_dtype=torch.float16,
+                    local_files_only=local_files_only,
                 ).to(gfx_device)
             else:
                 from controlnet_aux import CannyDetector
                 from diffusers.pipelines import BlipDiffusionControlNetPipeline
 
                 pipe = BlipDiffusionControlNetPipeline.from_pretrained(
-                    "Salesforce/blipdiffusion-controlnet", torch_dtype=torch.float16
+                    "Salesforce/blipdiffusion-controlnet",
+                    torch_dtype=torch.float16,
+                    local_files_only=local_files_only,
                 ).to(gfx_device)
 
         # OpenPose
         elif image_model_card == "lllyasviel/sd-controlnet-openpose":
             print("Load: OpenPose Model")
             from diffusers import (
-                StableDiffusionControlNetPipeline,
+                #StableDiffusionControlNetPipeline,
+                StableDiffusionXLControlNetPipeline,
                 ControlNetModel,
                 UniPCMultistepScheduler,
+                AutoencoderKL,
             )
             from controlnet_aux import OpenposeDetector
 
             openpose = OpenposeDetector.from_pretrained("lllyasviel/ControlNet")
             controlnet = ControlNetModel.from_pretrained(
-                "lllyasviel/sd-controlnet-openpose", torch_dtype=torch.float16
+                #"lllyasviel/sd-controlnet-openpose",
+                #"lllyasviel/t2i-adapter_xl_openpose",
+                "thibaud/controlnet-openpose-sdxl-1.0",
+                torch_dtype=torch.float16,
+                local_files_only=local_files_only,
             )
-            pipe = StableDiffusionControlNetPipeline.from_pretrained(
-                "runwayml/stable-diffusion-v1-5",
+            #vae=AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
+
+#            pipe = StableDiffusionControlNetPipeline.from_pretrained(
+#                "runwayml/stable-diffusion-v1-5",
+            pipe = StableDiffusionXLControlNetPipeline.from_pretrained(
+                "stabilityai/stable-diffusion-xl-base-1.0",
+                #vae=vae,
                 controlnet=controlnet,
                 torch_dtype=torch.float16,
+                variant="fp16",
+                local_files_only=local_files_only,
             )  # safety_checker=None,
+
             if scene.use_lcm:
                 from diffusers import LCMScheduler
 
                 pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
-                pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
+                pipe.load_lora_weights("latent-consistency/lcm-lora-sdxl")
+                #pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
+
                 pipe.fuse_lora()
                 scene.movie_num_guidance = 0
             else:
@@ -3046,7 +3153,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     pipe.scheduler.config
                 )
             if low_vram():
-                pipe.enable_xformers_memory_efficient_attention()
+                #pipe.enable_xformers_memory_efficient_attention()
                 pipe.enable_model_cpu_offload()
             else:
                 pipe.to(gfx_device)
@@ -3064,12 +3171,15 @@ class SEQUENCER_OT_generate_image(Operator):
             processor = HEDdetector.from_pretrained("lllyasviel/Annotators")
             checkpoint = "lllyasviel/control_v11p_sd15_scribble"
             controlnet = ControlNetModel.from_pretrained(
-                checkpoint, torch_dtype=torch.float16
+                checkpoint,
+                torch_dtype=torch.float16,
+                local_files_only=local_files_only,
             )
             pipe = StableDiffusionControlNetPipeline.from_pretrained(
                 "runwayml/stable-diffusion-v1-5",
                 controlnet=controlnet,
                 torch_dtype=torch.float16,
+                local_files_only=local_files_only,
             )
             if scene.use_lcm:
                 from diffusers import LCMScheduler
@@ -3091,7 +3201,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 pipe.to(gfx_device)
 
         # Dreamshaper
-        elif image_model_card == "Lykon/dreamshaper-7":
+        elif image_model_card == "Lykon/dreamshaper-8":
             if do_convert:
                 print(
                     image_model_card
@@ -3100,7 +3210,9 @@ class SEQUENCER_OT_generate_image(Operator):
             from diffusers import DiffusionPipeline
 
             pipe = DiffusionPipeline.from_pretrained(
-                "Lykon/dreamshaper-7", torch_dtype=torch.float16
+                "Lykon/dreamshaper-8",
+                torch_dtype=torch.float16,
+                local_files_only=local_files_only,
             )  # , custom_pipeline="latent_consistency_txt2img"
             pipe.to(torch_device="cuda", torch_dtype=torch.float16)
 
@@ -3120,6 +3232,7 @@ class SEQUENCER_OT_generate_image(Operator):
             pipe = AutoPipelineForText2Image.from_pretrained(
                 "warp-ai/wuerstchen",
                 torch_dtype=torch.float16,
+                local_files_only=local_files_only,
             )
             if low_vram():
                 pipe.enable_model_cpu_offload()
@@ -3139,7 +3252,10 @@ class SEQUENCER_OT_generate_image(Operator):
             result = login(token=addon_prefs.hugginface_token)
             # stage 1
             stage_1 = DiffusionPipeline.from_pretrained(
-                "DeepFloyd/IF-I-M-v1.0", variant="fp16", torch_dtype=torch.float16
+                "DeepFloyd/IF-I-M-v1.0",
+                variant="fp16",
+                torch_dtype=torch.float16,
+                local_files_only=local_files_only,
             )
             if low_vram():
                 stage_1.enable_model_cpu_offload()
@@ -3151,6 +3267,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 text_encoder=None,
                 variant="fp16",
                 torch_dtype=torch.float16,
+                local_files_only=local_files_only,
             )
             if low_vram():
                 stage_2.enable_model_cpu_offload()
@@ -3166,42 +3283,65 @@ class SEQUENCER_OT_generate_image(Operator):
                 "stabilityai/stable-diffusion-x4-upscaler",
                 **safety_modules,
                 torch_dtype=torch.float16,
+                local_files_only=local_files_only,
             )
             if low_vram():
                 stage_3.enable_model_cpu_offload()
             else:
                 stage_3.to(gfx_device)
 
+        # sdxl_dpo_turbo
+        elif image_model_card == "thibaud/sdxl_dpo_turbo":
+            from diffusers import StableDiffusionXLPipeline
+
+            from diffusers import AutoencoderKL
+
+#            vae = AutoencoderKL.from_pretrained(
+#                "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
+#            )
+            pipe = StableDiffusionXLPipeline.from_single_file(
+                "https://huggingface.co/thibaud/sdxl_dpo_turbo/blob/main/sdxl_dpo_turbo.safetensors",
+#                vae=vae,
+                torch_dtype=torch.float16,
+                variant="fp16",
+            )
+            if low_vram():
+                pipe.enable_model_cpu_offload()
+            else:
+                pipe.to(gfx_device)
+
         # Stable diffusion etc.
         else:
             print("Load: " + image_model_card + " Model")
-            enabled_items = None
+
             if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
                 from diffusers import AutoencoderKL
-
                 vae = AutoencoderKL.from_pretrained(
-                    "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
+                    "madebyollin/sdxl-vae-fp16-fix",
+                    torch_dtype=torch.float16,
+                    local_files_only=local_files_only,
                 )
                 pipe = DiffusionPipeline.from_pretrained(
                     image_model_card,
                     vae=vae,
                     torch_dtype=torch.float16,
                     variant="fp16",
+                    local_files_only=local_files_only,
                 )
             elif image_model_card == "runwayml/stable-diffusion-v1-5":
                 from diffusers import StableDiffusionPipeline
-
                 pipe = StableDiffusionPipeline.from_pretrained(
                     "runwayml/stable-diffusion-v1-5",
                     torch_dtype=torch.float16,  # vae=vae,
+                    local_files_only=local_files_only,
                 )
             else:
                 from diffusers import AutoPipelineForText2Image
-
                 pipe = AutoPipelineForText2Image.from_pretrained(
                     image_model_card,
                     torch_dtype=torch.float16,
                     variant="fp16",
+                    local_files_only=local_files_only,
                 )
 
             # LCM
@@ -3223,7 +3363,10 @@ class SEQUENCER_OT_generate_image(Operator):
                     pipe.fuse_lora()
                 elif image_model_card == "latent-consistency/lcm-lora-sdv1-5":
                     scene.movie_num_guidance = 0
-                    pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
+                    pipe.fuse_lora()
+                elif image_model_card == "Lykon/dreamshaper-8":
+                    pipe.load_lora_weights("Lykon/dreamshaper-8-lcm")
+                    scene.movie_num_guidance = 0
                     pipe.fuse_lora()
                 pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
             else:
@@ -3241,39 +3384,42 @@ class SEQUENCER_OT_generate_image(Operator):
             else:
                 pipe.to(gfx_device)
 
-            # FreeU
-            if scene.use_freeU and pipe:  # Free Lunch
-                # -------- freeu block registration
-                print("Process: FreeU")
-                register_free_upblock2d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
-                register_free_crossattn_upblock2d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
-                # -------- freeu block registration
+#            # FreeU
+#            if scene.use_freeU and pipe:  # Free Lunch
+#                # -------- freeu block registration
+#                print("Process: FreeU")
+#                register_free_upblock2d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
+#                register_free_crossattn_upblock2d(pipe, b1=1.1, b2=1.2, s1=0.6, s2=0.4)
+#                # -------- freeu block registration
 
-            # LoRA
-            if (
-                image_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
-                or image_model_card == "runwayml/stable-diffusion-v1-5"
-                or image_model_card == "stabilityai/sdxl-turbo"
-            ):
-                scene = context.scene
-                lora_files = scene.lora_files
-                enabled_names = []
-                enabled_weights = []
-                # Check if there are any enabled items before loading
-                enabled_items = [item for item in lora_files if item.enabled]
-                if enabled_items:
-                    for item in enabled_items:
-                        enabled_names.append(
-                            (clean_filename(item.name)).replace(".", "")
-                        )
-                        enabled_weights.append(item.weight_value)
-                        pipe.load_lora_weights(
-                            bpy.path.abspath(scene.lora_folder),
-                            weight_name=item.name + ".safetensors",
-                            adapter_name=((clean_filename(item.name)).replace(".", "")),
-                        )
-                    pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)
-                    print("Load LoRAs: " + " ".join(enabled_names))
+        # LoRA
+        if (
+            image_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
+            or image_model_card == "runwayml/stable-diffusion-v1-5"
+            or image_model_card == "stabilityai/sdxl-turbo"
+            or image_model_card == "lllyasviel/sd-controlnet-openpose"
+            #or image_model_card == "lllyasviel/sd-controlnet-canny"
+            #or image_model_card == "lllyasviel/control_v11p_sd15_scribble"
+        ):
+            scene = context.scene
+            lora_files = scene.lora_files
+            enabled_names = []
+            enabled_weights = []
+            # Check if there are any enabled items before loading
+            enabled_items = [item for item in lora_files if item.enabled]
+            if enabled_items:
+                for item in enabled_items:
+                    enabled_names.append(
+                        (clean_filename(item.name)).replace(".", "")
+                    )
+                    enabled_weights.append(item.weight_value)
+                    pipe.load_lora_weights(
+                        bpy.path.abspath(scene.lora_folder),
+                        weight_name=item.name + ".safetensors",
+                        adapter_name=((clean_filename(item.name)).replace(".", "")),
+                    )
+                pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)
+                print("Load LoRAs: " + " ".join(enabled_names))
 
         # Refiner model - load if chosen.
         if do_refine:
@@ -3283,13 +3429,16 @@ class SEQUENCER_OT_generate_image(Operator):
             from diffusers import StableDiffusionXLImg2ImgPipeline, AutoencoderKL
 
             vae = AutoencoderKL.from_pretrained(
-                "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
+                "madebyollin/sdxl-vae-fp16-fix",
+                torch_dtype=torch.float16,
+                local_files_only=local_files_only,
             )
             refiner = StableDiffusionXLImg2ImgPipeline.from_pretrained(
                 "stabilityai/stable-diffusion-xl-refiner-1.0",
                 vae=vae,
                 torch_dtype=torch.float16,
                 variant="fp16",
+                local_files_only=local_files_only,
             )
             refiner.watermark = NoWatermark()
             if low_vram():
@@ -3438,7 +3587,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 ).images[0]
 
             # DreamShaper
-            elif image_model_card == "Lykon/dreamshaper-7":
+            elif image_model_card == "Lykon/dreamshaper-8":
                 image = pipe(
                     prompt=prompt,
                     negative_prompt=negative_prompt,
@@ -3463,9 +3612,18 @@ class SEQUENCER_OT_generate_image(Operator):
                     print("Loading strip failed!")
                     return {"CANCELLED"}
                 image = init_image.resize((x, y))
+
                 if not scene.openpose_use_bones:
                     image = np.array(image)
-                    image = openpose(image)
+
+                    image = openpose(image, hand_and_face=False)
+                    # Save pose image
+                    filename = clean_filename(
+                        str(seed) + "_" + context.scene.generate_movie_prompt
+                    )
+                    out_path = solve_path("Pose_"+filename + ".png")
+                    image.save(out_path)
+
                 image = pipe(
                     prompt=prompt,
                     negative_prompt=negative_prompt,
@@ -3641,6 +3799,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 if (
                     image_model_card == "stabilityai/sdxl-turbo"
                     or image_model_card == "stabilityai/sd-turbo"
+                    or image_model_card == "thibaud/sdxl_dpo_turbo"
                 ):
                     image = converter(
                         prompt=prompt,
@@ -3669,7 +3828,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 print("Generate: Image ")
 
                 # SDXL Turbo
-                if image_model_card == "stabilityai/sdxl-turbo":
+                if image_model_card == "stabilityai/sdxl-turbo": # or image_model_card == "thibaud/sdxl_dpo_turbo":
 
                     # LoRA.
                     if enabled_items:
@@ -3769,9 +3928,7 @@ class SEQUENCER_OT_generate_image(Operator):
             else:
                 print("No resulting file found.")
 
-            # clear the VRAM
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            gc.collect()
 
             for window in bpy.context.window_manager.windows:
                 screen = window.screen
@@ -3788,8 +3945,19 @@ class SEQUENCER_OT_generate_image(Operator):
                             bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
                             break
 
+        if pipe:
+            pipe = None
+        if refiner:
+            compel = None
+        if converter:
+            converter = None
+
+        # clear the VRAM
+        clear_cuda_cache()
+
         scene.movie_num_guidance = guidance
-        bpy.ops.renderreminder.play_notification()
+        if input != "input_strips":
+            bpy.ops.renderreminder.play_notification()
         scene.frame_current = current_frame
 
         return {"FINISHED"}
@@ -3822,6 +3990,7 @@ class SEQUENCER_OT_generate_text(Operator):
         seq_editor = scene.sequence_editor
         preferences = context.preferences
         addon_prefs = preferences.addons[__name__].preferences
+        local_files_only = addon_prefs.local_files_only
         guidance = scene.movie_num_guidance
         current_frame = scene.frame_current
         prompt = style_prompt(scene.generate_movie_prompt)[0]
@@ -3851,15 +4020,17 @@ class SEQUENCER_OT_generate_text(Operator):
             return {"CANCELLED"}
 
         # clear the VRAM
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        clear_cuda_cache()
 
         processor = BlipProcessor.from_pretrained(
-            "Salesforce/blip-image-captioning-large"
+            "Salesforce/blip-image-captioning-large",
+            local_files_only=local_files_only,
         )
 
         model = BlipForConditionalGeneration.from_pretrained(
-            "Salesforce/blip-image-captioning-large", torch_dtype=torch.float16
+            "Salesforce/blip-image-captioning-large",
+            torch_dtype=torch.float16,
+            local_files_only=local_files_only,
         ).to(gfx_device)
 
         init_image = (
@@ -3946,12 +4117,12 @@ class SEQUENCER_OT_generate_text(Operator):
                         break
 
         scene.movie_num_guidance = guidance
-        bpy.ops.renderreminder.play_notification()
+        # bpy.ops.renderreminder.play_notification()
         scene.frame_current = current_frame
 
+        model = None
         # clear the VRAM
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        clear_cuda_cache()
 
         return {"FINISHED"}
 
@@ -3988,20 +4159,21 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         use_random = scene.movie_use_random
         use_strip_data = addon_prefs.use_strip_data
         temp_strip = None
+        input = scene.input_strips
 
         if not strips:
             self.report({"INFO"}, "Select strip(s) for processing.")
             return {"CANCELLED"}
         else:
-            print("\nStrip input processing started (Ctrl+C to Cancel).")
+            print("\nStrip input processing started...")
 
         for strip in strips:
-            if strip.type in {"MOVIE", "IMAGE", "TEXT", "SCENE"}:
+            if strip.type in {"MOVIE", "IMAGE", "TEXT", "SCENE", "META"}:
                 break
         else:
             self.report(
                 {"INFO"},
-                "None of the selected strips are movie, image, text or scene types.",
+                "None of the selected strips are movie, image, text, meta or scene types.",
             )
             return {"CANCELLED"}
 
@@ -4039,7 +4211,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
             strip.select = True
 
             # render intermediate mp4 file
-            if strip.type == "SCENE" or strip.type == "MOVIE":
+            if strip.type == "SCENE" or strip.type == "MOVIE" or strip.type == "IMAGE" or strip.type == "META":
                 # Make the current frame overlapped frame, the temp strip.
 
                 if type == "image" or type == "text":
@@ -4229,7 +4401,8 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         context.scene.movie_use_random = use_random
         context.scene.movie_num_seed = seed
         context.scene.sequence_editor.active_strip = active_strip
-        addon_prefs.playsound = play_sound
+        if input != "input_strips":
+            addon_prefs.playsound = play_sound
         bpy.ops.renderreminder.play_notification()
 
         print("Processing finished.")
@@ -4274,6 +4447,7 @@ def register():
         step=64,
         min=256,
         max=1536,
+        description="Use the power of 64",
     )
     bpy.types.Scene.generate_movie_y = bpy.props.IntProperty(
         name="generate_movie_y",
@@ -4281,6 +4455,7 @@ def register():
         step=64,
         min=256,
         max=1536,
+        description="Use the power of 64",
     )
     # The number of frames to be generated.
     bpy.types.Scene.generate_movie_frames = bpy.props.IntProperty(
@@ -4288,6 +4463,7 @@ def register():
         default=6,
         min=1,
         max=125,
+        description="Number of frames to generate. NB. some models have fixed values.",
     )
     # The number of denoising steps. More denoising steps usually lead to a higher quality audio at the expense of slower inference.
     bpy.types.Scene.movie_num_inference_steps = bpy.props.IntProperty(
@@ -4295,6 +4471,7 @@ def register():
         default=25,
         min=1,
         max=100,
+        description="Number of inference steps to improve the quality",
     )
     # The number of videos to generate.
     bpy.types.Scene.movie_num_batch = bpy.props.IntProperty(
@@ -4302,6 +4479,7 @@ def register():
         default=1,
         min=1,
         max=100,
+        description="Number of generated media files",
     )
     # The seed number.
     bpy.types.Scene.movie_num_seed = bpy.props.IntProperty(
@@ -4309,11 +4487,13 @@ def register():
         default=1,
         min=-2147483647,
         max=2147483647,
+        description="Seed value",
     )
     # The seed number.
     bpy.types.Scene.movie_use_random = bpy.props.BoolProperty(
         name="movie_use_random",
         default=1,
+        description="Randomize seed value. Switched off will give more consistency.",
     )
     # The guidance number.
     bpy.types.Scene.movie_num_guidance = bpy.props.FloatProperty(
@@ -4328,6 +4508,7 @@ def register():
         default=80,
         min=1,
         max=10000,
+        description="Audio duration: Maximum 30 sec.",
     )
     bpy.types.Scene.generatorai_typeselect = bpy.props.EnumProperty(
         name="Sound",
@@ -4388,6 +4569,7 @@ def register():
     bpy.types.Scene.refine_sd = bpy.props.BoolProperty(
         name="refine_sd",
         default=1,
+        description="Add a refinement step",
     )
     # movie path
     bpy.types.Scene.movie_path = bpy.props.StringProperty(name="movie_path", default="")
@@ -4417,34 +4599,43 @@ def register():
             name="Generator AI Styles",
             items=[("no_style", "No Style", "No Style")] + styles_array,
             default="no_style",
+            description="Add style prompts",
         )
     bpy.types.Scene.openpose_use_bones = bpy.props.BoolProperty(
         name="openpose_use_bones",
         default=0,
+        description="Read as Open Pose rig image",
     )
     bpy.types.Scene.use_scribble_image = bpy.props.BoolProperty(
         name="use_scribble_image",
         default=0,
+        description="Read as scribble image",
     )
     # Blip
     bpy.types.Scene.blip_cond_subject = bpy.props.StringProperty(
         name="blip_cond_subject",
         default="",
+        description="Condition Image",
     )
     bpy.types.Scene.blip_tgt_subject = bpy.props.StringProperty(
         name="blip_tgt_subject",
         default="",
+        description="Target Prompt",
     )
     bpy.types.Scene.blip_subject_image = bpy.props.StringProperty(
-        name="blip_subject_image", default=""
+        name="blip_subject_image",
+        default="",
+        description="Subject Image",
     )
-    bpy.types.Scene.use_freeU = bpy.props.BoolProperty(
-        name="use_freeU",
-        default=0,
-    )
+#    bpy.types.Scene.use_freeU = bpy.props.BoolProperty(
+#        name="use_freeU",
+#        default=0,
+#    )
     bpy.types.Scene.use_lcm = bpy.props.BoolProperty(
         name="use_lcm",
         default=0,
+        description="Higher Speed, lower quality. Try Quality Steps: 1-10",
+        update=lcm_updated,
     )
     # SVD decode chunck
     bpy.types.Scene.svd_decode_chunk_size = bpy.props.IntProperty(
@@ -4452,6 +4643,7 @@ def register():
         default=2,
         min=1,
         max=100,
+        description="Number of frames to decode",
     )
     # SVD motion_bucket_id
     bpy.types.Scene.svd_motion_bucket_id = bpy.props.IntProperty(
@@ -4459,6 +4651,7 @@ def register():
         default=30,
         min=1,
         max=512,
+        description="A higher number: more camera movement. A lower number: more character movement",
     )
 
     for cls in classes:
