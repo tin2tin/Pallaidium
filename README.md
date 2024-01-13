@@ -248,6 +248,8 @@ https://github.com/tin2tin/text_to_strip
 
 Trainer for LoRAs: https://github.com/johnman3032/simple-lora-dreambooth-trainer
 
+HD Horizon(LoRA for making SD 1.5 work at higher resolutions): https://civitai.com/models/238891/hd-horizon-the-resolution-frontier-multi-resolution-high-resolution-native-inferencing
+
 
 ## Video Examples
 
