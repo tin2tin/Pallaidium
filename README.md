@@ -67,6 +67,7 @@ https://github.com/amb/blender_pip      |
 
 ## Change Log
 
+* 2024-01-31: Add OpenDalle, Speed option, SDXL and LoRA support for Canny and OpenPose, include OpenPose rig images. Prune old models including SD. 
 * 2023-12-18: Add: Bark audio enhance, Segmind Vega. 
 * 2023-12-1: Add SD Turbo & MusicGen Medium, MPS device for MacOS.
 * 2023-11-30: Add: SVD, SVD-XT, SDXL Turbo
@@ -162,8 +163,6 @@ Or: Voice of God judging mankind, woman talking about celestial beings, hammer o
 
 The performance can be improved by following this guide: https://nvidia.custhelp.com/app/answers/detail/a_id/5490/~/system-memory-fallback-for-stable-diffusion
 
-On 6 GB of VRAM I typically render images first with 1024x512 images with SDXL. And img2vid with Zeroscope XL in 768x384x10 or 640x320x17, with a low Quality Steps value.
-
 
 ## New to Blender?
 
@@ -173,28 +172,20 @@ Watch this tutorial: https://youtu.be/4_MIaxzjh5Y?feature=shared
 ## AI Modules
 Diffusers: https://github.com/huggingface/diffusers
 
-ModelScope: https://modelscope.cn/models/damo/text-to-video-synthesis/summary
-
-Animov: https://huggingface.co/vdo/animov-0.1.1
-
-Potat1: https://huggingface.co/camenduru/potat1
-
-Zeroscope Dark: https://huggingface.co/cerspense/zeroscope_v2_dark_30x448x256
-
 Zeroscope XL: https://huggingface.co/cerspense/zeroscope_v2_XL
-
-Würstchen: https://github.com/dome272/Wuerstchen
 
 AudioLDM2 Music: [https://huggingface.co/cvssp/audioldm-s-full-v2 https://github.com/haoheliu/AudioLDM](https://huggingface.co/cvssp/audioldm2-music)
 
+MusicGen Stereo: https://huggingface.co/facebook/musicgen-stereo-medium
+
 Bark: https://github.com/suno-ai/bark
 
-Deep Floyd IF: https://github.com/deep-floyd/IF
-
-Stable Diffusion XL: https://huggingface.co/stabilityai/stable-diffusion-xl-base-0.9
+Stable Diffusion XL: https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0
 
 Segmind SDXL: https://huggingface.co/segmind/SSD-1B 
 https://blog.segmind.com/generating-photographic-images-with-stable-diffusion/
+
+OpenDalle: https://huggingface.co/dataautogpt3/OpenDalleV1.1
 
 
 
@@ -272,7 +263,7 @@ https://github.com/tin2tin/Pallaidium/assets/1322593/c74a4e38-8b16-423b-be78-aad
 https://github.com/tin2tin/Pallaidium/assets/1322593/b80812b4-e3be-40b0-a73b-bc55b7eeadf7
 
 
-### ControlNet
+### Canny
 https://github.com/tin2tin/Pallaidium/assets/1322593/a1e94e09-0147-40ae-b4c2-4ce0671b1289
 
 
