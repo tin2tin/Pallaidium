@@ -14,7 +14,7 @@
 bl_info = {
     "name": "Pallaidium - Generative AI",
     "author": "tintwotin",
-    "version": (2, 0),
+    "version": (2, 1),
     "blender": (3, 4, 0),
     "location": "Video Sequence Editor > Sidebar > Generative AI",
     "description": "AI Generate media in the VSE",
@@ -654,7 +654,7 @@ def import_module(self, module, install_module):
         #        if target not in sys.path:
         #            sys.path.append(target)
         self.report({"INFO"}, "Installing: " + module + " module.")
-        print("Installing: " + module + " module")
+        print("\nInstalling: " + module + " module")
         subprocess.call([python_exe, "-m", "pip", "install", install_module, "--no-warn-script-location", "--upgrade"])
         #        subprocess.check_call(
         #            [
@@ -696,29 +696,12 @@ def install_modules(self):
         pass
 
     import_module(self, "huggingface_hub", "huggingface_hub")
-    import_module(self, "accelerate", "git+https://github.com/huggingface/accelerate.git")
     import_module(self, "transformers", "git+https://github.com/huggingface/transformers.git")
-    import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
-    #import_module(self, "diffusers", "diffusers")
-    import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
-    subprocess.check_call([pybin, "-m", "pip", "install", "tensorflow"])
-    #import_module(self, "tensorflow", "tensorflow")
-    import_module(self, "soundfile", "PySoundFile")
-    import_module(self, "sentencepiece", "sentencepiece")
-    import_module(self, "safetensors", "safetensors")
-    import_module(self, "cv2", "opencv_python")
-    import_module(self, "PIL", "pillow")
-    import_module(self, "scipy", "scipy")
-    import_module(self, "IPython", "IPython")
-    import_module(self, "omegaconf", "omegaconf")
-    import_module(self, "protobuf", "protobuf")
-
-    python_version_info = sys.version_info
-    python_version_str = parse_python_version(python_version_info)
-
+    
+    subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/suno-ai/bark.git", "--upgrade"])
     if os_platform == "Windows":
-
-        subprocess.call([pybin, "-m", "pip", "install", "resemble-enhance", "--no-dependencies", "--upgrade"])
+        subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/daswer123/resemble-enhance-windows.git", "--no-dependencies", "--upgrade"])
+        #subprocess.call([pybin, "-m", "pip", "install", "resemble-enhance", "--no-dependencies", "--upgrade"])
         deep_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),"deepspeed/deepspeed-0.12.4+unknown-py3-none-any.whl")
         import_module(self, "deepspeed", deep_path)
 
@@ -734,7 +717,25 @@ def install_modules(self):
         #import_module(self, "gradio", "gradio==4.8.0") #Fail
     else:
         import_module(self, "resemble_enhance", "resemble-enhance")
+    #import_module(self, "peft", "git+https://github.com/huggingface/peft.git")
         
+    #import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
+    #import_module(self, "diffusers", "diffusers")
+    import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
+    subprocess.check_call([pybin, "-m", "pip", "install", "tensorflow"])
+    #import_module(self, "tensorflow", "tensorflow")
+    import_module(self, "soundfile", "PySoundFile")
+    import_module(self, "sentencepiece", "sentencepiece")
+    import_module(self, "safetensors", "safetensors")
+    import_module(self, "cv2", "opencv_python")
+    import_module(self, "PIL", "pillow")
+    import_module(self, "scipy", "scipy")
+    import_module(self, "IPython", "IPython")
+    import_module(self, "omegaconf", "omegaconf")
+    import_module(self, "protobuf", "protobuf")
+
+    python_version_info = sys.version_info
+    python_version_str = parse_python_version(python_version_info)   
 
     import_module(self, "imageio", "imageio")
     import_module(self, "imwatermark", "invisible-watermark>=0.2.0")
@@ -761,8 +762,6 @@ def install_modules(self):
             import_module(self, "triton", "triton")
 
     #subprocess.check_call([pybin, "-m", "pip", "install", "numpy", "--upgrade"])
-    import_module(self, "controlnet_aux", "controlnet_aux")
-    subprocess.check_call([pybin, "-m", "pip", "install", "peft", "--upgrade"])
     
     # import_module(self, "mustango", "mustango")
     # import_module(self, "mustango", "git+https://github.com/AMAAI-Lab/mustango.git")
@@ -786,73 +785,17 @@ def install_modules(self):
     #import_module(self, "audiocraft", "git+https://github.com/facebookresearch/audiocraft.git")
 
     # import_module(self, "compel", "compel")
-    import_module(self, "peft", "git+https://github.com/huggingface/peft.git")
 
 #    try:
 #        exec("import torch")
 #    except ModuleNotFoundError:
     subprocess.call([pybin, "-m", "pip", "install", "lmdb"])
-    self.report({"INFO"}, "Installing: torch module.")
-    print("Installing: torch module")
-    if os_platform == "Windows":
-        subprocess.check_call(
-            [
-                pybin,
-                "-m",
-                "pip",
-                "install",
-                "torch==2.1.2+cu121",
-                "--index-url",
-                "https://download.pytorch.org/whl/cu121",
-                "--no-warn-script-location",
-                # "--user",
-            ]
-        )
-        subprocess.check_call(
-            [
-                pybin,
-                "-m",
-                "pip",
-                "install",
-                "torchvision==0.16.0+cu121",
-                "--index-url",
-                "https://download.pytorch.org/whl/cu121",
-                "--no-warn-script-location",
-                # "--user",
-            ]
-        )
-        subprocess.check_call(
-            [
-                pybin,
-                "-m",
-                "pip",
-                "install",
-                "torchaudio==2.1.2",
-                "--index-url",
-                "https://download.pytorch.org/whl/cu121",
-                "--no-warn-script-location",
-                # "--user",
-            ]
-        )
-#            subprocess.check_call(
-#                [
-#                    pybin,
-#                    "-m",
-#                    "pip",
-#                    "install",
-#                    "-U",
-#                    "xformers==0.0.16",
-#                    "--index-url",
-#                    "https://download.pytorch.org/whl/cu121",
-#                    "--no-warn-script-location",
-#                    # "--user",
-#                ]
-#            )
-    else:
-        import_module(self, "torch", "torch")
-        import_module(self, "torchvision", "torchvision")
-        import_module(self, "torchaudio", "torchaudio")
+    import_module(self, "accelerate", "git+https://github.com/huggingface/accelerate.git")
+#    import_module(self, "controlnet_aux", "controlnet_aux")
+    subprocess.check_call([pybin, "-m", "pip", "install", "peft", "--upgrade"])
 
+    self.report({"INFO"}, "Installing: torch module.")
+    print("\nInstalling: torch module")
     if os_platform == "Windows":
         subprocess.check_call(
             [
@@ -869,8 +812,67 @@ def install_modules(self):
                 "--user",
             ]
         )
+        subprocess.check_call(
+            [
+                pybin,
+                "-m",
+                "pip",
+                "install",
+                #"torch==2.1.2+cu121",
+                "torch==2.2.0+cu121",
+                "--index-url",
+                "https://download.pytorch.org/whl/cu121",
+                "--no-warn-script-location",
+                # "--user",
+            ]
+        )
+        subprocess.check_call(
+            [
+                pybin,
+                "-m",
+                "pip",
+                "install",
+                "torchvision==0.17.0+cu121",
+                "--index-url",
+                "https://download.pytorch.org/whl/cu121",
+                "--no-warn-script-location",
+                # "--user",
+            ]
+        )
+        subprocess.check_call(
+            [
+                pybin,
+                "-m",
+                "pip",
+                "install",
+                #"torchaudio==2.1.2",
+                "torchaudio==2.2.0",
+                "--index-url",
+                "https://download.pytorch.org/whl/cu121",
+                "--no-warn-script-location",
+                # "--user",
+            ]
+        )
+#        subprocess.check_call(
+#            [
+#                pybin,
+#                "-m",
+#                "pip",
+#                "install",
+#                "-U",
+#                "xformers==0.0.16",
+#                "--index-url",
+#                "https://download.pytorch.org/whl/cu121",
+#                "--no-warn-script-location",
+#                # "--user",
+#            ]
+#        )
     else:
+        import_module(self, "torch", "torch")
+        import_module(self, "torchvision", "torchvision")
+        import_module(self, "torchaudio", "torchaudio")
         import_module(self, "xformers", "xformers")
+        
 
 
 def get_module_dependencies(module_name):
@@ -910,7 +912,8 @@ def uninstall_module_with_dependencies(module_name):
     subprocess.run([pybin, "-m", "pip", "uninstall", "-y", module_name])
     # Uninstall the dependencies
     for dependency in dependencies:
-        if str(dependency[5].lower) != "numpy":
+        print("\n ")
+        if len(dependency)> 5 and str(dependency[5].lower) != "numpy":
             subprocess.run([pybin, "-m", "pip", "uninstall", "-y", dependency])
     #subprocess.check_call([pybin, "-m", "pip", "install", "numpy"])
 
@@ -2827,12 +2830,12 @@ class SEQUENCER_OT_generate_audio(Operator):
                     device = "cpu"
 
 #                wav1, new_sr = denoise(dwav, sr, device)
-                wav2, new_sr = enhance(dwav, sr, device, nfe=64, solver="midpoint", lambd=0.1, tau=0.5)
+                wav2, new_sr = enhance(dwav=dwav, sr=sr, device=device, nfe=64, chunk_seconds=10, chunks_overlap=1, solver="midpoint", lambd=0.1, tau=0.5)
                 #print("sr_save " + str(new_sr))
                 # wav1 = wav1.cpu().numpy()
                 wav2 = wav2.cpu().numpy()
                 # Write the combined audio to a file
-                #write_wav(filename, new_sr, wav2)
+                write_wav(filename, new_sr, wav2)
 
             # Musicgen.
             elif addon_prefs.audio_model_card == "facebook/musicgen-stereo-medium":
