@@ -67,6 +67,7 @@ https://github.com/amb/blender_pip      |
 
 ## Change Log
 
+* 2024-01-01: Fix installation and Bark bugs.
 * 2024-01-31: Add OpenDalle, Speed option, SDXL and LoRA support for Canny and OpenPose, include OpenPose rig images. Prune old models including SD. 
 * 2023-12-18: Add: Bark audio enhance, Segmind Vega. 
 * 2023-12-1: Add SD Turbo & MusicGen Medium, MPS device for MacOS.
