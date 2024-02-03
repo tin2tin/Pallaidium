@@ -14,7 +14,7 @@
 bl_info = {
     "name": "Pallaidium - Generative AI",
     "author": "tintwotin",
-    "version": (2, 1),
+    "version": (2, 0),
     "blender": (3, 4, 0),
     "location": "Video Sequence Editor > Sidebar > Generative AI",
     "description": "AI Generate media in the VSE",
@@ -44,6 +44,7 @@ import gc
 temp = pathlib.PosixPath
 pathlib.PosixPath = pathlib.WindowsPath
 import time
+from bpy_extras.io_utils import ImportHelper
 
 import sys
 print("Python: "+sys.version)
@@ -114,7 +115,7 @@ def timer():
 def print_elapsed_time(start_time):
     elapsed_time = time.time() - start_time
     formatted_time = format_time(elapsed_time * 1000)  # Convert to milliseconds
-    print(f"Total time: {formatted_time}")
+    print(f"Total time: {formatted_time}\n\n")
 
 
 def split_and_recombine_text(text, desired_length=200, max_length=300):
@@ -697,8 +698,9 @@ def install_modules(self):
 
     import_module(self, "huggingface_hub", "huggingface_hub")
     import_module(self, "transformers", "git+https://github.com/huggingface/transformers.git")
-    
     subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/suno-ai/bark.git", "--upgrade"])
+    import_module(self, "WhisperSpeech", "WhisperSpeech")
+    import_module(self, "pydub", "pydub")
     if os_platform == "Windows":
         subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/daswer123/resemble-enhance-windows.git", "--no-dependencies", "--upgrade"])
         #subprocess.call([pybin, "-m", "pip", "install", "resemble-enhance", "--no-dependencies", "--upgrade"])
@@ -718,7 +720,7 @@ def install_modules(self):
     else:
         import_module(self, "resemble_enhance", "resemble-enhance")
     #import_module(self, "peft", "git+https://github.com/huggingface/peft.git")
-        
+
     #import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
     #import_module(self, "diffusers", "diffusers")
     import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
@@ -735,7 +737,7 @@ def install_modules(self):
     import_module(self, "protobuf", "protobuf")
 
     python_version_info = sys.version_info
-    python_version_str = parse_python_version(python_version_info)   
+    python_version_str = parse_python_version(python_version_info)
 
     import_module(self, "imageio", "imageio")
     import_module(self, "imwatermark", "invisible-watermark>=0.2.0")
@@ -762,26 +764,26 @@ def install_modules(self):
             import_module(self, "triton", "triton")
 
     #subprocess.check_call([pybin, "-m", "pip", "install", "numpy", "--upgrade"])
-    
+
     # import_module(self, "mustango", "mustango")
     # import_module(self, "mustango", "git+https://github.com/AMAAI-Lab/mustango.git")
-    
+
     if os_platform == "Windows":
-        if python_version_str == "3.10":        
+        if python_version_str == "3.10":
             subprocess.check_call([pybin, "-m", "pip", "install", "https://files.pythonhosted.org/packages/e2/a9/98e0197b24165113ac551aae5646005205f88347fb13ac59a75a9864e1d3/mediapipe-0.10.9-cp310-cp310-win_amd64.whl", "--no-warn-script-location"])
         else:
             subprocess.check_call([pybin, "-m", "pip", "install", "https://files.pythonhosted.org/packages/e9/7b/cd671c5067a56e1b4a9b70d0e42ac8cdb9f63acdc186589827cf213802a5/mediapipe-0.10.9-cp311-cp311-win_amd64.whl", "--no-warn-script-location"])
     else:
         import_module(self, "mediapipe", "mediapipe")
-        
+
     if os_platform == "Windows":
-        if python_version_str == "3.10": 
+        if python_version_str == "3.10":
             subprocess.check_call([pybin, "-m", "pip", "install", "https://github.com/Gourieff/Assets/raw/main/Insightface/insightface-0.7.3-cp310-cp310-win_amd64.whl", "--no-warn-script-location"])
         else:
             subprocess.check_call([pybin, "-m", "pip", "install", "https://github.com/Gourieff/Assets/raw/main/Insightface/insightface-0.7.3-cp311-cp311-win_amd64.whl", "--no-warn-script-location"])
     else:
         import_module(self, "insightface", "insightface")
-        
+
     #import_module(self, "audiocraft", "git+https://github.com/facebookresearch/audiocraft.git")
 
     # import_module(self, "compel", "compel")
@@ -872,7 +874,7 @@ def install_modules(self):
         import_module(self, "torchvision", "torchvision")
         import_module(self, "torchaudio", "torchaudio")
         import_module(self, "xformers", "xformers")
-        
+
 
 
 def get_module_dependencies(module_name):
@@ -984,6 +986,17 @@ class GENERATOR_OT_uninstall(Operator):
         uninstall_module_with_dependencies("tabulate")
         uninstall_module_with_dependencies("gradio")
 
+        # WhisperSpeech
+        uninstall_module_with_dependencies("ruamel.yaml.clib")
+        uninstall_module_with_dependencies("fastprogress")
+        uninstall_module_with_dependencies("fastcore")
+        uninstall_module_with_dependencies("ruamel.yaml")
+        uninstall_module_with_dependencies("hyperpyyaml")
+        uninstall_module_with_dependencies("speechbrain")
+        uninstall_module_with_dependencies("vocos")
+        uninstall_module_with_dependencies("WhisperSpeech")
+        uninstall_module_with_dependencies("pydub")
+
         self.report(
             {"INFO"},
             "\nRemove AI Models manually: \nLinux and macOS: ~/.cache/huggingface/hub\nWindows: %userprofile%.cache\\huggingface\\hub",
@@ -1019,10 +1032,10 @@ def input_strips_updated(self, context):
         scene.inpaint_selected_strip = ""
 
     if type == "image" and scene.input_strips != "input_strips" and (
-        image_model_card == "lllyasviel/sd-controlnet-canny"
+        image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
         or image_model_card == "lllyasviel/sd-controlnet-openpose"
         or image_model_card == "lllyasviel/control_v11p_sd15_scribble"
-        or image_model_card == "monster-labs/control_v1p_sd15_qrcode_monster"
+        or image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
         or image_model_card == "Salesforce/blipdiffusion"
         or image_model_card == "h94/IP-Adapter"
     ):
@@ -1082,10 +1095,10 @@ def output_strips_updated(self, context):
             bpy.ops.lora.refresh_files()
 
     if (
-        image_model_card == "lllyasviel/sd-controlnet-canny"
+        image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
         or image_model_card == "lllyasviel/sd-controlnet-openpose"
         or image_model_card == "lllyasviel/control_v11p_sd15_scribble"
-        or image_model_card == "monster-labs/control_v1p_sd15_qrcode_monster"
+        or image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
         or image_model_card == "Salesforce/blipdiffusion"
         or image_model_card == "h94/IP-Adapter"
     ) and type == "image":
@@ -1243,7 +1256,7 @@ class GeneratorAddonPreferences(AddonPreferences):
 #                "dataautogpt3/Miniaturus_PotentiaV1.2",
 #                "Miniaturus_PotentiaV1.2 (1024x1024)",
 #                "dataautogpt3/Miniaturus_PotentiaV1.2",
-#            ),#  
+#            ),#
 #            (
 #                "dataautogpt3/ProteusV0.2",
 #                "Proteus (1024x1024)",
@@ -1266,17 +1279,17 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Salesforce/blipdiffusion",
             ),
             (
-                "lllyasviel/sd-controlnet-canny",
+                "diffusers/controlnet-canny-sdxl-1.0-small",
                 "Canny (512x512)",
-                "lllyasviel/sd-controlnet-canny",
+                "diffusers/controlnet-canny-sdxl-1.0-small",
             ),
             # Disabled - has log-in code.
             # ("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0"),
-#            (
-#                "monster-labs/control_v1p_sd15_qrcode_monster",
-#                "Illusion (512x512)",
-#                "monster-labs/control_v1p_sd15_qrcode_monster",
-#            ),
+            (
+                "monster-labs/control_v1p_sdxl_qrcode_monster",
+                "Illusion (512x512)",
+                "monster-labs/control_v1p_sdxl_qrcode_monster",
+            ),
             (
                 "lllyasviel/sd-controlnet-openpose",
                 "OpenPose (512x512)",
@@ -1305,6 +1318,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "vtrungnhan9/audioldm2-music-zac2023",
             ),
             ("bark", "Speech: Bark", "Bark"),
+            ("WhisperSpeech", "Speech: WhisperSpeech", "WhisperSpeech"),
 #            (
 #                #"vtrungnhan9/audioldm2-music-zac2023",
 #                "cvssp/audioldm2-music",
@@ -1708,12 +1722,11 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     and movie_model_card != "guoyww/animatediff-motion-adapter-v1-5-2"
                 ) or (
                     type == "image"
-                    #and image_model_card != "lllyasviel/sd-controlnet-canny"
+                    #and image_model_card != "diffusers/controlnet-canny-sdxl-1.0-small"
                     and image_model_card != "lllyasviel/sd-controlnet-openpose"
                     #and image_model_card != "h94/IP-Adapter"
                     and image_model_card != "lllyasviel/control_v11p_sd15_scribble"
-                    and image_model_card
-                    != "monster-labs/control_v1p_sd15_qrcode_monster"
+                    #and image_model_card!= "monster-labs/control_v1p_sdxl_qrcode_monster"
                     and image_model_card != "Salesforce/blipdiffusion"
                 ):
                     if input == "input_strips" and not scene.inpaint_selected_strip:
@@ -1737,7 +1750,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                                 "svd_decode_chunk_size",
                                 text="Decode Frames",
                             )
-                    if bpy.context.scene.sequence_editor is not None and image_model_card != "lllyasviel/sd-controlnet-canny":
+                    if bpy.context.scene.sequence_editor is not None and image_model_card != "diffusers/controlnet-canny-sdxl-1.0-small":
                         if len(bpy.context.scene.sequence_editor.sequences) > 0:
                             if input == "input_strips" and type == "image":
                                 col.prop_search(
@@ -1768,7 +1781,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     or image_model_card == "runwayml/stable-diffusion-v1-5"
                     or image_model_card == "stabilityai/sdxl-turbo"
                     or image_model_card == "lllyasviel/sd-controlnet-openpose"
-                    or image_model_card == "lllyasviel/sd-controlnet-canny"
+                    or image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
                     or image_model_card == "lllyasviel/control_v11p_sd15_scribble"
                 )
                 and type == "image"
@@ -1817,6 +1830,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 if (type == "audio" and audio_model_card == "bark") or (
                     type == "audio"
                     and audio_model_card == "facebook/musicgen-stereo-medium"
+                    and audio_model_card == "WhisperSpeech"
                 ):
                     pass
                 else:
@@ -1847,6 +1861,12 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 col = layout.column(align=True)
                 col.prop(context.scene, "speakers", text="Speaker")
                 col.prop(context.scene, "languages", text="Language")
+
+            elif type == "audio" and audio_model_card == "WhisperSpeech":
+                row = col.row(align=True)
+                row.prop(context.scene, "audio_path", text="Speaker")
+                row.operator("sequencer.open_audio_filebrowser", text="", icon="FILEBROWSER")
+                col.prop(context.scene, "audio_speed", text="Speed")
             elif (
                 type == "audio"
                 and addon_prefs.audio_model_card == "facebook/musicgen-stereo-medium"
@@ -1854,6 +1874,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 col.prop(
                     context.scene, "movie_num_inference_steps", text="Quality Steps"
                 )
+
             else:
                 col.prop(
                     context.scene, "movie_num_inference_steps", text="Quality Steps"
@@ -1899,11 +1920,11 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
 #                row = col.row()
 ##                if type == "movie" or (
 ##                    type == "image"
-##                    and image_model_card != "lllyasviel/sd-controlnet-canny"
+##                    and image_model_card != "diffusers/controlnet-canny-sdxl-1.0-small"
 ##                    and image_model_card != "lllyasviel/sd-controlnet-openpose"
 ##                    and image_model_card != "lllyasviel/control_v11p_sd15_scribble"
 ##                    and image_model_card
-##                    != "monster-labs/control_v1p_sd15_qrcode_monster"
+##                    != "monster-labs/control_v1p_sdxl_qrcode_monster"
 ##                    and image_model_card != "Salesforce/blipdiffusion"
 ##                ):
 ##                    row.prop(context.scene, "use_freeU", text="FreeU")
@@ -1917,8 +1938,8 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     or (type == "image" and image_model_card == "segmind/SSD-1B")
                     or (type == "image" and image_model_card == "lllyasviel/sd-controlnet-openpose")
                     or (type == "image" and image_model_card == "lllyasviel/control_v11p_sd15_scribble")
-                    or (type == "image" and image_model_card == "lllyasviel/sd-controlnet-canny")
-                    or (type == "image" and image_model_card == "monster-labs/control_v1p_sd15_qrcode_monster")
+                    or (type == "image" and image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small")
+                    or (type == "image" and image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster")
                     or (
                         type == "image"
                         and image_model_card == "segmind/Segmind-Vega"
@@ -2612,6 +2633,34 @@ class SEQUENCER_OT_generate_movie(Operator):
         return {"FINISHED"}
 
 
+class SequencerOpenAudioFile(Operator, ImportHelper):
+    bl_idname = "sequencer.open_audio_filebrowser"
+    bl_label = "Open Audio File Browser"
+    filter_glob: StringProperty(
+        default='*.mp3;*.wav;*.ogg',
+        options={'HIDDEN'},
+    )
+
+    def execute(self, context):
+        scene = context.scene
+        # Check if the file exists
+        if self.filepath and os.path.exists(self.filepath):
+            valid_extensions = {".mp3", ".wav"}
+            filename, extension = os.path.splitext(self.filepath)
+            if extension.lower() in valid_extensions:
+                print('Selected audio file:', self.filepath)
+                scene.audio_path=bpy.path.abspath(self.filepath)
+        else:
+            self.report({'ERROR'}, "Selected file does not exist.")
+            return {'CANCELLED'}
+
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+
 class SEQUENCER_OT_generate_audio(Operator):
     """Generate Audio"""
 
@@ -2668,6 +2717,9 @@ class SEQUENCER_OT_generate_audio(Operator):
 
                 from resemble_enhance.enhancer.inference import denoise, enhance
 
+                if addon_prefs.audio_model_card == "WhisperSpeech":
+                    from whisperspeech.pipeline import Pipeline
+
             except ModuleNotFoundError:
                 print("Dependencies needs to be installed in the add-on preferences.")
                 self.report(
@@ -2675,6 +2727,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                     "Dependencies needs to be installed in the add-on preferences.",
                 )
                 return {"CANCELLED"}
+
         show_system_console(True)
         set_system_console_topmost(True)
         # clear the VRAM
@@ -2743,6 +2796,12 @@ class SEQUENCER_OT_generate_audio(Operator):
                 fine_use_gpu=True,
                 fine_use_small=True,
             )
+        #WhisperSpeech
+        elif addon_prefs.audio_model_card == "WhisperSpeech":
+            from whisperspeech.pipeline import Pipeline
+
+            pipe = Pipeline(s2a_ref='collabora/whisperspeech:s2a-q4-small-en+pl.model')
+
 
         # Mustango
         elif addon_prefs.audio_model_card == "declare-lab/mustango":
@@ -2823,7 +2882,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 #dwav = transform(dwav)
 #                dwav = audio
                 #sr = rate
-                
+
                 if torch.cuda.is_available():
                     device = "cuda"
                 else:
@@ -2836,6 +2895,19 @@ class SEQUENCER_OT_generate_audio(Operator):
                 wav2 = wav2.cpu().numpy()
                 # Write the combined audio to a file
                 write_wav(filename, new_sr, wav2)
+
+            #WhisperSpeech
+            elif addon_prefs.audio_model_card == "WhisperSpeech":
+
+                prompt = context.scene.generate_movie_prompt
+                prompt = prompt.replace("\n", " ").strip()
+                filename = solve_path(clean_filename(prompt) + ".wav")
+                if scene.audio_path:
+                    speaker = scene.audio_path
+                else:
+                    speaker = None
+
+                audio_tensor = pipe.generate_to_file(filename, prompt, speaker=speaker, lang='en', cps=int(scene.audio_speed))
 
             # Musicgen.
             elif addon_prefs.audio_model_card == "facebook/musicgen-stereo-medium":
@@ -3063,9 +3135,9 @@ class SEQUENCER_OT_generate_image(Operator):
 
         if (
             scene.generate_movie_prompt == ""
-            and not image_model_card == "lllyasviel/sd-controlnet-canny"
+            and not image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
             and not image_model_card == "Salesforce/blipdiffusion"
-            and not image_model_card == "monster-labs/control_v1p_sd15_qrcode_monster"
+            and not image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
         ):
             self.report({"INFO"}, "Text prompt in the Generative AI tab is empty!")
             return {"CANCELLED"}
@@ -3124,21 +3196,21 @@ class SEQUENCER_OT_generate_image(Operator):
             input == "input_strips"
             and find_strip_by_name(scene, scene.inpaint_selected_strip)
             and type == "image"
-            and not image_model_card == "lllyasviel/sd-controlnet-canny"
+            and not image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
             and not image_model_card == "lllyasviel/sd-controlnet-openpose"
             and not image_model_card == "lllyasviel/control_v11p_sd15_scribble"
             and not image_model_card == "h94/IP-Adapter"
-            and not image_model_card == "monster-labs/control_v1p_sd15_qrcode_monster"
+            and not image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
             and not image_model_card == "Salesforce/blipdiffusion"
             and not image_model_card ==  "Lykon/dreamshaper-8"
         )
         do_convert = (
             (scene.image_path or scene.movie_path)
-            and not image_model_card == "lllyasviel/sd-controlnet-canny"
+            and not image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
             and not image_model_card == "lllyasviel/sd-controlnet-openpose"
             and not image_model_card == "lllyasviel/control_v11p_sd15_scribble"
             and not image_model_card == "h94/IP-Adapter"
-            and not image_model_card == "monster-labs/control_v1p_sd15_qrcode_monster"
+            and not image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
             and not image_model_card == "Salesforce/blipdiffusion"
             and not do_inpaint
         )
@@ -3146,11 +3218,11 @@ class SEQUENCER_OT_generate_image(Operator):
         if (
             do_inpaint
             or do_convert
-            or image_model_card == "lllyasviel/sd-controlnet-canny"
+            or image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
             or image_model_card == "lllyasviel/sd-controlnet-openpose"
             or image_model_card == "lllyasviel/control_v11p_sd15_scribble"
             or image_model_card == "h94/IP-Adapter"
-            or image_model_card == "monster-labs/control_v1p_sd15_qrcode_monster"
+            or image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
             or image_model_card == "Salesforce/blipdiffusion"
         ):
             if not strips:
@@ -3178,11 +3250,14 @@ class SEQUENCER_OT_generate_image(Operator):
             # clear the VRAM
             clear_cuda_cache()
 
+            vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
+
             #pipe = AutoPipelineForInpainting.from_pretrained(
             pipe = StableDiffusionXLInpaintPipeline.from_pretrained(
                 "diffusers/stable-diffusion-xl-1.0-inpainting-0.1",
                 torch_dtype=torch.float16,
                 variant="fp16",
+                vae=vae,
                 local_files_only=local_files_only,
             ).to(gfx_device)
             # Set scheduler
@@ -3248,7 +3323,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 print("LoRAs will be ignored for image or movie input.")
                 enabled_items = False
 
-            if enabled_items:                
+            if enabled_items:
                 if scene.use_lcm:
                     from diffusers import LCMScheduler
 
@@ -3262,8 +3337,8 @@ class SEQUENCER_OT_generate_image(Operator):
                             adapter_name=("lcm-lora-sdxl"),
                         )
                     else:
-                        converter.load_lora_weights("latent-consistency/lcm-lora-sdxl")                
-                
+                        converter.load_lora_weights("latent-consistency/lcm-lora-sdxl")
+
             converter.watermark = NoWatermark()
             if low_vram():
                 converter.enable_model_cpu_offload()
@@ -3271,7 +3346,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 # converter.enable_vae_slicing()
             else:
                 converter.to(gfx_device)
-                    
+
 #        elif: # depth
 #            from transformers import DPTFeatureExtractor, DPTForDepthEstimation
 #            from diffusers import ControlNetModel, StableDiffusionXLControlNetImg2ImgPipeline, AutoencoderKL
@@ -3294,64 +3369,45 @@ class SEQUENCER_OT_generate_image(Operator):
 #                use_safetensors=True,
 #                torch_dtype=torch.float16,
 #            ).to(gfx_device)
-#            pipe.enable_model_cpu_offload()               
+#            pipe.enable_model_cpu_offload()
 
         # Canny & Illusion
         elif (
-            image_model_card == "lllyasviel/sd-controlnet-canny"
-            or image_model_card == "monster-labs/control_v1p_sd15_qrcode_monster"
+            image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
+            or image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
         ):
-            if image_model_card == "lllyasviel/sd-controlnet-canny":
+            if image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small":
                 print("Load: Canny")
             else:
                 print("Load: Illusion")
-                
-#            from diffusers import (
-#                #StableDiffusionControlNetPipeline,
-#                ControlNetModel,
-#                UniPCMultistepScheduler,
-#            )
 
             from diffusers import ControlNetModel, StableDiffusionXLControlNetPipeline, AutoencoderKL
 
-
-            controlnet = ControlNetModel.from_pretrained(
-                "diffusers/controlnet-canny-sdxl-1.0",
-                torch_dtype=torch.float16
-            )
-            
-            if image_model_card == "monster-labs/control_v1p_sd15_qrcode_monster":
-            
-                #vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
-                pipe = StableDiffusionXLControlNetPipeline.from_pretrained(
+            if image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster":
+                controlnet = ControlNetModel.from_pretrained(
                     "monster-labs/control_v1p_sdxl_qrcode_monster",
-                    controlnet=controlnet,
-                    #vae=vae,
                     torch_dtype=torch.float16,
-                )            
+                    local_files_only=local_files_only,
+                )
             else:
-                vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
-                pipe = StableDiffusionXLControlNetPipeline.from_pretrained(
-                    "stabilityai/stable-diffusion-xl-base-1.0",
-                    controlnet=controlnet,
-                    vae=vae,
+                controlnet = ControlNetModel.from_pretrained(
+                    "diffusers/controlnet-canny-sdxl-1.0-small",
                     torch_dtype=torch.float16,
+                    variant="fp16",
+                    local_files_only=local_files_only,
                 )
 
-#            controlnet = ControlNetModel.from_pretrained(
-#                image_model_card,
-#                torch_dtype=torch.float16,
-#                local_files_only=local_files_only,
-#            )
-#            pipe = StableDiffusionControlNetPipeline.from_pretrained(
-#                "runwayml/stable-diffusion-v1-5",
-#                controlnet=controlnet,
-#                torch_dtype=torch.float16,
-#                local_files_only=local_files_only,
-#            )  # safety_checker=None,
+            vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
+            pipe = StableDiffusionXLControlNetPipeline.from_pretrained(
+                "stabilityai/stable-diffusion-xl-base-1.0",
+                controlnet=controlnet,
+                vae=vae,
+                torch_dtype=torch.float16,
+                variant="fp16",
+            )
 
             pipe.watermark = NoWatermark()
-#            
+
             if scene.use_lcm:
                 from diffusers import LCMScheduler
 
@@ -3368,7 +3424,6 @@ class SEQUENCER_OT_generate_image(Operator):
                     pipe.load_lora_weights("latent-consistency/lcm-lora-sdxl")
 
             if low_vram():
-                #pipe.enable_xformers_memory_efficient_attention()
                 pipe.enable_model_cpu_offload()
             else:
                 pipe.to(gfx_device)
@@ -3660,12 +3715,12 @@ class SEQUENCER_OT_generate_image(Operator):
 
             from diffusers import AutoencoderKL
 
-#            vae = AutoencoderKL.from_pretrained(
-#                "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
-#            )
+            vae = AutoencoderKL.from_pretrained(
+                "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
+            )
             pipe = StableDiffusionXLPipeline.from_single_file(
                 "https://huggingface.co/thibaud/sdxl_dpo_turbo/blob/main/sdxl_dpo_turbo.safetensors",
-#                vae=vae,
+                vae=vae,
                 torch_dtype=torch.float16,
                 variant="fp16",
             )
@@ -3717,21 +3772,21 @@ class SEQUENCER_OT_generate_image(Operator):
                 import torch
                 from diffusers import (
                     AutoPipelineForText2Image,
-                    StableDiffusionXLPipeline, 
+                    StableDiffusionXLPipeline,
                     KDPM2AncestralDiscreteScheduler,
                     AutoencoderKL
                 )
 
 #                # Load VAE component
 #                vae = AutoencoderKL.from_pretrained(
-#                    "madebyollin/sdxl-vae-fp16-fix", 
+#                    "madebyollin/sdxl-vae-fp16-fix",
 #                    torch_dtype=torch.float16
 #                )
 
                 # Configure the pipeline
                 #pipe = StableDiffusionXLPipeline.from_pretrained(
 #                pipe = AutoPipelineForText2Image.from_pretrained(
-#                    "dataautogpt3/ProteusV0.2", 
+#                    "dataautogpt3/ProteusV0.2",
 #                    #vae=vae,
 #                    torch_dtype=torch.float16,
 #                    local_files_only=local_files_only,
@@ -3744,7 +3799,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     "dataautogpt3/Miniaturus_PotentiaV1.2",
                     torch_dtype=torch.float16,  # vae=vae,
                     local_files_only=local_files_only,
-                )                                         
+                )
             else:
                 from diffusers import AutoPipelineForText2Image
                 pipe = AutoPipelineForText2Image.from_pretrained(
@@ -3827,7 +3882,7 @@ class SEQUENCER_OT_generate_image(Operator):
             or image_model_card == "runwayml/stable-diffusion-v1-5"
             or image_model_card == "stabilityai/sdxl-turbo"
             or image_model_card == "lllyasviel/sd-controlnet-openpose"
-            or image_model_card == "lllyasviel/sd-controlnet-canny"
+            or image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
             or image_model_card == "lllyasviel/control_v11p_sd15_scribble"
         ):
             scene = context.scene
@@ -3844,7 +3899,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     )
                 pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)
                 print("Load LoRAs: " + " ".join(enabled_names))
-            
+
 
         # Refiner model - load if chosen.
         if do_refine:
@@ -3976,11 +4031,10 @@ class SEQUENCER_OT_generate_image(Operator):
 
             # Canny & Illusion
             elif (
-                image_model_card == "lllyasviel/sd-controlnet-canny"
-                or image_model_card == "monster-labs/control_v1p_sd15_qrcode_monster"
+                image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
+                or image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
             ):
-                print("Process: Canny")
-    
+
                 init_image = None
                 if scene.image_path:
                     init_image = load_first_frame(scene.image_path)
@@ -3992,7 +4046,8 @@ class SEQUENCER_OT_generate_image(Operator):
 
                 image = scale_image_within_dimensions(np.array(init_image),x,None)
 
-                if image_model_card == "lllyasviel/sd-controlnet-canny":
+                if image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small":
+                    print("Process: Canny")
                     image = np.array(init_image)
                     low_threshold = 100
                     high_threshold = 200
@@ -4001,25 +4056,43 @@ class SEQUENCER_OT_generate_image(Operator):
                     canny_image = np.concatenate([image, image, image], axis=2)
                     canny_image = Image.fromarray(canny_image)
                     # canny_image = np.array(canny_image)
+                    image = pipe(
+                        prompt=prompt,
+                        #negative_prompt=negative_prompt,
+                        num_inference_steps=image_num_inference_steps,  # Should be around 50
+                        controlnet_conditioning_scale=1.00 - scene.image_power,
+                        image=canny_image,
+                        #                    guidance_scale=clamp_value(
+                        #                        image_num_guidance, 3, 5
+                        #                    ),  # Should be between 3 and 5.
+                        #                    # guess_mode=True, #NOTE: Maybe the individual methods should be selectable instead?
+                        #                    height=y,
+                        #                    width=x,
+                        #                    generator=generator,
+                    ).images[0]
                 else:
-                    canny_image = init_image
-                    
-                image = pipe(
-                    prompt=prompt,
-                    #negative_prompt=negative_prompt,
-                    num_inference_steps=image_num_inference_steps,  # Should be around 50
-                    controlnet_conditioning_scale=1.00 - scene.image_power,
-                    image=canny_image,
-                    #                    guidance_scale=clamp_value(
-                    #                        image_num_guidance, 3, 5
-                    #                    ),  # Should be between 3 and 5.
-                    #                    # guess_mode=True, #NOTE: Maybe the individual methods should be selectable instead?
-                    #                    height=y,
-                    #                    width=x,
-                    #                    generator=generator,
-                ).images[0]
+                    print("Process: Illusion")
+                    illusion_image = init_image
 
-                    
+                    image = pipe(
+                        prompt=prompt,
+                        negative_prompt=negative_prompt,
+                        num_inference_steps=image_num_inference_steps,  # Should be around 50
+                        control_image=illusion_image,
+                        controlnet_conditioning_scale=1.00 - scene.image_power,
+                        generator=generator,
+                        control_guidance_start=0,
+                        control_guidance_end=1,
+                        #output_type="latent"
+                        #                    guidance_scale=clamp_value(
+                        #                        image_num_guidance, 3, 5
+                        #                    ),  # Should be between 3 and 5.
+                        #                    # guess_mode=True, #NOTE: Maybe the individual methods should be selectable instead?
+                        #                    height=y,
+                        #                    width=x,
+                    ).images[0]
+
+
 
             # DreamShaper
             elif image_model_card == "Lykon/dreamshaper-8" and do_convert == False:
@@ -4256,7 +4329,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             # Img2img
             elif do_convert:
-                
+
                 if enabled_items:
                     self.report(
                         {"INFO"},
@@ -4910,6 +4983,7 @@ classes = (
     LORABROWSER_UL_files,
     GENERATOR_OT_install,
     GENERATOR_OT_uninstall,
+    SequencerOpenAudioFile,
 )
 
 
@@ -5153,7 +5227,19 @@ def register():
         default="",
         update=update_folder_callback,
     )
-
+    bpy.types.Scene.audio_path = bpy.props.StringProperty(
+        name="audio_path",
+        default="",
+        description="Path to speaker voice",
+    )
+    # The frame audio duration.
+    bpy.types.Scene.audio_speed = bpy.props.IntProperty(
+        name="audio_speed",
+        default=13,
+        min=1,
+        max=20,
+        description="Speech speed.",
+    )
 
 def unregister():
     for cls in classes:
