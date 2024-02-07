@@ -532,7 +532,6 @@ def process_image(image_path, frames_nr):
     processed_frames = process_frames(temp_image_folder, movie_x)
     # Clean up: Delete the temporary image folder
     shutil.rmtree(temp_image_folder)
-    cv2.destroyAllWindows()
     return processed_frames
 
 
@@ -643,53 +642,34 @@ def import_module(self, module, install_module):
     set_system_console_topmost(True)
     module = str(module)
     python_exe = python_exec()
+
     try:
         subprocess.call([python_exe, "import ", packageName])
-        # exec("import " + module)
-    except:  # ModuleNotFoundError:
-        #        app_path = site.USER_SITE
-        #        if app_path not in sys.path:
-        #            sys.path.append(app_path)
-        #        pybin = sys.executable
-        #        target = os.path.join(sys.prefix, 'site-packages')
-        #        if target not in sys.path:
-        #            sys.path.append(target)
+    except:
         self.report({"INFO"}, "Installing: " + module + " module.")
         print("\nInstalling: " + module + " module")
         subprocess.call([python_exe, "-m", "pip", "install", install_module, "--no-warn-script-location", "--upgrade"])
-        #        subprocess.check_call(
-        #            [
-        #                pybin,
-        #                "-m",
-        #                "pip",
-        #                "install",
-        #                install_module,
-        #                "--no-warn-script-location",
-        #                "--user",
-        #                #'-t', target,
-        #            ]
-        #        )
+
         try:
             exec("import " + module)
         except ModuleNotFoundError:
             return False
+
     return True
+
 
 def parse_python_version(version_info):
     major, minor = version_info[:2]
     return f"{major}.{minor}"
 
+
 def install_modules(self):
     os_platform = platform.system()
     app_path = site.USER_SITE
-    #    if app_path not in sys.path:
-    #        sys.path.append(app_path)
-    #    pybin = sys.executable
-    #    target = os.path.join(sys.prefix, 'site-packages')
-    #    if target not in sys.path:
-    #        sys.path.append(target)
+
     pybin = python_exec()
     print("Ensuring: pip")
+
     try:
         subprocess.call([pybin, "-m", "ensurepip"])
         subprocess.call([pybin, "-m", "pip", "install", "--upgrade", "pip"])
@@ -702,12 +682,10 @@ def install_modules(self):
     import_module(self, "WhisperSpeech", "WhisperSpeech")
     import_module(self, "pydub", "pydub")
     if os_platform == "Windows":
+        # resemble-enhance:
         subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/daswer123/resemble-enhance-windows.git", "--no-dependencies", "--upgrade"])
-        #subprocess.call([pybin, "-m", "pip", "install", "resemble-enhance", "--no-dependencies", "--upgrade"])
         deep_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),"deepspeed/deepspeed-0.12.4+unknown-py3-none-any.whl")
         import_module(self, "deepspeed", deep_path)
-
-        # resemble-enhance:
         import_module(self, "librosa", "librosa")
         import_module(self, "celluloid", "celluloid")
         import_module(self, "omegaconf", "omegaconf")
@@ -716,16 +694,12 @@ def install_modules(self):
         import_module(self, "rich", "rich")
         import_module(self, "resampy", "resampy")
         import_module(self, "tabulate", "tabulate")
-        #import_module(self, "gradio", "gradio==4.8.0") #Fail
     else:
         import_module(self, "resemble_enhance", "resemble-enhance")
-    #import_module(self, "peft", "git+https://github.com/huggingface/peft.git")
 
-    #import_module(self, "bark", "git+https://github.com/suno-ai/bark.git")
-    #import_module(self, "diffusers", "diffusers")
-    import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
+    import_module(self, "diffusers", "diffusers")
+    #import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
     subprocess.check_call([pybin, "-m", "pip", "install", "tensorflow"])
-    #import_module(self, "tensorflow", "tensorflow")
     import_module(self, "soundfile", "PySoundFile")
     import_module(self, "sentencepiece", "sentencepiece")
     import_module(self, "safetensors", "safetensors")
@@ -743,30 +717,11 @@ def install_modules(self):
     import_module(self, "imwatermark", "invisible-watermark>=0.2.0")
     if os_platform == "Windows":
         pass
-#        subprocess.check_call(
-#            [
-#                pybin,
-#                "-m",
-#                "pip",
-#                "install",
-#                # "triton",
-#                # "--index-url",
-#                "https://huggingface.co/r4ziel/xformers_pre_built/resolve/main/triton-2.0.0-cp310-cp310-win_amd64.whl",
-#                "--no-warn-script-location",
-#                #"--user",
-#                #'-t', target,
-#            ]
-#        )
     else:
         try:
             exec("import triton")
         except ModuleNotFoundError:
             import_module(self, "triton", "triton")
-
-    #subprocess.check_call([pybin, "-m", "pip", "install", "numpy", "--upgrade"])
-
-    # import_module(self, "mustango", "mustango")
-    # import_module(self, "mustango", "git+https://github.com/AMAAI-Lab/mustango.git")
 
     if os_platform == "Windows":
         if python_version_str == "3.10":
@@ -784,16 +739,8 @@ def install_modules(self):
     else:
         import_module(self, "insightface", "insightface")
 
-    #import_module(self, "audiocraft", "git+https://github.com/facebookresearch/audiocraft.git")
-
-    # import_module(self, "compel", "compel")
-
-#    try:
-#        exec("import torch")
-#    except ModuleNotFoundError:
     subprocess.call([pybin, "-m", "pip", "install", "lmdb"])
     import_module(self, "accelerate", "git+https://github.com/huggingface/accelerate.git")
-#    import_module(self, "controlnet_aux", "controlnet_aux")
     subprocess.check_call([pybin, "-m", "pip", "install", "peft", "--upgrade"])
 
     self.report({"INFO"}, "Installing: torch module.")
@@ -806,10 +753,8 @@ def install_modules(self):
                 "pip",
                 "install",
                 "xformers",
-                #"xformers==0.0.22.post4",
                 "--index-url",
                 "https://download.pytorch.org/whl/cu121",
-                #"https://download.pytorch.org/whl/cu118",
                 "--no-warn-script-location",
                 "--user",
             ]
@@ -820,12 +765,11 @@ def install_modules(self):
                 "-m",
                 "pip",
                 "install",
-                #"torch==2.1.2+cu121",
                 "torch==2.2.0+cu121",
                 "--index-url",
                 "https://download.pytorch.org/whl/cu121",
                 "--no-warn-script-location",
-                # "--user",
+                "--user",
             ]
         )
         subprocess.check_call(
@@ -838,7 +782,7 @@ def install_modules(self):
                 "--index-url",
                 "https://download.pytorch.org/whl/cu121",
                 "--no-warn-script-location",
-                # "--user",
+                "--user",
             ]
         )
         subprocess.check_call(
@@ -847,28 +791,13 @@ def install_modules(self):
                 "-m",
                 "pip",
                 "install",
-                #"torchaudio==2.1.2",
                 "torchaudio==2.2.0",
                 "--index-url",
                 "https://download.pytorch.org/whl/cu121",
                 "--no-warn-script-location",
-                # "--user",
+                "--user",
             ]
         )
-#        subprocess.check_call(
-#            [
-#                pybin,
-#                "-m",
-#                "pip",
-#                "install",
-#                "-U",
-#                "xformers==0.0.16",
-#                "--index-url",
-#                "https://download.pytorch.org/whl/cu121",
-#                "--no-warn-script-location",
-#                # "--user",
-#            ]
-#        )
     else:
         import_module(self, "torch", "torch")
         import_module(self, "torchvision", "torchvision")
@@ -881,10 +810,6 @@ def get_module_dependencies(module_name):
     """
     Get the list of dependencies for a given module.
     """
-    #    app_path = site.USER_SITE
-    #    if app_path not in sys.path:
-    #        sys.path.append(app_path)
-    #    pybin = sys.executable
     pybin = python_exec()
     result = subprocess.run(
         [pybin, "-m", "pip", "show", module_name], capture_output=True, text=True
@@ -904,10 +829,6 @@ def uninstall_module_with_dependencies(module_name):
     """
     show_system_console(True)
     set_system_console_topmost(True)
-    #    app_path = site.USER_SITE
-    #    if app_path not in sys.path:
-    #        sys.path.append(app_path)
-    #    pybin = sys.executable
     pybin = python_exec()
     dependencies = get_module_dependencies(module_name)
     # Uninstall the module
@@ -917,7 +838,6 @@ def uninstall_module_with_dependencies(module_name):
         print("\n ")
         if len(dependency)> 5 and str(dependency[5].lower) != "numpy":
             subprocess.run([pybin, "-m", "pip", "uninstall", "-y", dependency])
-    #subprocess.check_call([pybin, "-m", "pip", "install", "numpy"])
 
 
 class GENERATOR_OT_install(Operator):
@@ -951,9 +871,6 @@ class GENERATOR_OT_uninstall(Operator):
         uninstall_module_with_dependencies("torch")
         uninstall_module_with_dependencies("torchvision")
         uninstall_module_with_dependencies("torchaudio")
-        #        if os_platform == "Darwin" or os_platform == "Linux":
-        #            uninstall_module_with_dependencies("sox")
-        #        else:
         uninstall_module_with_dependencies("PySoundFile")
         uninstall_module_with_dependencies("diffusers")
         uninstall_module_with_dependencies("transformers")
@@ -968,7 +885,6 @@ class GENERATOR_OT_uninstall(Operator):
         uninstall_module_with_dependencies("invisible-watermark")
         uninstall_module_with_dependencies("pillow")
         uninstall_module_with_dependencies("libtorrent")
-        # uninstall_module_with_dependencies("compel")
         uninstall_module_with_dependencies("accelerate")
         uninstall_module_with_dependencies("triton")
         uninstall_module_with_dependencies("cv2")
@@ -1226,7 +1142,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Stable Diffusion XL 1.0 (1024x1024)",
                 "stabilityai/stable-diffusion-xl-base-1.0",
             ),
-#            ("thibaud/sdxl_dpo_turbo", "SDXL DPO TURBO (1024x1024)", "thibaud/sdxl_dpo_turbo"),
+            ("thibaud/sdxl_dpo_turbo", "SDXL DPO TURBO (1024x1024)", "thibaud/sdxl_dpo_turbo"),
 #            (
 #                "stabilityai/sdxl-turbo",
 #                "Stable Diffusion XL Turbo (512x512)",
@@ -1330,8 +1246,6 @@ class GeneratorAddonPreferences(AddonPreferences):
 #                "Sound: AudioLDM 2",
 #                "Sound: AudioLDM 2",
 #            ),
-            # Missing API installation: https://github.com/AMAAI-Lab/mustango/issues
-            # ("declare-lab/mustango", "Mustango", "declare-lab/mustango"),
         ],
         default="facebook/musicgen-stereo-medium",
         update=input_strips_updated,
@@ -1499,6 +1413,8 @@ def get_render_strip(self, context, strip):
         strip.select = True
         # Store current frame for later
         bpy.context.scene.frame_current = int(strip.frame_start)
+        # make_meta to keep transforms
+        bpy.ops.sequencer.meta_make()
         # Copy the strip to the clipboard
         bpy.ops.sequencer.copy()
         # Create a new scene
@@ -1512,8 +1428,8 @@ def get_render_strip(self, context, strip):
         # Set the new scene as the active scene
         context.window.scene = new_scene
         # Copy the scene properties from the current scene to the new scene
-        new_scene.render.resolution_x = current_scene.generate_movie_x #.render.resolution_x
-        new_scene.render.resolution_y = current_scene.generate_movie_y #current_scene.render.resolution_y
+        new_scene.render.resolution_x = current_scene.render.resolution_x
+        new_scene.render.resolution_y = current_scene.render.resolution_y
         new_scene.render.resolution_percentage = (
             current_scene.render.resolution_percentage
         )
@@ -1566,7 +1482,7 @@ def get_render_strip(self, context, strip):
         # Render the strip to hard disk
         bpy.ops.render.opengl(animation=True, sequencer=True)
         # Delete the new scene
-        bpy.data.scenes.remove(new_scene, do_unlink=True)
+        #bpy.data.scenes.remove(new_scene, do_unlink=True)
         if not os.path.exists(output_path):
             print("Render failed: " + output_path)
             bpy.context.preferences.system.sequencer_proxy_setup = "AUTOMATIC"
@@ -1854,7 +1770,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             col = layout.column(align=True)
             if type == "movie" or type == "image":
                 col.prop(context.scene, "generate_movie_frames", text="Frames")
-            if type == "audio" and audio_model_card != "bark":
+            if type == "audio" and audio_model_card != "bark" and audio_model_card != "WhisperSpeech":
                 col.prop(context.scene, "audio_length_in_f", text="Frames")
 
             if type == "audio" and audio_model_card == "bark":
@@ -2038,12 +1954,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
             Image.MAX_IMAGE_PIXELS = None
             import numpy as np
-#            from .free_lunch_utils import (
-#                register_free_upblock3d,
-#                register_free_crossattn_upblock3d,
-#            )
 
-            # from compel import Compel
         except ModuleNotFoundError:
             print("In the add-on preferences, install dependencies.")
             self.report(
@@ -2167,16 +2078,31 @@ class SEQUENCER_OT_generate_movie(Operator):
             #                else:
             #                    refiner.to(gfx_device)
 
-            elif (movie_model_card == "stabilityai/stable-video-diffusion-img2vid" or movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt"):
+            elif (movie_model_card == "stabilityai/stable-video-diffusion-img2vid" or movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt"): # or movie_model_card == "vdo/stable-video-diffusion-img2vid-fp16"):
                 from diffusers import StableVideoDiffusionPipeline
                 from diffusers.utils import load_image, export_to_video
 
-                refiner = StableVideoDiffusionPipeline.from_pretrained(
-                    movie_model_card,
-                    torch_dtype=torch.float16,
-                    variant="fp16",
-                    local_files_only=local_files_only,
-                )
+                if movie_model_card == "stabilityai/stable-video-diffusion-img2vid":
+                    # Version 1.1 - too heavy
+                    #refiner = StableVideoDiffusionPipeline.from_single_file(
+                        #"https://huggingface.co/vdo/stable-video-diffusion-img2vid-fp16/blob/main/svd_image_decoder-fp16.safetensors",
+                    refiner = StableVideoDiffusionPipeline.from_pretrained(
+                        movie_model_card,
+                        torch_dtype=torch.float16,
+                        variant="fp16",
+                        local_files_only=local_files_only,
+                    )
+                if movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt":
+                    # Version 1.1 - too heavy
+                    #refiner = StableVideoDiffusionPipeline.from_single_file(
+                        #"https://huggingface.co/vdo/stable-video-diffusion-img2vid-fp16/blob/main/svd_xt_image_decoder-fp16.safetensors",
+                    refiner = StableVideoDiffusionPipeline.from_pretrained(
+                        "vdo/stable-video-diffusion-img2vid-xt-1-1",
+                        #movie_model_card,
+                        torch_dtype=torch.float16,
+                        variant="fp16",
+                        local_files_only=local_files_only,
+                    )
                 if low_vram():
                     refiner.enable_model_cpu_offload()
                 else:
@@ -2191,17 +2117,15 @@ class SEQUENCER_OT_generate_movie(Operator):
                     card = "cerspense/zeroscope_v2_XL"
                 else:
                     card = movie_model_card
-                from diffusers import VideoToVideoSDPipeline
 
+                from diffusers import VideoToVideoSDPipeline
                 upscale = VideoToVideoSDPipeline.from_pretrained(
                     card,
                     torch_dtype=torch.float16,
-                    variant="fp16",
-                    # use_safetensors=True,
                     local_files_only=local_files_only,
                 )
-                from diffusers import DPMSolverMultistepScheduler
 
+                from diffusers import DPMSolverMultistepScheduler
                 upscale.scheduler = DPMSolverMultistepScheduler.from_config(
                     upscale.scheduler.config
                 )
@@ -2462,9 +2386,6 @@ class SEQUENCER_OT_generate_movie(Operator):
                         num_frames=duration,
                         generator=generator,
                     ).frames[0]
-                    export_to_video(
-                        video_frames, "C:/Users/45239/Documents/generated2.mp4", fps=7
-                    )
 
                 elif movie_model_card != "guoyww/animatediff-motion-adapter-v1-5-2":
                     if scene.movie_path:
@@ -2516,13 +2437,13 @@ class SEQUENCER_OT_generate_movie(Operator):
                         num_inference_steps=movie_num_inference_steps,
                         guidance_scale=movie_num_guidance,
                         generator=generator,
-                    ).frames
+                    ).frames[0]
 
             # Movie.
             else:
                 print("Generate: Video")
                 if movie_model_card == "guoyww/animatediff-motion-adapter-v1-5-2":
-                    output = pipe(
+                    video_frames = pipe(
                         prompt=prompt,
                         negative_prompt=negative_prompt,
                         num_inference_steps=movie_num_inference_steps,
@@ -2531,8 +2452,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         width=x,
                         num_frames=duration,
                         generator=generator,
-                    )
-                    video_frames = output.frames[0]
+                    ).frames[0]
                 else:
                     video_frames = pipe(
                         prompt=prompt,
@@ -2543,7 +2463,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         width=x,
                         num_frames=duration,
                         generator=generator,
-                    ).frames
+                    ).frames[0]
                 movie_model_card = addon_prefs.movie_model_card
 
                 if torch.cuda.is_available():
@@ -2568,7 +2488,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         num_inference_steps=movie_num_inference_steps,
                         guidance_scale=movie_num_guidance,
                         generator=generator,
-                    ).frames
+                    ).frames[0]
 
             if movie_model_card == "guoyww/animatediff-motion-adapter-v1-5-2":
                 # from diffusers.utils import export_to_video
@@ -2637,7 +2557,7 @@ class SequencerOpenAudioFile(Operator, ImportHelper):
     bl_idname = "sequencer.open_audio_filebrowser"
     bl_label = "Open Audio File Browser"
     filter_glob: StringProperty(
-        default='*.mp3;*.wav;*.ogg',
+        default='*.wav;',
         options={'HIDDEN'},
     )
 
@@ -2645,11 +2565,13 @@ class SequencerOpenAudioFile(Operator, ImportHelper):
         scene = context.scene
         # Check if the file exists
         if self.filepath and os.path.exists(self.filepath):
-            valid_extensions = {".mp3", ".wav"}
+            valid_extensions = {".wav"}
             filename, extension = os.path.splitext(self.filepath)
             if extension.lower() in valid_extensions:
                 print('Selected audio file:', self.filepath)
                 scene.audio_path=bpy.path.abspath(self.filepath)
+            else:
+                print("Info: Only wav is allowed.")
         else:
             self.report({'ERROR'}, "Selected file does not exist.")
             return {'CANCELLED'}
@@ -2704,6 +2626,19 @@ class SEQUENCER_OT_generate_audio(Operator):
             #                import sox
             #            else:
             import soundfile as sf
+
+        if addon_prefs.audio_model_card == "WhisperSpeech":
+            import numpy as np
+            try:
+                from whisperspeech.pipeline import Pipeline
+            except ModuleNotFoundError:
+                print("Dependencies needs to be installed in the add-on preferences.")
+                self.report(
+                    {"INFO"},
+                    "Dependencies needs to be installed in the add-on preferences.",
+                )
+                return {"CANCELLED"}
+
         if addon_prefs.audio_model_card == "bark":
             os.environ["CUDA_VISIBLE_DEVICES"] = "0"
             try:
@@ -2716,9 +2651,6 @@ class SEQUENCER_OT_generate_audio(Operator):
                 from bark import generate_audio, SAMPLE_RATE
 
                 from resemble_enhance.enhancer.inference import denoise, enhance
-
-                if addon_prefs.audio_model_card == "WhisperSpeech":
-                    from whisperspeech.pipeline import Pipeline
 
             except ModuleNotFoundError:
                 print("Dependencies needs to be installed in the add-on preferences.")
@@ -2802,20 +2734,6 @@ class SEQUENCER_OT_generate_audio(Operator):
 
             pipe = Pipeline(s2a_ref='collabora/whisperspeech:s2a-q4-small-en+pl.model')
 
-
-        # Mustango
-        elif addon_prefs.audio_model_card == "declare-lab/mustango":
-            import IPython
-            import soundfile as sf
-            from diffusers import DiffusionPipeline
-
-            # from mustango import Mustango
-            # from transformers import pipeline
-            # from transformers import set_seed
-            model = DiffusionPipeline.from_pretrained(
-                "declare-lab/mustango"
-            )  # , device="cuda:0", torch_dtype=torch.float16)
-
         # Deadend
         else:
             print("Audio model not found.")
@@ -2850,11 +2768,11 @@ class SEQUENCER_OT_generate_audio(Operator):
                 rate = SAMPLE_RATE
                 GEN_TEMP = 0.6
                 SPEAKER = "v2/" + scene.languages + "_" + scene.speakers
-                silence = np.zeros(int(0.25 * rate))  # quarter second of silence
+                silence = np.zeros(int(0.28 * rate))  # quarter second of silence
                 prompt = context.scene.generate_movie_prompt
                 prompt = prompt.replace("\n", " ").strip()
                 sentences = split_and_recombine_text(
-                    prompt, desired_length=130, max_length=150
+                    prompt, desired_length=120, max_length=150
                 )
                 pieces = []
                 for sentence in sentences:
@@ -2907,7 +2825,36 @@ class SEQUENCER_OT_generate_audio(Operator):
                 else:
                     speaker = None
 
-                audio_tensor = pipe.generate_to_file(filename, prompt, speaker=speaker, lang='en', cps=int(scene.audio_speed))
+#                sentences = split_and_recombine_text(
+#                    prompt, desired_length=250, max_length=320
+#                )
+#                pieces = []
+#                #pieces.append(silence.copy())
+#                for sentence in sentences:
+#                    print("Sentence: " + sentence)
+##                    semantic_tokens = generate_text_semantic(
+##                        sentence,
+##                        history_prompt=SPEAKER,
+##                        temp=GEN_TEMP,
+##                        # min_eos_p=0.1,  # this controls how likely the generation is to end
+##                    )
+##                    audio_array = semantic_to_waveform(
+##                        semantic_tokens, history_prompt=SPEAKER
+##                    )
+#                    audio_array = pipe.generate(sentence, speaker=speaker, lang='en', cps=int(scene.audio_speed))
+#                    audio_piece = (audio_array.cpu().numpy() * 32767).astype(np.int16)
+#                    #pieces += [np.expand_dims(audio_piece, axis=0), np.expand_dims(silence.copy(), axis=0)]
+
+#                    #pieces += [audio_array.cpu().numpy().astype(np.int16)]
+#                    #pieces.append(audio_piece)
+#                    pieces += [silence.copy(), audio_piece]
+#                audio = pieces.numpy()#np.concatenate(pieces)
+#                filename = solve_path(clean_filename(prompt) + ".wav")
+#                # Write the combined audio to a file
+#                write_wav(filename, rate, audio.transpose())
+
+
+                pipe.generate_to_file(filename, prompt, speaker=speaker, lang='en', cps=int(scene.audio_speed))
 
             # Musicgen.
             elif addon_prefs.audio_model_card == "facebook/musicgen-stereo-medium":
@@ -2939,12 +2886,6 @@ class SEQUENCER_OT_generate_audio(Operator):
                 #                    )
                 #                else:
                 sf.write(filename, music["audio"][0].T, music["sampling_rate"])
-
-            # Mustango.
-            elif addon_prefs.audio_model_card == "declare-lab/mustango":
-                music = model.generate(prompt)
-                sf.write(filename, audio, samplerate=16000)
-                IPython.display.Audio(data=audio, rate=16000)
 
             # MusicLDM ZAC
             elif (
@@ -3043,7 +2984,9 @@ class SEQUENCER_OT_generate_audio(Operator):
 
             print_elapsed_time(start_time)
 
-        pipe = None
+        if pipe:
+            pipe = None
+
         # clear the VRAM
         clear_cuda_cache()
 
@@ -3724,6 +3667,11 @@ class SEQUENCER_OT_generate_image(Operator):
                 torch_dtype=torch.float16,
                 variant="fp16",
             )
+            from diffusers import DPMSolverMultistepScheduler
+            pipe.scheduler = DPMSolverMultistepScheduler.from_config(
+                pipe.scheduler.config
+            )
+
             if low_vram():
                 pipe.enable_model_cpu_offload()
             else:
@@ -4770,7 +4718,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
             strip.select = True
 
             # render intermediate mp4 file
-            if strip.type == "SCENE" or strip.type == "MOVIE" or strip.type == "IMAGE" or strip.type == "META":
+            if strip.type == "SCENE" or strip.type == "MOVIE" or strip.type == "META": # or strip.type == "IMAGE"
                 # Make the current frame overlapped frame, the temp strip.
 
                 if type == "image" or type == "text":
@@ -4783,9 +4731,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                         intermediate_strip.frame_start = strip.frame_start
                         intermediate_strip.frame_offset_start = int(trim_frame)
                         intermediate_strip.frame_final_duration = 1
-                        temp_strip = strip = get_render_strip(
-                            self, context, intermediate_strip
-                        )
+                        temp_strip = strip = get_render_strip(self, context, intermediate_strip)
                         if intermediate_strip is not None:
                             delete_strip(intermediate_strip)
                     elif type == "text":
