@@ -1183,6 +1183,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             #("PixArt-alpha/PixArt-XL-2-1024-MS", "PixArt (1024 x 1024)", "PixArt-alpha/PixArt-XL-2-1024-MS"),
             ### ("ptx0/terminus-xl-gamma-v1", "Terminus XL Gamma v1", "ptx0/terminus-xl-gamma-v1"),
 #            ("warp-ai/wuerstchen", "Würstchen (1024x1024)", "warp-ai/wuerstchen"),
+            ("imagepipeline/JuggernautXL-v8", "JuggernautXL-v8 (1024x1024)", "imagepipeline/JuggernautXL-v8"),
             ### ("lrzjason/playground-v2-1024px-aesthetic-fp16", "Playground v2 (1024x1024)", "lrzjason/playground-v2-1024px-aesthetic-fp16"),
 #            (
 #                "playgroundai/playground-v2-1024px-aesthetic",
@@ -3801,7 +3802,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     scene.movie_num_guidance = 0
                     pipe.load_lora_weights("segmind/Segmind-VegaRT")
                     pipe.fuse_lora()
-            elif image_model_card != "PixArt-alpha/PixArt-XL-2-1024-MS":
+            elif image_model_card != "PixArt-alpha/PixArt-XL-2-1024-MS" and image_model_card != "Lykon/dreamshaper-8":
                 print("Use LCM: False")
                 pipe.scheduler = DPMSolverMultistepScheduler.from_config(
                     pipe.scheduler.config
