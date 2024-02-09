@@ -1142,7 +1142,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Stable Diffusion XL 1.0 (1024x1024)",
                 "stabilityai/stable-diffusion-xl-base-1.0",
             ),
-            ("thibaud/sdxl_dpo_turbo", "SDXL DPO TURBO (1024x1024)", "thibaud/sdxl_dpo_turbo"),
+#            ("thibaud/sdxl_dpo_turbo", "SDXL DPO TURBO (1024x1024)", "thibaud/sdxl_dpo_turbo"),
 #            (
 #                "stabilityai/sdxl-turbo",
 #                "Stable Diffusion XL Turbo (512x512)",
@@ -1410,24 +1410,36 @@ def get_render_strip(self, context, strip):
         # Deselect all strips in the current scene
         for s in sequencer.sequences_all:
             s.select = False
+
         # Select the current strip in the current scene
         strip.select = True
+
         # Store current frame for later
         bpy.context.scene.frame_current = int(strip.frame_start)
+
         # make_meta to keep transforms
         bpy.ops.sequencer.meta_make()
+
         # Copy the strip to the clipboard
         bpy.ops.sequencer.copy()
+
+        # unmeta
+        bpy.ops.sequencer.meta_separate()
+
         # Create a new scene
         # new_scene = bpy.data.scenes.new(name="New Scene")
         # Create a new scene
         new_scene = bpy.ops.scene.new(type="EMPTY")
+
         # Get the newly created scene
         new_scene = bpy.context.scene
+
         # Add a sequencer to the new scene
         new_scene.sequence_editor_create()
+
         # Set the new scene as the active scene
         context.window.scene = new_scene
+
         # Copy the scene properties from the current scene to the new scene
         new_scene.render.resolution_x = current_scene.render.resolution_x
         new_scene.render.resolution_y = current_scene.render.resolution_y
@@ -1451,45 +1463,56 @@ def get_render_strip(self, context, strip):
         with bpy.context.temp_override(area=area):
             # Paste the strip from the clipboard to the new scene
             bpy.ops.sequencer.paste()
+
         # Get the new strip in the new scene
         new_strip = (
             new_scene.sequence_editor.active_strip
         ) = bpy.context.selected_sequences[0]
+
         # Set the range in the new scene to fit the pasted strip
         new_scene.frame_start = int(new_strip.frame_final_start)
         new_scene.frame_end = (
             int(new_strip.frame_final_start + new_strip.frame_final_duration) - 1
         )
+
         # Set the render settings for rendering animation with FFmpeg and MP4 with sound
         bpy.context.scene.render.image_settings.file_format = "FFMPEG"
         bpy.context.scene.render.ffmpeg.format = "MPEG4"
         bpy.context.scene.render.ffmpeg.audio_codec = "AAC"
+
         # Make dir
         preferences = bpy.context.preferences
         addon_prefs = preferences.addons[__name__].preferences
         rendered_dir = os.path.join(addon_prefs.generator_ai, str(date.today()))
         rendered_dir = os.path.join(rendered_dir, "Rendered_Strips")
+
         # Set the name of the file
         src_name = strip.name
         src_dir = ""
         src_ext = ".mp4"
+
         # Create a new folder for the rendered files
         if not os.path.exists(rendered_dir):
             os.makedirs(rendered_dir)
+
         # Set the output path for the rendering
         output_path = os.path.join(rendered_dir, src_name + "_rendered" + src_ext)
         output_path = ensure_unique_filename(output_path)
         new_scene.render.filepath = output_path
+
         # Render the strip to hard disk
         bpy.ops.render.opengl(animation=True, sequencer=True)
+
         # Delete the new scene
-        #bpy.data.scenes.remove(new_scene, do_unlink=True)
+        bpy.data.scenes.remove(new_scene, do_unlink=True)
         if not os.path.exists(output_path):
             print("Render failed: " + output_path)
             bpy.context.preferences.system.sequencer_proxy_setup = "AUTOMATIC"
             return {"CANCELLED"}
+
         # Set the original scene as the active scene
         context.window.scene = current_scene
+
         # Reset to total top channel
         insert_channel = insert_channel_total
         area = [
@@ -1537,9 +1560,11 @@ def get_render_strip(self, context, strip):
                 )
         resulting_strip = sequencer.active_strip
         resulting_strip.use_proxy = False
+
         # Reset current frame
         bpy.context.scene.frame_current = current_frame_old
         bpy.context.preferences.system.sequencer_proxy_setup = "AUTOMATIC"
+
     return resulting_strip
 
 
@@ -2106,6 +2131,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     )
                 if low_vram():
                     refiner.enable_model_cpu_offload()
+                    refiner.unet.enable_forward_chunking()
                 else:
                     refiner.to(gfx_device)
 
@@ -3187,23 +3213,21 @@ class SEQUENCER_OT_generate_image(Operator):
         # models for inpaint
         if do_inpaint:
             print("Load: Inpaint Model")
-            #from diffusers import AutoPipelineForInpainting
-            from diffusers import StableDiffusionXLInpaintPipeline
+            from diffusers import AutoPipelineForInpainting
+            #from diffusers import StableDiffusionXLInpaintPipeline
             from diffusers.utils import load_image
 
             # clear the VRAM
             clear_cuda_cache()
 
-            vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
-
-            #pipe = AutoPipelineForInpainting.from_pretrained(
-            pipe = StableDiffusionXLInpaintPipeline.from_pretrained(
+            pipe = AutoPipelineForInpainting.from_pretrained(
+            #pipe = StableDiffusionXLInpaintPipeline.from_pretrained(
                 "diffusers/stable-diffusion-xl-1.0-inpainting-0.1",
                 torch_dtype=torch.float16,
                 variant="fp16",
-                vae=vae,
                 local_files_only=local_files_only,
             ).to(gfx_device)
+
             # Set scheduler
             if scene.use_lcm:
                 from diffusers import LCMScheduler
@@ -3220,7 +3244,12 @@ class SEQUENCER_OT_generate_image(Operator):
                 else:
                     pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
                     pipe.load_lora_weights("latent-consistency/lcm-lora-sdxl")
+            else:
+                from diffusers import DPMSolverMultistepScheduler
+                pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+
             pipe.watermark = NoWatermark()
+
             if low_vram():
                 # torch.cuda.set_per_process_memory_fraction(0.99)
                 pipe.enable_model_cpu_offload()
@@ -4222,6 +4251,7 @@ class SEQUENCER_OT_generate_image(Operator):
             elif do_inpaint:
                 print("Process: Inpaint")
                 mask_strip = find_strip_by_name(scene, scene.inpaint_selected_strip)
+
                 if not mask_strip:
                     print("Selected mask not found!")
                     return {"CANCELLED"}
@@ -4232,13 +4262,17 @@ class SEQUENCER_OT_generate_image(Operator):
                     or mask_strip.type == "META"
                 ):
                     mask_strip = get_render_strip(self, context, mask_strip)
+
                 mask_path = get_strip_path(mask_strip)
                 mask_image = load_first_frame(mask_path)
+
                 if not mask_image:
                     print("Loading mask failed!")
                     return
+
                 mask_image = mask_image.resize((x, y))
                 mask_image = pipe.mask_processor.blur(mask_image, blur_factor=33)
+
                 if scene.image_path:
                     init_image = load_first_frame(scene.image_path)
                 if scene.movie_path:
@@ -4246,6 +4280,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 if not init_image:
                     print("Loading strip failed!")
                     return {"CANCELLED"}
+
                 init_image = init_image.resize((x, y))
                 image = pipe(
                     prompt=prompt,
@@ -4257,23 +4292,27 @@ class SEQUENCER_OT_generate_image(Operator):
                     height=y,
                     width=x,
                     generator=generator,
-                    padding_mask_crop=32,
+                    padding_mask_crop=42,
+                    strength=0.99,
                 ).images[0]
-                # Limit inpaint to maske area:
-                # Convert mask to grayscale NumPy array
-                mask_image_arr = np.array(mask_image.convert("L"))
-                # Add a channel dimension to the end of the grayscale mask
-                mask_image_arr = mask_image_arr[:, :, None]
-                mask_image_arr = mask_image_arr.astype(np.float32) / 255.0
-                mask_image_arr[mask_image_arr < 0.5] = 0
-                mask_image_arr[mask_image_arr >= 0.5] = 1
-                # Take the masked pixels from the repainted image and the unmasked pixels from the initial image
-                unmasked_unchanged_image_arr = (
-                    1 - mask_image_arr
-                ) * init_image + mask_image_arr * image
-                image = PIL.Image.fromarray(
-                    unmasked_unchanged_image_arr.astype("uint8")
-                )
+
+#                # Limit inpaint to maske area:
+#                # Convert mask to grayscale NumPy array
+#                mask_image_arr = np.array(mask_image.convert("L"))
+
+#                # Add a channel dimension to the end of the grayscale mask
+#                mask_image_arr = mask_image_arr[:, :, None]
+#                mask_image_arr = mask_image_arr.astype(np.float32) / 255.0
+#                mask_image_arr[mask_image_arr < 0.5] = 0
+#                mask_image_arr[mask_image_arr >= 0.5] = 1
+
+#                # Take the masked pixels from the repainted image and the unmasked pixels from the initial image
+#                unmasked_unchanged_image_arr = (
+#                    1 - mask_image_arr
+#                ) * init_image + mask_image_arr * image
+#                image = PIL.Image.fromarray(
+#                    unmasked_unchanged_image_arr.astype("uint8")
+#                )
                 delete_strip(mask_strip)
 
             # Img2img
