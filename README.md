@@ -67,7 +67,7 @@ https://github.com/amb/blender_pip      |
 
 ## Change Log
 
-* 2024-2-21: Add: SDXL-Lightning 2 Step
+* 2024-2-21: Add: SDXL-Lightning 2 Step & Proteus v. 0.3
 * 2024-1-02: Add: WhisperSpeech
 * 2024-01-01: Fix installation and Bark bugs.
 * 2024-01-31: Add OpenDalle, Speed option, SDXL and LoRA support for Canny and OpenPose, include OpenPose rig images. Prune old models including SD. 
