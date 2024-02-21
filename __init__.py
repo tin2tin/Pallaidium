@@ -3776,43 +3776,20 @@ class SEQUENCER_OT_generate_image(Operator):
                 pipe.scheduler = EulerDiscreteScheduler.from_config(pipe.scheduler.config, timestep_spacing="trailing")
                 
             elif image_model_card == "dataautogpt3/ProteusV0.3":
-                from diffusers import StableDiffusionXLPipeline
-#                from diffusers import AutoencoderKL
+                from diffusers import StableDiffusionXLPipeline, KDPM2AncestralDiscreteScheduler
+                from diffusers import AutoencoderKL
 
-#                vae = AutoencoderKL.from_pretrained(
-#                    "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
-#                )
-                pipe = StableDiffusionXLPipeline.from_single_file(
+                vae = AutoencoderKL.from_pretrained(
+                    "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
+                )
+                pipe = StableDiffusionXLPipeline.from_pretrained(
                     "dataautogpt3/ProteusV0.3",
-                    #vae=vae,
+                    vae=vae,
                     torch_dtype=torch.float16,
                     #variant="fp16",
                 )
-#                from diffusers import DPMSolverMultistepScheduler
-#                pipe.scheduler = DPMSolverMultistepScheduler.from_config(
-#                    pipe.scheduler.config
-#                )
-
-                if low_vram():
-                    pipe.enable_model_cpu_offload()
-                else:
-                    pipe.to(gfx_device)
-
-#                # Load VAE component
-#                vae = AutoencoderKL.from_pretrained(
-#                    "madebyollin/sdxl-vae-fp16-fix",
-#                    torch_dtype=torch.float16
-#                )
-
-                # Configure the pipeline
-                #pipe = StableDiffusionXLPipeline.from_pretrained(
-#                pipe = AutoPipelineForText2Image.from_pretrained(
-#                    "dataautogpt3/ProteusV0.2",
-#                    #vae=vae,
-#                    torch_dtype=torch.float16,
-#                    local_files_only=local_files_only,
-#                )
-                #pipe.scheduler = KDPM2AncestralDiscreteScheduler.from_config(pipe.scheduler.config)
+                pipe.scheduler = KDPM2AncestralDiscreteScheduler.from_config(pipe.scheduler.config)
+                pipe.to(gfx_device)
 
             elif image_model_card == "stabilityai/stable-cascade":
                 import torch
@@ -4332,6 +4309,18 @@ class SEQUENCER_OT_generate_image(Operator):
                     num_inference_steps=int(image_num_inference_steps/2),
                 ).images[0]
                 decoder = None              
+
+            elif image_model_card == "dataautogpt3/ProteusV0.3":
+                image = pipe(
+                    # prompt_embeds=prompt, # for compel - long prompts
+                    prompt,
+                    negative_prompt=negative_prompt,
+                    num_inference_steps=image_num_inference_steps,
+                    guidance_scale=image_num_guidance,
+                    height=y,
+                    width=x,
+                    generator=generator,
+                ).images[0]                
 
             # Inpaint
             elif do_inpaint:
