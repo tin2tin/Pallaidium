@@ -1143,7 +1143,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Stable Diffusion XL 1.0 (1024x1024)",
                 "stabilityai/stable-diffusion-xl-base-1.0",
             ),
-            ("ByteDance/SDXL-Lightning", "SDXL-Lightning 2 Step (1024 x 1024)", "ByteDance/SDXL-Lightning"),
+            ("ByteDance/SDXL-Lightning", "SDXL-Lightning (1024 x 1024)", "ByteDance/SDXL-Lightning"),
 #            ("stabilityai/stable-cascade", "Stable Cascade (1024 x 1024)", "stabilityai/stable-cascade"),
 #            ("thibaud/sdxl_dpo_turbo", "SDXL DPO TURBO (1024x1024)", "thibaud/sdxl_dpo_turbo"),
 #            (
@@ -1695,7 +1695,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                                 "svd_decode_chunk_size",
                                 text="Decode Frames",
                             )
-                    if bpy.context.scene.sequence_editor is not None and image_model_card != "diffusers/controlnet-canny-sdxl-1.0-small" and image_model_card != "ByteDance/SDXL-Lightning":
+                    if bpy.context.scene.sequence_editor is not None and image_model_card != "diffusers/controlnet-canny-sdxl-1.0-small":
                         if len(bpy.context.scene.sequence_editor.sequences) > 0:
                             if input == "input_strips" and type == "image":
                                 col.prop_search(
@@ -1821,12 +1821,9 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 )
 
             else:
-                if type == "image" and image_model_card == "ByteDance/SDXL-Lightning":
-                    pass
-                else:
-                    col.prop(
-                        context.scene, "movie_num_inference_steps", text="Quality Steps"
-                    )
+                col.prop(
+                    context.scene, "movie_num_inference_steps", text="Quality Steps"
+                )
 
                 if (
                     type == "movie"
@@ -1839,9 +1836,6 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     scene.use_lcm and not (
                         type == "image"
                         and image_model_card == "Lykon/dreamshaper-8"
-                    ) and not (
-                        type == "image"
-                        and image_model_card == image_model_card == "ByteDance/SDXL-Lightning"
                     )
                 ):
                     pass
@@ -3183,7 +3177,6 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
             and not image_model_card == "Salesforce/blipdiffusion"
             and not image_model_card ==  "Lykon/dreamshaper-8"
-            and not image_model_card ==  "ByteDance/SDXL-Lightning"
         )
         do_convert = (
             (scene.image_path or scene.movie_path)
@@ -3193,7 +3186,6 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "h94/IP-Adapter"
             and not image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
             and not image_model_card == "Salesforce/blipdiffusion"
-            and not image_model_card ==  "ByteDance/SDXL-Lightning"
             and not do_inpaint
         )
         do_refine = scene.refine_sd and not do_convert
@@ -3765,7 +3757,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
                 base = "stabilityai/stable-diffusion-xl-base-1.0"
                 repo = "ByteDance/SDXL-Lightning"
-                ckpt = "sdxl_lightning_2step_lora.pth" # Use the correct ckpt for your step setting!
+                ckpt = "sdxl_lightning_2step_lora.safetensors" # Use the correct ckpt for your step setting!
 
                 # Load model.
                 pipe = StableDiffusionXLPipeline.from_pretrained(base, torch_dtype=torch.float16, variant="fp16").to("cuda")
@@ -3776,20 +3768,43 @@ class SEQUENCER_OT_generate_image(Operator):
                 pipe.scheduler = EulerDiscreteScheduler.from_config(pipe.scheduler.config, timestep_spacing="trailing")
                 
             elif image_model_card == "dataautogpt3/ProteusV0.3":
-                from diffusers import StableDiffusionXLPipeline, KDPM2AncestralDiscreteScheduler
-                from diffusers import AutoencoderKL
+                from diffusers import StableDiffusionXLPipeline
+#                from diffusers import AutoencoderKL
 
-                vae = AutoencoderKL.from_pretrained(
-                    "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
-                )
-                pipe = StableDiffusionXLPipeline.from_pretrained(
+#                vae = AutoencoderKL.from_pretrained(
+#                    "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
+#                )
+                pipe = StableDiffusionXLPipeline.from_single_file(
                     "dataautogpt3/ProteusV0.3",
-                    vae=vae,
+                    #vae=vae,
                     torch_dtype=torch.float16,
                     #variant="fp16",
                 )
-                pipe.scheduler = KDPM2AncestralDiscreteScheduler.from_config(pipe.scheduler.config)
-                pipe.to(gfx_device)
+#                from diffusers import DPMSolverMultistepScheduler
+#                pipe.scheduler = DPMSolverMultistepScheduler.from_config(
+#                    pipe.scheduler.config
+#                )
+
+                if low_vram():
+                    pipe.enable_model_cpu_offload()
+                else:
+                    pipe.to(gfx_device)
+
+#                # Load VAE component
+#                vae = AutoencoderKL.from_pretrained(
+#                    "madebyollin/sdxl-vae-fp16-fix",
+#                    torch_dtype=torch.float16
+#                )
+
+                # Configure the pipeline
+                #pipe = StableDiffusionXLPipeline.from_pretrained(
+#                pipe = AutoPipelineForText2Image.from_pretrained(
+#                    "dataautogpt3/ProteusV0.2",
+#                    #vae=vae,
+#                    torch_dtype=torch.float16,
+#                    local_files_only=local_files_only,
+#                )
+                #pipe.scheduler = KDPM2AncestralDiscreteScheduler.from_config(pipe.scheduler.config)
 
             elif image_model_card == "stabilityai/stable-cascade":
                 import torch
@@ -4309,18 +4324,6 @@ class SEQUENCER_OT_generate_image(Operator):
                     num_inference_steps=int(image_num_inference_steps/2),
                 ).images[0]
                 decoder = None              
-
-            elif image_model_card == "dataautogpt3/ProteusV0.3":
-                image = pipe(
-                    # prompt_embeds=prompt, # for compel - long prompts
-                    prompt,
-                    negative_prompt=negative_prompt,
-                    num_inference_steps=image_num_inference_steps,
-                    guidance_scale=image_num_guidance,
-                    height=y,
-                    width=x,
-                    generator=generator,
-                ).images[0]                
 
             # Inpaint
             elif do_inpaint:
