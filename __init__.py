@@ -23,7 +23,25 @@ bl_info = {
 
 # TO DO: Style title check, long prompts, SDXL controlnet, Move prints.
 
-import bpy, ctypes, random
+import bpy
+import ctypes
+import random
+import site
+import platform
+import json
+import subprocess
+import sys
+import os
+import aud
+import re
+import string
+from os.path import dirname, realpath, isdir, join, basename
+import shutil
+from datetime import date
+import pathlib
+import gc
+import time
+from bpy_extras.io_utils import ImportHelper
 from bpy.types import Operator, Panel, AddonPreferences, UIList, PropertyGroup
 from bpy.props import (
     StringProperty,
@@ -32,21 +50,14 @@ from bpy.props import (
     IntProperty,
     FloatProperty,
 )
-import site, platform, json
-import subprocess
-import sys, os, aud, re
-import string
-from os.path import dirname, realpath, isdir, join, basename
-import shutil
-from datetime import date
-import pathlib
-import gc
+
+# Temporarily modify pathlib.PosixPath for Windows compatibility
 temp = pathlib.PosixPath
 pathlib.PosixPath = pathlib.WindowsPath
-import time
-from bpy_extras.io_utils import ImportHelper
 
+# Additional import
 import sys
+
 print("Python: "+sys.version)
 
 
@@ -1101,7 +1112,6 @@ class GeneratorAddonPreferences(AddonPreferences):
             #                "stabilityai/sd-turbo",
             #            ),
 
-            # ("camenduru/potat1", "Potat v1 (1024x576)", "Potat (1024x576)"),
             # ("VideoCrafter/Image2Video-512", "VideoCrafter v1 (512x512)", "VideoCrafter/Image2Video-512"),
             (
                 "cerspense/zeroscope_v2_XL",
@@ -2568,7 +2578,6 @@ class SEQUENCER_OT_generate_movie(Operator):
                                 use_framerate=False,
                             )
                             strip = scene.sequence_editor.active_strip
-                            strip.transform.filter = "SUBSAMPLING_3x3"
                             scene.sequence_editor.active_strip = strip
                             strip.name = str(seed) + "_" + prompt
                             strip.use_proxy = True
@@ -3565,8 +3574,12 @@ class SEQUENCER_OT_generate_image(Operator):
                 
         # dreamshaper-xl-lightning
         elif do_convert == False and image_model_card == "Lykon/dreamshaper-xl-lightning":
+            from diffusers import AutoPipelineForText2Image
+            from diffusers import DPMSolverMultistepScheduler
             pipe = AutoPipelineForText2Image.from_pretrained('Lykon/dreamshaper-xl-lightning', torch_dtype=torch.float16, variant="fp16")
-
+            pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+            pipe = pipe.to(gfx_device)
+            
         # Wuerstchen
         elif image_model_card == "warp-ai/wuerstchen":
             print("Load: Würstchen Model")
@@ -4611,7 +4624,6 @@ class SEQUENCER_OT_generate_image(Operator):
                     fit_method="FIT",
                 )
                 strip.frame_final_duration = scene.generate_movie_frames
-                strip.transform.filter = "SUBSAMPLING_3x3"
                 scene.sequence_editor.active_strip = strip
                 if i > 0:
                     scene.frame_current = (
