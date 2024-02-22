@@ -3765,7 +3765,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
                 base = "stabilityai/stable-diffusion-xl-base-1.0"
                 repo = "ByteDance/SDXL-Lightning"
-                ckpt = "sdxl_lightning_2step_lora.pth" # Use the correct ckpt for your step setting!
+                ckpt = "sdxl_lightning_2step_lora.safetensors" # Use the correct ckpt for your step setting!
 
                 # Load model.
                 pipe = StableDiffusionXLPipeline.from_pretrained(base, torch_dtype=torch.float16, variant="fp16").to("cuda")
