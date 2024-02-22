@@ -1138,6 +1138,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Dreamshaper v8 (1024 x 1024)",
                 "Lykon/dreamshaper-8",
             ),
+            ("Lykon/dreamshaper-xl-lightning", "Dreamshaper XL-Lightning (1024 x 1024)", "Lykon/dreamshaper-xl-lightning"),
             (
                 "stabilityai/stable-diffusion-xl-base-1.0",
                 "Stable Diffusion XL 1.0 (1024x1024)",
@@ -1181,6 +1182,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Proteus (1024x1024)",
                 "dataautogpt3/ProteusV0.3",
             ),
+            ("dataautogpt3/ProteusV0.3-Lightning", "ProteusV0.3-Lightning (1024 x 1024)", "dataautogpt3/ProteusV0.3-Lightning"),
             ("dataautogpt3/OpenDalleV1.1", "OpenDalle (1024 x 1024)", "dataautogpt3/OpenDalleV1.1"),
 #            ("h94/IP-Adapter", "IP-Adapter (512 x 512)", "h94/IP-Adapter"),
             #("PixArt-alpha/PixArt-XL-2-1024-MS", "PixArt (1024 x 1024)", "PixArt-alpha/PixArt-XL-2-1024-MS"),
@@ -3551,7 +3553,8 @@ class SEQUENCER_OT_generate_image(Operator):
                 pipe.enable_model_cpu_offload()
             else:
                 pipe.to(gfx_device)
-
+        elif do_convert == False and image_model_card == "Lykon/dreamshaper-xl-lightning":
+            pipe = AutoPipelineForText2Image.from_pretrained('Lykon/dreamshaper-xl-lightning', torch_dtype=torch.float16, variant="fp16")
 
         # Wuerstchen
         elif image_model_card == "warp-ai/wuerstchen":
@@ -3760,23 +3763,51 @@ class SEQUENCER_OT_generate_image(Operator):
                     )
             elif image_model_card == "ByteDance/SDXL-Lightning":
                 import torch
-                from diffusers import StableDiffusionXLPipeline, EulerDiscreteScheduler
+                from diffusers import StableDiffusionXLPipeline, EulerAncestralDiscreteScheduler, AutoencoderKL
                 from huggingface_hub import hf_hub_download
 
                 base = "stabilityai/stable-diffusion-xl-base-1.0"
                 repo = "ByteDance/SDXL-Lightning"
                 ckpt = "sdxl_lightning_2step_lora.safetensors" # Use the correct ckpt for your step setting!
 
+                vae = AutoencoderKL.from_pretrained(
+                    "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
+                )
+
                 # Load model.
-                pipe = StableDiffusionXLPipeline.from_pretrained(base, torch_dtype=torch.float16, variant="fp16").to("cuda")
+                pipe = StableDiffusionXLPipeline.from_pretrained(base, torch_dtype=torch.float16, vae=vae, variant="fp16").to("cuda")
                 pipe.load_lora_weights(hf_hub_download(repo, ckpt))
                 pipe.fuse_lora()
 
                 # Ensure sampler uses "trailing" timesteps.
-                pipe.scheduler = EulerDiscreteScheduler.from_config(pipe.scheduler.config, timestep_spacing="trailing")
+                pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config, timestep_spacing="trailing")
+
+            elif image_model_card == "dataautogpt3/ProteusV0.3-Lightning":
+                
+                import torch
+                from diffusers import (
+                    StableDiffusionXLPipeline, 
+                    EulerAncestralDiscreteScheduler,
+                    AutoencoderKL
+                )
+
+                # Load VAE component
+                vae = AutoencoderKL.from_pretrained(
+                    "madebyollin/sdxl-vae-fp16-fix", 
+                    torch_dtype=torch.float16
+                )
+
+                # Configure the pipeline
+                pipe = StableDiffusionXLPipeline.from_pretrained(
+                    "dataautogpt3/ProteusV0.3-Lightning", 
+                    vae=vae,
+                    torch_dtype=torch.float16
+                )
+                pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
+                pipe.to('cuda')            
                 
             elif image_model_card == "dataautogpt3/ProteusV0.3":
-                from diffusers import StableDiffusionXLPipeline, KDPM2AncestralDiscreteScheduler
+                from diffusers import StableDiffusionXLPipeline, EulerAncestralDiscreteScheduler
                 from diffusers import AutoencoderKL
 
                 vae = AutoencoderKL.from_pretrained(
@@ -3788,7 +3819,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     torch_dtype=torch.float16,
                     #variant="fp16",
                 )
-                pipe.scheduler = KDPM2AncestralDiscreteScheduler.from_config(pipe.scheduler.config)
+                pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
                 pipe.to(gfx_device)
 
             elif image_model_card == "stabilityai/stable-cascade":
@@ -3858,10 +3889,16 @@ class SEQUENCER_OT_generate_image(Operator):
                     scene.movie_num_guidance = 0
                     pipe.load_lora_weights("segmind/Segmind-VegaRT")
                     pipe.fuse_lora()
-            elif image_model_card != "PixArt-alpha/PixArt-XL-2-1024-MS" and image_model_card != "Lykon/dreamshaper-8" and image_model_card != "stabilityai/stable-cascade":
+
+            elif image_model_card == "Lykon/dreamshaper-8":
+                from diffusers import EulerAncestralDiscreteScheduler
+                pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
+
+            elif image_model_card != "PixArt-alpha/PixArt-XL-2-1024-MS" and image_model_card != "stabilityai/stable-cascade":
                 pipe.scheduler = DPMSolverMultistepScheduler.from_config(
                     pipe.scheduler.config
-                )
+                )      
+                
             if image_model_card != "stabilityai/stable-cascade":
                 pipe.watermark = NoWatermark()
 
@@ -4111,6 +4148,17 @@ class SEQUENCER_OT_generate_image(Operator):
                     generator=generator,
                     output_type="pil",
                 ).images[0]
+            elif image_model_card == "Lykon/dreamshaper-xl-lightning" and do_convert == False:
+                image = pipe(
+                    prompt=prompt,
+                    negative_prompt=negative_prompt,
+                    num_inference_steps=4,
+                    guidance_scale=2,
+                    height=y,
+                    width=x,
+                    generator=generator,
+                    output_type="pil",
+                ).images[0]
 
             # OpenPose
             elif image_model_card == "lllyasviel/sd-controlnet-openpose":
@@ -4283,7 +4331,19 @@ class SEQUENCER_OT_generate_image(Operator):
                     output_type="pil",
                     num_inference_steps=2,
                 ).images[0]
-                decoder = None                  
+                decoder = None
+                
+            elif image_model_card == "dataautogpt3/ProteusV0.3-Lightning":
+                image = pipe(
+                    prompt=prompt,
+                    negative_prompt=negative_prompt,
+                    height=y,
+                    width=x,
+                    guidance_scale=1.0,
+                    output_type="pil",
+                    num_inference_steps=4,
+                ).images[0]
+                decoder = None                 
             elif image_model_card == "stabilityai/stable-cascade":
                 #import torch
                 prior = StableCascadePriorPipeline.from_pretrained("stabilityai/stable-cascade-prior", torch_dtype=torch.bfloat16)
