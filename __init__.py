@@ -2568,7 +2568,6 @@ class SEQUENCER_OT_generate_movie(Operator):
                                 use_framerate=False,
                             )
                             strip = scene.sequence_editor.active_strip
-                            strip.transform.filter = "SUBSAMPLING_3x3"
                             scene.sequence_editor.active_strip = strip
                             strip.name = str(seed) + "_" + prompt
                             strip.use_proxy = True
