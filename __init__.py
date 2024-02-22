@@ -1823,7 +1823,10 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 )
 
             else:
-                if type == "image" and image_model_card == "ByteDance/SDXL-Lightning":
+                if (type == "image" and image_model_card == "ByteDance/SDXL-Lightning" or
+                    type == "image" and image_model_card == "dataautogpt3/ProteusV0.3-Lightning" or
+                    type == "image" and image_model_card == "Lykon/dreamshaper-xl-lightning"
+                ):
                     pass
                 else:
                     col.prop(
@@ -1843,7 +1846,9 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         and image_model_card == "Lykon/dreamshaper-8"
                     ) and not (
                         type == "image"
-                        and image_model_card == image_model_card == "ByteDance/SDXL-Lightning"
+                        and image_model_card == image_model_card == "ByteDance/SDXL-Lightning" or
+                        type == "image" and image_model_card == "dataautogpt3/ProteusV0.3-Lightning" or
+                        type == "image" and image_model_card == "Lykon/dreamshaper-xl-lightning"
                     )
                 ):
                     pass
@@ -3184,8 +3189,10 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "h94/IP-Adapter"
             and not image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
             and not image_model_card == "Salesforce/blipdiffusion"
-            and not image_model_card ==  "Lykon/dreamshaper-8"
-            and not image_model_card ==  "ByteDance/SDXL-Lightning"
+            and not image_model_card == "Lykon/dreamshaper-8"
+            and not image_model_card == "ByteDance/SDXL-Lightning"
+            and not image_model_card == "dataautogpt3/ProteusV0.3-Lightning"
+            and not image_model_card == "Lykon/dreamshaper-xl-lightning"
         )
         do_convert = (
             (scene.image_path or scene.movie_path)
@@ -3195,7 +3202,9 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "h94/IP-Adapter"
             and not image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
             and not image_model_card == "Salesforce/blipdiffusion"
-            and not image_model_card ==  "ByteDance/SDXL-Lightning"
+            and not image_model_card == "ByteDance/SDXL-Lightning"
+            and not image_model_card == "dataautogpt3/ProteusV0.3-Lightning"
+            and not image_model_card == "Lykon/dreamshaper-xl-lightning"
             and not do_inpaint
         )
         do_refine = scene.refine_sd and not do_convert
@@ -3553,6 +3562,8 @@ class SEQUENCER_OT_generate_image(Operator):
                 pipe.enable_model_cpu_offload()
             else:
                 pipe.to(gfx_device)
+                
+        # dreamshaper-xl-lightning
         elif do_convert == False and image_model_card == "Lykon/dreamshaper-xl-lightning":
             pipe = AutoPipelineForText2Image.from_pretrained('Lykon/dreamshaper-xl-lightning', torch_dtype=torch.float16, variant="fp16")
 
@@ -3761,6 +3772,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         torch_dtype=torch.float16,
                         local_files_only=local_files_only,
                     )
+                    
             elif image_model_card == "ByteDance/SDXL-Lightning":
                 import torch
                 from diffusers import StableDiffusionXLPipeline, EulerAncestralDiscreteScheduler, AutoencoderKL
@@ -4148,6 +4160,8 @@ class SEQUENCER_OT_generate_image(Operator):
                     generator=generator,
                     output_type="pil",
                 ).images[0]
+                
+            # dreamshaper-xl-lightning
             elif image_model_card == "Lykon/dreamshaper-xl-lightning" and do_convert == False:
                 image = pipe(
                     prompt=prompt,
