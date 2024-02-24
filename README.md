@@ -4,7 +4,7 @@ AI-generate video, image, and audio from text prompts or video, image, or text s
 ![PallAIdium](https://github.com/tin2tin/Generative_AI/assets/1322593/1b1b232f-00d9-4b0b-86fb-5f0f24136d2c)
 
 # Discord
-https://discord.gg/csBJhBtE
+[https://discord.gg/csBJhBtE](https://discord.gg/HMYpnPzbTm)
 
 ## Features
 
@@ -67,6 +67,7 @@ https://github.com/amb/blender_pip      |
 
 ## Change Log
 
+* 2024-2-23: Add: Proteus Lightning and Dreamshaper XL Lightning
 * 2024-2-21: Add: SDXL-Lightning 2 Step & Proteus v. 0.3
 * 2024-1-02: Add: WhisperSpeech
 * 2024-01-01: Fix installation and Bark bugs.
