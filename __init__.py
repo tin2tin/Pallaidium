@@ -696,7 +696,7 @@ def install_modules(self):
         # resemble-enhance:
         subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/daswer123/resemble-enhance-windows.git", "--no-dependencies", "--upgrade"])
         deep_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),"deepspeed/deepspeed-0.12.4+unknown-py3-none-any.whl")
-        print(deep_speed)
+        print("deep_speed_path: "+deep_path)
         import_module(self, "deepspeed", deep_path)
         import_module(self, "librosa", "librosa")
         import_module(self, "celluloid", "celluloid")
@@ -1431,6 +1431,9 @@ def get_render_strip(self, context, strip):
 
         # Store current frame for later
         bpy.context.scene.frame_current = int(strip.frame_start)
+        
+#        if strip.type == "SCENE":
+#            bpy.data.scenes["Scene"].name
 
         # make_meta to keep transforms
         bpy.ops.sequencer.meta_make()
@@ -1489,6 +1492,9 @@ def get_render_strip(self, context, strip):
         new_scene.frame_end = (
             int(new_strip.frame_final_start + new_strip.frame_final_duration) - 1
         )
+
+
+
 
         # Set the render settings for rendering animation with FFmpeg and MP4 with sound
         bpy.context.scene.render.image_settings.file_format = "FFMPEG"
@@ -3574,10 +3580,18 @@ class SEQUENCER_OT_generate_image(Operator):
                 
         # dreamshaper-xl-lightning
         elif do_convert == False and image_model_card == "Lykon/dreamshaper-xl-lightning":
-            from diffusers import AutoPipelineForText2Image
+            from diffusers import AutoPipelineForText2Image, AutoencoderKL
             from diffusers import DPMSolverMultistepScheduler
-            pipe = AutoPipelineForText2Image.from_pretrained('Lykon/dreamshaper-xl-lightning', torch_dtype=torch.float16, variant="fp16")
+            vae = AutoencoderKL.from_pretrained(
+                "madebyollin/sdxl-vae-fp16-fix",
+                torch_dtype=torch.float16,
+                local_files_only=local_files_only,
+            )            
+            
+            #from diffusers import EulerAncestralDiscreteScheduler
+            pipe = AutoPipelineForText2Image.from_pretrained('Lykon/dreamshaper-xl-lightning', torch_dtype=torch.float16, variant="fp16", vae=vae)
             pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+            #pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
             pipe = pipe.to(gfx_device)
             
         # Wuerstchen
@@ -4161,7 +4175,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
 
             # DreamShaper
-            elif image_model_card == "Lykon/dreamshaper-8" and do_convert == False:
+            elif image_model_card == "Lykon/dreamshaper-8":
                 image = pipe(
                     prompt=prompt,
                     negative_prompt=negative_prompt,
@@ -4175,17 +4189,17 @@ class SEQUENCER_OT_generate_image(Operator):
                 ).images[0]
                 
             # dreamshaper-xl-lightning
-            elif image_model_card == "Lykon/dreamshaper-xl-lightning" and do_convert == False:
+            elif image_model_card == "Lykon/dreamshaper-xl-lightning":
                 image = pipe(
                     prompt=prompt,
                     negative_prompt=negative_prompt,
                     num_inference_steps=4,
-                    guidance_scale=2,
+                    guidance_scale=image_num_guidance,
                     height=y,
                     width=x,
                     generator=generator,
-                    output_type="pil",
-                ).images[0]
+                    #output_type="pil",
+                ).images[0]            
 
             # OpenPose
             elif image_model_card == "lllyasviel/sd-controlnet-openpose":
@@ -4967,11 +4981,11 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     if type == "image":
                         sequencer.generate_image()
 
-                    context.scene.generate_movie_prompt = prompt
-                    scene.generate_movie_negative_prompt = negative_prompt
+                    #context.scene.generate_movie_prompt = prompt
+                    #scene.generate_movie_negative_prompt = negative_prompt
                     context.scene.movie_use_random = use_random
                     context.scene.movie_num_seed = seed
-                    scene.generate_movie_prompt = prompt
+                    #scene.generate_movie_prompt = prompt
                     scene.generate_movie_negative_prompt = negative_prompt
 
                     if use_strip_data:
