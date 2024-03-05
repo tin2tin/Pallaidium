@@ -27,8 +27,7 @@ AI-generate video, image, and audio from text prompts or video, image, or text s
 | User-defined file path for generated files.        | Define the location for storing generated files.  |
 | Seed and prompt added to strip name.               | Include seed and prompt information in the strip name. |
 
-
-![image](https://github.com/tin2tin/Pallaidium/assets/1322593/09bba394-3188-49be-8ae1-37c0c43ec2fd)
+![image](https://github.com/tin2tin/Pallaidium/assets/1322593/88f73b46-409a-4a89-bbf0-0e10a580336c)
 
 ## Requirements
 * Windows (Unsupported: Linux and MacOS).
