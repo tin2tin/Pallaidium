@@ -1113,6 +1113,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             #            ),
 
             # ("VideoCrafter/Image2Video-512", "VideoCrafter v1 (512x512)", "VideoCrafter/Image2Video-512"),
+            ("wangfuyun/AnimateLCM", "AnimateLCM", "wangfuyun/AnimateLCM"),
             (
                 "cerspense/zeroscope_v2_XL",
                 "Zeroscope XL (1024x576x24)",
@@ -1188,18 +1189,18 @@ class GeneratorAddonPreferences(AddonPreferences):
 #                "dataautogpt3/Miniaturus_PotentiaV1.2",
 #            ),#
             (
-                "dataautogpt3/ProteusV0.3",
-                "Proteus (1024x1024)",
-                "dataautogpt3/ProteusV0.3",
+                "dataautogpt3/Proteus-RunDiffusion",
+                "Proteus-RunDiffusion (1024x1024)",
+                "dataautogpt3/Proteus-RunDiffusion",
             ),
-            ("dataautogpt3/ProteusV0.3-Lightning", "ProteusV0.3-Lightning (1024 x 1024)", "dataautogpt3/ProteusV0.3-Lightning"),
+            ("dataautogpt3/Proteus-RunDiffusion-Lightning", "ProteusV0.3-Lightning (1024 x 1024)", "dataautogpt3/Proteus-RunDiffusion-Lightning"),
             ("dataautogpt3/OpenDalleV1.1", "OpenDalle (1024 x 1024)", "dataautogpt3/OpenDalleV1.1"),
 #            ("h94/IP-Adapter", "IP-Adapter (512 x 512)", "h94/IP-Adapter"),
             #("PixArt-alpha/PixArt-XL-2-1024-MS", "PixArt (1024 x 1024)", "PixArt-alpha/PixArt-XL-2-1024-MS"),
             ### ("ptx0/terminus-xl-gamma-v1", "Terminus XL Gamma v1", "ptx0/terminus-xl-gamma-v1"),
 #            ("warp-ai/wuerstchen", "Würstchen (1024x1024)", "warp-ai/wuerstchen"),
             ("imagepipeline/JuggernautXL-v8", "JuggernautXL-v8 (1024x1024)", "imagepipeline/JuggernautXL-v8"),
-            ### ("lrzjason/playground-v2-1024px-aesthetic-fp16", "Playground v2 (1024x1024)", "lrzjason/playground-v2-1024px-aesthetic-fp16"),
+            ("playgroundai/playground-v2.5-1024px-aesthetic", "Playground v2.5 (1024x1024)", "playgroundai/playground-v2.5-1024px-aesthetic"),
 #            (
 #                "playgroundai/playground-v2-1024px-aesthetic",
 #                "Playground v2 (1024x1024)",
@@ -1212,19 +1213,19 @@ class GeneratorAddonPreferences(AddonPreferences):
             ),
             (
                 "diffusers/controlnet-canny-sdxl-1.0-small",
-                "Canny (512x512)",
+                "Canny ControlNet",
                 "diffusers/controlnet-canny-sdxl-1.0-small",
             ),
             # Disabled - has log-in code.
             # ("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0"),
             (
                 "monster-labs/control_v1p_sdxl_qrcode_monster",
-                "Illusion (512x512)",
+                "Illusion ControlNet",
                 "monster-labs/control_v1p_sdxl_qrcode_monster",
             ),
             (
                 "lllyasviel/sd-controlnet-openpose",
-                "OpenPose (512x512)",
+                "OpenPose ControlNet",
                 "lllyasviel/sd-controlnet-openpose",
             ),
 #            (
@@ -1840,7 +1841,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
 
             else:
                 if (type == "image" and image_model_card == "ByteDance/SDXL-Lightning" or
-                    type == "image" and image_model_card == "dataautogpt3/ProteusV0.3-Lightning" or
+                    type == "image" and image_model_card == "dataautogpt3/Proteus-RunDiffusion-Lightning" or
                     type == "image" and image_model_card == "Lykon/dreamshaper-xl-lightning"
                 ):
                     pass
@@ -1863,7 +1864,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     ) and not (
                         type == "image"
                         and image_model_card == image_model_card == "ByteDance/SDXL-Lightning" or
-                        type == "image" and image_model_card == "dataautogpt3/ProteusV0.3-Lightning" or
+                        type == "image" and image_model_card == "dataautogpt3/Proteus-RunDiffusion-Lightning" or
                         type == "image" and image_model_card == "Lykon/dreamshaper-xl-lightning"
                     )
                 ):
@@ -2139,6 +2140,16 @@ class SEQUENCER_OT_generate_movie(Operator):
             elif (movie_model_card == "stabilityai/stable-video-diffusion-img2vid" or movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt"): # or movie_model_card == "vdo/stable-video-diffusion-img2vid-fp16"):
                 from diffusers import StableVideoDiffusionPipeline
                 from diffusers.utils import load_image, export_to_video
+#                from .lcm_scheduler import AnimateLCMSVDStochasticIterativeScheduler
+#                noise_scheduler = AnimateLCMSVDStochasticIterativeScheduler(
+#                    num_train_timesteps=40,
+#                    sigma_min=0.002,
+#                    sigma_max=700.0,
+#                    sigma_data=1.0,
+#                    s_noise=1.0,
+#                    rho=7,
+#                    clip_denoised=False,
+#                )
 
                 if movie_model_card == "stabilityai/stable-video-diffusion-img2vid":
                     # Version 1.1 - too heavy
@@ -2161,11 +2172,22 @@ class SEQUENCER_OT_generate_movie(Operator):
                         variant="fp16",
                         local_files_only=local_files_only,
                     )
+#                    model_select = "AnimateLCM-SVD-xt-1.1.safetensors"
+#                    refinere.unet.cpu()
+#                    file_path = os.path.join("./safetensors", model_select)
+#                    state_dict = {}
+#                    with safe_open(file_path, framework="pt", device="cpu") as f:
+#                        for key in f.keys():
+#                            state_dict[key] = f.get_tensor(key)
+#                    missing, unexpected = refiner.unet.load_state_dict(state_dict, strict=True)
+#                    pipe.unet.cuda()
+#                    del state_dict
                 if low_vram():
                     refiner.enable_model_cpu_offload()
                     refiner.unet.enable_forward_chunking()
                 else:
                     refiner.to(gfx_device)
+                    
 
             else:  # vid2vid / img2vid
                 if (
@@ -2230,6 +2252,28 @@ class SEQUENCER_OT_generate_movie(Operator):
                 else:
                     pipe.to(gfx_device)
 
+            elif movie_model_card == "wangfuyun/AnimateLCM":
+                
+                import torch
+                from diffusers import AnimateDiffPipeline, LCMScheduler, MotionAdapter
+                from diffusers.utils import export_to_gif
+
+                adapter = MotionAdapter.from_pretrained("wangfuyun/AnimateLCM", torch_dtype=torch.float16)
+                #pipe = AnimateDiffPipeline.from_pretrained("dataautogpt3/OpenDalleV1.1", motion_adapter=adapter, torch_dtype=torch.float16, variant="fp16",) 
+                #pipe = AnimateDiffPipeline.from_pretrained("lykon/dreamshaper-8", motion_adapter=adapter, torch_dtype=torch.float16, variant="fp16",) 
+                pipe = AnimateDiffPipeline.from_pretrained("emilianJR/epiCRealism", motion_adapter=adapter, torch_dtype=torch.float16)
+                pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config, beta_schedule="linear")
+
+                pipe.load_lora_weights("wangfuyun/AnimateLCM", weight_name="AnimateLCM_sd15_t2v_lora.safetensors", adapter_name="lcm-lora")
+                pipe.set_adapters(["lcm-lora"], [0.8])
+               
+                if low_vram():
+                    pipe.enable_vae_slicing()
+                    pipe.enable_model_cpu_offload()
+                    # pipe.enable_vae_slicing()
+                else:
+                    pipe.to(gfx_device)
+                
             elif movie_model_card == "VideoCrafter/Image2Video-512":
                 from diffusers import StableDiffusionPipeline
 
@@ -2445,6 +2489,24 @@ class SEQUENCER_OT_generate_movie(Operator):
                         num_frames=duration,
                         generator=generator,
                     ).frames[0]
+
+                elif movie_model_card == "wangfuyun/AnimateLCM":
+                    video_frames = pipe(
+                        prompt=prompt,
+                        negative_prompt=negative_prompt,
+                        num_inference_steps=movie_num_inference_steps,
+                        guidance_scale=movie_num_guidance,
+                        height=y,
+                        width=x,
+                        num_frames=duration,
+                        generator=generator,
+                        #num_frames=16,
+                        #guidance_scale=2.0,
+                        #num_inference_steps=6,
+                        #generator=torch.Generator("cpu").manual_seed(0),
+                    )
+                    #frames = output.frames[0]
+                    #export_to_gif(frames, "animatelcm.gif")
 
                 elif movie_model_card != "guoyww/animatediff-motion-adapter-v1-5-2":
                     if scene.movie_path:
@@ -3206,7 +3268,7 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "Salesforce/blipdiffusion"
             and not image_model_card == "Lykon/dreamshaper-8"
             and not image_model_card == "ByteDance/SDXL-Lightning"
-            and not image_model_card == "dataautogpt3/ProteusV0.3-Lightning"
+            and not image_model_card == "dataautogpt3/Proteus-RunDiffusion-Lightning"
             and not image_model_card == "Lykon/dreamshaper-xl-lightning"
         )
         do_convert = (
@@ -3218,7 +3280,7 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
             and not image_model_card == "Salesforce/blipdiffusion"
             and not image_model_card == "ByteDance/SDXL-Lightning"
-            and not image_model_card == "dataautogpt3/ProteusV0.3-Lightning"
+            and not image_model_card == "dataautogpt3/Proteus-RunDiffusion-Lightning"
             and not image_model_card == "Lykon/dreamshaper-xl-lightning"
             and not do_inpaint
         )
@@ -3581,17 +3643,26 @@ class SEQUENCER_OT_generate_image(Operator):
         # dreamshaper-xl-lightning
         elif do_convert == False and image_model_card == "Lykon/dreamshaper-xl-lightning":
             from diffusers import AutoPipelineForText2Image, AutoencoderKL
-            from diffusers import DPMSolverMultistepScheduler
+            from diffusers import DPMSolverMultistep
+            #from diffusers import DPMSolverMultistepScheduler
+            #from diffusers import EulerAncestralDiscreteScheduler
             vae = AutoencoderKL.from_pretrained(
                 "madebyollin/sdxl-vae-fp16-fix",
                 torch_dtype=torch.float16,
                 local_files_only=local_files_only,
             )            
-            
+
+
+            #from diffusers import DPMSolverMultistepScheduler
+
             #from diffusers import EulerAncestralDiscreteScheduler
             pipe = AutoPipelineForText2Image.from_pretrained('Lykon/dreamshaper-xl-lightning', torch_dtype=torch.float16, variant="fp16", vae=vae)
-            pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-            #pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
+            #pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+            #pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config, algorithm_type="sde-dpmsolver++")
+            
+            
+            #pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config, timestep_spacing="trailing")
+            pipe.scheduler = DPMSolverMultistep.from_config(pipe.scheduler.config)
             pipe = pipe.to(gfx_device)
             
         # Wuerstchen
@@ -3735,6 +3806,24 @@ class SEQUENCER_OT_generate_image(Operator):
             else:
                 stage_3.to(gfx_device)
 
+        # playground
+        elif image_model_card == "playgroundai/playground-v2.5-1024px-aesthetic":
+            from diffusers import DiffusionPipeline
+
+            pipe = DiffusionPipeline.from_pretrained(
+                "playgroundai/playground-v2.5-1024px-aesthetic",
+                torch_dtype=torch.float16,
+                variant="fp16",
+            )           
+
+            from diffusers import EDMDPMSolverMultistepScheduler
+            pipe.scheduler = EDMDPMSolverMultistepScheduler()
+
+            if low_vram():
+                pipe.enable_model_cpu_offload()
+            else:
+                pipe.to(gfx_device)
+
         # sdxl_dpo_turbo
         elif image_model_card == "thibaud/sdxl_dpo_turbo":
             from diffusers import StableDiffusionXLPipeline
@@ -3821,7 +3910,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 # Ensure sampler uses "trailing" timesteps.
                 pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config, timestep_spacing="trailing")
 
-            elif image_model_card == "dataautogpt3/ProteusV0.3-Lightning":
+            elif image_model_card == "dataautogpt3/Proteus-RunDiffusion-Lightning":
                 
                 import torch
                 from diffusers import (
@@ -3838,14 +3927,14 @@ class SEQUENCER_OT_generate_image(Operator):
 
                 # Configure the pipeline
                 pipe = StableDiffusionXLPipeline.from_pretrained(
-                    "dataautogpt3/ProteusV0.3-Lightning", 
+                    "dataautogpt3/Proteus-RunDiffusion-Lightning", 
                     vae=vae,
                     torch_dtype=torch.float16
                 )
                 pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
                 pipe.to('cuda')            
                 
-            elif image_model_card == "dataautogpt3/ProteusV0.3":
+            elif image_model_card == "dataautogpt3/Proteus-RunDiffusion":
                 from diffusers import StableDiffusionXLPipeline, EulerAncestralDiscreteScheduler
                 from diffusers import AutoencoderKL
 
@@ -3853,7 +3942,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
                 )
                 pipe = StableDiffusionXLPipeline.from_pretrained(
-                    "dataautogpt3/ProteusV0.3",
+                    "dataautogpt3/Proteus-RunDiffusion",
                     vae=vae,
                     torch_dtype=torch.float16,
                     #variant="fp16",
@@ -4193,12 +4282,12 @@ class SEQUENCER_OT_generate_image(Operator):
                 image = pipe(
                     prompt=prompt,
                     negative_prompt=negative_prompt,
-                    num_inference_steps=4,
+                    num_inference_steps=5,
                     guidance_scale=image_num_guidance,
                     height=y,
                     width=x,
                     generator=generator,
-                    #output_type="pil",
+                    output_type="pil",
                 ).images[0]            
 
             # OpenPose
@@ -4374,7 +4463,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 ).images[0]
                 decoder = None
                 
-            elif image_model_card == "dataautogpt3/ProteusV0.3-Lightning":
+            elif image_model_card == "dataautogpt3/Proteus-RunDiffusion-Lightning":
                 image = pipe(
                     prompt=prompt,
                     negative_prompt=negative_prompt,
@@ -4411,7 +4500,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 ).images[0]
                 decoder = None              
 
-            elif image_model_card == "dataautogpt3/ProteusV0.3":
+            elif image_model_card == "dataautogpt3/Proteus-RunDiffusion":
                 image = pipe(
                     # prompt_embeds=prompt, # for compel - long prompts
                     prompt,
