@@ -33,7 +33,8 @@ AI-generate video, image, and audio from text prompts or video, image, or text s
 * Windows (Unsupported: Linux and MacOS).
 * A CUDA-supported Nvidia card with at least 6 GB VRAM.
 * 20+ GB HDD. (Each model is 6+ GB).
-  
+
+For Mac and Linux, we'll have to rely on contributor support. So, post your issues here for Mac: https://github.com/tin2tin/Pallaidium/issues/106 and here for Linux: https://github.com/tin2tin/Pallaidium/issues/105, and hope some contributor wants to help you out.
 
 ## How to install
 
