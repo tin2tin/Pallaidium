@@ -2727,6 +2727,7 @@ class SEQUENCER_OT_generate_audio(Operator):
         movie_num_inference_steps = scene.movie_num_inference_steps
         movie_num_guidance = scene.movie_num_guidance
         audio_length_in_s = scene.audio_length_in_f / (scene.render.fps / scene.render.fps_base)
+        pipe = None
         #try:
         import torch
         import torchaudio
@@ -2751,6 +2752,7 @@ class SEQUENCER_OT_generate_audio(Operator):
             import numpy as np
             try:
                 from whisperspeech.pipeline import Pipeline
+                from resemble_enhance.enhancer.inference import denoise, enhance
             except ModuleNotFoundError:
                 print("Dependencies needs to be installed in the add-on preferences.")
                 self.report(
@@ -2865,6 +2867,7 @@ class SEQUENCER_OT_generate_audio(Operator):
 
             start_time = timer()
 
+            # Find free space for the strip in the timeline.
             if i > 0:
                 empty_channel = scene.sequence_editor.active_strip.channel
                 start_frame = (
@@ -2876,10 +2879,11 @@ class SEQUENCER_OT_generate_audio(Operator):
                 )
             else:
                 empty_channel = find_first_empty_channel(
-                    scene.frame_current,
-                    100000000000000000000,
+                scene.sequence_editor.active_strip.frame_final_start,
+                    (scene.movie_num_batch * (len(prompt) * 4)) + scene.frame_current,
                 )
                 start_frame = scene.frame_current
+
 
             # Bark.
             if addon_prefs.audio_model_card == "bark":
@@ -2975,6 +2979,7 @@ class SEQUENCER_OT_generate_audio(Operator):
 
 
                 pipe.generate_to_file(filename, prompt, speaker=speaker, lang='en', cps=int(scene.audio_speed))
+
 
             # Musicgen.
             elif addon_prefs.audio_model_card == "facebook/musicgen-stereo-medium":
@@ -3080,11 +3085,12 @@ class SEQUENCER_OT_generate_audio(Operator):
                 filename = solve_path(str(seed) + "_" + prompt + ".wav")
                 write_wav(filename, rate, audio.transpose())
 
+            # Add Audio Strip
             filepath = filename
             if os.path.isfile(filepath):
-                empty_channel = find_first_empty_channel(
-                    start_frame, start_frame + scene.audio_length_in_f
-                )
+#                empty_channel = find_first_empty_channel(
+#                    start_frame, start_frame + scene.audio_length_in_f
+#                )
                 strip = scene.sequence_editor.sequences.new_sound(
                     name=prompt,
                     filepath=filepath,
