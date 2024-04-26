@@ -165,6 +165,11 @@
 		"negative_prompt": "realism, symmetry, quiet, calm, photo"
 	},
 	{
+		"name": "Art: gothic batik",
+		"prompt": "in the style of southern gothic batik, {prompt}, a harmony of midnightblue and saffron colors",
+		"negative_prompt": "ugly, deformed, noisy, blurry, low contrast, realism, photorealistic"
+	},
+	{
 		"name": "Art: graffiti",
 		"prompt": "graffiti style {prompt}. street art, vibrant, urban, detailed, tag, mural",
 		"negative_prompt": "ugly, deformed, noisy, blurry, low contrast, realism"
