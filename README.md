@@ -67,6 +67,7 @@ https://github.com/amb/blender_pip      |
 
 ## Change Log
 
+* 2024-4-29: Add: PixArt Sigma 2k, PixArt 1024 and RealViz V4
 * 2024-2-23: Add: Proteus Lightning and Dreamshaper XL Lightning
 * 2024-2-21: Add: SDXL-Lightning 2 Step & Proteus v. 0.3
 * 2024-1-02: Add: WhisperSpeech
