@@ -709,8 +709,8 @@ def install_modules(self):
     else:
         import_module(self, "resemble_enhance", "resemble-enhance")
 
-    import_module(self, "diffusers", "diffusers")
-    #import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
+    #import_module(self, "diffusers", "diffusers")
+    import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
     subprocess.check_call([pybin, "-m", "pip", "install", "tensorflow"])
     import_module(self, "soundfile", "PySoundFile")
     import_module(self, "sentencepiece", "sentencepiece")
@@ -721,6 +721,9 @@ def install_modules(self):
     import_module(self, "IPython", "IPython")
     import_module(self, "omegaconf", "omegaconf")
     import_module(self, "protobuf", "protobuf")
+
+    import_module(self, "beautifulsoup4", "beautifulsoup4")
+    import_module(self, "ftfy", "ftfy")
 
     python_version_info = sys.version_info
     python_version_str = parse_python_version(python_version_info)
@@ -904,6 +907,9 @@ class GENERATOR_OT_uninstall(Operator):
         uninstall_module_with_dependencies("resemble_enhance")
         uninstall_module_with_dependencies("mediapipe")
 
+        uninstall_module_with_dependencies("beautifulsoup4")
+        uninstall_module_with_dependencies("ftfy")
+
         # "resemble-enhance":
         uninstall_module_with_dependencies("celluloid")
         uninstall_module_with_dependencies("omegaconf")
@@ -985,7 +991,7 @@ def input_strips_updated(self, context):
         scene.input_strips = "input_strips"
 
     if (
-        movie_model_card == "guoyww/animatediff-motion-adapter-v1-5-2"
+        movie_model_card == "a-r-r-o-w/animatediff-motion-adapter-sdxl-beta"
         and type == "movie"
     ):
         scene.input_strips = "input_prompt"
@@ -1045,7 +1051,7 @@ def output_strips_updated(self, context):
         scene.input_strips = "input_strips"
 
     if (
-        movie_model_card == "guoyww/animatediff-motion-adapter-v1-5-2"
+        movie_model_card == "a-r-r-o-w/animatediff-motion-adapter-sdxl-beta"
         and type == "movie"
     ):
         scene.input_strips = "input_prompt"
@@ -1130,7 +1136,7 @@ class GeneratorAddonPreferences(AddonPreferences):
 #                "Zeroscope (448x256x30)",
 #            ),
             (
-                "guoyww/animatediff-motion-adapter-v1-5-2",
+                "a-r-r-o-w/animatediff-motion-adapter-sdxl-beta",
                 "AnimateDiff",
                 "AnimateDiff",
             ),
@@ -1183,11 +1189,21 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Segmind SSD-1B (1024x1024)",
                 "segmind/SSD-1B",
             ),
-#            (
-#                "dataautogpt3/Miniaturus_PotentiaV1.2",
-#                "Miniaturus_PotentiaV1.2 (1024x1024)",
-#                "dataautogpt3/Miniaturus_PotentiaV1.2",
-#            ),#
+            (
+                "SG161222/RealVisXL_V4.0",
+                "RealVisXL_V4 (1024x1024)",
+                "SG161222/RealVisXL_V4.0",
+            ),#
+            (
+                "PixArt-alpha/PixArt-XL-2-1024-MS",
+                "PixArt XL (1024x1024)",
+                "PixArt-alpha/PixArt-XL-2-1024-MS",
+            ),
+            (
+                "Vargol/PixArt-Sigma_2k_16bit",
+                "PixArt Sigma XL 2K (2560x1440)",
+                "Vargol/PixArt-Sigma_2k_16bit",
+            ),            
             (
                 "dataautogpt3/Proteus-RunDiffusion",
                 "Proteus-RunDiffusion (1024x1024)",
@@ -1195,7 +1211,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             ),
             ("dataautogpt3/Proteus-RunDiffusion-Lightning", "ProteusV0.3-Lightning (1024 x 1024)", "dataautogpt3/Proteus-RunDiffusion-Lightning"),
             ("dataautogpt3/OpenDalleV1.1", "OpenDalle (1024 x 1024)", "dataautogpt3/OpenDalleV1.1"),
-#            ("h94/IP-Adapter", "IP-Adapter (512 x 512)", "h94/IP-Adapter"),
+            ("h94/IP-Adapter", "IP-Adapter (512 x 512)", "h94/IP-Adapter"),
             #("PixArt-alpha/PixArt-XL-2-1024-MS", "PixArt (1024 x 1024)", "PixArt-alpha/PixArt-XL-2-1024-MS"),
             ### ("ptx0/terminus-xl-gamma-v1", "Terminus XL Gamma v1", "ptx0/terminus-xl-gamma-v1"),
 #            ("warp-ai/wuerstchen", "Würstchen (1024x1024)", "warp-ai/wuerstchen"),
@@ -1683,7 +1699,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             if type != "audio":
                 if (
                     type == "movie"
-                    and movie_model_card != "guoyww/animatediff-motion-adapter-v1-5-2"
+                    and movie_model_card != "a-r-r-o-w/animatediff-motion-adapter-sdxl-beta"
                 ) or (
                     type == "image"
                     #and image_model_card != "diffusers/controlnet-canny-sdxl-1.0-small"
@@ -1931,6 +1947,10 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         type == "image"
                         and image_model_card == "PixArt-alpha/PixArt-XL-2-1024-MS"
                     )
+                    or (
+                        type == "image"
+                        and image_model_card == "Vargol/PixArt-Sigma_2k_16bit"
+                    )
                 ):
                     row.prop(context.scene, "use_lcm", text="Speed")
         # Output.
@@ -2060,7 +2080,7 @@ class SEQUENCER_OT_generate_movie(Operator):
         print("Model:  " + movie_model_card)
 
         # Models for refine imported image or movie
-        if ((scene.movie_path or scene.image_path) and input == "input_strips" and movie_model_card != "guoyww/animatediff-motion-adapter-v1-5-2"):
+        if ((scene.movie_path or scene.image_path) and input == "input_strips" and movie_model_card != "a-r-r-o-w/animatediff-motion-adapter-sdxl-beta"):
 
             if movie_model_card == "stabilityai/sd-turbo":  # img2img
                 from diffusers import AutoPipelineForImage2Image
@@ -2218,19 +2238,17 @@ class SEQUENCER_OT_generate_movie(Operator):
         # Models for movie generation
         else:
 
-            if movie_model_card == "guoyww/animatediff-motion-adapter-v1-5-2":
+            if movie_model_card == "a-r-r-o-w/animatediff-motion-adapter-sdxl-beta":
                 from diffusers import MotionAdapter, AnimateDiffPipeline, DDIMScheduler
                 from diffusers.utils import export_to_gif
 
                 # Load the motion adapter
                 adapter = MotionAdapter.from_pretrained(
-                    "guoyww/animatediff-motion-adapter-v1-5-2",
+                    "a-r-r-o-w/animatediff-motion-adapter-sdxl-beta",
                     local_files_only=local_files_only,
                 )
-                # load SD 1.5 based finetuned model
-                # model_id = "runwayml/stable-diffusion-v1-5"
-                model_id = "SG161222/Realistic_Vision_V5.1_noVAE"
-                # model_id = "pagebrain/majicmix-realistic-v7"
+
+                model_id = "stabilityai/stable-diffusion-xl-base-1.0"
                 pipe = AnimateDiffPipeline.from_pretrained(
                     model_id,
                     motion_adapter=adapter,
@@ -2397,7 +2415,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             if (
                 (scene.movie_path or scene.image_path)
                 and input == "input_strips"
-                and movie_model_card != "guoyww/animatediff-motion-adapter-v1-5-2"
+                and movie_model_card != "a-r-r-o-w/animatediff-motion-adapter-sdxl-beta"
             ):
                 video_path = scene.movie_path
 
@@ -2508,7 +2526,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     #frames = output.frames[0]
                     #export_to_gif(frames, "animatelcm.gif")
 
-                elif movie_model_card != "guoyww/animatediff-motion-adapter-v1-5-2":
+                elif movie_model_card != "a-r-r-o-w/animatediff-motion-adapter-sdxl-beta":
                     if scene.movie_path:
                         print("Process: Video to video")
                         if not os.path.isfile(scene.movie_path):
@@ -2563,7 +2581,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             # Movie.
             else:
                 print("Generate: Video")
-                if movie_model_card == "guoyww/animatediff-motion-adapter-v1-5-2":
+                if movie_model_card == "a-r-r-o-w/animatediff-motion-adapter-sdxl-beta":
                     video_frames = pipe(
                         prompt=prompt,
                         negative_prompt=negative_prompt,
@@ -2611,7 +2629,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         generator=generator,
                     ).frames[0]
 
-            if movie_model_card == "guoyww/animatediff-motion-adapter-v1-5-2":
+            if movie_model_card == "a-r-r-o-w/animatediff-motion-adapter-sdxl-beta":
                 # from diffusers.utils import export_to_video
                 # Move to folder.
                 video_frames = np.array(video_frames)
@@ -2728,7 +2746,6 @@ class SEQUENCER_OT_generate_audio(Operator):
         movie_num_guidance = scene.movie_num_guidance
         audio_length_in_s = scene.audio_length_in_f / (scene.render.fps / scene.render.fps_base)
         pipe = None
-        #try:
         import torch
         import torchaudio
         import scipy
@@ -3391,12 +3408,19 @@ class SEQUENCER_OT_generate_image(Operator):
             else:
                 from diffusers import AutoPipelineForImage2Image
 
-                converter = AutoPipelineForImage2Image.from_pretrained(
-                    image_model_card,
-                    torch_dtype=torch.float16,
-                    variant="fp16",
-                    local_files_only=local_files_only,
-                )
+                try:
+                    converter = AutoPipelineForImage2Image.from_pretrained(
+                        image_model_card,
+                        torch_dtype=torch.float16,
+                        variant="fp16",
+                        local_files_only=local_files_only,
+                    )
+                except:
+                    converter = AutoPipelineForImage2Image.from_pretrained(
+                        image_model_card,
+                        torch_dtype=torch.float16,
+                        local_files_only=local_files_only,
+                    )                    
 
             if enabled_items and input == "input_strips" and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0" and (scene.image_path or scene.movie_path) and not do_inpaint:
                 print("LoRAs will be ignored for image or movie input.")
@@ -3894,7 +3918,22 @@ class SEQUENCER_OT_generate_image(Operator):
                         torch_dtype=torch.float16,
                         local_files_only=local_files_only,
                     )
-                    
+                if low_vram():
+                    pipe.enable_model_cpu_offload()
+                else:
+                    pipe.to(gfx_device)
+            elif image_model_card == "Vargol/PixArt-Sigma_2k_16bit":
+                from diffusers import PixArtSigmaPipeline
+                pipe = PixArtSigmaPipeline.from_pretrained(
+                    "Vargol/PixArt-Sigma_2k_16bit",
+                    torch_dtype=torch.float16,
+                    variant="fp16",
+                    local_files_only=local_files_only,
+                )
+                if low_vram():
+                    pipe.enable_model_cpu_offload()
+                else:
+                    pipe.to(gfx_device)            
             elif image_model_card == "ByteDance/SDXL-Lightning":
                 import torch
                 from diffusers import StableDiffusionXLPipeline, EulerAncestralDiscreteScheduler, AutoencoderKL
@@ -3963,21 +4002,30 @@ class SEQUENCER_OT_generate_image(Operator):
 #                decoder = StableCascadeDecoderPipeline.from_pretrained("stabilityai/stable-cascade",  torch_dtype=torch.float16).to(gfx_device)
                                 
 
-            elif image_model_card == "dataautogpt3/Miniaturus_PotentiaV1.2":
-                from diffusers import AutoPipelineForText2Image
-                pipe = AutoPipelineForText2Image.from_pretrained(
-                    "dataautogpt3/Miniaturus_PotentiaV1.2",
-                    torch_dtype=torch.float16,  # vae=vae,
-                    local_files_only=local_files_only,
-                )
+#            elif image_model_card == "SG161222/RealVisXL_V4.0":
+#                from diffusers import AutoPipelineForText2Image
+#                pipe = AutoPipelineForText2Image.from_pretrained(
+#                    "SG161222/RealVisXL_V4.0",
+#                    torch_dtype=torch.float16,  # vae=vae,
+#                    variant="fp16",
+#                    local_files_only=local_files_only,
+#                )
             else:
-                from diffusers import AutoPipelineForText2Image
-                pipe = AutoPipelineForText2Image.from_pretrained(
-                    image_model_card,
-                    torch_dtype=torch.float16,
-                    variant="fp16",
-                    local_files_only=local_files_only,
-                )
+                try:
+                    from diffusers import AutoPipelineForText2Image
+                    pipe = AutoPipelineForText2Image.from_pretrained(
+                        image_model_card,
+                        torch_dtype=torch.float16,
+                        variant="fp16",
+                        local_files_only=local_files_only,
+                    )
+                except:
+                    from diffusers import AutoPipelineForText2Image
+                    pipe = AutoPipelineForText2Image.from_pretrained(
+                        image_model_card,
+                        torch_dtype=torch.float16,
+                        local_files_only=local_files_only,
+                    )                
 
             # LCM
             if scene.use_lcm:
@@ -4028,12 +4076,12 @@ class SEQUENCER_OT_generate_image(Operator):
                 from diffusers import EulerAncestralDiscreteScheduler
                 pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
 
-            elif image_model_card != "PixArt-alpha/PixArt-XL-2-1024-MS" and image_model_card != "stabilityai/stable-cascade":
+            elif image_model_card != "PixArt-alpha/PixArt-XL-2-1024-MS" and image_model_card != "stabilityai/stable-cascade" and image_model_card != "Vargol/PixArt-Sigma_2k_16bit":
                 pipe.scheduler = DPMSolverMultistepScheduler.from_config(
                     pipe.scheduler.config
                 )      
                 
-            if image_model_card != "stabilityai/stable-cascade":
+            if image_model_card != "stabilityai/stable-cascade" and image_model_card != "Vargol/PixArt-Sigma_2k_16bit":
                 pipe.watermark = NoWatermark()
 
                 if low_vram():
@@ -4516,7 +4564,20 @@ class SEQUENCER_OT_generate_image(Operator):
                     height=y,
                     width=x,
                     generator=generator,
-                ).images[0]                
+                ).images[0]
+                
+                
+            elif image_model_card == "Vargol/PixArt-Sigma_2k_16bit":
+                image = pipe(
+                    # prompt_embeds=prompt, # for compel - long prompts
+                    prompt,
+                    negative_prompt=negative_prompt,
+                    num_inference_steps=image_num_inference_steps,
+                    guidance_scale=image_num_guidance,
+                    height=y,
+                    width=x,
+                    generator=generator,
+                ).images[0]                                                
 
             # Inpaint
             elif do_inpaint:
@@ -5262,7 +5323,7 @@ def register():
         default=1024,
         step=64,
         min=256,
-        max=1536,
+        max=2560,
         description="Use the power of 64",
     )
     bpy.types.Scene.generate_movie_y = bpy.props.IntProperty(
@@ -5270,7 +5331,7 @@ def register():
         default=576,
         step=64,
         min=256,
-        max=1536,
+        max=1440,
         description="Use the power of 64",
     )
     # The number of frames to be generated.
