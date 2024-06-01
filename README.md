@@ -67,7 +67,7 @@ If any Python modules are missing, use this add-on to manually install them:    
 https://github.com/amb/blender_pip      |
 
 ## Change Log
-
+* 2024-6-1: IP Adapter(When using SDXL): Face (Image or folder), Style (image or folder) New image models: Mobius, OpenVision, Juggernaut X Hyper
 * 2024-4-29: Add: PixArt Sigma 2k, PixArt 1024 and RealViz V4
 * 2024-2-23: Add: Proteus Lightning and Dreamshaper XL Lightning
 * 2024-2-21: Add: SDXL-Lightning 2 Step & Proteus v. 0.3
@@ -246,7 +246,9 @@ https://github.com/tin2tin/text_to_strip
 
 ## Useful Projects
 
-Trainer for LoRAs: https://github.com/johnman3032/simple-lora-dreambooth-trainer
+Trainer for LoRAs: 
+https://github.com/Nerogar/OneTrainer
+https://github.com/johnman3032/simple-lora-dreambooth-trainer
 
 HD Horizon(LoRA for making SD 1.5 work at higher resolutions): https://civitai.com/models/238891/hd-horizon-the-resolution-frontier-multi-resolution-high-resolution-native-inferencing
 
