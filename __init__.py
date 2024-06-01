@@ -34,6 +34,7 @@ import sys
 import os
 import aud
 import re
+import glob
 import string
 from os.path import dirname, realpath, isdir, join, basename
 import shutil
@@ -133,7 +134,7 @@ def split_and_recombine_text(text, desired_length=200, max_length=300):
     """Split text it into chunks of a desired length trying to keep sentences intact."""
     text = re.sub(r"\n\n+", "\n", text)
     text = re.sub(r"\s+", " ", text)
-    text = re.sub(r"[“”]", '"', text)
+    text = re.sub(r"[“[“”]”]", '"', text)
     rv = []
     in_quote = False
     current = ""
@@ -721,6 +722,8 @@ def install_modules(self):
     import_module(self, "IPython", "IPython")
     import_module(self, "omegaconf", "omegaconf")
     import_module(self, "protobuf", "protobuf")
+    
+    import_module(self, "controlnet-aux", "controlnet-aux")
 
     import_module(self, "beautifulsoup4", "beautifulsoup4")
     import_module(self, "ftfy", "ftfy")
@@ -906,6 +909,8 @@ class GENERATOR_OT_uninstall(Operator):
         uninstall_module_with_dependencies("protobuf")
         uninstall_module_with_dependencies("resemble_enhance")
         uninstall_module_with_dependencies("mediapipe")
+        
+        uninstall_module_with_dependencies("controlnet-aux")
 
         uninstall_module_with_dependencies("beautifulsoup4")
         uninstall_module_with_dependencies("ftfy")
@@ -971,7 +976,7 @@ def input_strips_updated(self, context):
         or image_model_card == "lllyasviel/control_v11p_sd15_scribble"
         or image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
         or image_model_card == "Salesforce/blipdiffusion"
-        or image_model_card == "h94/IP-Adapter"
+        #or image_model_card == "h94/IP-Adapter"
     ):
         scene.input_strips = "input_strips"
 
@@ -1034,7 +1039,7 @@ def output_strips_updated(self, context):
         or image_model_card == "lllyasviel/control_v11p_sd15_scribble"
         or image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
         or image_model_card == "Salesforce/blipdiffusion"
-        or image_model_card == "h94/IP-Adapter"
+        #or image_model_card == "h94/IP-Adapter"
     ) and type == "image":
         scene.input_strips = "input_strips"
 
@@ -1152,16 +1157,18 @@ class GeneratorAddonPreferences(AddonPreferences):
         items=[
             (
                 "Lykon/dreamshaper-8",
-                "Dreamshaper v8 (1024 x 1024)",
+                "Dreamshaper v8 (1024x1024)",
                 "Lykon/dreamshaper-8",
             ),
-            ("Lykon/dreamshaper-xl-lightning", "Dreamshaper XL-Lightning (1024 x 1024)", "Lykon/dreamshaper-xl-lightning"),
+            ("Lykon/dreamshaper-xl-lightning", "Dreamshaper XL-Lightning (1024x1024)", "Lykon/dreamshaper-xl-lightning"),
             (
                 "stabilityai/stable-diffusion-xl-base-1.0",
                 "Stable Diffusion XL 1.0 (1024x1024)",
                 "stabilityai/stable-diffusion-xl-base-1.0",
             ),
-            ("ByteDance/SDXL-Lightning", "SDXL-Lightning 2 Step (1024 x 1024)", "ByteDance/SDXL-Lightning"),
+            ("ByteDance/SDXL-Lightning", "SDXL-Lightning 2 Step (1024x1024)", "ByteDance/SDXL-Lightning"),
+            ("Corcelio/mobius", "Mobius (1024x1024)", "Corcelio/mobius"),
+            ("Corcelio/openvision", "OpenVision (1280x1280)", "Corcelio/openvision"),
 #            ("stabilityai/stable-cascade", "Stable Cascade (1024 x 1024)", "stabilityai/stable-cascade"),
 #            ("thibaud/sdxl_dpo_turbo", "SDXL DPO TURBO (1024x1024)", "thibaud/sdxl_dpo_turbo"),
 #            (
@@ -1211,11 +1218,11 @@ class GeneratorAddonPreferences(AddonPreferences):
             ),
             ("dataautogpt3/Proteus-RunDiffusion-Lightning", "ProteusV0.3-Lightning (1024 x 1024)", "dataautogpt3/Proteus-RunDiffusion-Lightning"),
             ("dataautogpt3/OpenDalleV1.1", "OpenDalle (1024 x 1024)", "dataautogpt3/OpenDalleV1.1"),
-            ("h94/IP-Adapter", "IP-Adapter (512 x 512)", "h94/IP-Adapter"),
+            #("h94/IP-Adapter", "IP-Adapter (512 x 512)", "h94/IP-Adapter"),
             #("PixArt-alpha/PixArt-XL-2-1024-MS", "PixArt (1024 x 1024)", "PixArt-alpha/PixArt-XL-2-1024-MS"),
             ### ("ptx0/terminus-xl-gamma-v1", "Terminus XL Gamma v1", "ptx0/terminus-xl-gamma-v1"),
 #            ("warp-ai/wuerstchen", "Würstchen (1024x1024)", "warp-ai/wuerstchen"),
-            ("imagepipeline/JuggernautXL-v8", "JuggernautXL-v8 (1024x1024)", "imagepipeline/JuggernautXL-v8"),
+            ("RunDiffusion/Juggernaut-X-Hyper", "Juggernaut X Hyper (1024x1024)", "RunDiffusion/Juggernaut-X-Hyper"),
             ("playgroundai/playground-v2.5-1024px-aesthetic", "Playground v2.5 (1024x1024)", "playgroundai/playground-v2.5-1024px-aesthetic"),
 #            (
 #                "playgroundai/playground-v2-1024px-aesthetic",
@@ -1234,11 +1241,11 @@ class GeneratorAddonPreferences(AddonPreferences):
             ),
             # Disabled - has log-in code.
             # ("DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0", "DeepFloyd/IF-I-M-v1.0"),
-            (
-                "monster-labs/control_v1p_sdxl_qrcode_monster",
-                "Illusion ControlNet",
-                "monster-labs/control_v1p_sdxl_qrcode_monster",
-            ),
+#            (
+#                "monster-labs/control_v1p_sdxl_qrcode_monster",
+#                "Illusion ControlNet",
+#                "monster-labs/control_v1p_sdxl_qrcode_monster",
+#            ),
             (
                 "lllyasviel/sd-controlnet-openpose",
                 "OpenPose ControlNet",
@@ -1754,7 +1761,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 col = col.column(heading="Read as", align=True)
                 col.prop(context.scene, "use_scribble_image", text="Scribble Image")
 
-            # LoRA.
+             # IPAdapter.
             if (
                 (
                     image_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
@@ -1767,28 +1774,20 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 and type == "image"
                 #and input != "input_strips"
             ):
-                col = layout.column(align=True)
-                col = col.box()
-                col = col.column(align=True)
-                col.use_property_split = False
-                col.use_property_decorate = False
+                #col = layout.column(align=True)
+                #col = col.box()
+                #col = col.column(align=True)
+                #col.use_property_split = True
+                #col.use_property_decorate = False
                 # Folder selection and refresh button
                 row = col.row(align=True)
-                row.prop(scene, "lora_folder", text="LoRA")
-                row.operator("lora.refresh_files", text="", icon="FILE_REFRESH")
-                # Custom UIList
-                lora_files = scene.lora_files
-                list_len = len(lora_files)
-                if list_len > 0:
-                    col.template_list(
-                        "LORABROWSER_UL_files",
-                        "The_List",
-                        scene,
-                        "lora_files",
-                        scene,
-                        "lora_files_index",
-                        rows=2,
-                    )
+                row.prop(scene, "ip_adapter_face_folder", text="Adapter Face")
+                row.operator("ip_adapter_face.file_browser", text="", icon="FILE_FOLDER")
+                #if not scene.inpaint_selected_strip:
+                row = col.row(align=True)
+                row.prop(scene, "ip_adapter_style_folder", text="Adapter Style")
+                row.operator("ip_adapter_style.file_browser", text="", icon="FILE_FOLDER")
+
             # Prompts
             col = layout.column(align=True)
             col = col.box()
@@ -1953,6 +1952,47 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     )
                 ):
                     row.prop(context.scene, "use_lcm", text="Speed")
+
+        # LoRA.
+        if (
+            (
+                image_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
+                or image_model_card == "runwayml/stable-diffusion-v1-5"
+                or image_model_card == "stabilityai/sdxl-turbo"
+                or image_model_card == "lllyasviel/sd-controlnet-openpose"
+                or image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
+                or image_model_card == "lllyasviel/control_v11p_sd15_scribble"
+            )
+            and type == "image"
+            #and input != "input_strips"
+        ):
+            layout = self.layout
+            layout.use_property_split = True
+            layout.use_property_decorate = False
+            col = layout.column(align=True)
+            col = col.box()
+            col = col.column(align=True)
+            col.use_property_split = False
+            col.use_property_decorate = False
+            # Folder selection and refresh button
+            row = col.row(align=True)
+            row.prop(scene, "lora_folder", text="LoRA")
+            row.operator("lora.refresh_files", text="", icon="FILE_REFRESH")
+            # Custom UIList
+            lora_files = scene.lora_files
+            list_len = len(lora_files)
+            if list_len > 0:
+                col.template_list(
+                    "LORABROWSER_UL_files",
+                    "The_List",
+                    scene,
+                    "lora_files",
+                    scene,
+                    "lora_files_index",
+                    rows=2,
+                )
+
+
         # Output.
         layout = self.layout
         layout.use_property_split = True
@@ -3187,6 +3227,160 @@ def get_depth_map(image):
     return image
 
 
+class IPAdapterFaceProperties(bpy.types.PropertyGroup):
+    files_to_import: bpy.props.CollectionProperty(type=bpy.types.PropertyGroup)
+
+
+class IPAdapterFaceFileBrowserOperator(Operator):
+    bl_idname = "ip_adapter_face.file_browser"
+    bl_label = "Open IP Adapter Face File Browser"
+    
+    filepath: bpy.props.StringProperty(subtype="FILE_PATH")
+    import_as_folder: bpy.props.BoolProperty(name="Import as Folder", default=False)
+
+    def execute(self, context):
+        valid_image_extensions = {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif", ".gif", ".hdr"}
+        scene = context.scene
+        
+        if self.filepath:
+            if self.import_as_folder:
+                files_to_import = bpy.context.scene.ip_adapter_face_files_to_import
+                files_to_import.clear()
+                #self.filepath = os.path.dirname(self.filepath)
+                print("Importing folder:", self.filepath)
+                for file_path in glob.glob(os.path.join(self.filepath, "*")):
+                    if os.path.isfile(file_path):
+                        file_ext = os.path.splitext(file_path)[1].lower()
+                        if file_ext in valid_image_extensions:
+                            print("Found image file in folder:", os.path.basename(file_path))
+                            new_file = files_to_import.add()
+                            #new_file.name = os.path.basename(self.filepath)
+                            new_file.path = os.path.abspath(self.filepath)
+                scene.ip_adapter_face_folder = os.path.abspath(os.path.dirname(self.filepath))
+                self.report({'INFO'}, f"{len(files_to_import)} image files found in folder.")
+            else:
+                print("Importing file:", self.filepath)
+                valid_file_ext = os.path.splitext(self.filepath)[1].lower()
+                if valid_file_ext in valid_image_extensions:
+                    print("Adding image file:", os.path.basename(self.filepath))
+                    files_to_import = bpy.context.scene.ip_adapter_face_files_to_import
+                    new_file = files_to_import.add()
+                    #new_file.name = os.path.basename(self.filepath)
+                    new_file.name = os.path.abspath(self.filepath)
+                    self.report({'INFO'}, "Image file added.")
+                    scene.ip_adapter_face_folder = os.path.abspath(self.filepath)
+                else:
+                    self.report({'ERROR'}, "Selected file is not a valid image.")
+        else:
+            self.report({'ERROR'}, "No file selected.")
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+
+class IPAdapterStyleProperties(bpy.types.PropertyGroup):
+    files_to_import: bpy.props.CollectionProperty(type=bpy.types.PropertyGroup)
+
+
+class IPAdapterStyleFileBrowserOperator(Operator):
+    bl_idname = "ip_adapter_style.file_browser"
+    bl_label = "Open IP Adapter Style File Browser"
+    
+    filepath: bpy.props.StringProperty(subtype="FILE_PATH")
+    import_as_folder: bpy.props.BoolProperty(name="Import as Folder", default=False)
+
+    def execute(self, context):
+        valid_image_extensions = {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif", ".gif", ".hdr"}
+        scene = context.scene
+        
+        if self.filepath:
+            if self.import_as_folder:
+                files_to_import = bpy.context.scene.ip_adapter_style_files_to_import
+                files_to_import.clear()  # Clear the list first
+                self.filepath = os.path.dirname(self.filepath)
+                print("Importing folder:", self.filepath)
+                for file_path in glob.glob(os.path.join(self.filepath, "*")):
+                    if os.path.isfile(file_path):
+                        file_ext = os.path.splitext(file_path)[1].lower()
+                        if file_ext in valid_image_extensions:
+                            print("Found image file in folder:", os.path.basename(file_path))
+                            new_file = files_to_import.add()
+                            new_file.name = os.path.basename(file_path)
+                            new_file.path = os.path.abspath(file_path)
+                scene.ip_adapter_style_folder = os.path.abspath(self.filepath)
+                self.report({'INFO'}, f"{len(files_to_import)} image files found in folder.")
+            else:
+                print("Importing file:", self.filepath)
+                valid_file_ext = os.path.splitext(self.filepath)[1].lower()
+                if valid_file_ext in valid_image_extensions:
+                    print("Adding image file:", os.path.basename(self.filepath))
+                    files_to_import = bpy.context.scene.ip_adapter_style_files_to_import
+                    new_file = files_to_import.add()
+                    new_file.name = os.path.basename(self.filepath)
+                    new_file.path = os.path.abspath(self.filepath)
+                    self.report({'INFO'}, "Image file added.")
+                    scene.ip_adapter_style_folder = os.path.abspath(self.filepath)
+                else:
+                    self.report({'ERROR'}, "Selected file is not a valid image.")
+        else:
+            self.report({'ERROR'}, "No file selected.")
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+
+def load_images_from_folder(folder_path):
+    from diffusers.utils import load_image
+    
+    # List to hold the loaded images
+    loaded_images = []
+
+    # Check if the path is a file
+    if os.path.isfile(folder_path) and folder_path.lower().endswith(('.png', '.jpg', '.jpeg', '.tga', '.bmp')):
+        # Load the image
+        try:
+            image = load_image(folder_path)
+            loaded_images.append(image)
+            print(f"Loaded image: {folder_path}")
+        except Exception as e:
+            print(f"Failed to load image {folder_path}: {e}")
+        if len(loaded_images) == 1:
+            return loaded_images[0]
+        else:
+            return None
+
+    # Check if the folder exists
+    if not os.path.exists(folder_path):
+        print(f"The folder {folder_path} does not exist.")
+        return None
+    
+    print(f"Loaded folder: {folder_path}")
+    # Iterate through all files in the folder
+    for filename in os.listdir(folder_path):
+        # Build the full file path
+        file_path = os.path.join(folder_path, filename)
+        
+        # Check if the current file is an image
+        if os.path.isfile(file_path) and filename.lower().endswith(('.png', '.jpg', '.jpeg', '.tga', '.bmp')):
+            # Load the image
+            try:
+                image = load_image(file_path)
+                loaded_images.append(image)
+            except Exception as e:
+                print(f"Failed to load folder image {file_path}: {e}")
+    
+    if len(loaded_images) == 1:
+        return loaded_images[0]
+    elif len(loaded_images) > 1:
+        return loaded_images
+    else:
+        return None
+
+
 class SEQUENCER_OT_generate_image(Operator):
     """Generate Image"""
 
@@ -3286,25 +3480,30 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
             and not image_model_card == "lllyasviel/sd-controlnet-openpose"
             and not image_model_card == "lllyasviel/control_v11p_sd15_scribble"
-            and not image_model_card == "h94/IP-Adapter"
+            #and not image_model_card == "h94/IP-Adapter"
             and not image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
             and not image_model_card == "Salesforce/blipdiffusion"
             and not image_model_card == "Lykon/dreamshaper-8"
-            and not image_model_card == "ByteDance/SDXL-Lightning"
+            and not image_model_card == "Corcelio/mobius"
+            and not image_model_card == "Corcelio/openvision"
             and not image_model_card == "dataautogpt3/Proteus-RunDiffusion-Lightning"
             and not image_model_card == "Lykon/dreamshaper-xl-lightning"
+            and not scene.ip_adapter_face_folder
+            and not scene.ip_adapter_style_folder
         )
         do_convert = (
             (scene.image_path or scene.movie_path)
             and not image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
             and not image_model_card == "lllyasviel/sd-controlnet-openpose"
             and not image_model_card == "lllyasviel/control_v11p_sd15_scribble"
-            and not image_model_card == "h94/IP-Adapter"
+            #and not image_model_card == "h94/IP-Adapter"
             and not image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
             and not image_model_card == "Salesforce/blipdiffusion"
             and not image_model_card == "ByteDance/SDXL-Lightning"
             and not image_model_card == "dataautogpt3/Proteus-RunDiffusion-Lightning"
             and not image_model_card == "Lykon/dreamshaper-xl-lightning"
+            and not scene.ip_adapter_face_folder
+            and not scene.ip_adapter_style_folder
             and not do_inpaint
         )
         do_refine = scene.refine_sd and not do_convert
@@ -3314,9 +3513,11 @@ class SEQUENCER_OT_generate_image(Operator):
             or image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
             or image_model_card == "lllyasviel/sd-controlnet-openpose"
             or image_model_card == "lllyasviel/control_v11p_sd15_scribble"
-            or image_model_card == "h94/IP-Adapter"
+            #or image_model_card == "h94/IP-Adapter"
             or image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
             or image_model_card == "Salesforce/blipdiffusion"
+            and not scene.ip_adapter_face_folder
+            and not scene.ip_adapter_style_folder
         ):
             if not strips:
                 self.report({"INFO"}, "Select strip(s) for processing.")
@@ -3383,7 +3584,7 @@ class SEQUENCER_OT_generate_image(Operator):
         elif (
             do_convert
             and image_model_card != "warp-ai/wuerstchen"
-            and image_model_card != "h94/IP-Adapter"
+            #and image_model_card != "h94/IP-Adapter"
         ):
 
             print("Load: img2img/vid2img Model")
@@ -3425,6 +3626,10 @@ class SEQUENCER_OT_generate_image(Operator):
             if enabled_items and input == "input_strips" and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0" and (scene.image_path or scene.movie_path) and not do_inpaint:
                 print("LoRAs will be ignored for image or movie input.")
                 enabled_items = False
+
+#            if enabled_items and input == "input_strips" and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0" and (scene.ip_adapter_face_folder or scene.ip_adapter_style_folder):
+#                print("Adapters will be ignored for image or movie input.")
+#                enabled_items = False
 
             if enabled_items:
                 if scene.use_lcm:
@@ -3577,33 +3782,84 @@ class SEQUENCER_OT_generate_image(Operator):
             )
             vae=AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16, local_files_only=local_files_only)
 
-#            pipe = StableDiffusionControlNetPipeline.from_pretrained(
-#                "runwayml/stable-diffusion-v1-5",
-            pipe = StableDiffusionXLControlNetPipeline.from_pretrained(
-                "stabilityai/stable-diffusion-xl-base-1.0",
-                vae=vae,
-                controlnet=controlnet,
-                torch_dtype=torch.float16,
-                variant="fp16",
-                local_files_only=local_files_only,
-            )  # safety_checker=None,
+
+            if not (scene.image_path or scene.movie_path):
+    #            pipe = StableDiffusionControlNetPipeline.from_pretrained(
+    #                "runwayml/stable-diffusion-v1-5",
+                pipe = StableDiffusionXLControlNetPipeline.from_pretrained(
+                    "stabilityai/stable-diffusion-xl-base-1.0",
+                    vae=vae,
+                    controlnet=controlnet,
+                    torch_dtype=torch.float16,
+                    variant="fp16",
+                    local_files_only=local_files_only,
+                )  # safety_checker=None,
+
+            # IPAdapter
+            else:
+                print("Loading: IP Adapter")
+                import torch                
+                from diffusers import DDIMScheduler
+                from diffusers.utils import load_image
+
+                from transformers import CLIPVisionModelWithProjection
+                image_encoder = CLIPVisionModelWithProjection.from_pretrained(
+                    "h94/IP-Adapter",
+                    subfolder="models/image_encoder",
+                    torch_dtype=torch.float16,
+                    local_files_only=local_files_only,
+                )                
+                if find_strip_by_name(scene, scene.inpaint_selected_strip):          
+                    from diffusers import AutoPipelineForInpainting
+                    pipe = AutoPipelineForInpainting.from_pretrained("diffusers/stable-diffusion-xl-1.0-inpainting-0.1", torch_dtype=torch.float16, image_encoder=image_encoder,controlnet=controlnet,local_files_only=local_files_only)
+                elif scene.input_strips == "input_strips" and (scene.image_path or scene.movie_path):
+                    from diffusers import AutoPipelineForImage2Image
+                    pipe = AutoPipelineForImage2Image.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", vae=vae, torch_dtype=torch.float16, image_encoder=image_encoder,controlnet=controlnet,local_files_only=local_files_only)
+                else:
+                    from diffusers import AutoPipelineForText2Image
+                    pipe = AutoPipelineForText2Image.from_pretrained(
+                        "stabilityai/stable-diffusion-xl-base-1.0",
+                        controlnet=controlnet,
+                        torch_dtype=torch.float16,
+                        image_encoder=image_encoder,
+                        vae=vae,
+                        local_files_only=local_files_only,
+                    )
+                    
+                if scene.ip_adapter_face_folder and scene.ip_adapter_style_folder:                
+                    pipe.load_ip_adapter(
+                      "h94/IP-Adapter",
+                      subfolder="sdxl_models",
+                      weight_name=["ip-adapter-plus_sdxl_vit-h.safetensors", "ip-adapter-plus-face_sdxl_vit-h.safetensors"],
+                      local_files_only=local_files_only,
+                    )
+                    pipe.set_ip_adapter_scale([0.7, 0.8])
+                elif scene.ip_adapter_face_folder:                
+                    pipe.load_ip_adapter(
+                      "h94/IP-Adapter",
+                      subfolder="sdxl_models",
+                      weight_name=["ip-adapter-plus-face_sdxl_vit-h.safetensors"],
+                      local_files_only=local_files_only,
+                    )
+                    pipe.set_ip_adapter_scale([0.8])
+                elif scene.ip_adapter_style_folder:                
+                    pipe.load_ip_adapter(
+                      "h94/IP-Adapter",
+                      subfolder="sdxl_models",
+                      weight_name=["ip-adapter-plus_sdxl_vit-h.safetensors"],
+                      local_files_only=local_files_only,
+                    )
+                    pipe.set_ip_adapter_scale([0.7])
+                    pipe.scheduler = DDIMScheduler.from_config(pipe.scheduler.config)  
 
             if scene.use_lcm:
                 from diffusers import LCMScheduler
 
                 pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
                 pipe.load_lora_weights("latent-consistency/lcm-lora-sdxl")
-                #pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
-
-                #pipe.fuse_lora()
                 scene.movie_num_guidance = 0
-#            else:
-#                pipe.scheduler = UniPCMultistepScheduler.from_config(
-#                    pipe.scheduler.config
-#                )
 
             if low_vram():
-                #pipe.enable_xformers_memory_efficient_attention()
                 pipe.enable_model_cpu_offload()
             else:
                 pipe.to(gfx_device)
@@ -3694,7 +3950,70 @@ class SEQUENCER_OT_generate_image(Operator):
             #pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config, timestep_spacing="trailing")
             pipe.scheduler = DPMSolverMultistep.from_config(pipe.scheduler.config)
             pipe = pipe.to(gfx_device)
+
+        # Mobius
+        elif do_convert == False and image_model_card == "Corcelio/mobius":
+            print("Load: Mobius Model")
             
+            import torch
+            from diffusers import (
+                StableDiffusionXLPipeline, 
+                KDPM2AncestralDiscreteScheduler,
+                AutoencoderKL
+            )
+
+            # Load VAE component
+            vae = AutoencoderKL.from_pretrained(
+                "madebyollin/sdxl-vae-fp16-fix", 
+                torch_dtype=torch.float16
+            )
+
+            # Configure the pipeline
+            pipe = StableDiffusionXLPipeline.from_pretrained(
+                "Corcelio/mobius", 
+                vae=vae,
+                torch_dtype=torch.float16,
+                variant="fp16",
+                local_files_only=local_files_only,
+            )
+            pipe.scheduler = KDPM2AncestralDiscreteScheduler.from_config(pipe.scheduler.config)
+            
+            if low_vram():
+                pipe.enable_model_cpu_offload()
+            else:
+                pipe.to(gfx_device)
+
+        # OpenVision
+        elif do_convert == False and image_model_card == "Corcelio/openvision":
+            print("Load: OpenVision Model")
+            import torch
+            from diffusers import (
+                StableDiffusionXLPipeline,
+                #KDPM2AncestralDiscreteScheduler,
+                AutoencoderKL
+            )
+
+            # Load VAE component
+            vae = AutoencoderKL.from_pretrained(
+                "madebyollin/sdxl-vae-fp16-fix", 
+                torch_dtype=torch.float16,
+                variant="fp16",
+                local_files_only=local_files_only,
+            )
+
+            # Configure the pipeline
+            pipe = StableDiffusionXLPipeline.from_pretrained(
+                "Corcelio/openvision", 
+                vae=vae,
+                torch_dtype=torch.float16
+            )
+            #pipe.scheduler = KDPM2AncestralDiscreteScheduler.from_config(pipe.scheduler.config)
+            
+            if low_vram():
+                pipe.enable_model_cpu_offload()
+            else:
+                pipe.to(gfx_device)
+                       
         # Wuerstchen
         elif image_model_card == "warp-ai/wuerstchen":
             print("Load: Würstchen Model")
@@ -3717,73 +4036,6 @@ class SEQUENCER_OT_generate_image(Operator):
                 pipe.enable_model_cpu_offload()
             else:
                 pipe.to(gfx_device)
-
-
-        # IP-Adapter
-        elif image_model_card == "h94/IP-Adapter":
-            print("Load: IP-Adapter")
-            import torch
-            from diffusers import StableDiffusionPipeline, DDIMScheduler
-            from diffusers.utils import load_image
-
-            noise_scheduler = DDIMScheduler(
-                num_train_timesteps=1000,
-                beta_start=0.00085,
-                beta_end=0.012,
-                beta_schedule="scaled_linear",
-                clip_sample=False,
-                set_alpha_to_one=False,
-                steps_offset=1
-            )
-
-# For SDXL
-            from diffusers import AutoPipelineForText2Image
-
-            from transformers import CLIPVisionModelWithProjection
-            image_encoder = CLIPVisionModelWithProjection.from_pretrained(
-                "h94/IP-Adapter",
-                subfolder="sdxl_models/image_encoder",
-                torch_dtype=torch.float16,
-                #weight_name="ip-adapter_sdxl.bin",
-            ).to(gfx_device)
-            ip_adapter = AutoPipelineForText2Image.from_pretrained(
-                "stabilityai/stable-diffusion-xl-base-1.0",
-                torch_dtype=torch.float16,
-                image_encoder = image_encoder,
-            ).to(gfx_device)
-
-# For SD 1.5
-#            from transformers import CLIPVisionModelWithProjection
-#            image_encoder = CLIPVisionModelWithProjection.from_pretrained(
-#                "h94/IP-Adapter",
-#                subfolder="models/image_encoder",
-#                torch_dtype=torch.float16,
-#            )#.to(gfx_device)
-
-
-#            ip_adapter = StableDiffusionPipeline.from_pretrained(
-#                "runwayml/stable-diffusion-v1-5",
-#                torch_dtype=torch.float16,
-#                scheduler=noise_scheduler,
-#                image_encoder = image_encoder,
-#            )#.to(gfx_device)
-
-
-            #ip_adapter.image_encoder = image_encoder
-            #ip_adapter.set_ip_adapter_scale(scene.image_power)
-
-#            if scene.use_lcm:
-#                from diffusers import LCMScheduler
-
-#                ip_adapter.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
-#                ip_adapter.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
-#                ip_adapter.fuse_lora()
-#                scene.movie_num_guidance = 0
-            if low_vram():
-                ip_adapter.enable_model_cpu_offload()
-            else:
-                ip_adapter.to(gfx_device)
-
 
         # DeepFloyd
         elif image_model_card == "DeepFloyd/IF-I-M-v1.0":
@@ -3884,19 +4136,75 @@ class SEQUENCER_OT_generate_image(Operator):
             print("Load: " + image_model_card + " Model")
 
             if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
-                from diffusers import AutoencoderKL
-                vae = AutoencoderKL.from_pretrained(
-                    "madebyollin/sdxl-vae-fp16-fix",
-                    torch_dtype=torch.float16,
-                    local_files_only=local_files_only,
-                )
-                pipe = DiffusionPipeline.from_pretrained(
-                    image_model_card,
-                    vae=vae,
-                    torch_dtype=torch.float16,
-                    variant="fp16",
-                    local_files_only=local_files_only,
-                )
+                if not (scene.ip_adapter_face_folder or scene.ip_adapter_style_folder): 
+                    from diffusers import AutoencoderKL
+                    vae = AutoencoderKL.from_pretrained(
+                        "madebyollin/sdxl-vae-fp16-fix",
+                        torch_dtype=torch.float16,
+                        local_files_only=local_files_only,
+                    )
+                    pipe = DiffusionPipeline.from_pretrained(
+                        image_model_card,
+                        vae=vae,
+                        torch_dtype=torch.float16,
+                        variant="fp16",
+                        local_files_only=local_files_only,
+                    )
+                else:
+                # IPAdapter
+                    print("Loading: IP Adapter")
+                    import torch                
+                    from diffusers import DDIMScheduler
+                    from diffusers.utils import load_image
+
+                    from transformers import CLIPVisionModelWithProjection
+                    image_encoder = CLIPVisionModelWithProjection.from_pretrained(
+                        "h94/IP-Adapter",
+                        subfolder="models/image_encoder",
+                        torch_dtype=torch.float16,
+                        local_files_only=local_files_only,
+                    )                
+                    if find_strip_by_name(scene, scene.inpaint_selected_strip):          
+                        from diffusers import AutoPipelineForInpainting
+                        pipe = AutoPipelineForInpainting.from_pretrained("diffusers/stable-diffusion-xl-1.0-inpainting-0.1", torch_dtype=torch.float16, image_encoder=image_encoder,local_files_only=local_files_only)
+                    elif scene.input_strips == "input_strips" and (scene.image_path or scene.movie_path):
+                        from diffusers import AutoPipelineForImage2Image
+                        pipe = AutoPipelineForImage2Image.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16, image_encoder=image_encoder,local_files_only=local_files_only)
+                    else:
+                        from diffusers import AutoPipelineForText2Image
+                        pipe = AutoPipelineForText2Image.from_pretrained(
+                            "stabilityai/stable-diffusion-xl-base-1.0",
+                            torch_dtype=torch.float16,
+                            image_encoder=image_encoder,
+                            local_files_only=local_files_only,
+                        )
+                        
+                    if scene.ip_adapter_face_folder and scene.ip_adapter_style_folder:                
+                        pipe.load_ip_adapter(
+                          "h94/IP-Adapter",
+                          subfolder="sdxl_models",
+                          weight_name=["ip-adapter-plus_sdxl_vit-h.safetensors", "ip-adapter-plus-face_sdxl_vit-h.safetensors"],
+                          local_files_only=local_files_only,
+                        )
+                        pipe.set_ip_adapter_scale([0.7, 0.8])
+                    elif scene.ip_adapter_face_folder:                
+                        pipe.load_ip_adapter(
+                          "h94/IP-Adapter",
+                          subfolder="sdxl_models",
+                          weight_name=["ip-adapter-plus-face_sdxl_vit-h.safetensors"],
+                          local_files_only=local_files_only,
+                        )
+                        pipe.set_ip_adapter_scale([1.0])
+                    elif scene.ip_adapter_style_folder:                
+                        pipe.load_ip_adapter(
+                          "h94/IP-Adapter",
+                          subfolder="sdxl_models",
+                          weight_name=["ip-adapter-plus_sdxl_vit-h.safetensors"],
+                          local_files_only=local_files_only,
+                        )
+                        pipe.set_ip_adapter_scale([0.7])
+                        pipe.scheduler = DDIMScheduler.from_config(pipe.scheduler.config)  
+                
             elif image_model_card == "runwayml/stable-diffusion-v1-5":
                 from diffusers import StableDiffusionPipeline
                 pipe = StableDiffusionPipeline.from_pretrained(
@@ -4315,8 +4623,6 @@ class SEQUENCER_OT_generate_image(Operator):
                         #                    width=x,
                     ).images[0]
 
-
-
             # DreamShaper
             elif image_model_card == "Lykon/dreamshaper-8":
                 image = pipe(
@@ -4346,7 +4652,6 @@ class SEQUENCER_OT_generate_image(Operator):
 
             # OpenPose
             elif image_model_card == "lllyasviel/sd-controlnet-openpose":
-                print("Process: OpenPose")
                 init_image = None
                 if scene.image_path:
                     init_image = load_first_frame(scene.image_path)
@@ -4368,16 +4673,120 @@ class SEQUENCER_OT_generate_image(Operator):
                         str(seed) + "_" + context.scene.generate_movie_prompt
                     )
                     out_path = solve_path("Pose_"+filename + ".png")
+                    print("Saving OpenPoseBone image: "+out_path)
                     image.save(out_path)
 
-                image = pipe(
-                    prompt=prompt,
-                    negative_prompt=negative_prompt,
-                    image=image,
-                    num_inference_steps=image_num_inference_steps,
-                    guidance_scale=image_num_guidance,
-                    generator=generator,
-                ).images[0]
+                if not (scene.ip_adapter_face_folder or scene.ip_adapter_style_folder):
+                    print("Process: OpenPose")
+                    image = pipe(
+                        prompt=prompt,
+                        negative_prompt=negative_prompt,
+                        image=image,
+                        num_inference_steps=image_num_inference_steps,
+                        guidance_scale=image_num_guidance,
+                        generator=generator,
+                    ).images[0]
+                
+                # IPAdapter                        
+                else:
+                    mask_image = None
+                    init_image = None
+                    ip_adapter_image = None
+                    init_image = image
+
+                    if scene.ip_adapter_face_folder and scene.ip_adapter_style_folder:
+                        face_images = load_images_from_folder((scene.ip_adapter_face_folder).replace('\\','/'))
+                        style_images = load_images_from_folder((scene.ip_adapter_style_folder).replace('\\','/'))
+                        ip_adapter_image=[style_images, face_images]
+                    elif scene.ip_adapter_face_folder:
+                        face_images = load_images_from_folder((scene.ip_adapter_face_folder).replace('\\','/'))
+                        ip_adapter_image=[face_images]
+                    elif scene.ip_adapter_style_folder:
+                        style_images = load_images_from_folder((scene.ip_adapter_style_folder).replace('\\','/'))
+                        ip_adapter_image=[style_images]
+
+                    #inpaint
+                    if scene.inpaint_selected_strip:
+                        print("Process: Inpaint")
+                        mask_strip = find_strip_by_name(scene, scene.inpaint_selected_strip)
+                        
+                        if not mask_strip:
+                            print("Selected mask not found!")
+                            return {"CANCELLED"}
+                        
+                        if (
+                            mask_strip.type == "MASK"
+                            or mask_strip.type == "COLOR"
+                            or mask_strip.type == "SCENE"
+                            or mask_strip.type == "META"
+                        ):
+                            mask_strip = get_render_strip(self, context, mask_strip)
+
+                        mask_path = get_strip_path(mask_strip)
+                        mask_image = load_first_frame(mask_path)
+
+                        if not mask_image:
+                            print("Loading mask failed!")
+                            return
+
+                        mask_image = mask_image.resize((x, y))
+                        mask_image = pipe.mask_processor.blur(mask_image, blur_factor=33)
+
+#                        if scene.image_path:
+#                            init_image = load_first_frame(scene.image_path)
+#                        if scene.movie_path:
+#                            init_image = load_first_frame(scene.movie_path)
+#                        if not init_image:
+#                            print("Loading strip failed!")
+#                            return {"CANCELLED"}
+
+                        image = pipe(
+                            prompt,
+                            negative_prompt=negative_prompt,
+                            image=init_image,
+                            mask_image=mask_image,
+                            ip_adapter_image=ip_adapter_image,
+                            num_inference_steps=image_num_inference_steps,
+                            guidance_scale=image_num_guidance,
+                            height=y,
+                            width=x,
+                            generator=generator,
+                            #cross_attention_kwargs={"scale": 1.0},
+                            #padding_mask_crop=42,
+                            #strength=0.99,
+                        ).images[0]
+
+                    # Input strip + ip adapter
+                    else:
+                        print("Process: OpenPose & IPAdapter")
+                        image = pipe(
+                            prompt,
+                            image=init_image,
+                            negative_prompt=negative_prompt,
+                            ip_adapter_image=ip_adapter_image,
+                            num_inference_steps=image_num_inference_steps,
+                            guidance_scale=image_num_guidance,
+                            height=y,
+                            width=x,
+                            #strength=max(1.00 - scene.image_power, 0.1),
+                            generator=generator,
+                        ).images[0]                                         
+
+#                    # No inpaint, but IP Adapter
+#                    else:
+#                        image = pipe(
+#                            prompt,
+#                            negative_prompt=negative_prompt,
+#                            ip_adapter_image=ip_adapter_image,
+#                            num_inference_steps=image_num_inference_steps,
+#                            guidance_scale=image_num_guidance,
+#                            height=y,
+#                            width=x,
+#                            generator=generator,
+#                        ).images[0]                            
+                
+                
+                
 
             # Scribble
             elif image_model_card == "lllyasviel/control_v11p_sd15_scribble":
@@ -4474,37 +4883,6 @@ class SEQUENCER_OT_generate_image(Operator):
                         generator=generator,
                     ).images[0]
 
-
-            # IP-Adapter
-            elif image_model_card == "h94/IP-Adapter":
-                from diffusers.utils import numpy_to_pil
-                print("Process: IP-Adapter")
-                init_image = None
-                if scene.image_path:
-                    init_image = load_first_frame(scene.image_path)
-                if scene.movie_path:
-                    init_image = load_first_frame(scene.movie_path)
-                if not init_image:
-                    print("Loading strip failed!")
-                    return {"CANCELLED"}
-                image = scale_image_within_dimensions(np.array(init_image),x,None)
-                #image = numpy_to_pil(image)
-
-                from diffusers.utils import load_image
-                image = load_image("https://huggingface.co/datasets/YiYiXu/testing-images/resolve/main/ai_face2.png")
-
-                image = ip_adapter(
-                    prompt=prompt,
-                    ip_adapter_image=image,
-                    negative_prompt=negative_prompt,
-                    num_inference_steps=image_num_inference_steps,
-                    guidance_scale=max(image_num_guidance, 1.1),
-                    height=y,
-                    width=x,
-                    strength=1.00 - scene.image_power,
-                    generator=generator,
-                ).images[0]
-
             elif image_model_card == "ByteDance/SDXL-Lightning":
                 image = pipe(
                     prompt=prompt,
@@ -4581,6 +4959,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             # Inpaint
             elif do_inpaint:
+                init_image = None
                 print("Process: Inpaint")
                 mask_strip = find_strip_by_name(scene, scene.inpaint_selected_strip)
 
@@ -4699,12 +5078,119 @@ class SEQUENCER_OT_generate_image(Operator):
                         generator=generator,
                     ).images[0]
 
+
             # Generate Stable Diffusion etc.
             else:
                 print("Generate: Image ")
+                from diffusers.utils import load_image
+
+                # IPAdapter                        
+                if (scene.ip_adapter_face_folder or scene.ip_adapter_style_folder) and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+
+                    mask_image = None
+                    init_image = None
+                    ip_adapter_image = None
+
+                    if scene.ip_adapter_face_folder and scene.ip_adapter_style_folder:
+                        face_images = load_images_from_folder((scene.ip_adapter_face_folder).replace('\\','/'))
+                        style_images = load_images_from_folder((scene.ip_adapter_style_folder).replace('\\','/'))
+                        ip_adapter_image=[style_images, face_images]
+                    elif scene.ip_adapter_face_folder:
+                        face_images = load_images_from_folder((scene.ip_adapter_face_folder).replace('\\','/'))
+                        ip_adapter_image=[face_images]
+                    elif scene.ip_adapter_style_folder:
+                        style_images = load_images_from_folder((scene.ip_adapter_style_folder).replace('\\','/'))
+                        ip_adapter_image=[style_images]
+
+                    #inpaint    
+                    if scene.inpaint_selected_strip:
+                        print("Process: Inpaint")
+                        mask_strip = find_strip_by_name(scene, scene.inpaint_selected_strip)
+                        
+                        if not mask_strip:
+                            print("Selected mask not found!")
+                            return {"CANCELLED"}
+                        
+                        if (
+                            mask_strip.type == "MASK"
+                            or mask_strip.type == "COLOR"
+                            or mask_strip.type == "SCENE"
+                            or mask_strip.type == "META"
+                        ):
+                            mask_strip = get_render_strip(self, context, mask_strip)
+
+                        mask_path = get_strip_path(mask_strip)
+                        mask_image = load_first_frame(mask_path)
+
+                        if not mask_image:
+                            print("Loading mask failed!")
+                            return
+
+                        mask_image = mask_image.resize((x, y))
+                        mask_image = pipe.mask_processor.blur(mask_image, blur_factor=33)
+
+                        if scene.image_path:
+                            init_image = load_first_frame(scene.image_path)
+                        if scene.movie_path:
+                            init_image = load_first_frame(scene.movie_path)
+                        if not init_image:
+                            print("Loading strip failed!")
+                            return {"CANCELLED"}
+
+                        image = pipe(
+                            prompt,
+                            negative_prompt=negative_prompt,
+                            image=init_image,
+                            mask_image=mask_image,
+                            ip_adapter_image=ip_adapter_image,
+                            num_inference_steps=image_num_inference_steps,
+                            guidance_scale=image_num_guidance,
+                            height=y,
+                            width=x,
+                            generator=generator,
+                            #cross_attention_kwargs={"scale": 1.0},
+                            #padding_mask_crop=42,
+                            #strength=0.99,
+                        ).images[0]
+
+                    # Input strip + ip adapter
+                    elif scene.input_strips == "input_strips" and (scene.image_path or scene.movie_path):
+                        if scene.image_path:
+                            init_image = load_first_frame(scene.image_path)
+                        if scene.movie_path:
+                            init_image = load_first_frame(scene.movie_path)
+                        if not init_image:
+                            print("Loading strip failed!")
+                            return {"CANCELLED"}
+                        image = pipe(
+                            prompt,
+                            image=init_image,
+                            negative_prompt=negative_prompt,
+                            ip_adapter_image=ip_adapter_image,
+                            num_inference_steps=image_num_inference_steps,
+                            guidance_scale=image_num_guidance,
+                            height=y,
+                            width=x,
+                            #strength=max(1.00 - scene.image_power, 0.1),
+                            generator=generator,
+                        ).images[0]                                         
+
+                    # No inpaint, but IP Adapter
+                    else:
+                        image = pipe(
+                            prompt,
+                            negative_prompt=negative_prompt,
+                            ip_adapter_image=ip_adapter_image,
+                            num_inference_steps=image_num_inference_steps,
+                            guidance_scale=image_num_guidance,
+                            height=y,
+                            width=x,
+                            generator=generator,
+                        ).images[0]                            
+
 
                 # SDXL Turbo
-                if image_model_card == "stabilityai/sdxl-turbo": # or image_model_card == "thibaud/sdxl_dpo_turbo":
+                elif image_model_card == "stabilityai/sdxl-turbo": # or image_model_card == "thibaud/sdxl_dpo_turbo":
 
                     # LoRA.
                     if enabled_items:
@@ -5301,6 +5787,10 @@ classes = (
     GENERATOR_OT_install,
     GENERATOR_OT_uninstall,
     SequencerOpenAudioFile,
+    IPAdapterFaceProperties,
+    IPAdapterFaceFileBrowserOperator,
+    IPAdapterStyleProperties,
+    IPAdapterStyleFileBrowserOperator,
 )
 
 
@@ -5558,6 +6048,24 @@ def register():
         description="Speech speed.",
     )
 
+    bpy.types.Scene.ip_adapter_face_folder = bpy.props.StringProperty(
+        name="File",
+        description="Select a file or folder",
+        default="",
+        options={"TEXTEDIT_UPDATE"},
+        #update=update_ip_adapter_face_callback,
+    )
+    bpy.types.Scene.ip_adapter_face_files_to_import = bpy.props.CollectionProperty(type=IPAdapterFaceProperties)
+    bpy.types.Scene.ip_adapter_style_folder = bpy.props.StringProperty(
+        name="File",
+        description="Select a file or folder",
+        default="",
+        options={"TEXTEDIT_UPDATE"},
+        #update=update_ip_adapter_style_callback,
+    )      
+    bpy.types.Scene.ip_adapter_style_files_to_import = bpy.props.CollectionProperty(type=IPAdapterStyleProperties)
+    
+
 def unregister():
     for cls in classes:
         bpy.utils.unregister_class(cls)
@@ -5583,7 +6091,10 @@ def unregister():
     del bpy.types.Scene.blip_subject_image
     del bpy.types.Scene.lora_files
     del bpy.types.Scene.lora_files_index
-
+    del bpy.types.Scene.ip_adapter_face_folder
+    del bpy.types.Scene.ip_adapter_style_folder
+    del bpy.types.Scene.ip_adapter_face_files_to_import
+    del bpy.types.Scene.ip_adapter_style_files_to_import
 
 if __name__ == "__main__":
     unregister()
