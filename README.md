@@ -252,6 +252,8 @@ https://github.com/johnman3032/simple-lora-dreambooth-trainer
 
 HD Horizon(LoRA for making SD 1.5 work at higher resolutions): https://civitai.com/models/238891/hd-horizon-the-resolution-frontier-multi-resolution-high-resolution-native-inferencing
 
+Triton for manual installing on Windows: https://huggingface.co/madbuda/triton-windows-builds
+
 
 ## Video Examples
 
