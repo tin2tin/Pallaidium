@@ -1381,7 +1381,6 @@ class GENERATOR_OT_sound_notification(Operator):
     def execute(self, context):
         preferences = context.preferences
         addon_prefs = preferences.addons[__name__].preferences
-        print("Playing sound!")
         if addon_prefs.playsound:
             device = aud.Device()
 
@@ -2330,7 +2329,7 @@ class SEQUENCER_OT_generate_movie(Operator):
         #            register_free_crossattn_upblock3d(pipe)  # , b1=1.1, b2=1.2, s1=0.6, s2=0.4)
         #            # -------- freeu block registration
 
-        # GENERATING - Main Loop
+        # GENERATING - Main Loop Video
         for i in range(scene.movie_num_batch):
 
             start_time = timer()
@@ -2617,8 +2616,8 @@ class SEQUENCER_OT_generate_movie(Operator):
                             bpy.ops.sequencer.rebuild_proxy()
                             if i > 0:
                                 scene.frame_current = scene.sequence_editor.active_strip.frame_final_start
+ 
                             # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
-
                             bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
                             break
             print_elapsed_time(start_time)
@@ -2685,6 +2684,7 @@ class SEQUENCER_OT_generate_audio(Operator):
         addon_prefs = preferences.addons[__name__].preferences
         local_files_only = addon_prefs.local_files_only
         current_frame = scene.frame_current
+        active_strip = scene.sequence_editor.active_strip
         prompt = scene.generate_movie_prompt
         negative_prompt = scene.generate_movie_negative_prompt
         movie_num_inference_steps = scene.movie_num_inference_steps
@@ -2806,21 +2806,18 @@ class SEQUENCER_OT_generate_audio(Operator):
             )
 
         # WhisperSpeech
-
         elif addon_prefs.audio_model_card == "WhisperSpeech":
             from whisperspeech.pipeline import Pipeline
 
             pipe = Pipeline(s2a_ref="collabora/whisperspeech:s2a-q4-small-en+pl.model")
 
         # Deadend
-
         else:
             print("Audio model not found.")
             self.report({"INFO"}, "Audio model not found.")
             return {"CANCELLED"}
 
-        # Main loop
-
+        # Main loop Audio
         for i in range(scene.movie_num_batch):
 
             start_time = timer()
@@ -2832,13 +2829,19 @@ class SEQUENCER_OT_generate_audio(Operator):
                 start_frame = scene.sequence_editor.active_strip.frame_final_start + scene.sequence_editor.active_strip.frame_final_duration
                 scene.frame_current = scene.sequence_editor.active_strip.frame_final_start
             else:
-                empty_channel = find_first_empty_channel(
-                    scene.sequence_editor.active_strip.frame_final_start,
-                    (scene.movie_num_batch * (len(prompt) * 4)) + scene.frame_current,
-                )
+                if input != "input_strips":
+                    empty_channel = find_first_empty_channel(
+                        scene.frame_current,
+                        (scene.movie_num_batch * (len(prompt) * 4)) + scene.frame_current,
+                    )
+                else:             
+                    empty_channel = find_first_empty_channel(
+                        active_strip.frame_final_start,
+                        (scene.movie_num_batch * (len(prompt) * 4)) + scene.frame_current,
+                    )
                 start_frame = scene.frame_current
+                
             # Bark.
-
             if addon_prefs.audio_model_card == "bark":
                 print("Generate: Speech (Bark)")
 
@@ -4361,7 +4364,7 @@ class SEQUENCER_OT_generate_image(Operator):
             #                compel = Compel(tokenizer=converter.tokenizer, text_encoder=converter.text_encoder)
             #            prompt_embed = compel.build_conditioning_tensor(prompt)
 
-        # Main Generate Loop:
+        # Main Generate Loop Image:
 
         for i in range(scene.movie_num_batch):
 
@@ -5143,7 +5146,8 @@ class SEQUENCER_OT_generate_image(Operator):
             out_path = solve_path(filename + ".png")
             image.save(out_path)
 
-            old_strip = context.selected_sequences[0]
+            if input == "input_strips":
+                old_strip = context.selected_sequences[0]
 
             # Add strip
 
@@ -5155,10 +5159,10 @@ class SEQUENCER_OT_generate_image(Operator):
                     channel=empty_channel,
                     fit_method="FIT",
                 )
-                if scene.generate_movie_frames == -1:
+                if scene.generate_movie_frames == -1 and input == "input_strips":
                     strip.frame_final_duration = old_strip.frame_final_duration
                 else:
-                    strip.frame_final_duration = scene.generate_movie_frames
+                    strip.frame_final_duration = abs(scene.generate_movie_frames)
                 scene.sequence_editor.active_strip = strip
                 if i > 0:
                     scene.frame_current = scene.sequence_editor.active_strip.frame_final_start
@@ -5303,7 +5307,6 @@ class SEQUENCER_OT_generate_text(Operator):
             scene.frame_current = scene.sequence_editor.active_strip.frame_final_start
 
         # Add strip
-
         if text:
             print(str(start_frame))
             strip = scene.sequence_editor.sequences.new_effect(
@@ -5475,6 +5478,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     print("Negative Prompt: " + negative_prompt)
                     scene.generate_movie_prompt = strip.text + ", " + prompt
                     scene.frame_current = strip.frame_final_start
+                    context.scene.sequence_editor.active_strip = strip
 
                     if type == "movie":
                         sequencer.generate_movie()
