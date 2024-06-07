@@ -744,6 +744,9 @@ def install_modules(self):
     import_module(self, "protobuf", "protobuf")
     import_module(self, "hidiffusion", "hidiffusion")
 
+    import_module(self, "stable_audio_tools", "stable-audio-tools")
+    import_module(self, "flash_attn", "flash-attn")
+
     import_module(self, "controlnet_aux", "controlnet-aux")
 
     import_module(self, "beautifulsoup4", "beautifulsoup4")
@@ -811,6 +814,7 @@ def install_modules(self):
             )
     else:
         import_module(self, "insightface", "insightface")
+
     subprocess.call([pybin, "-m", "pip", "install", "lmdb"])
     import_module(self, "accelerate", "git+https://github.com/huggingface/accelerate.git")
     subprocess.check_call([pybin, "-m", "pip", "install", "peft", "--upgrade"])
@@ -964,6 +968,8 @@ class GENERATOR_OT_uninstall(Operator):
         uninstall_module_with_dependencies("mediapipe")
 
         uninstall_module_with_dependencies("controlnet-aux")
+        
+        uninstall_module_with_dependencies("stable-audio-tools")
 
         uninstall_module_with_dependencies("beautifulsoup4")
         uninstall_module_with_dependencies("ftfy")
@@ -1272,6 +1278,7 @@ class GeneratorAddonPreferences(AddonPreferences):
     audio_model_card: bpy.props.EnumProperty(
         name="Audio Model",
         items=[
+            ("audo/stable-audio-open-1.0", "Stable Audio Open", "audo/stable-audio-open-1.0"),
             (
                 "facebook/musicgen-stereo-medium",
                 "Music: MusicGen Stereo",
@@ -1296,7 +1303,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             #                "Sound: AudioLDM 2",
             #            ),
         ],
-        default="facebook/musicgen-stereo-medium",
+        default="audo/stable-audio-open-1.0",
         update=input_strips_updated,
     )
     # For DeepFloyd
@@ -1766,7 +1773,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 col.use_property_split = False
                 col.use_property_decorate = False
                 col.prop(context.scene, "generate_movie_prompt", text="", icon="ADD")
-                if (type == "audio" and audio_model_card == "bark") or (
+                if (type == "audio" and audio_model_card == "bark") or (type == "audio" and audio_model_card == "audo/stable-audio-open-1.0") or (
                     type == "audio" and audio_model_card == "facebook/musicgen-stereo-medium" and audio_model_card == "WhisperSpeech"
                 ):
                     pass
@@ -1802,7 +1809,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 row.prop(context.scene, "audio_path", text="Speaker")
                 row.operator("sequencer.open_audio_filebrowser", text="", icon="FILEBROWSER")
                 col.prop(context.scene, "audio_speed", text="Speed")
-            elif type == "audio" and addon_prefs.audio_model_card == "facebook/musicgen-stereo-medium":
+            elif type == "audio" and (addon_prefs.audio_model_card == "facebook/musicgen-stereo-medium" or addon_prefs.audio_model_card == "audo/stable-audio-open-1.0"):
                 col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
             else:
                 if (
@@ -1995,9 +2002,9 @@ class SEQUENCER_OT_generate_movie(Operator):
     def execute(self, context):
         scene = context.scene
 
-        if not scene.generate_movie_prompt:
-            self.report({"INFO"}, "Text prompt in the Generative AI tab is empty!")
-            return {"CANCELLED"}
+#        if not scene.generate_movie_prompt:
+#            self.report({"INFO"}, "Text prompt in the Generative AI tab is empty!")
+#            return {"CANCELLED"}
         try:
             import torch
             from diffusers.utils import export_to_video
@@ -2675,9 +2682,9 @@ class SEQUENCER_OT_generate_audio(Operator):
 
     def execute(self, context):
         scene = context.scene
-        if not scene.generate_movie_prompt:
-            self.report({"INFO"}, "Text prompt in the Generative AI tab is empty!")
-            return {"CANCELLED"}
+#        if not scene.generate_movie_prompt:
+#            self.report({"INFO"}, "Text prompt in the Generative AI tab is empty!")
+#            return {"CANCELLED"}
         if not scene.sequence_editor:
             scene.sequence_editor_create()
         preferences = context.preferences
@@ -2707,6 +2714,20 @@ class SEQUENCER_OT_generate_audio(Operator):
             #            else:
 
             import soundfile as sf
+            
+        if addon_prefs.audio_model_card == "audo/stable-audio-open-1.0":
+            try:
+                from einops import rearrange
+                from stable_audio_tools import get_pretrained_model
+                from stable_audio_tools.inference.generation import generate_diffusion_cond
+            except ModuleNotFoundError:
+                print("Dependencies needs to be installed in the add-on preferences.")
+                self.report(
+                    {"INFO"},
+                    "Dependencies needs to be installed in the add-on preferences.",
+                )
+                return {"CANCELLED"}            
+                    
         if addon_prefs.audio_model_card == "WhisperSpeech":
             import numpy as np
 
@@ -2720,6 +2741,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                     "Dependencies needs to be installed in the add-on preferences.",
                 )
                 return {"CANCELLED"}
+            
         if addon_prefs.audio_model_card == "bark":
             os.environ["CUDA_VISIBLE_DEVICES"] = "0"
             try:
@@ -2739,6 +2761,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                     "Dependencies needs to be installed in the add-on preferences.",
                 )
                 return {"CANCELLED"}
+            
         show_system_console(True)
         set_system_console_topmost(True)
 
@@ -2747,7 +2770,8 @@ class SEQUENCER_OT_generate_audio(Operator):
 
         print("Model:  " + addon_prefs.audio_model_card)
 
-        # Load models
+        # Load models Audio
+        
         if addon_prefs.audio_model_card == "cvssp/audioldm2" or addon_prefs.audio_model_card == "cvssp/audioldm2-music":
             repo_id = addon_prefs.audio_model_card
             pipe = AudioLDM2Pipeline.from_pretrained(repo_id)
@@ -2758,9 +2782,17 @@ class SEQUENCER_OT_generate_audio(Operator):
             else:
                 pipe.to(gfx_device)
 
-        # Load models
+        if addon_prefs.audio_model_card == "audo/stable-audio-open-1.0":
 
-        if addon_prefs.audio_model_card == "vtrungnhan9/audioldm2-music-zac2023":
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            # Download model
+            model, model_config = get_pretrained_model("audo/stable-audio-open-1.0")
+            sample_rate = model_config["sample_rate"]
+            sample_size = model_config["sample_size"]
+
+            model = model.to(device)
+
+        elif addon_prefs.audio_model_card == "vtrungnhan9/audioldm2-music-zac2023":
             repo_id = addon_prefs.audio_model_card
 
             from diffusers import AudioLDM2Pipeline
@@ -2840,9 +2872,57 @@ class SEQUENCER_OT_generate_audio(Operator):
                         (scene.movie_num_batch * (len(prompt) * 4)) + scene.frame_current,
                     )
                 start_frame = scene.frame_current
+
+            # Stable Open Audio
+            if addon_prefs.audio_model_card == "audo/stable-audio-open-1.0":
+                print("Generate: Stable Open Audio")     
+                seed = context.scene.movie_num_seed
+                seed = seed if not context.scene.movie_use_random else random.randint(0, 999999)
+                print("Seed: " + str(seed))
+                context.scene.movie_num_seed = seed
+                filename = solve_path(clean_filename(str(seed) + "_" + prompt) + ".wav")
+
+                # Set up text and timing conditioning
+                conditioning = [{
+                    "prompt": prompt,
+                    "seconds_start": 0, 
+                    "seconds_total": audio_length_in_s
+                }]
+                
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+                
+                # Generate stereo audio
+                output = generate_diffusion_cond(
+                    model,
+                    steps=movie_num_inference_steps,
+                    cfg_scale=movie_num_guidance,
+                    conditioning=conditioning,
+                    sample_size=sample_size,
+                    sigma_min=0.3,
+                    sigma_max=500,
+                    sampler_type="dpmpp-3m-sde",
+                    device=device,
+                    seed=seed,
+                )
+
+                # Rearrange audio batch to a single sequence
+                output = rearrange(output, "b d n -> d (b n)")
+
+                # Peak normalize, clip, convert to int16, and save to file
+                output = output.to(torch.float32).div(torch.max(torch.abs(output))).clamp(-1, 1).mul(32767).to(torch.int16).cpu()
+
+                # Ensure the output tensor has the right shape
+                if output.ndim == 1:
+                    output = output.unsqueeze(0)  # Make it 2D: (channels x samples)
+                
+                max_length = int(sample_rate * audio_length_in_s)
+                if output.shape[1] > max_length:
+                    output = output[:, :max_length]
+
+                torchaudio.save(filename, output, sample_rate) 
                 
             # Bark.
-            if addon_prefs.audio_model_card == "bark":
+            elif addon_prefs.audio_model_card == "bark":
                 print("Generate: Speech (Bark)")
 
                 rate = SAMPLE_RATE
@@ -3310,14 +3390,14 @@ class SEQUENCER_OT_generate_image(Operator):
 
         enabled_items = [item for item in lora_files if item.enabled]
 
-        if (
-            scene.generate_movie_prompt == ""
-            and not image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
-            and not image_model_card == "Salesforce/blipdiffusion"
-            and not image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
-        ):
-            self.report({"INFO"}, "Text prompt in the Generative AI tab is empty!")
-            return {"CANCELLED"}
+#        if (
+#            scene.generate_movie_prompt == ""
+#            and not image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
+#            and not image_model_card == "Salesforce/blipdiffusion"
+#            and not image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
+#        ):
+#            self.report({"INFO"}, "Text prompt in the Generative AI tab is empty!")
+#            return {"CANCELLED"}
         show_system_console(True)
         set_system_console_topmost(True)
 
@@ -5292,28 +5372,32 @@ class SEQUENCER_OT_generate_text(Operator):
 
         # Find free space for the strip in the timeline.
 
-        if active_strip.frame_final_start <= current_frame <= (active_strip.frame_final_start + active_strip.frame_final_duration):
-            empty_channel = find_first_empty_channel(
-                scene.frame_current,
-                (scene.sequence_editor.active_strip.frame_final_duration) + scene.frame_current,
-            )
-            start_frame = scene.frame_current
-        else:
-            empty_channel = find_first_empty_channel(
-                scene.sequence_editor.active_strip.frame_final_start,
-                scene.sequence_editor.active_strip.frame_final_end,
-            )
-            start_frame = scene.sequence_editor.active_strip.frame_final_start
-            scene.frame_current = scene.sequence_editor.active_strip.frame_final_start
+#        if active_strip.frame_final_start <= current_frame <= (active_strip.frame_final_start + active_strip.frame_final_duration):
+##            empty_channel = find_first_empty_channel(
+##                scene.frame_current,
+##                (scene.sequence_editor.active_strip.frame_final_duration) + scene.frame_current,
+##            )
+#            start_frame = scene.frame_current
+#            end_frame = frame_end=int(start_frame + ((len(text) / 12) * fps))
+#        else:
+        start_frame = scene.sequence_editor.active_strip.frame_final_start
+        scene.frame_current = scene.sequence_editor.active_strip.frame_final_start
+        end_frame = start_frame + scene.sequence_editor.active_strip.frame_final_duration
+        empty_channel = find_first_empty_channel(
+            start_frame,
+            end_frame,
+        )
 
         # Add strip
         if text:
+#            if input == "input_strips":
+#                old_strip = context.selected_sequences[0]            
             print(str(start_frame))
             strip = scene.sequence_editor.sequences.new_effect(
                 name=text,
                 type="TEXT",
                 frame_start=start_frame,
-                frame_end=int(start_frame + ((len(text) / 12) * fps)),
+                frame_end=end_frame,
                 channel=empty_channel,
             )
             strip.text = text
@@ -5325,6 +5409,10 @@ class SEQUENCER_OT_generate_text(Operator):
             strip.align_y = "TOP"
             strip.use_shadow = True
             strip.use_box = True
+#            if scene.generate_movie_frames == -1 and input == "input_strips":
+#                strip.frame_final_duration = old_strip.frame_final_duration
+#            else:
+#                strip.frame_final_duration = abs(scene.generate_movie_frames)            
             scene.sequence_editor.active_strip = strip
         for window in bpy.context.window_manager.windows:
             screen = window.screen
@@ -5346,8 +5434,6 @@ class SEQUENCER_OT_generate_text(Operator):
                         bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
                         break
         scene.movie_num_guidance = guidance
-        if input != "input_strips":
-            bpy.ops.renderreminder.play_notification()
         scene.frame_current = current_frame
 
         model = None
@@ -5727,9 +5813,9 @@ def register():
     bpy.types.Scene.audio_length_in_f = bpy.props.IntProperty(
         name="audio_length_in_f",
         default=80,
-        min=1,
+        min=-1,
         max=10000,
-        description="Audio duration: Maximum 30 sec.",
+        description="Audio duration: Maximum 47 sec.",
     )
     bpy.types.Scene.generatorai_typeselect = bpy.props.EnumProperty(
         name="Sound",
