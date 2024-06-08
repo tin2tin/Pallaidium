@@ -39,7 +39,7 @@ For Mac and Linux, we'll have to rely on contributor support. So, post your issu
 
 ## How to install
 
-* First you must download and install git for your platform(must be on PATH(or Bark will fail)): https://git-scm.com/downloads
+* First, download and install git (must be on PATH): https://git-scm.com/downloads
 
 * Download the add-on: https://github.com/tin2tin/text_to_video/archive/refs/heads/main.zip
 
@@ -51,7 +51,7 @@ For Mac and Linux, we'll have to rely on contributor support. So, post your issu
 
 * Note that you can change what model cards are used in the various modes here(video, image, and audio).
 
-* Then it writes that it is finished(if any vital errors, let me know).
+* Then it is written that it is finished(if any vital errors, let me know).
   
 * Restart Blender.
 
@@ -63,10 +63,11 @@ For Mac and Linux, we'll have to rely on contributor support. So, post your issu
 
 Tip           |
 :------------- |
-If any Python modules are missing, use this add-on to manually install them:      |
+If any Python modules are missing, use this add-on to install them manually:      |
 https://github.com/amb/blender_pip      |
 
 ## Change Log
+* 20024-6-6: Add: Stable Audio Open, Frame:-1 will inherit duration. 
 * 2024-6-1: IP Adapter(When using SDXL): Face (Image or folder), Style (image or folder) New image models: Mobius, OpenVision, Juggernaut X Hyper
 * 2024-4-29: Add: PixArt Sigma 2k, PixArt 1024 and RealViz V4
 * 2024-2-23: Add: Proteus Lightning and Dreamshaper XL Lightning
@@ -209,7 +210,7 @@ Here you can locate and delete the individual models.
 
 ### Add Rendered Strips
 
-Since the Generative AI add-on only can input image or movie strips, you'll need to convert other strip types to movie-strip. For this purpose, this add-on can be used:
+Since the Generative AI add-on can only input images or movie strips, you'll need to convert other strip types to movie-strip. For this purpose, this add-on can be used:
 
 https://github.com/tin2tin/Add_Rendered_Strips
 
@@ -252,7 +253,7 @@ https://github.com/johnman3032/simple-lora-dreambooth-trainer
 
 HD Horizon(LoRA for making SD 1.5 work at higher resolutions): https://civitai.com/models/238891/hd-horizon-the-resolution-frontier-multi-resolution-high-resolution-native-inferencing
 
-Triton for manual installing on Windows: https://huggingface.co/madbuda/triton-windows-builds
+Triton for manual installation on Windows: https://huggingface.co/madbuda/triton-windows-builds
 
 
 ## Video Examples
@@ -279,6 +280,14 @@ https://github.com/tin2tin/Pallaidium/assets/1322593/a1e94e09-0147-40ae-b4c2-4ce
 
 ### OpenPose
 https://github.com/tin2tin/Pallaidium/assets/1322593/ac9f278e-9fc9-46fc-a4e7-562ff041964f
+
+
+### Screenplay to Film
+[![Watch the video](https://img.youtube.com/vi/J64ZitsSN6k/0.jpg)](https://youtu.be/J64ZitsSN6k) 
+
+
+### Img to Txt to Audio
+[![Watch the video](https://img.youtube.com/vi/0EnUq1RhJ6M/0.jpg)](https://youtu.be/0EnUq1RhJ6M) 
 
 
 ### Zeroscope
