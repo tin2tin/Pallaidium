@@ -3933,12 +3933,11 @@ class SEQUENCER_OT_generate_image(Operator):
             print("Load: Stable Diffusion 3 Model")
             import torch            
             from huggingface_hub.commands.user import login
-
             result = login(token=addon_prefs.hugginface_token, add_to_git_credential=True)
             print(str(result))
             from diffusers import StableDiffusion3Pipeline
             pipe = StableDiffusion3Pipeline.from_pretrained(
-                "stabilityai/stable-diffusion-3-medium-diffusers-diffusers",
+                "stabilityai/stable-diffusion-3-medium-diffusers",
 #                "stabilityai/stable-diffusion-3-medium-diffusers",
 #                revision="refs/pr/26",
                 torch_dtype=torch.float16,
