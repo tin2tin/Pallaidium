@@ -1182,7 +1182,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "stabilityai/stable-diffusion-xl-base-1.0",
             ),
             ("ByteDance/SDXL-Lightning", "SDXL-Lightning 2 Step (1024x1024)", "ByteDance/SDXL-Lightning"),
-            ("stabilityai/stable-diffusion-3-medium", "Stable Diffusion 3", "stabilityai/stable-diffusion-3-medium"),
+            ("stabilityai/stable-diffusion-3-medium-diffusers", "Stable Diffusion 3", "stabilityai/stable-diffusion-3-medium-diffusers"),
             (
                 "Lykon/dreamshaper-8",
                 "Dreamshaper v8 (1024x1024)",
@@ -1355,7 +1355,7 @@ class GeneratorAddonPreferences(AddonPreferences):
         box.prop(self, "movie_model_card")
         box.prop(self, "image_model_card")
         #if self.image_model_card == "DeepFloyd/IF-I-M-v1.0":
-        if self.image_model_card == "stabilityai/stable-diffusion-3-medium":
+        if self.image_model_card == "stabilityai/stable-diffusion-3-medium-diffusers":
             row = box.row(align=True)
             row.prop(self, "hugginface_token")
             row.operator("wm.url_open", text="", icon="URL").url = "https://huggingface.co/settings/tokens"
@@ -1953,7 +1953,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         if type == "image":
             col.prop(addon_prefs, "image_model_card", text=" ")
             #if addon_prefs.image_model_card == "DeepFloyd/IF-I-M-v1.0":
-            if addon_prefs.image_model_card == "stabilityai/stable-diffusion-3-medium":
+            if addon_prefs.image_model_card == "stabilityai/stable-diffusion-3-medium-diffusers":
                 row = col.row(align=True)
                 row.prop(addon_prefs, "hugginface_token")
                 row.operator("wm.url_open", text="", icon="URL").url = "https://huggingface.co/settings/tokens"
@@ -3465,7 +3465,7 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "Salesforce/blipdiffusion"
             and not image_model_card == "Lykon/dreamshaper-8"
             and not image_model_card == "Corcelio/mobius"
-            and not image_model_card == "stabilityai/stable-diffusion-3-medium"
+            and not image_model_card == "stabilityai/stable-diffusion-3-medium-diffusers"
             and not image_model_card == "Corcelio/openvision"
             and not image_model_card == "dataautogpt3/Proteus-RunDiffusion-Lightning"
             and not image_model_card == "Lykon/dreamshaper-xl-lightning"
@@ -3594,7 +3594,10 @@ class SEQUENCER_OT_generate_image(Operator):
                 )
             else:
                 from diffusers import AutoPipelineForImage2Image
-
+                if image_model_card == "stabilityai/stable-diffusion-3-medium-diffusers":
+                    import torch
+                    from huggingface_hub.commands.user import login
+                    result = login(token=addon_prefs.hugginface_token, add_to_git_credential=True)
                 try:
                     converter = AutoPipelineForImage2Image.from_pretrained(
                         image_model_card,
@@ -3926,7 +3929,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
 
         # SD3 Stable Diffusion 3
-        elif image_model_card == "stabilityai/stable-diffusion-3-medium":
+        elif image_model_card == "stabilityai/stable-diffusion-3-medium-diffusers":
             print("Load: Stable Diffusion 3 Model")
             import torch            
             from huggingface_hub.commands.user import login
@@ -3935,8 +3938,9 @@ class SEQUENCER_OT_generate_image(Operator):
             print(str(result))
             from diffusers import StableDiffusion3Pipeline
             pipe = StableDiffusion3Pipeline.from_pretrained(
-                "stabilityai/stable-diffusion-3-medium",
-                revision="refs/pr/26",
+                "stabilityai/stable-diffusion-3-medium-diffusers-diffusers",
+#                "stabilityai/stable-diffusion-3-medium-diffusers",
+#                revision="refs/pr/26",
                 torch_dtype=torch.float16,
             )
             if low_vram():
@@ -4308,7 +4312,7 @@ class SEQUENCER_OT_generate_image(Operator):
             #                    local_files_only=local_files_only,
             #                )
 
-            else:
+            else:                
                 try:
                     from diffusers import AutoPipelineForText2Image
 
@@ -5046,8 +5050,8 @@ class SEQUENCER_OT_generate_image(Operator):
                         negative_prompt=negative_prompt,
                         num_inference_steps=image_num_inference_steps,
                         guidance_scale=image_num_guidance,
-                        height=y,
-                        width=x,
+                        #height=y,
+                        #width=x,
                         generator=generator,
                     ).images[0]
 
