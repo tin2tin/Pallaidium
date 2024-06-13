@@ -55,6 +55,8 @@ from bpy.props import (
 )
 import sys
 
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+
 print("Python: " + sys.version)
 
 # if os_platform == "Windows":
@@ -571,9 +573,9 @@ def low_vram():
 
 
 def clear_cuda_cache():
+    gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
-    gc.collect()
 
 
 def isWindows():
@@ -747,7 +749,7 @@ def install_modules(self):
     import_module(self, "stable_audio_tools", "stable-audio-tools")
     import_module(self, "flash_attn", "flash-attn")
 
-    import_module(self, "controlnet_aux", "controlnet-aux")
+    #import_module(self, "controlnet_aux", "controlnet-aux")
 
     import_module(self, "beautifulsoup4", "beautifulsoup4")
     import_module(self, "ftfy", "ftfy")
@@ -756,7 +758,7 @@ def install_modules(self):
     python_version_str = parse_python_version(python_version_info)
 
     import_module(self, "imageio", "imageio")
-    import_module(self, "imwatermark", "invisible-watermark>=0.2.0")
+    import_module(self, "imWatermark", "imWatermark")
     if os_platform == "Windows":
         pass
     else:
@@ -764,59 +766,62 @@ def install_modules(self):
             exec("import triton")
         except ModuleNotFoundError:
             import_module(self, "triton", "triton")
-    if os_platform == "Windows":
-        if python_version_str == "3.10":
-            subprocess.check_call(
-                [
-                    pybin,
-                    "-m",
-                    "pip",
-                    "install",
-                    "https://files.pythonhosted.org/packages/e2/a9/98e0197b24165113ac551aae5646005205f88347fb13ac59a75a9864e1d3/mediapipe-0.10.9-cp310-cp310-win_amd64.whl",
-                    "--no-warn-script-location",
-                ]
-            )
-        else:
-            subprocess.check_call(
-                [
-                    pybin,
-                    "-m",
-                    "pip",
-                    "install",
-                    "https://files.pythonhosted.org/packages/e9/7b/cd671c5067a56e1b4a9b70d0e42ac8cdb9f63acdc186589827cf213802a5/mediapipe-0.10.9-cp311-cp311-win_amd64.whl",
-                    "--no-warn-script-location",
-                ]
-            )
-    else:
-        import_module(self, "mediapipe", "mediapipe")
-    if os_platform == "Windows":
-        if python_version_str == "3.10":
-            subprocess.check_call(
-                [
-                    pybin,
-                    "-m",
-                    "pip",
-                    "install",
-                    "https://github.com/Gourieff/Assets/raw/main/Insightface/insightface-0.7.3-cp310-cp310-win_amd64.whl",
-                    "--no-warn-script-location",
-                ]
-            )
-        else:
-            subprocess.check_call(
-                [
-                    pybin,
-                    "-m",
-                    "pip",
-                    "install",
-                    "https://github.com/Gourieff/Assets/raw/main/Insightface/insightface-0.7.3-cp311-cp311-win_amd64.whl",
-                    "--no-warn-script-location",
-                ]
-            )
-    else:
-        import_module(self, "insightface", "insightface")
+#    if os_platform == "Windows":
+#        if python_version_str == "3.10":
+#            subprocess.check_call(
+#                [
+#                    pybin,
+#                    "-m",
+#                    "pip",
+#                    "install",
+#                    "https://files.pythonhosted.org/packages/e2/a9/98e0197b24165113ac551aae5646005205f88347fb13ac59a75a9864e1d3/mediapipe-0.10.9-cp310-cp310-win_amd64.whl",
+#                    "--no-warn-script-location",
+#                ]
+#            )
+#        else:
+#            subprocess.check_call(
+#                [
+#                    pybin,
+#                    "-m",
+#                    "pip",
+#                    "install",
+#                    "https://files.pythonhosted.org/packages/e9/7b/cd671c5067a56e1b4a9b70d0e42ac8cdb9f63acdc186589827cf213802a5/mediapipe-0.10.9-cp311-cp311-win_amd64.whl",
+#                    "--no-warn-script-location",
+#                ]
+#            )
+#    else:
+    import_module(self, "mediapipe", "mediapipe")
+#    if os_platform == "Windows":
+#        print("")
+#        if python_version_str == "3.10":
+#            subprocess.check_call(
+#                [
+#                    pybin,
+#                    "-m",
+#                    "pip",
+#                    "install",
+#                    "https://github.com/Gourieff/Assets/raw/main/Insightface/insightface-0.7.3-cp310-cp310-win_amd64.whl",
+#                    "--no-warn-script-location",
+#                ]
+#            )
+#        else:
+#            subprocess.check_call(
+#                [
+#                    pybin,
+#                    "-m",
+#                    "pip",
+#                    "install",
+#                    "https://github.com/Gourieff/Assets/raw/main/Insightface/insightface-0.7.3-cp311-cp311-win_amd64.whl",
+#                    "--no-warn-script-location",
+#                ]
+#            )
+#    else:
+#    import_module(self, "insightface", "insightface")
+#    import_module(self, "onnxruntime", "onnxruntime")
 
     subprocess.call([pybin, "-m", "pip", "install", "lmdb"])
-    import_module(self, "accelerate", "git+https://github.com/huggingface/accelerate.git")
+    #import_module(self, "accelerate", "git+https://github.com/huggingface/accelerate.git")
+    import_module(self, "accelerate", "accelerate")
     subprocess.check_call([pybin, "-m", "pip", "install", "peft", "--upgrade"])
 
     self.report({"INFO"}, "Installing: torch module.")
@@ -841,7 +846,7 @@ def install_modules(self):
                 "-m",
                 "pip",
                 "install",
-                "torch==2.2.0+cu121",
+                "torch==2.3.0+cu121",
                 "--index-url",
                 "https://download.pytorch.org/whl/cu121",
                 "--no-warn-script-location",
@@ -854,7 +859,8 @@ def install_modules(self):
                 "-m",
                 "pip",
                 "install",
-                "torchvision==0.17.0+cu121",
+                #"torchvision==0.17.0+cu121",
+                "torchvision==0.18.0+cu121",
                 "--index-url",
                 "https://download.pytorch.org/whl/cu121",
                 "--no-warn-script-location",
@@ -867,7 +873,7 @@ def install_modules(self):
                 "-m",
                 "pip",
                 "install",
-                "torchaudio==2.2.0",
+                "torchaudio==2.3.0+cu121",
                 "--index-url",
                 "https://download.pytorch.org/whl/cu121",
                 "--no-warn-script-location",
@@ -957,7 +963,7 @@ class GENERATOR_OT_uninstall(Operator):
         uninstall_module_with_dependencies("bark")
         uninstall_module_with_dependencies("xformers")
         uninstall_module_with_dependencies("imageio")
-        uninstall_module_with_dependencies("invisible-watermark")
+        uninstall_module_with_dependencies("imWatermark")
         uninstall_module_with_dependencies("pillow")
         uninstall_module_with_dependencies("libtorrent")
         uninstall_module_with_dependencies("accelerate")
@@ -967,9 +973,9 @@ class GENERATOR_OT_uninstall(Operator):
         uninstall_module_with_dependencies("resemble_enhance")
         uninstall_module_with_dependencies("mediapipe")
 
-        uninstall_module_with_dependencies("controlnet-aux")
+        uninstall_module_with_dependencies("controlnet_aux")
         
-        uninstall_module_with_dependencies("stable-audio-tools")
+        uninstall_module_with_dependencies("stable_audio_tools")
 
         uninstall_module_with_dependencies("beautifulsoup4")
         uninstall_module_with_dependencies("ftfy")
@@ -999,7 +1005,7 @@ class GENERATOR_OT_uninstall(Operator):
 
         self.report(
             {"INFO"},
-            "\nRemove AI Models manually: \nLinux and macOS: ~/.cache/huggingface/hub\nWindows: %userprofile%.cache\\huggingface\\hub",
+            "\nRemove AI Models manually: \nLinux and macOS: ~/.cache/huggingface/hub\nWindows: %userprofile%\\.cache\\huggingface\\hub",
         )
         return {"FINISHED"}
 
@@ -1171,19 +1177,18 @@ class GeneratorAddonPreferences(AddonPreferences):
         name="Image Model",
         items=[
             (
-                "Lykon/dreamshaper-8",
-                "Dreamshaper v8 (1024x1024)",
-                "Lykon/dreamshaper-8",
-            ),
-            ("Lykon/dreamshaper-xl-lightning", "Dreamshaper XL-Lightning (1024x1024)", "Lykon/dreamshaper-xl-lightning"),
-            (
                 "stabilityai/stable-diffusion-xl-base-1.0",
                 "Stable Diffusion XL 1.0 (1024x1024)",
                 "stabilityai/stable-diffusion-xl-base-1.0",
             ),
             ("ByteDance/SDXL-Lightning", "SDXL-Lightning 2 Step (1024x1024)", "ByteDance/SDXL-Lightning"),
-            ("Corcelio/mobius", "Mobius (1024x1024)", "Corcelio/mobius"),
-            ("Corcelio/openvision", "OpenVision (1280x1280)", "Corcelio/openvision"),
+            ("stabilityai/stable-diffusion-3-medium", "Stable Diffusion 3", "stabilityai/stable-diffusion-3-medium"),
+            (
+                "Lykon/dreamshaper-8",
+                "Dreamshaper v8 (1024x1024)",
+                "Lykon/dreamshaper-8",
+            ),
+            ("Lykon/dreamshaper-xl-lightning", "Dreamshaper XL-Lightning (1024x1024)", "Lykon/dreamshaper-xl-lightning"),
             #            ("stabilityai/stable-cascade", "Stable Cascade (1024 x 1024)", "stabilityai/stable-cascade"),
             #            ("thibaud/sdxl_dpo_turbo", "SDXL DPO TURBO (1024x1024)", "thibaud/sdxl_dpo_turbo"),
             #            (
@@ -1206,39 +1211,41 @@ class GeneratorAddonPreferences(AddonPreferences):
             #                "Stable Diffusion 1.5 (512x512)",
             #                "runwayml/stable-diffusion-v1-5",
             #            ),
+            ("RunDiffusion/Juggernaut-X-Hyper", "Juggernaut X Hyper (1024x1024)", "RunDiffusion/Juggernaut-X-Hyper"),
+            ("Corcelio/mobius", "Mobius (1024x1024)", "Corcelio/mobius"),
+            ("Corcelio/openvision", "OpenVision (1280x1280)", "Corcelio/openvision"),
+            ("dataautogpt3/OpenDalleV1.1", "OpenDalle (1024 x 1024)", "dataautogpt3/OpenDalleV1.1"),
             (
-                "segmind/SSD-1B",
-                "Segmind SSD-1B (1024x1024)",
-                "segmind/SSD-1B",
-            ),
-            (
-                "SG161222/RealVisXL_V4.0",
-                "RealVisXL_V4 (1024x1024)",
-                "SG161222/RealVisXL_V4.0",
-            ),  #
-            (
-                "PixArt-alpha/PixArt-XL-2-1024-MS",
+                "Vargol/PixArt-Sigma_16bit",
                 "PixArt XL (1024x1024)",
-                "PixArt-alpha/PixArt-XL-2-1024-MS",
+                "Vargol/PixArt-Sigma_16bit",
             ),
             (
                 "Vargol/PixArt-Sigma_2k_16bit",
                 "PixArt Sigma XL 2K (2560x1440)",
                 "Vargol/PixArt-Sigma_2k_16bit",
             ),
+            ("playgroundai/playground-v2.5-1024px-aesthetic", "Playground v2.5 (1024x1024)", "playgroundai/playground-v2.5-1024px-aesthetic"),
             (
-                "dataautogpt3/Proteus-RunDiffusion",
-                "Proteus-RunDiffusion (1024x1024)",
-                "dataautogpt3/Proteus-RunDiffusion",
+                "Vargol/ProteusV0.4",
+                "Proteus 4.0 (1024x1024)",
+                "Vargol/ProteusV0.4",
             ),
             ("dataautogpt3/Proteus-RunDiffusion-Lightning", "ProteusV0.3-Lightning (1024 x 1024)", "dataautogpt3/Proteus-RunDiffusion-Lightning"),
-            ("dataautogpt3/OpenDalleV1.1", "OpenDalle (1024 x 1024)", "dataautogpt3/OpenDalleV1.1"),
+            (
+                "SG161222/RealVisXL_V4.0",
+                "RealVisXL_V4 (1024x1024)",
+                "SG161222/RealVisXL_V4.0",
+            ),  #
+            (
+                "segmind/SSD-1B",
+                "Segmind SSD-1B (1024x1024)",
+                "segmind/SSD-1B",
+            ),
             # ("h94/IP-Adapter", "IP-Adapter (512 x 512)", "h94/IP-Adapter"),
-            # ("PixArt-alpha/PixArt-XL-2-1024-MS", "PixArt (1024 x 1024)", "PixArt-alpha/PixArt-XL-2-1024-MS"),
+            # ("Vargol/PixArt-Sigma_16bit", "PixArt (1024 x 1024)", "Vargol/PixArt-Sigma_16bit"),
             ### ("ptx0/terminus-xl-gamma-v1", "Terminus XL Gamma v1", "ptx0/terminus-xl-gamma-v1"),
             #            ("warp-ai/wuerstchen", "Würstchen (1024x1024)", "warp-ai/wuerstchen"),
-            ("RunDiffusion/Juggernaut-X-Hyper", "Juggernaut X Hyper (1024x1024)", "RunDiffusion/Juggernaut-X-Hyper"),
-            ("playgroundai/playground-v2.5-1024px-aesthetic", "Playground v2.5 (1024x1024)", "playgroundai/playground-v2.5-1024px-aesthetic"),
             #            (
             #                "playgroundai/playground-v2-1024px-aesthetic",
             #                "Playground v2 (1024x1024)",
@@ -1347,7 +1354,8 @@ class GeneratorAddonPreferences(AddonPreferences):
         row.operator("sequencer.uninstall_generator")
         box.prop(self, "movie_model_card")
         box.prop(self, "image_model_card")
-        if self.image_model_card == "DeepFloyd/IF-I-M-v1.0":
+        #if self.image_model_card == "DeepFloyd/IF-I-M-v1.0":
+        if self.image_model_card == "stabilityai/stable-diffusion-3-medium":
             row = box.row(align=True)
             row.prop(self, "hugginface_token")
             row.operator("wm.url_open", text="", icon="URL").url = "https://huggingface.co/settings/tokens"
@@ -1360,7 +1368,7 @@ class GeneratorAddonPreferences(AddonPreferences):
         sub_row.prop(self, "soundselect", text="")
         if self.soundselect == "user":
             sub_row.prop(self, "usersound", text="")
-        sub_row.operator("renderreminder.play_notification", text="", icon="PLAY")
+        sub_row.operator("renderreminder.pallaidium_play_notification", text="", icon="PLAY")
         sub_row.active = self.playsound
 
         row_row = box.row(align=True)
@@ -1381,7 +1389,7 @@ class GeneratorAddonPreferences(AddonPreferences):
 class GENERATOR_OT_sound_notification(Operator):
     """Test your notification settings"""
 
-    bl_idname = "renderreminder.play_notification"
+    bl_idname = "renderreminder.pallaidium_play_notification"
     bl_label = "Test Notification"
     bl_options = {"REGISTER", "UNDO"}
 
@@ -1885,7 +1893,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     or (type == "image" and image_model_card == "segmind/Segmind-Vega")
                     or (type == "image" and image_model_card == "runwayml/stable-diffusion-v1-5")
                     or (type == "image" and image_model_card == "Lykon/dreamshaper-8")
-                    or (type == "image" and image_model_card == "PixArt-alpha/PixArt-XL-2-1024-MS")
+                    or (type == "image" and image_model_card == "Vargol/PixArt-Sigma_16bit")
                     or (type == "image" and image_model_card == "Vargol/PixArt-Sigma_2k_16bit")
                 ):
                     row.prop(context.scene, "use_lcm", text="Speed")
@@ -1944,7 +1952,8 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         col.prop(context.scene, "generatorai_typeselect", text="Output")
         if type == "image":
             col.prop(addon_prefs, "image_model_card", text=" ")
-            if addon_prefs.image_model_card == "DeepFloyd/IF-I-M-v1.0":
+            #if addon_prefs.image_model_card == "DeepFloyd/IF-I-M-v1.0":
+            if addon_prefs.image_model_card == "stabilityai/stable-diffusion-3-medium":
                 row = col.row(align=True)
                 row.prop(addon_prefs, "hugginface_token")
                 row.operator("wm.url_open", text="", icon="URL").url = "https://huggingface.co/settings/tokens"
@@ -2637,7 +2646,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         bpy.types.Scene.movie_path = ""
         if input != "input_strips":
-            bpy.ops.renderreminder.play_notification()
+            bpy.ops.renderreminder.pallaidium_play_notification()
         scene.frame_current = current_frame
         return {"FINISHED"}
 
@@ -3138,7 +3147,7 @@ class SEQUENCER_OT_generate_audio(Operator):
         clear_cuda_cache()
 
         if input != "input_strips":
-            bpy.ops.renderreminder.play_notification()
+            bpy.ops.renderreminder.pallaidium_play_notification()
         return {"FINISHED"}
 
 
@@ -3456,6 +3465,7 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "Salesforce/blipdiffusion"
             and not image_model_card == "Lykon/dreamshaper-8"
             and not image_model_card == "Corcelio/mobius"
+            and not image_model_card == "stabilityai/stable-diffusion-3-medium"
             and not image_model_card == "Corcelio/openvision"
             and not image_model_card == "dataautogpt3/Proteus-RunDiffusion-Lightning"
             and not image_model_card == "Lykon/dreamshaper-xl-lightning"
@@ -3901,35 +3911,40 @@ class SEQUENCER_OT_generate_image(Operator):
                 pipe.to(gfx_device)
 
         # dreamshaper-xl-lightning
-
         elif do_convert == False and image_model_card == "Lykon/dreamshaper-xl-lightning":
             from diffusers import AutoPipelineForText2Image, AutoencoderKL
             from diffusers import DPMSolverMultistep
-
-            # from diffusers import DPMSolverMultistepScheduler
-            # from diffusers import EulerAncestralDiscreteScheduler
 
             vae = AutoencoderKL.from_pretrained(
                 "madebyollin/sdxl-vae-fp16-fix",
                 torch_dtype=torch.float16,
                 local_files_only=local_files_only,
             )
-
-            # from diffusers import DPMSolverMultistepScheduler
-
-            # from diffusers import EulerAncestralDiscreteScheduler
-
             pipe = AutoPipelineForText2Image.from_pretrained("Lykon/dreamshaper-xl-lightning", torch_dtype=torch.float16, variant="fp16", vae=vae)
-            # pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-            # pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config, algorithm_type="sde-dpmsolver++")
-
-            # pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config, timestep_spacing="trailing")
-
             pipe.scheduler = DPMSolverMultistep.from_config(pipe.scheduler.config)
             pipe = pipe.to(gfx_device)
 
-        # Mobius
 
+        # SD3 Stable Diffusion 3
+        elif image_model_card == "stabilityai/stable-diffusion-3-medium":
+            print("Load: Stable Diffusion 3 Model")
+            import torch            
+            from huggingface_hub.commands.user import login
+
+            result = login(token=addon_prefs.hugginface_token, add_to_git_credential=True)
+            print(str(result))
+            from diffusers import StableDiffusion3Pipeline
+            pipe = StableDiffusion3Pipeline.from_pretrained(
+                "stabilityai/stable-diffusion-3-medium",
+                revision="refs/pr/26",
+                torch_dtype=torch.float16,
+            )
+            if low_vram():
+                pipe.enable_model_cpu_offload()
+            else:
+                pipe.to(gfx_device)
+
+        # Mobius
         elif do_convert == False and image_model_card == "Corcelio/mobius":
             print("Load: Mobius Model")
 
@@ -4200,17 +4215,18 @@ class SEQUENCER_OT_generate_image(Operator):
                     torch_dtype=torch.float16,  # vae=vae,
                     local_files_only=local_files_only,
                 )
-            elif image_model_card == "PixArt-alpha/PixArt-XL-2-1024-MS":
+            elif image_model_card == "Vargol/PixArt-Sigma_16bit":
                 from diffusers import PixArtAlphaPipeline
 
-                if scene.use_lcm:
+                if scene.use_lcm: 
                     pipe = PixArtAlphaPipeline.from_pretrained(
                         "PixArt-alpha/PixArt-LCM-XL-2-1024-MS", torch_dtype=torch.float16, local_files_only=local_files_only
                     )
                 else:
                     pipe = PixArtAlphaPipeline.from_pretrained(
-                        "PixArt-alpha/PixArt-XL-2-1024-MS",
+                        "Vargol/PixArt-Sigma_16bit",
                         torch_dtype=torch.float16,
+                        variant="fp16",
                         local_files_only=local_files_only,
                     )
                 if low_vram():
@@ -4264,16 +4280,16 @@ class SEQUENCER_OT_generate_image(Operator):
                 pipe = StableDiffusionXLPipeline.from_pretrained("dataautogpt3/Proteus-RunDiffusion-Lightning", vae=vae, torch_dtype=torch.float16)
                 pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
                 pipe.to("cuda")
-            elif image_model_card == "dataautogpt3/Proteus-RunDiffusion":
+            elif image_model_card == "Vargol/ProteusV0.4":
                 from diffusers import StableDiffusionXLPipeline, EulerAncestralDiscreteScheduler
                 from diffusers import AutoencoderKL
 
                 vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
                 pipe = StableDiffusionXLPipeline.from_pretrained(
-                    "dataautogpt3/Proteus-RunDiffusion",
+                    "Vargol/ProteusV0.4",
                     vae=vae,
                     torch_dtype=torch.float16,
-                    # variant="fp16",
+                    variant="fp16",
                 )
                 pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
                 pipe.to(gfx_device)
@@ -4356,7 +4372,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
                 pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
             elif (
-                image_model_card != "PixArt-alpha/PixArt-XL-2-1024-MS"
+                image_model_card != "Vargol/PixArt-Sigma_16bit"
                 and image_model_card != "stabilityai/stable-cascade"
                 and image_model_card != "Vargol/PixArt-Sigma_2k_16bit"
             ):
@@ -4894,7 +4910,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     num_inference_steps=int(image_num_inference_steps / 2),
                 ).images[0]
                 decoder = None
-            elif image_model_card == "dataautogpt3/Proteus-RunDiffusion":
+            elif image_model_card == "Vargol/ProteusV0.4":
                 image = pipe(
                     # prompt_embeds=prompt, # for compel - long prompts
                     prompt,
@@ -5278,7 +5294,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
         scene.movie_num_guidance = guidance
         if input != "input_strips":
-            bpy.ops.renderreminder.play_notification()
+            bpy.ops.renderreminder.pallaidium_play_notification()
         scene.frame_current = current_frame
 
         return {"FINISHED"}
@@ -5693,7 +5709,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         context.scene.sequence_editor.active_strip = active_strip
 
         addon_prefs.playsound = play_sound
-        bpy.ops.renderreminder.play_notification()
+        bpy.ops.renderreminder.pallaidium_play_notification()
 
         print("Processing finished.")
 
