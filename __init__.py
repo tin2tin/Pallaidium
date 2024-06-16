@@ -708,13 +708,13 @@ def install_modules(self):
     except ImportError:
         pass
     import_module(self, "huggingface_hub", "huggingface_hub")
-    import_module(self, "transformers", "git+https://github.com/huggingface/transformers.git")
+    import_module(self, "transformers", "transformers")
+    #import_module(self, "transformers", "git+https://github.com/huggingface/transformers.git")
     subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/suno-ai/bark.git", "--upgrade"])
     import_module(self, "WhisperSpeech", "WhisperSpeech")
     import_module(self, "pydub", "pydub")
     if os_platform == "Windows":
         # resemble-enhance:
-
         subprocess.call(
             [pybin, "-m", "pip", "install", "git+https://github.com/daswer123/resemble-enhance-windows.git", "--no-dependencies", "--upgrade"]
         )
@@ -744,8 +744,8 @@ def install_modules(self):
     import_module(self, "IPython", "IPython")
     import_module(self, "omegaconf", "omegaconf")
     import_module(self, "protobuf", "protobuf")
-    import_module(self, "hidiffusion", "hidiffusion")
-
+    #import_module(self, "hidiffusion", "hidiffusion")
+    
     import_module(self, "stable_audio_tools", "stable-audio-tools")
     import_module(self, "flash_attn", "flash-attn")
 
@@ -1897,10 +1897,10 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     or (type == "image" and image_model_card == "Vargol/PixArt-Sigma_2k_16bit")
                 ):
                     row.prop(context.scene, "use_lcm", text="Speed")
-                if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
-                    col = col.column(heading="Resolution", align=True)
-                    row = col.row()
-                    row.prop(context.scene, "hidiff", text="HiDiff")
+#                if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+#                    col = col.column(heading="Resolution", align=True)
+#                    row = col.row()
+#                    row.prop(context.scene, "hidiff", text="HiDiff")
         # LoRA.
 
         if (
@@ -4421,12 +4421,12 @@ class SEQUENCER_OT_generate_image(Operator):
                 pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)
                 print("Load LoRAs: " + " ".join(enabled_names))
 
-        # HiDiffusion
+#        # HiDiffusion
 
-        if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0" and scene.hidiff:
-            from hidiffusion import apply_hidiffusion
+#        if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0" and scene.hidiff:
+#            from hidiffusion import apply_hidiffusion
 
-            apply_hidiffusion(pipe)
+#            apply_hidiffusion(pipe, apply_window_attn=False)
 
         # Refiner model - load if chosen.
 
@@ -5902,13 +5902,13 @@ def register():
         description="Add a refinement step",
     )
 
-    # hidiff
+#    # hidiff
 
-    bpy.types.Scene.hidiff = bpy.props.BoolProperty(
-        name="hidiff",
-        default=0,
-        description="Use high resolution",
-    )
+#    bpy.types.Scene.hidiff = bpy.props.BoolProperty(
+#        name="hidiff",
+#        default=0,
+#        description="Use high resolution",
+#    )
 
     # movie path
 
@@ -6065,7 +6065,7 @@ def unregister():
     del bpy.types.Scene.movie_path
     del bpy.types.Scene.image_path
     del bpy.types.Scene.refine_sd
-    del bpy.types.Scene.hidiff
+    #del bpy.types.Scene.hidiff
     del bpy.types.Scene.generatorai_styles
     del bpy.types.Scene.inpaint_selected_strip
     del bpy.types.Scene.openpose_use_bones
