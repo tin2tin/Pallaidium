@@ -114,6 +114,8 @@ The Stable Diffusion models for generating images have been used a lot, so there
 https://stablediffusion.fr/artists
 
 ### Prompting:
+https://replicate.com/blog/get-the-best-from-stable-diffusion-3
+
 https://github.com/invoke-ai/InvokeAI/blob/main/docs/features/PROMPTS.md
 
 https://stablediffusion.fr/prompts
