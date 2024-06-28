@@ -750,7 +750,7 @@ def install_modules(self):
     import_module(self, "stable_audio_tools", "stable-audio-tools")
     import_module(self, "flash_attn", "flash-attn")
 
-    #import_module(self, "controlnet_aux", "controlnet-aux")
+    import_module(self, "controlnet_aux", "controlnet-aux")
 
     import_module(self, "beautifulsoup4", "beautifulsoup4")
     import_module(self, "ftfy", "ftfy")
@@ -1036,7 +1036,7 @@ def input_strips_updated(self, context):
     input = scene.input_strips
     if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0" and type == "movie":
         scene.input_strips = "input_strips"
-    if type == "movie" or type == "audio" or image_model_card == "lllyasviel/control_v11p_sd15_scribble":
+    if type == "movie" or type == "audio" or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0":
         scene.inpaint_selected_strip = ""
     if (
         type == "image"
@@ -1044,7 +1044,7 @@ def input_strips_updated(self, context):
         and (
             image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
             or image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
-            or image_model_card == "lllyasviel/control_v11p_sd15_scribble"
+            or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
             or image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
             or image_model_card == "Salesforce/blipdiffusion"
             # or image_model_card == "h94/IP-Adapter"
@@ -1078,14 +1078,14 @@ def output_strips_updated(self, context):
     scene = context.scene
     type = scene.generatorai_typeselect
     input = scene.input_strips
-    if type == "movie" or type == "audio" or image_model_card == "lllyasviel/control_v11p_sd15_scribble":
+    if type == "movie" or type == "audio" or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0":
         scene.inpaint_selected_strip = ""
         if context.scene.lora_folder:
             bpy.ops.lora.refresh_files()
     if (
         image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
         or image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
-        or image_model_card == "lllyasviel/control_v11p_sd15_scribble"
+        or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
         or image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
         or image_model_card == "Salesforce/blipdiffusion"
         # or image_model_card == "h94/IP-Adapter"
@@ -1289,11 +1289,11 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "OpenPose ControlNet (1024 x 1024)",
                 "xinsir/controlnet-openpose-sdxl-1.0",
             ),
-            #            (
-            #                "lllyasviel/control_v11p_sd15_scribble",
-            #                "Scribble (512x512)",
-            #                "lllyasviel/control_v11p_sd15_scribble",
-            #            ),
+            (
+                "xinsir/controlnet-scribble-sdxl-1.0",
+                "Scribble (1024x1024)",
+                "xinsir/controlnet-scribble-sdxl-1.0",
+            ),
         ],
         default="dataautogpt3/OpenDalleV1.1",
         update=input_strips_updated,
@@ -1715,7 +1715,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     # and image_model_card != "diffusers/controlnet-canny-sdxl-1.0-small"
                     and image_model_card != "xinsir/controlnet-openpose-sdxl-1.0"
                     # and image_model_card != "h94/IP-Adapter"
-                    and image_model_card != "lllyasviel/control_v11p_sd15_scribble"
+                    and image_model_card != "xinsir/controlnet-scribble-sdxl-1.0"
                     # and image_model_card!= "monster-labs/control_v1p_sdxl_qrcode_monster"
                     and image_model_card != "Salesforce/blipdiffusion"
                 ):
@@ -1750,7 +1750,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             if image_model_card == "xinsir/controlnet-openpose-sdxl-1.0" and type == "image":
                 col = col.column(heading="Read as", align=True)
                 col.prop(context.scene, "openpose_use_bones", text="OpenPose Rig Image")
-            if image_model_card == "lllyasviel/control_v11p_sd15_scribble" and type == "image":
+            if image_model_card == "xinsir/controlnet-scribble-sdxl-1.0" and type == "image":
                 col = col.column(heading="Read as", align=True)
                 col.prop(context.scene, "use_scribble_image", text="Scribble Image")
             # IPAdapter.
@@ -1762,7 +1762,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     or image_model_card == "stabilityai/sdxl-turbo"
                     # or image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
                     # or image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
-                    # or image_model_card == "lllyasviel/control_v11p_sd15_scribble"
+                    # or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
                 )
                 and type == "image"
                 # and input != "input_strips"
@@ -1891,7 +1891,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 ##                    type == "image"
                 ##                    and image_model_card != "diffusers/controlnet-canny-sdxl-1.0-small"
                 ##                    and image_model_card != "xinsir/controlnet-openpose-sdxl-1.0"
-                ##                    and image_model_card != "lllyasviel/control_v11p_sd15_scribble"
+                ##                    and image_model_card != "xinsir/controlnet-scribble-sdxl-1.0"
                 ##                    and image_model_card
                 ##                    != "monster-labs/control_v1p_sdxl_qrcode_monster"
                 ##                    and image_model_card != "Salesforce/blipdiffusion"
@@ -1903,7 +1903,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     (type == "image" and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0")
                     or (type == "image" and image_model_card == "segmind/SSD-1B")
                     or (type == "image" and image_model_card == "xinsir/controlnet-openpose-sdxl-1.0")
-                    or (type == "image" and image_model_card == "lllyasviel/control_v11p_sd15_scribble")
+                    or (type == "image" and image_model_card == "xinsir/controlnet-scribble-sdxl-1.0")
                     or (type == "image" and image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small")
                     or (type == "image" and image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster")
                     or (type == "image" and image_model_card == "segmind/Segmind-Vega")
@@ -1941,7 +1941,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 or image_model_card == "stabilityai/sdxl-turbo"
                 or image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
                 or image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
-                or image_model_card == "lllyasviel/control_v11p_sd15_scribble"
+                or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
             )
             and type == "image"
             # and input != "input_strips"
@@ -3491,7 +3491,7 @@ class SEQUENCER_OT_generate_image(Operator):
             and type == "image"
             and not image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
             and not image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
-            and not image_model_card == "lllyasviel/control_v11p_sd15_scribble"
+            and not image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
             # and not image_model_card == "h94/IP-Adapter"
             and not image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
             and not image_model_card == "Salesforce/blipdiffusion"
@@ -3508,7 +3508,7 @@ class SEQUENCER_OT_generate_image(Operator):
             (scene.image_path or scene.movie_path)
             and not image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
             and not image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
-            and not image_model_card == "lllyasviel/control_v11p_sd15_scribble"
+            and not image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
             # and not image_model_card == "h94/IP-Adapter"
             and not image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
             and not image_model_card == "Salesforce/blipdiffusion"
@@ -3525,7 +3525,7 @@ class SEQUENCER_OT_generate_image(Operator):
             or do_convert
             or image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
             or image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
-            or image_model_card == "lllyasviel/control_v11p_sd15_scribble"
+            or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
             # or image_model_card == "h94/IP-Adapter"
             or image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
             or image_model_card == "Salesforce/blipdiffusion"
@@ -3826,37 +3826,45 @@ class SEQUENCER_OT_generate_image(Operator):
                 pipe.to(gfx_device)
 
         # Scribble
-        elif image_model_card == "lllyasviel/control_v11p_sd15_scribble":
+        elif image_model_card == "xinsir/controlnet-scribble-sdxl-1.0":
+            
+            #https://huggingface.co/xinsir/controlnet-scribble-sdxl-1.0 #use this instead
+            
             print("Load: Scribble Model")
             from controlnet_aux import PidiNetDetector, HEDdetector
             from diffusers import (
                 ControlNetModel,
-                StableDiffusionControlNetPipeline,
-                UniPCMultistepScheduler,
+                StableDiffusionXLControlNetPipeline,
+                EulerAncestralDiscreteScheduler,
+                AutoencoderKL,
             )
 
             processor = HEDdetector.from_pretrained("lllyasviel/Annotators")
-            checkpoint = "lllyasviel/control_v11p_sd15_scribble"
+            checkpoint = "xinsir/controlnet-scribble-sdxl-1.0"
             controlnet = ControlNetModel.from_pretrained(
                 checkpoint,
                 torch_dtype=torch.float16,
                 local_files_only=local_files_only,
             )
-            pipe = StableDiffusionControlNetPipeline.from_pretrained(
-                "runwayml/stable-diffusion-v1-5",
+            
+            vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
+
+            pipe = StableDiffusionXLControlNetPipeline.from_pretrained(
+                "stabilityai/stable-diffusion-xl-base-1.0",
                 controlnet=controlnet,
                 torch_dtype=torch.float16,
+                vae=vae,
                 local_files_only=local_files_only,
             )
             if scene.use_lcm:
                 from diffusers import LCMScheduler
 
                 pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
-                pipe.load_lora_weights("latent-consistency/lcm-lora-sdv1-5")
+                pipe.load_lora_weights("latent-consistency/lcm-lora-sdxl")
                 pipe.fuse_lora()
                 scene.movie_num_guidance = 0
             else:
-                pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
+                eulera_scheduler = EulerAncestralDiscreteScheduler.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", subfolder="scheduler")
             if low_vram():
                 # torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
 
@@ -4421,7 +4429,7 @@ class SEQUENCER_OT_generate_image(Operator):
             or image_model_card == "stabilityai/sdxl-turbo"
             or image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
             or image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
-            or image_model_card == "lllyasviel/control_v11p_sd15_scribble"
+            or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
         ):
             scene = context.scene
             if enabled_items:
@@ -4792,7 +4800,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             # Scribble
 
-            elif image_model_card == "lllyasviel/control_v11p_sd15_scribble":
+            elif image_model_card == "xinsir/controlnet-scribble-sdxl-1.0":
                 print("Process: Scribble")
                 init_image = None
 
@@ -4805,20 +4813,33 @@ class SEQUENCER_OT_generate_image(Operator):
                     return {"CANCELLED"}
                 image = scale_image_within_dimensions(np.array(init_image), x, None)
 
-                if scene.use_scribble_image:
+                if not scene.use_scribble_image:
                     image = np.array(image)
                     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
                     image = cv2.bitwise_not(image)
-                    image = processor(image, scribble=False)
+                    image = cv2.GaussianBlur(image, (0, 0), 3)
+
+                    # higher threshold, thiner line
+                    random_val = int(round(random.uniform(0.01, 0.10), 2) * 255)
+                    image[image > random_val] = 255
+                    image[image < 255] = 0
+                    image = Image.fromarray(image)
+                    image = processor(image, scribble=True)
                 else:
                     image = np.array(image)
+                    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                    image = cv2.bitwise_not(image)
                     image = processor(image, scribble=True)
+                    
                 image = pipe(
                     prompt=prompt,
                     negative_prompt=negative_prompt,
                     image=image,
                     num_inference_steps=image_num_inference_steps,
                     guidance_scale=image_num_guidance,
+                    controlnet_conditioning_scale=1.0,
+                    height=y,
+                    width=x,
                     generator=generator,
                 ).images[0]
 
@@ -6161,7 +6182,7 @@ def unregister():
     del bpy.types.Scene.image_path
     del bpy.types.Scene.refine_sd
     #del bpy.types.Scene.hidiff
-    del bpy.types.Scene.AuraSR
+    del bpy.types.Scene.aurasr
     del bpy.types.Scene.adetailer
     del bpy.types.Scene.generatorai_styles
     del bpy.types.Scene.inpaint_selected_strip
