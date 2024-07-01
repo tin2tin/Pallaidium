@@ -679,7 +679,7 @@ def import_module(self, module, install_module):
     try:
         subprocess.call([python_exe, "import ", packageName])
     except:
-        self.report({"INFO"}, "Installing: " + module + " module.")
+        self.report({"INFO"}, "Installing: " + install_module + " module.")
         print("\nInstalling: " + module + " module")
         subprocess.call([python_exe, "-m", "pip", "install", install_module, "--no-warn-script-location", "--upgrade"])
 
@@ -750,7 +750,8 @@ def install_modules(self):
     import_module(self, "stable_audio_tools", "stable-audio-tools")
     import_module(self, "flash_attn", "flash-attn")
 
-    import_module(self, "controlnet_aux", "controlnet-aux")
+    #import_module(self, "controlnet_aux", "controlnet-aux")
+    subprocess.call([pybin, "-m", "pip", "install", "controlnet-aux"])
 
     import_module(self, "beautifulsoup4", "beautifulsoup4")
     import_module(self, "ftfy", "ftfy")
@@ -819,12 +820,15 @@ def install_modules(self):
 #    else:
 #    import_module(self, "insightface", "insightface")
 #    import_module(self, "onnxruntime", "onnxruntime")
-    import_module(self, "asdff", "https://github.com/theblackhatmagician/adetailer_sdxl.git")
-    import_module(self, "ultralytics", "ultralytics")
+    #import_module(self, "asdff", "git+https://github.com/theblackhatmagician/adetailer_sdxl.git")
+    #import_module(self, "ultralytics", "ultralytics")
 
+    subprocess.call([pybin, "-m", "pip", "install", "ultralytics"])
+    subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/theblackhatmagician/adetailer_sdxl.git"])
     subprocess.call([pybin, "-m", "pip", "install", "lmdb"])
+    subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/huggingface/accelerate.git"])
     #import_module(self, "accelerate", "git+https://github.com/huggingface/accelerate.git")
-    import_module(self, "accelerate", "accelerate")
+    #import_module(self, "accelerate", "accelerate")
     subprocess.check_call([pybin, "-m", "pip", "install", "peft", "--upgrade"])
 
     self.report({"INFO"}, "Installing: torch module.")
@@ -973,12 +977,12 @@ class GENERATOR_OT_uninstall(Operator):
         uninstall_module_with_dependencies("triton")
         uninstall_module_with_dependencies("cv2")
         uninstall_module_with_dependencies("protobuf")
-        uninstall_module_with_dependencies("resemble_enhance")
+        uninstall_module_with_dependencies("resemble-enhance")
         uninstall_module_with_dependencies("mediapipe")
 
-        uninstall_module_with_dependencies("controlnet_aux")
+        uninstall_module_with_dependencies("controlnet-aux")
         
-        uninstall_module_with_dependencies("stable_audio_tools")
+        uninstall_module_with_dependencies("stable-audio-tools")
 
         uninstall_module_with_dependencies("beautifulsoup4")
         uninstall_module_with_dependencies("ftfy")
