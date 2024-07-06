@@ -24,8 +24,7 @@ AI-generate video, image, and audio from text prompts or video, image, or text s
 | Batch upscale & refinement of movies.              | Model card selector.                               |
 | Render-to-path selector.                           | Render finished notification.                      |
 | Model Cards                                        | One-click install and uninstall dependencies. |
-| User-defined file path for generated files.        | Define the location for storing generated files.  |
-| Seed and prompt added to strip name.               | Include seed and prompt information in the strip name. |
+| User-defined file path for generated files.        | Seed and prompt added to strip name.   |
 
 ![image](https://github.com/tin2tin/Pallaidium/assets/1322593/88f73b46-409a-4a89-bbf0-0e10a580336c)
 
