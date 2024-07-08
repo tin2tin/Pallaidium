@@ -1070,6 +1070,8 @@ def input_strips_updated(self, context):
         bpy.types.Scene.image_path = ""
     if (image_model_card == "dataautogpt3/OpenDalleV1.1") and type == "image":
         bpy.context.scene.use_lcm = False
+    if (image_model_card == "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers") and type == "image":
+        bpy.context.scene.use_lcm = False        
     if movie_model_card == "cerspense/zeroscope_v2_XL" and type == "movie":
         scene.upscale = False
 
@@ -1105,6 +1107,8 @@ def output_strips_updated(self, context):
         scene.input_strips = "input_prompt"
     if (image_model_card == "dataautogpt3/OpenDalleV1.1") and type == "image":
         bpy.context.scene.use_lcm = False
+    if (image_model_card == "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers") and type == "image":
+        bpy.context.scene.use_lcm = False        
     if movie_model_card == "cerspense/zeroscope_v2_XL" and type == "movie":
         scene.upscale = False
 
@@ -1225,7 +1229,9 @@ class GeneratorAddonPreferences(AddonPreferences):
             #                "Stable Diffusion 1.5 (512x512)",
             #                "runwayml/stable-diffusion-v1-5",
             #            ),
+            #("Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers", "HunyuanDiT-v1.2", "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers"),
             ("RunDiffusion/Juggernaut-X-Hyper", "Juggernaut X Hyper (1024x1024)", "RunDiffusion/Juggernaut-X-Hyper"),
+            #("Kwai-Kolors/Kolors", "Kolors", "Kwai-Kolors/Kolors"), 
             ("Corcelio/mobius", "Mobius (1024x1024)", "Corcelio/mobius"), 
             ("Corcelio/openvision", "OpenVision (1280x1280)", "Corcelio/openvision"),
             ("dataautogpt3/OpenDalleV1.1", "OpenDalle (1024 x 1024)", "dataautogpt3/OpenDalleV1.1"),
@@ -1245,7 +1251,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Vargol/PixArt-Sigma_2k_16bit",
             ),
             ("playgroundai/playground-v2.5-1024px-aesthetic", "Playground v2.5 (1024x1024)", "playgroundai/playground-v2.5-1024px-aesthetic"),
-            ("John6666/pony-realism-v21main-sdxl", "Pony Realistic (1024x1024)", "John6666/pony-realism-v21main-sdxl"),
+            ("youknownothing/Fluently-XL-Final", "Fluently (1024x1024)", "youknownothing/Fluently-XL-Final"),
             (
                 "Vargol/ProteusV0.4",
                 "Proteus 4.0 (1024x1024)",
@@ -1924,12 +1930,12 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
 #                    row.prop(context.scene, "hidiff", text="HiDiff")
 
 #                # ADetailer - Switch off for release:
-#                if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
-                #col = col.column(heading="Details", align=True)
+                if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+                    col = col.column(heading="Details", align=True)
 
                 row = col.row()
                 # enable this for Adetailer
-#                row.prop(context.scene, "adetailer", text="Face")
+                #row.prop(context.scene, "adetailer", text="Face")
                 
 #                # AuraSR
 #                if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
@@ -3914,6 +3920,11 @@ class SEQUENCER_OT_generate_image(Operator):
             pipe.scheduler = DPMSolverMultistep.from_config(pipe.scheduler.config)
             pipe = pipe.to(gfx_device)
 
+        # HunyuanDiT
+        elif do_convert == False and image_model_card == "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers":
+            from diffusers import HunyuanDiTPipeline
+            pipe = HunyuanDiTPipeline.from_pretrained(image_model_card, torch_dtype=torch.float16)
+            pipe = pipe.to(gfx_device)
 
         # SD3 Stable Diffusion 3
         elif image_model_card == "stabilityai/stable-diffusion-3-medium-diffusers":
@@ -4088,7 +4099,7 @@ class SEQUENCER_OT_generate_image(Operator):
             from diffusers import DiffusionPipeline, DDIMScheduler
 
             pipe = DiffusionPipeline.from_pretrained(
-                "John6666/pony-realism-v21main-sdxl",
+                "youknownothing/Fluently-XL-Final",
                 torch_dtype=torch.float16,
                 scheduler=DDIMScheduler(
                     beta_start=0.00085,
@@ -4215,7 +4226,7 @@ class SEQUENCER_OT_generate_image(Operator):
                             weight_name=["ip-adapter-plus_sdxl_vit-h.safetensors"],
                             local_files_only=local_files_only,
                         )
-                        pipe.set_ip_adapter_scale([0.7])
+                        pipe.set_ip_adapter_scale([1.0])
                         pipe.scheduler = DDIMScheduler.from_config(pipe.scheduler.config)
                         
 #                    scale = {
@@ -4685,9 +4696,8 @@ class SEQUENCER_OT_generate_image(Operator):
                 if not scene.openpose_use_bones:
                     image = np.array(image)
 
-                    image = openpose(image, hand_and_face=False)
+                    image = processor(image, hand_and_face=False)
                     # Save pose image
-
                     filename = clean_filename(str(seed) + "_" + context.scene.generate_movie_prompt)
                     out_path = solve_path("Pose_" + filename + ".png")
                     print("Saving OpenPoseBone image: " + out_path)
@@ -5098,7 +5108,8 @@ class SEQUENCER_OT_generate_image(Operator):
             elif image_model_card == "stabilityai/stable-diffusion-3-medium-diffusers":
                 print("Generate: SD3 Image ")
                 image = pipe(
-                    prompt,
+                    prompt="",
+                    prompt_3=prompt,
                     negative_prompt=negative_prompt,
                     num_inference_steps=image_num_inference_steps,
                     guidance_scale=image_num_guidance,
