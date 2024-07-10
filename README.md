@@ -47,17 +47,17 @@ For Mac and Linux, we'll have to rely on contributor support. So, post your issu
 
 * Install the add-on as usual: Preferences > Add-ons > Install > select file > enable the add-on. 
 
+* In the Generative AI add-on preferences, hit the "Uninstall Dependencies" button (to clear out any incompatible libs). 
+
+* Restart Blender.
+
 * In the Generative AI add-on preferences, hit the "Install Dependencies" button.
-
-* Note that you can change what model cards are used in the various modes here(video, image, and audio).
-
-* Then it is written that it is finished(if any vital errors, let me know).
   
 * Restart Blender.
 
 * Open the add-on UI in the Sequencer > Sidebar > Generative AI.
 
-* The first time any model is executed many GB will have to be downloaded, so go grab lots of coffee. 
+* The first time any model is executed, 5-10 GB will have to be downloaded first. 
 
 Tip           |
 :------------- |
