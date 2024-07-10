@@ -1,4 +1,4 @@
-# PALLAIDIUM - a generative AI movie studio integrated in the Blender video editor.
+# PALLAIDIUM - a generative AI movie studio integrated into the Blender video editor.
 AI-generate video, image, and audio from text prompts or video, image, or text strips. 
 
 ![PallAIdium](https://github.com/tin2tin/Generative_AI/assets/1322593/1b1b232f-00d9-4b0b-86fb-5f0f24136d2c)
