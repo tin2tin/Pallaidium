@@ -59,8 +59,6 @@ For Mac and Linux, we'll have to rely on contributor support. So, post your issu
 
 * The first time any model is executed many GB will have to be downloaded, so go grab lots of coffee. 
 
-* If it says: "ModuleNotFoundError: Refer to https://github.com/facebookresearch/xformers for more information on how to install xformers", then try to restart Blender.
-
 Tip           |
 :------------- |
 If any Python modules are missing, use this add-on to install them manually:      |
@@ -75,14 +73,14 @@ https://github.com/amb/blender_pip      |
 * 2024-2-21: Add: SDXL-Lightning 2 Step & Proteus v. 0.3
 * 2024-1-02: Add: WhisperSpeech
 * 2024-01-01: Fix installation and Bark bugs.
-* 2024-01-31: Add OpenDalle, Speed option, SDXL and LoRA support for Canny and OpenPose, include OpenPose rig images. Prune old models including SD. 
+* 2024-01-31: Add OpenDalle, Speed option, SDXL, and LoRA support for Canny and OpenPose, including OpenPose rig images. Prune old models including SD. 
 * 2023-12-18: Add: Bark audio enhance, Segmind Vega. 
 * 2023-12-1: Add SD Turbo & MusicGen Medium, MPS device for MacOS.
 * 2023-11-30: Add: SVD, SVD-XT, SDXL Turbo
 
 ## Location
 
-Install Dependencies, set Movie Model Card, and set Sound Notification in the add-on preferences:
+Install Dependencies, and set Sound Notification in the add-on preferences:
 
 ![image](https://github.com/tin2tin/Generative_AI/assets/1322593/49ba0182-f8a0-4a1d-b24f-caca9741d033)
 
@@ -90,28 +88,11 @@ Video Sequence Editor > Sidebar > Generative AI:
 
 ![image](https://github.com/tin2tin/Pallaidium/assets/1322593/e3c1193d-5e0a-4ed2-acca-3f7a4413e4c1)
 
-Styles:
+### Styles:
 
 ![image](https://github.com/tin2tin/Generative_AI/assets/1322593/86807264-a377-4de1-875e-471aaa3011a7)
 
 See SDXL handling most of the styles here: https://stable-diffusion-art.com/sdxl-styles/
-
-
-## Updates
-
-Read about the updates here: 
-
-https://github.com/tin2tin/Pallaidium/discussions/categories/announcements
-
-
-## Text to Video
-The Animov models have been trained on Anime material, so adding "anime" to the prompt is necessary, especially for the Animov-512x model. 
-
-## Text to Image
-The Stable Diffusion models for generating images have been used a lot, so there are plenty of prompt suggestions out there if you google for them. 
-
-### Artists
-https://stablediffusion.fr/artists
 
 ### Prompting:
 https://replicate.com/blog/get-the-best-from-stable-diffusion-3
@@ -125,7 +106,7 @@ https://blog.segmind.com/generating-photographic-images-with-stable-diffusion/
 
 Tip           |
 :------------- |
-If the image of your renders breaks, then use the resolution from the Model Card in the Preferences.     |
+If the image of your renders breaks, use the resolution from the Model Card in the Preferences.     |
 
 Tip           |
 :------------- |
@@ -133,7 +114,7 @@ If the image of your playback stutters, then select a strip > Menu > Strip > Mov
 
 Tip           |
 :------------- |
-If you get the message that CUDA is out of memory, then restart Blender to free up memory and make it stable again.     |
+If you get the message that CUDA is out of memory, restart Blender to free up memory and make it stable again.     |
 
 
 # Batch Processing
@@ -163,12 +144,6 @@ Tip           |
 :------------- |
 If the audio breaks up, try processing longer sentences.      |
 
-### AudioLDM2
-Find AudioLDM documentation here: https://github.com/haoheliu/AudioLDM
-Try prompts like: Bag pipes playing a funeral dirge, punk rock band playing hardcore song, techno dj playing deep bass house music, and acid house loop with jazz.
-Or: Voice of God judging mankind, woman talking about celestial beings, hammer on wood.
-
-
 ## Performance
 
 The performance can be improved by following this guide: https://nvidia.custhelp.com/app/answers/detail/a_id/5490/~/system-memory-fallback-for-stable-diffusion
@@ -177,27 +152,6 @@ The performance can be improved by following this guide: https://nvidia.custhelp
 ## New to Blender?
 
 Watch this tutorial: https://youtu.be/4_MIaxzjh5Y?feature=shared
-
-
-## AI Modules
-Diffusers: https://github.com/huggingface/diffusers
-
-Zeroscope XL: https://huggingface.co/cerspense/zeroscope_v2_XL
-
-AudioLDM2 Music: [https://huggingface.co/cvssp/audioldm-s-full-v2 https://github.com/haoheliu/AudioLDM](https://huggingface.co/cvssp/audioldm2-music)
-
-MusicGen Stereo: https://huggingface.co/facebook/musicgen-stereo-medium
-
-Bark: https://github.com/suno-ai/bark
-
-Stable Diffusion XL: https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0
-
-Segmind SDXL: https://huggingface.co/segmind/SSD-1B 
-https://blog.segmind.com/generating-photographic-images-with-stable-diffusion/
-
-OpenDalle: https://huggingface.co/dataautogpt3/OpenDalleV1.1
-
-
 
 ## Uninstall
 
@@ -327,17 +281,17 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 
 https://huggingface.co/blog/lcm_lora
 
-### FreeU
+## Restrictions on using Pallaidium:
+- It is prohibited to use Pallaidium to generate content that is demeaning or harmful to people, their environment, culture, religion, etc.
+- It is prohibited to use Pallaidium for pornographic, violent, and bloody content generation.
+- It is prohibited to use Pallaidium for error and false information generation.
 
-https://github.com/ChenyangSi/FreeU
+## Restrictions on using the AI models:
+- Pallaidium does not include any genAI models(weights). If the user decides to use a model, it is downloaded from HuggingFace. 
+- In general, the models can only be used for non-commercial purposes and are meant for research purposes.
+- Consult the individual models on HuggingFace to read up on their licenses and ex. if they can be used commercially.
 
-## Restrictions for using the AI models:
 
-- The models can only be used for non-commercial purposes. The models are meant for research purposes.
-- The models was not trained to realistically represent people or events, so using it to generate such content is beyond the model's capabilities.
-- It is prohibited to generate content that is demeaning or harmful to people or their environment, culture, religion, etc.
-- Prohibited for pornographic, violent, and bloody content generation.
-- Prohibited for error and false information generation.
 
 
 
