@@ -15,6 +15,7 @@ AI-generate video, image, and audio from text prompts or video, image, or text s
 | Image to image                                     | Image to video                                     |
 | Video to video                                     | Image to text                                    |
 | ControlNet                                         | OpenPose                                          |
+| ADetailer                                          | IP Adapter Face/Style                             |
 | Canny                                              | Illusion                                          |
 | Multiple LoRAs                                     | Segmind distilled SDXL                            |
 | Seed                                               | Quality steps                                     |
