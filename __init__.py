@@ -706,10 +706,12 @@ def install_modules(self):
         subprocess.call([pybin, "-m", "ensurepip"])
         subprocess.call([pybin, "-m", "pip", "install", "--upgrade", "pip"])
     except ImportError:
+        subprocess.call([pybin, "-m", "pip", "install", "--upgrade", "pip"])
         pass
+
     import_module(self, "huggingface_hub", "huggingface_hub")
-    import_module(self, "transformers", "transformers")
-    #import_module(self, "transformers", "git+https://github.com/huggingface/transformers.git")
+    #import_module(self, "transformers", "transformers")
+    import_module(self, "transformers", "git+https://github.com/huggingface/transformers.git")
     subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/suno-ai/bark.git", "--upgrade"])
     import_module(self, "WhisperSpeech", "WhisperSpeech")
     import_module(self, "pydub", "pydub")
@@ -720,7 +722,8 @@ def install_modules(self):
         )
         deep_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deepspeed/deepspeed-0.12.4+unknown-py3-none-any.whl")
         print("deep_speed_path: " + deep_path)
-        import_module(self, "deepspeed", deep_path)
+        #import_module(self, "deepspeed", deep_path)
+        subprocess.call([pybin, "-m", deep_path, "--upgrade"])
         import_module(self, "librosa", "librosa")
         import_module(self, "celluloid", "celluloid")
         import_module(self, "omegaconf", "omegaconf")
@@ -751,7 +754,7 @@ def install_modules(self):
     import_module(self, "flash_attn", "flash-attn")
 
     #import_module(self, "controlnet_aux", "controlnet-aux")
-    subprocess.call([pybin, "-m", "pip", "install", "controlnet-aux"])
+    subprocess.call([pybin, "-m", "pip", "install", "controlnet-aux", "--upgrade"])
 
     import_module(self, "beautifulsoup4", "beautifulsoup4")
     import_module(self, "ftfy", "ftfy")
@@ -823,17 +826,20 @@ def install_modules(self):
     #import_module(self, "asdff", "git+https://github.com/theblackhatmagician/adetailer_sdxl.git")
     #import_module(self, "ultralytics", "ultralytics")
 
-    subprocess.call([pybin, "-m", "pip", "install", "ultralytics"])
-    subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/theblackhatmagician/adetailer_sdxl.git"])
-    subprocess.call([pybin, "-m", "pip", "install", "lmdb"])
-    subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/huggingface/accelerate.git"])
+    subprocess.call([pybin, "-m", "pip", "install", "ultralytics", "--upgrade"])
+    subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/theblackhatmagician/adetailer_sdxl.git", "--upgrade"])
+    subprocess.call([pybin, "-m", "pip", "install", "lmdb", "--upgrade"])
+    subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/huggingface/accelerate.git", "--upgrade"])
     #import_module(self, "accelerate", "git+https://github.com/huggingface/accelerate.git")
     #import_module(self, "accelerate", "accelerate")
     subprocess.check_call([pybin, "-m", "pip", "install", "peft", "--upgrade"])
 
     self.report({"INFO"}, "Installing: torch module.")
     print("\nInstalling: torch module")
+    #pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
     if os_platform == "Windows":
+#        subprocess.check_call([pybin, "-m", "pip", "install", "torch==1.12.1+cu114 pytorch torchvision torchaudio xformers", "--upgrade"]) #"-c", "pytorch", "-c", "nvidia",
+#        subprocess.check_call([pybin, "-m", "pip", "install", "torch==1.12.1+cu114 pytorch torchvision torchaudio xformers", "--upgrade"]) #"-c", "pytorch", "-c", "nvidia",
         subprocess.check_call(
             [
                 pybin,
@@ -844,20 +850,22 @@ def install_modules(self):
                 "--index-url",
                 "https://download.pytorch.org/whl/cu121",
                 "--no-warn-script-location",
-                "--user",
+                #"--user",
+                "--upgrade",
             ]
         )
         subprocess.check_call(
             [
                 pybin,
                 "-m",
-                "pip",
+                "pip",  
                 "install",
                 "torch==2.3.0+cu121",
                 "--index-url",
                 "https://download.pytorch.org/whl/cu121",
                 "--no-warn-script-location",
-                "--user",
+                #"--user",
+                "--upgrade",
             ]
         )
         subprocess.check_call(
@@ -871,7 +879,8 @@ def install_modules(self):
                 "--index-url",
                 "https://download.pytorch.org/whl/cu121",
                 "--no-warn-script-location",
-                "--user",
+                #"--user",
+                "--upgrade",
             ]
         )
         subprocess.check_call(
@@ -884,7 +893,8 @@ def install_modules(self):
                 "--index-url",
                 "https://download.pytorch.org/whl/cu121",
                 "--no-warn-script-location",
-                "--user",
+                #"--user",
+                "--upgrade",
             ]
         )
     else:
@@ -1935,7 +1945,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
 
                 row = col.row()
                 # enable this for Adetailer
-                #row.prop(context.scene, "adetailer", text="Face")
+                row.prop(context.scene, "adetailer", text="Face")
                 
 #                # AuraSR
 #                if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
