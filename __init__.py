@@ -834,6 +834,7 @@ def install_modules(self):
     #import_module(self, "accelerate", "accelerate")
     subprocess.check_call([pybin, "-m", "pip", "install", "peft", "--upgrade"])
 
+
     self.report({"INFO"}, "Installing: torch module.")
     print("\nInstalling: torch module")
     #pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
@@ -903,6 +904,8 @@ def install_modules(self):
         import_module(self, "torchaudio", "torchaudio")
         import_module(self, "xformers", "xformers")
 
+    print("Dir: " + str(subprocess.check_call([pybin, "-m", "pip", "cache", "purge"])))
+
 
 def get_module_dependencies(module_name):
     """
@@ -964,6 +967,7 @@ class GENERATOR_OT_uninstall(Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
+        pybin = python_exec()
         preferences = context.preferences
         addon_prefs = preferences.addons[__name__].preferences
         uninstall_module_with_dependencies("torch")
@@ -1019,6 +1023,8 @@ class GENERATOR_OT_uninstall(Operator):
         uninstall_module_with_dependencies("vocos")
         uninstall_module_with_dependencies("WhisperSpeech")
         uninstall_module_with_dependencies("pydub")
+
+        subprocess.check_call([pybin, "-m", "pip", "cache", "purge"])
 
         self.report(
             {"INFO"},
