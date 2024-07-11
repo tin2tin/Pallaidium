@@ -837,10 +837,7 @@ def install_modules(self):
 
     self.report({"INFO"}, "Installing: torch module.")
     print("\nInstalling: torch module")
-    #pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
     if os_platform == "Windows":
-#        subprocess.check_call([pybin, "-m", "pip", "install", "torch==1.12.1+cu114 pytorch torchvision torchaudio xformers", "--upgrade"]) #"-c", "pytorch", "-c", "nvidia",
-#        subprocess.check_call([pybin, "-m", "pip", "install", "torch==1.12.1+cu114 pytorch torchvision torchaudio xformers", "--upgrade"]) #"-c", "pytorch", "-c", "nvidia",
         subprocess.check_call(
             [
                 pybin,
@@ -1462,6 +1459,23 @@ class GENERATOR_OT_sound_notification(Operator):
         return {"FINISHED"}
 
 
+def copy_struct(source, target):
+    if not source or not target:
+        return
+    for name, prop in source.bl_rna.properties.items():
+        if name in ("rna_type", "name", "name_full", "original", "is_evaluated"):
+            continue
+        try:
+            setattr(target, name, getattr(source, name))
+        except AttributeError:
+            new_source = getattr(source, name)
+            new_target = getattr(target, name)
+            if hasattr(new_source, "bl_rna"):
+                copy_struct(new_source, new_target)
+        except TypeError:
+            pass
+
+
 def get_render_strip(self, context, strip):
     """Render selected strip to hard-disk"""
     # Check for the context and selected strips
@@ -1474,12 +1488,15 @@ def get_render_strip(self, context, strip):
     sequencer = current_scene.sequence_editor
     current_frame_old = bpy.context.scene.frame_current
     selected_sequences = strip
+    
     # Get the first empty channel above all strips
-
     insert_channel_total = 1
     for s in sequencer.sequences_all:
         if s.channel >= insert_channel_total:
             insert_channel_total = s.channel + 1
+
+    print("Strip type: "+str(strip.type))
+            
     if strip.type in {
         "MOVIE",
         "IMAGE",
@@ -1503,14 +1520,20 @@ def get_render_strip(self, context, strip):
         #        if strip.type == "SCENE":
         #            bpy.data.scenes["Scene"].name
 
-        # make_meta to keep transforms
-        bpy.ops.sequencer.meta_make()
+        if strip.type != "SCENE":
+            # make_meta to keep transforms
+            #bpy.ops.sequencer.meta_make()
 
-        # Copy the strip to the clipboard
-        bpy.ops.sequencer.copy()
+            # Copy the strip to the clipboard
+            bpy.ops.sequencer.copy()
 
-        # unmeta
-        bpy.ops.sequencer.meta_separate()
+            # unmeta
+            #bpy.ops.sequencer.meta_separate()
+#        else:
+#            print("hep")            
+#            bpy.ops.sequencer.scene_strip_add(frame_start=0, channel=5, replace_sel=True)
+#            new_strip = bpy.context.selected_sequences[0]
+#            copy_struct(strip, new_strip)
 
         # Create a new scene
         # new_scene = bpy.data.scenes.new(name="New Scene")
@@ -1537,13 +1560,20 @@ def get_render_strip(self, context, strip):
         new_scene.render.sequencer_gl_preview = current_scene.render.sequencer_gl_preview
         new_scene.render.use_sequencer_override_scene_strip = current_scene.render.use_sequencer_override_scene_strip
         new_scene.world = current_scene.world
+
         area = [area for area in context.screen.areas if area.type == "SEQUENCE_EDITOR"][0]
         with bpy.context.temp_override(area=area):
-            # Paste the strip from the clipboard to the new scene
-            bpy.ops.sequencer.paste()
+            if strip.type == "SCENE":
+                bpy.ops.sequencer.scene_strip_add(frame_start=0, channel=8, replace_sel=True)
+            else:
+                # Paste the strip from the clipboard to the new scene
+                bpy.ops.sequencer.paste()
+                #bpy.ops.sequencer.meta_separate()
 
         # Get the new strip in the new scene
         new_strip = new_scene.sequence_editor.active_strip = bpy.context.selected_sequences[0]
+
+        copy_struct(strip, new_strip)
 
         # Set the range in the new scene to fit the pasted strip
         new_scene.frame_start = int(new_strip.frame_final_start)
@@ -1579,6 +1609,7 @@ def get_render_strip(self, context, strip):
 
         # Delete the new scene
         bpy.data.scenes.remove(new_scene, do_unlink=True)
+        
         if not os.path.exists(output_path):
             print("Render failed: " + output_path)
             bpy.context.preferences.system.sequencer_proxy_setup = "AUTOMATIC"
@@ -1604,16 +1635,16 @@ def get_render_strip(self, context, strip):
                     frame_start=int(strip.frame_final_start),
                     overlap=0,
                 )
-            elif strip.type == "SCENE":
-                # Insert the rendered file as a scene strip in the original scene.
+#            elif strip.type == "SCENE":
+#                # Insert the rendered file as a scene strip in the original scene.
 
-                bpy.ops.sequencer.movie_strip_add(
-                    channel=insert_channel,
-                    filepath=output_path,
-                    frame_start=int(strip.frame_final_start),
-                    overlap=0,
-                    sound=False,
-                )
+#                bpy.ops.sequencer.movie_strip_add(
+#                    channel=insert_channel,
+#                    filepath=output_path,
+#                    frame_start=int(strip.frame_final_start),
+#                    overlap=0,
+#                    sound=False,
+#                )
             #            elif strip.type == "IMAGE":
             #                # Insert the rendered file as an image strip in the original scene.
             #                bpy.ops.sequencer.image_strip_add(
@@ -1626,7 +1657,6 @@ def get_render_strip(self, context, strip):
 
             else:
                 # Insert the rendered file as a movie strip in the original scene without sound.
-
                 bpy.ops.sequencer.movie_strip_add(
                     channel=insert_channel,
                     filepath=output_path,
@@ -1644,8 +1674,6 @@ def get_render_strip(self, context, strip):
 
 
 # LoRA.
-
-
 class LORABrowserFileItem(PropertyGroup):
     name: bpy.props.StringProperty()
     enabled: bpy.props.BoolProperty(default=True)
@@ -5086,7 +5114,6 @@ class SEQUENCER_OT_generate_image(Operator):
                 print("X: " + str(x), "Y: " + str(y))
 
                 # Turbo
-
                 if (
                     image_model_card == "stabilityai/sdxl-turbo"
                     or image_model_card == "stabilityai/sd-turbo"
@@ -5105,7 +5132,6 @@ class SEQUENCER_OT_generate_image(Operator):
                     ).images[0]
 
                 # Not Turbo
-
                 else:
                     image = converter(
                         prompt=prompt,
@@ -5602,6 +5628,9 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         return context.scene and context.scene.sequence_editor
 
     def execute(self, context):
+        import torch
+        import scipy
+
         bpy.types.Scene.movie_path = ""
         bpy.types.Scene.image_path = ""
         preferences = context.preferences
@@ -5614,7 +5643,6 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         strips = context.selected_sequences
         active_strip = context.scene.sequence_editor.active_strip
         prompt = scene.generate_movie_prompt
-        print("Prompt før: "+prompt)
         negative_prompt = scene.generate_movie_negative_prompt
         current_frame = scene.frame_current
         type = scene.generatorai_typeselect
@@ -5638,6 +5666,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                 "None of the selected strips are movie, image, text, meta or scene types.",
             )
             return {"CANCELLED"}
+        
         if type == "text":
             for strip in strips:
                 if strip.type in {"MOVIE", "IMAGE"}:
@@ -5649,12 +5678,11 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     "None of the selected strips are movie or image.",
                 )
                 return {"CANCELLED"}
+            
         if use_strip_data:
             print("Use file seed and prompt: Yes")
         else:
             print("Use file seed and prompt: No")
-        import torch
-        import scipy
 
         total_vram = 0
         for i in range(torch.cuda.device_count()):
@@ -5669,36 +5697,39 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
             strip.select = True
 
             # render intermediate mp4 file
-
             if strip.type == "SCENE" or strip.type == "MOVIE" or strip.type == "META":  # or strip.type == "IMAGE"
-                # Make the current frame overlapped frame, the temp strip.
 
+                # Make the current frame overlapped frame, the temp strip.
                 if type == "image" or type == "text":
                     trim_frame = find_overlapping_frame(strip, current_frame)
 
                     if trim_frame and len(strips) == 1:
-                        bpy.ops.sequencer.copy()
-                        bpy.ops.sequencer.paste()
+                        bpy.ops.sequencer.duplicate_move(SEQUENCER_OT_duplicate={}, TRANSFORM_OT_seq_slide={"value":(0, 1), "use_restore_handle_selection":False, "snap":False, "view2d_edge_pan":False, "release_confirm":False, "use_accurate":False})
                         intermediate_strip = bpy.context.selected_sequences[0]
                         intermediate_strip.frame_start = strip.frame_start
                         intermediate_strip.frame_offset_start = int(trim_frame)
                         intermediate_strip.frame_final_duration = 1
                         temp_strip = strip = get_render_strip(self, context, intermediate_strip)
+                        
                         if intermediate_strip is not None:
                             delete_strip(intermediate_strip)
+
                     elif type == "text":
                         bpy.ops.sequencer.copy()
                         bpy.ops.sequencer.paste(keep_offset=True)
                         intermediate_strip = bpy.context.selected_sequences[0]
                         intermediate_strip.frame_start = strip.frame_start
-                        # intermediate_strip.frame_offset_start = int(trim_frame)
 
+                        # intermediate_strip.frame_offset_start = int(trim_frame)
                         intermediate_strip.frame_final_duration = 1
                         temp_strip = strip = get_render_strip(self, context, intermediate_strip)
+                        
                         if intermediate_strip is not None:
                             delete_strip(intermediate_strip)
                     else:
                         temp_strip = strip = get_render_strip(self, context, strip)
+#                    temp_strip.select = True
+#                    bpy.ops.transform.seq_slide(value=(0, -1), snap=False, view2d_edge_pan=True)
                 else:
                     temp_strip = strip = get_render_strip(self, context, strip)
 
@@ -5830,6 +5861,8 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     scene.movie_num_seed = seed
                 if temp_strip is not None:
                     delete_strip(temp_strip)
+#                    strip.select = True
+#                    bpy.ops.transform.seq_slide(value=(0, -1), snap=False, view2d_edge_pan=True)
                 bpy.types.Scene.movie_path = ""
             scene.generate_movie_prompt = prompt
             scene.generate_movie_negative_prompt = negative_prompt
