@@ -765,7 +765,8 @@ def install_modules(self):
     import_module(self, "imageio", "imageio")
     import_module(self, "imWatermark", "imWatermark")
     if os_platform == "Windows":
-        subprocess.call([pybin, "-m", "pip", "install", "https://github.com/ACGNnsj/triton-windows-build/releases/download/3.0.0/triton-3.0.0-cp311-cp311-win_amd64.whl", "--upgrade", '--user'])
+        #subprocess.call([pybin, "-m", "pip", "install", "https://github.com/ACGNnsj/triton-windows-build/releases/download/3.0.0/triton-3.0.0-cp311-cp311-win_amd64.whl", "--upgrade", '--user'])
+        pass
     else:
         try:
             exec("import triton")
