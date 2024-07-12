@@ -65,7 +65,7 @@ If any Python modules are missing, use this add-on to install them manually:    
 https://github.com/amb/blender_pip      |
 
 ## Change Log
-* 2024-7-12: Add: Kwai/Kolors (txt2img & img2img) and Triton (py lib on Win)
+* 2024-7-12: Add: Kwai/Kolors (txt2img & img2img)
 * 2024-6-13: Add: SD3 - A "Read" token from HuggingFace must be entered, it's free (img2img). Fix: Installation of Dependencies
 * 2024-6-6: Add: Stable Audio Open, Frame:-1 will inherit duration. 
 * 2024-6-1: IP Adapter(When using SDXL): Face (Image or folder), Style (image or folder) New image models: Mobius, OpenVision, Juggernaut X Hyper
