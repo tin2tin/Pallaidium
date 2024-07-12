@@ -27,7 +27,7 @@ AI-generate video, image, and audio from text prompts or video, image, or text s
 | Model Cards                                        | One-click install and uninstall dependencies. |
 | User-defined file path for generated files.        | Seed and prompt added to strip name.   |
 
-![image](https://github.com/tin2tin/Pallaidium/assets/1322593/88f73b46-409a-4a89-bbf0-0e10a580336c)
+![image](https://github.com/user-attachments/assets/a5c44a7e-c670-49ef-941f-86e521568637)
 
 ## Requirements
 * Windows (Unsupported: Linux and MacOS).
