@@ -840,6 +840,10 @@ def install_modules(self):
     self.report({"INFO"}, "Installing: torch module.")
     print("\nInstalling: torch module")
     if os_platform == "Windows":
+        subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "torch"])
+        subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "torchvision"])
+        subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "torchaudio"])
+        subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "xformers"])
         subprocess.check_call(
             [
                 pybin,
@@ -1087,7 +1091,7 @@ def input_strips_updated(self, context):
         bpy.context.scene.use_lcm = False
     if (image_model_card == "Kwai-Kolors/Kolors-diffusers") and type == "image":
         bpy.context.scene.use_lcm = False
-    if (image_model_card == "fal/AuraFlow") and type == "image":
+    if (image_model_card == "Vargol/auraflow0.2-fp16-diffusers") and type == "image":
         bpy.context.scene.use_lcm = False
     if (image_model_card == "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers") and type == "image":
         bpy.context.scene.use_lcm = False
@@ -1128,7 +1132,7 @@ def output_strips_updated(self, context):
         bpy.context.scene.use_lcm = False
     if (image_model_card == "Kwai-Kolors/Kolors-diffusers") and type == "image":
         bpy.context.scene.use_lcm = False
-    if (image_model_card == "fal/AuraFlow") and type == "image":
+    if (image_model_card == "Vargol/auraflow0.2-fp16-diffusers") and type == "image":
         bpy.context.scene.use_lcm = False
     if (image_model_card == "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers") and type == "image":
         bpy.context.scene.use_lcm = False
@@ -1251,12 +1255,13 @@ class GeneratorAddonPreferences(AddonPreferences):
             #                "Stable Diffusion 1.5 (512x512)",
             #                "runwayml/stable-diffusion-v1-5",
             #            ),
+            ("black-forest-labs/FLUX.1-schnell", "Flux Schnell (24 GB VRAM)", "black-forest-labs/FLUX.1-schnell"),
             ("youknownothing/Fluently-XL-Final", "Fluently (1024x1024)", "youknownothing/Fluently-XL-Final"),
             ("Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers", "HunyuanDiT-v1.2", "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers"),
             ("RunDiffusion/Juggernaut-X-Hyper", "Juggernaut X Hyper (1024x1024)", "RunDiffusion/Juggernaut-X-Hyper"),
             ("Kwai-Kolors/Kolors-diffusers", "Kolors", "Kwai-Kolors/Kolors-diffusers"),
-# Produces garbage currently, check later for improvements.
-#            ("fal/AuraFlow", "AuraFlow", "fal/AuraFlow"),
+#            Not working:
+#            ("Vargol/auraflow0.2-fp16-diffusers", "AuraFlow", "Vargol/auraflow0.2-fp16-diffusers"),
             ("Corcelio/mobius", "Mobius (1024x1024)", "Corcelio/mobius"),
             ("Corcelio/openvision", "OpenVision (1280x1280)", "Corcelio/openvision"),
             ("dataautogpt3/OpenDalleV1.1", "OpenDalle (1024 x 1024)", "dataautogpt3/OpenDalleV1.1"),
@@ -1278,10 +1283,10 @@ class GeneratorAddonPreferences(AddonPreferences):
             ("playgroundai/playground-v2.5-1024px-aesthetic", "Playground v2.5 (1024x1024)", "playgroundai/playground-v2.5-1024px-aesthetic"),
             (
                 "Vargol/ProteusV0.4",
-                "Proteus 4.0 (1024x1024)",
+                "Proteus 0.4 (1024x1024)",
                 "Vargol/ProteusV0.4",
             ),
-            ("dataautogpt3/ProteusV0.4-Lightning", "Proteus Lightning (1024 x 1024)", "dataautogpt3/ProteusV0.4-Lightning"),
+            ("dataautogpt3/ProteusV0.5", "Proteus 0.5 (1024 x 1024)", "dataautogpt3/ProteusV0.5"),
             (
                 "SG161222/RealVisXL_V4.0",
                 "RealVisXL_V4 (1024x1024)",
@@ -1904,8 +1909,6 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     type == "image"
                     and image_model_card == "ByteDance/SDXL-Lightning"
                     or type == "image"
-                    and image_model_card == "dataautogpt3/ProteusV0.4-Lightning"
-                    or type == "image"
                     and image_model_card == "Lykon/dreamshaper-xl-lightning"
                 ):
                     pass
@@ -1921,7 +1924,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                             type == "image"
                             and image_model_card == image_model_card == "ByteDance/SDXL-Lightning"
                             or type == "image"
-                            and image_model_card == "dataautogpt3/ProteusV0.4-Lightning"
+                            and image_model_card == "dataautogpt3/ProteusV0.5"
                             or type == "image"
                             and image_model_card == "Lykon/dreamshaper-xl-lightning"
                         )
@@ -3461,6 +3464,20 @@ def load_images_from_folder(folder_path):
         return None
 
 
+
+
+def flush():
+    import torch 
+    import gc
+    gc.collect()
+    torch.cuda.empty_cache()
+    torch.cuda.reset_max_memory_allocated()
+    torch.cuda.reset_peak_memory_stats()
+
+def bytes_to_giga_bytes(bytes):
+    return bytes / 1024 / 1024 / 1024
+
+
 class SEQUENCER_OT_generate_image(Operator):
     """Generate Image"""
 
@@ -3468,6 +3485,7 @@ class SEQUENCER_OT_generate_image(Operator):
     bl_label = "Prompt"
     bl_description = "Convert text to image"
     bl_options = {"REGISTER", "UNDO"}
+    
 
     def execute(self, context):
         scene = context.scene
@@ -3562,7 +3580,7 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "Corcelio/mobius"
             and not image_model_card == "stabilityai/stable-diffusion-3-medium-diffusers"
             and not image_model_card == "Corcelio/openvision"
-            and not image_model_card == "dataautogpt3/ProteusV0.4-Lightning"
+            and not image_model_card == "dataautogpt3/ProteusV0.5"
             and not image_model_card == "Lykon/dreamshaper-xl-lightning"
             and not scene.ip_adapter_face_folder
             and not scene.ip_adapter_style_folder
@@ -3576,7 +3594,7 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "monster-labs/control_v1p_sdxl_qrcode_monster"
             and not image_model_card == "Salesforce/blipdiffusion"
             and not image_model_card == "ByteDance/SDXL-Lightning"
-            and not image_model_card == "dataautogpt3/ProteusV0.4-Lightning"
+            and not image_model_card == "dataautogpt3/ProteusV0.5"
             and not image_model_card == "Lykon/dreamshaper-xl-lightning"
             and not scene.ip_adapter_face_folder
             and not scene.ip_adapter_style_folder
@@ -4172,9 +4190,55 @@ class SEQUENCER_OT_generate_image(Operator):
             else:
                 pipe.to(gfx_device)
 
+        # Flux
+        elif image_model_card == "black-forest-labs/FLUX.1-schnell":
+#            flush()
+#            from diffusers import  FluxPipeline
+#            pipe = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-schnell", torch_dtype=torch.bfloat16, revision='refs/pr/1')
+#            pipe.enable_model_cpu_offload()
+          
+            
+            from diffusers import FluxPipeline, AutoencoderKL
+            from diffusers.image_processor import VaeImageProcessor
+            from transformers import T5EncoderModel, T5TokenizerFast, CLIPTokenizer, CLIPTextModel
 
-        # pony
-        elif image_model_card == "pJohn6666/pony-realism-v21main-sdxl":
+            flush()
+
+            ckpt_id = "black-forest-labs/FLUX.1-schnell"
+            #prompt = "a photo of a dog with cat-like look"
+
+            text_encoder = CLIPTextModel.from_pretrained(ckpt_id, revision="refs/pr/1", subfolder="text_encoder", torch_dtype=torch.bfloat16)
+            text_encoder_2 = T5EncoderModel.from_pretrained(ckpt_id, revision="refs/pr/1", subfolder="text_encoder_2", torch_dtype=torch.bfloat16)
+            tokenizer = CLIPTokenizer.from_pretrained(ckpt_id, subfolder="tokenizer", revision="refs/pr/1")
+            tokenizer_2 = T5TokenizerFast.from_pretrained(ckpt_id, subfolder="tokenizer_2", revision="refs/pr/1")
+
+            pipe = FluxPipeline.from_pretrained(
+                ckpt_id, text_encoder=text_encoder, text_encoder_2=text_encoder_2,
+                tokenizer=tokenizer, tokenizer_2=tokenizer_2, transformer=None, vae=None,
+                revision="refs/pr/1"
+            ).to(gfx_device)
+
+            with torch.no_grad():
+                print("Encoding prompts.")
+                prompt_embeds, pooled_prompt_embeds, text_ids = pipe.encode_prompt(prompt=prompt, prompt_2=None, max_sequence_length=256)
+
+            del text_encoder
+            del text_encoder_2
+            del tokenizer
+            del tokenizer_2
+            del pipe
+
+            flush()
+
+            pipe = FluxPipeline.from_pretrained(
+                ckpt_id, text_encoder=None, text_encoder_2=None,
+                tokenizer=None, tokenizer_2=None, vae=None,
+                revision="refs/pr/1",
+                torch_dtype=torch.bfloat16
+            ).to(gfx_device)
+                
+        # Fluently-XL
+        elif image_model_card == "youknownothing/Fluently-XL-Final":
             from diffusers import DiffusionPipeline, DDIMScheduler
 
             pipe = DiffusionPipeline.from_pretrained(
@@ -4388,7 +4452,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 # Ensure sampler uses "trailing" timesteps.
                 pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config, timestep_spacing="trailing")
 
-            elif image_model_card == "dataautogpt3/ProteusV0.4-Lightning":
+            elif image_model_card == "dataautogpt3/ProteusV0.5":
                 import torch
                 from diffusers import StableDiffusionXLPipeline, EulerAncestralDiscreteScheduler, AutoencoderKL
 
@@ -4396,7 +4460,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
 
                 # Configure the pipeline
-                pipe = StableDiffusionXLPipeline.from_pretrained("dataautogpt3/ProteusV0.4-Lightning", vae=vae, torch_dtype=torch.float16)
+                pipe = StableDiffusionXLPipeline.from_pretrained("dataautogpt3/ProteusV0.5", vae=vae, torch_dtype=torch.float16)
                 pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
                 if low_vram():
                     pipe.enable_model_cpu_offload()
@@ -4430,9 +4494,9 @@ class SEQUENCER_OT_generate_image(Operator):
                     pipe.enable_model_cpu_offload()
                 else:
                     pipe.to(gfx_device)
-            elif image_model_card == "fal/AuraFlow":
+            elif image_model_card == "Vargol/auraflow0.2-fp16-diffusers":
                 from diffusers import AuraFlowPipeline
-                pipe = AuraFlowPipeline.from_pretrained(image_model_card, torch_dtype=torch.float16, local_files_only=local_files_only)
+                pipe = AuraFlowPipeline.from_pretrained(image_model_card, torch_dtype=torch.float16, variant="fp16", local_files_only=local_files_only)
                 if low_vram():
                     pipe.enable_model_cpu_offload()
                 else:
@@ -4752,7 +4816,6 @@ class SEQUENCER_OT_generate_image(Operator):
                 ).images[0]
 
             # dreamshaper-xl-lightning
-
             elif image_model_card == "Lykon/dreamshaper-xl-lightning":
                 image = pipe(
                     prompt=prompt,
@@ -4766,7 +4829,6 @@ class SEQUENCER_OT_generate_image(Operator):
                 ).images[0]
 
             # OpenPose
-
             elif image_model_card == "xinsir/controlnet-openpose-sdxl-1.0":
                 image = None
                 if scene.image_path:
@@ -4901,7 +4963,6 @@ class SEQUENCER_OT_generate_image(Operator):
             #                        ).images[0]
 
             # Scribble
-
             elif image_model_card == "xinsir/controlnet-scribble-sdxl-1.0":
                 print("Process: Scribble")
                 init_image = None
@@ -4946,7 +5007,6 @@ class SEQUENCER_OT_generate_image(Operator):
                 ).images[0]
 
             # Blip
-
             elif image_model_card == "Salesforce/blipdiffusion":
                 print("Process: Subject Driven")
                 text_prompt_input = prompt
@@ -5014,15 +5074,15 @@ class SEQUENCER_OT_generate_image(Operator):
                 ).images[0]
                 decoder = None
 
-            elif image_model_card == "dataautogpt3/ProteusV0.4-Lightning":
+            elif image_model_card == "dataautogpt3/ProteusV0.5":
                 image = pipe(
-                    prompt=prompt,
+                    prompt,
                     negative_prompt=negative_prompt,
+                    num_inference_steps=image_num_inference_steps,
+                    guidance_scale=image_num_guidance,
                     height=y,
                     width=x,
-                    guidance_scale=1.0,
-                    output_type="pil",
-                    num_inference_steps=4,
+                    generator=generator,
                 ).images[0]
                 decoder = None
 
@@ -5111,6 +5171,55 @@ class SEQUENCER_OT_generate_image(Operator):
                 #                )
 
                 delete_strip(mask_strip)
+
+            # Flux
+            elif image_model_card == "black-forest-labs/FLUX.1-schnell":
+
+#                image = pipe(
+#                    prompt=prompt, 
+#                    guidance_scale=0., 
+#                    height=y, 
+#                    width=x, 
+#                    num_inference_steps=4, 
+#                    max_sequence_length=256,
+#                ).images[0]
+
+                print("Running denoising.")
+                #height, width = 768, 1360
+                # No need to wrap it up under `torch.no_grad()` as pipeline call method
+                # is already wrapped under that.
+                latents = pipe(
+                    prompt_embeds=prompt_embeds, 
+                    pooled_prompt_embeds=pooled_prompt_embeds,
+                    num_inference_steps=4, guidance_scale=0.0, 
+                    height=y,
+                    width=x,
+                    output_type="latent"
+                ).images
+                print(f"{latents.shape=}")
+
+                del pipe.transformer
+                del pipe
+
+                flush()
+
+                vae = AutoencoderKL.from_pretrained(
+                    ckpt_id, 
+                    revision="refs/pr/1",
+                    subfolder="vae",
+                    torch_dtype=torch.bfloat16
+                ).to("cuda")
+                vae_scale_factor = 2 ** (len(vae.config.block_out_channels))
+                image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
+
+                with torch.no_grad():
+                    print("Running decoding.")
+                    pipe = FluxPipeline._unpack_latents(latents, y, x, vae_scale_factor)
+                    pipe = (pipe / vae.config.scaling_factor) + vae.config.shift_factor
+
+                    image = vae.decode(pipe, return_dict=False)[0]
+                    image = image_processor.postprocess(image, output_type="pil")
+                    image = image[0]
 
             # Img2img
 
@@ -5453,14 +5562,17 @@ class SEQUENCER_OT_generate_image(Operator):
                             bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
                             break
             print_elapsed_time(start_time)
-        if pipe:
-            pipe = None
-        if refiner:
-            compel = None
-        if converter:
-            converter = None
-        # clear the VRAM
+        try:    
+            if pipe:
+                pipe = None
+            if refiner:
+                compel = None
+            if converter:
+                converter = None
+        except:
+            pass
 
+        # clear the VRAM
         clear_cuda_cache()
 
         scene.movie_num_guidance = guidance
