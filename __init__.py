@@ -676,17 +676,19 @@ def import_module(self, module, install_module):
     module = str(module)
     python_exe = python_exec()
 
-    try:
-        subprocess.call([python_exe, "import ", packageName])
-    except:
-        self.report({"INFO"}, "Installing: " + install_module + " module.")
-        print("\nInstalling: " + module + " module")
-        subprocess.call([python_exe, "-m", "pip", "install", install_module, "--no-warn-script-location", "--upgrade"])
+#    try:
+#        #exec("import " + module)
+#        subprocess.call([python_exe, "import ", module])
+#    except:
+    self.report({"INFO"}, "Installing: " + module + " module.")
+    print("\nInstalling: " + module + " module")
+    subprocess.call([python_exe, "-m", "pip", "install", install_module, "--no-warn-script-location", "--upgrade"])
 
-        try:
-            exec("import " + module)
-        except ModuleNotFoundError:
-            return False
+#    try:
+#        exec("import " + module)
+#    except ModuleNotFoundError:
+#        print("Module not found: " + module)
+#        return False
     return True
 
 
@@ -704,7 +706,7 @@ def install_modules(self):
 
     try:
         subprocess.call([pybin, "-m", "ensurepip"])
-        subprocess.call([pybin, "-m", "pip", "install", "--upgrade", "pip"])
+        #subprocess.call([pybin, "-m", "pip", "install", "--upgrade", "pip"])
     except ImportError:
         subprocess.call([pybin, "-m", "pip", "install", "--upgrade", "pip"])
         pass
@@ -713,7 +715,7 @@ def install_modules(self):
     #import_module(self, "transformers", "transformers")
     import_module(self, "transformers", "git+https://github.com/huggingface/transformers.git")
     subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/suno-ai/bark.git", "--upgrade"])
-    import_module(self, "WhisperSpeech", "WhisperSpeech")
+    import_module(self, "whisperspeech", "WhisperSpeech")
     import_module(self, "pydub", "pydub")
     if os_platform == "Windows":
         # resemble-enhance:
@@ -728,7 +730,7 @@ def install_modules(self):
         import_module(self, "celluloid", "celluloid")
         import_module(self, "omegaconf", "omegaconf")
         import_module(self, "pandas", "pandas")
-        import_module(self, "ptflops", "git+https://github.com/sovrasov/flops-counter.pytorch.git")
+        subprocess.check_call([pybin, "-m", "pip", "install", "git+https://github.com/sovrasov/flops-counter.pytorch.git", "--upgrade"])
         import_module(self, "rich", "rich")
         import_module(self, "resampy", "resampy")
         import_module(self, "tabulate", "tabulate")
@@ -737,7 +739,7 @@ def install_modules(self):
 
     # import_module(self, "diffusers", "diffusers")
     import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
-    subprocess.check_call([pybin, "-m", "pip", "install", "tensorflow"])
+    subprocess.check_call([pybin, "-m", "pip", "install", "tensorflow", "--upgrade"])
     import_module(self, "soundfile", "PySoundFile")
     import_module(self, "sentencepiece", "sentencepiece")
     import_module(self, "safetensors", "safetensors")
@@ -748,7 +750,7 @@ def install_modules(self):
     import_module(self, "omegaconf", "omegaconf")
     import_module(self, "protobuf", "protobuf")
     #import_module(self, "hidiffusion", "hidiffusion")
-    import_module(self, "aura_sr", "aura-sr")
+    #import_module(self, "aura_sr", "aura-sr")
 
     import_module(self, "stable_audio_tools", "stable-audio-tools")
     import_module(self, "flash_attn", "flash-attn")
@@ -844,13 +846,46 @@ def install_modules(self):
         subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "torchvision"])
         subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "torchaudio"])
         subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "xformers"])
+
+#         subprocess.call([pybin, "-m", "pip", "install", "torch torchvision torchaudio xformers", "--index-url", "https://download.pytorch.org/whl/cu121"])
+#        subprocess.check_call(
+#            [
+#                pybin,
+#                "-m",
+#                "pip",
+#                "install",
+#                #"torchvision==0.17.0+cu121",
+#                "torchvision==0.18.0+cu121",
+#                "--index-url",
+#                "https://download.pytorch.org/whl/cu121",
+#                "--no-warn-script-location",
+#                #"--user",
+#                "--upgrade",
+#            ]
+#        )
+#        subprocess.check_call(
+#            [
+#                pybin,
+#                "-m",
+#                "pip",
+#                "install",
+#                "xformers==0.0.26.post1",
+#                "--index-url",
+#                "https://download.pytorch.org/whl/cu121",
+#                "--no-warn-script-location",
+#                #"--user",
+#                "--upgrade",
+#            ]
+#        )
         subprocess.check_call(
             [
                 pybin,
                 "-m",
                 "pip",
                 "install",
+                "torch==2.3.1+cu121",
                 "xformers",
+                "torchvision",
                 "--index-url",
                 "https://download.pytorch.org/whl/cu121",
                 "--no-warn-script-location",
@@ -864,36 +899,7 @@ def install_modules(self):
                 "-m",
                 "pip",
                 "install",
-                "torch==2.3.0+cu121",
-                "--index-url",
-                "https://download.pytorch.org/whl/cu121",
-                "--no-warn-script-location",
-                #"--user",
-                "--upgrade",
-            ]
-        )
-        subprocess.check_call(
-            [
-                pybin,
-                "-m",
-                "pip",
-                "install",
-                #"torchvision==0.17.0+cu121",
-                "torchvision==0.18.0+cu121",
-                "--index-url",
-                "https://download.pytorch.org/whl/cu121",
-                "--no-warn-script-location",
-                #"--user",
-                "--upgrade",
-            ]
-        )
-        subprocess.check_call(
-            [
-                pybin,
-                "-m",
-                "pip",
-                "install",
-                "torchaudio==2.3.0+cu121",
+                "torchaudio==2.3.1+cu121",
                 "--index-url",
                 "https://download.pytorch.org/whl/cu121",
                 "--no-warn-script-location",
@@ -1003,6 +1009,15 @@ class GENERATOR_OT_uninstall(Operator):
 
         uninstall_module_with_dependencies("beautifulsoup4")
         uninstall_module_with_dependencies("ftfy")
+        uninstall_module_with_dependencies("albumentations")
+        uninstall_module_with_dependencies("datasets")
+        uninstall_module_with_dependencies("deepspeed")
+        uninstall_module_with_dependencies("gradio-client")
+        uninstall_module_with_dependencies("insightface")
+        uninstall_module_with_dependencies("suno-bark")
+        uninstall_module_with_dependencies("aura-sr")
+        uninstall_module_with_dependencies("peft")
+        uninstall_module_with_dependencies("ultralytics")
 
         # "resemble-enhance":
 
@@ -1822,8 +1837,8 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             if image_model_card == "xinsir/controlnet-scribble-sdxl-1.0" and type == "image":
                 col = col.column(heading="Read as", align=True)
                 col.prop(context.scene, "use_scribble_image", text="Scribble Image")
-            # IPAdapter.
 
+            # IPAdapter.
             if (
                 (
                     image_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
@@ -1867,6 +1882,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 col.use_property_decorate = False
                 col.prop(context.scene, "generate_movie_prompt", text="", icon="ADD")
                 if (type == "audio" and audio_model_card == "bark") or (type == "audio" and audio_model_card == "audo/stable-audio-open-1.0") or (
+                    type == "image" and image_model_card == "black-forest-labs/FLUX.1-schnell") or (
                     type == "audio" and audio_model_card == "facebook/musicgen-stereo-medium" and audio_model_card == "WhisperSpeech"
                 ):
                     pass
@@ -1917,6 +1933,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 if (
                     (type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid")
                     or (type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt")
+                    or (type == "image" and image_model_card == "black-forest-labs/FLUX.1-schnell")
                     or (
                         scene.use_lcm
                         and not (type == "image" and image_model_card == "Lykon/dreamshaper-8")
@@ -4198,7 +4215,7 @@ class SEQUENCER_OT_generate_image(Operator):
 #            pipe.enable_model_cpu_offload()
           
             
-            from diffusers import FluxPipeline, AutoencoderKL
+            from diffusers import FluxPipeline, FluxTransformer2DModel, AutoencoderKL
             from diffusers.image_processor import VaeImageProcessor
             from transformers import T5EncoderModel, T5TokenizerFast, CLIPTokenizer, CLIPTextModel
 
@@ -4207,6 +4224,7 @@ class SEQUENCER_OT_generate_image(Operator):
             ckpt_id = "black-forest-labs/FLUX.1-schnell"
             #prompt = "a photo of a dog with cat-like look"
 
+            #transformer = FluxTransformer2DModel.from_single_file("https://huggingface.co/Kijai/flux-fp8/blob/main/flux1-dev-fp8.safetensors")
             text_encoder = CLIPTextModel.from_pretrained(ckpt_id, revision="refs/pr/1", subfolder="text_encoder", torch_dtype=torch.bfloat16)
             text_encoder_2 = T5EncoderModel.from_pretrained(ckpt_id, revision="refs/pr/1", subfolder="text_encoder_2", torch_dtype=torch.bfloat16)
             tokenizer = CLIPTokenizer.from_pretrained(ckpt_id, subfolder="tokenizer", revision="refs/pr/1")
@@ -4214,7 +4232,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             pipe = FluxPipeline.from_pretrained(
                 ckpt_id, text_encoder=text_encoder, text_encoder_2=text_encoder_2,
-                tokenizer=tokenizer, tokenizer_2=tokenizer_2, transformer=None, vae=None,
+                tokenizer=tokenizer, tokenizer_2=tokenizer_2, transformer=None, vae=None, #transformer=transformer
                 revision="refs/pr/1"
             ).to(gfx_device)
 
@@ -4227,15 +4245,6 @@ class SEQUENCER_OT_generate_image(Operator):
             del tokenizer
             del tokenizer_2
             del pipe
-
-            flush()
-
-            pipe = FluxPipeline.from_pretrained(
-                ckpt_id, text_encoder=None, text_encoder_2=None,
-                tokenizer=None, tokenizer_2=None, vae=None,
-                revision="refs/pr/1",
-                torch_dtype=torch.bfloat16
-            ).to(gfx_device)
                 
         # Fluently-XL
         elif image_model_card == "youknownothing/Fluently-XL-Final":
@@ -5175,28 +5184,25 @@ class SEQUENCER_OT_generate_image(Operator):
             # Flux
             elif image_model_card == "black-forest-labs/FLUX.1-schnell":
 
-#                image = pipe(
-#                    prompt=prompt, 
-#                    guidance_scale=0., 
-#                    height=y, 
-#                    width=x, 
-#                    num_inference_steps=4, 
-#                    max_sequence_length=256,
-#                ).images[0]
+                flush()
 
-                print("Running denoising.")
-                #height, width = 768, 1360
-                # No need to wrap it up under `torch.no_grad()` as pipeline call method
-                # is already wrapped under that.
+                pipe = FluxPipeline.from_pretrained(
+                    ckpt_id, text_encoder=None, text_encoder_2=None,
+                    tokenizer=None, tokenizer_2=None, vae=None,
+                    revision="refs/pr/1",
+                    torch_dtype=torch.bfloat16
+                ).to(gfx_device)                
+                
                 latents = pipe(
                     prompt_embeds=prompt_embeds, 
                     pooled_prompt_embeds=pooled_prompt_embeds,
-                    num_inference_steps=4, guidance_scale=0.0, 
+                    num_inference_steps=image_num_inference_steps, guidance_scale=0.0, 
                     height=y,
                     width=x,
+                    generator=generator,
                     output_type="latent"
                 ).images
-                print(f"{latents.shape=}")
+                # print(f"{latents.shape=}")
 
                 del pipe.transformer
                 del pipe
@@ -5213,7 +5219,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
 
                 with torch.no_grad():
-                    print("Running decoding.")
+                    #print("Running decoding.")
                     pipe = FluxPipeline._unpack_latents(latents, y, x, vae_scale_factor)
                     pipe = (pipe / vae.config.scaling_factor) + vae.config.shift_factor
 
