@@ -740,7 +740,7 @@ def install_modules(self):
     # import_module(self, "diffusers", "diffusers")
     import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
     subprocess.check_call([pybin, "-m", "pip", "install", "tensorflow", "--upgrade"])
-    import_module(self, "soundfile", "PySoundFile")
+    import_module(self, "soundfile", "soundfile")
     import_module(self, "sentencepiece", "sentencepiece")
     import_module(self, "safetensors", "safetensors")
     import_module(self, "cv2", "opencv_python")
@@ -750,7 +750,7 @@ def install_modules(self):
     import_module(self, "omegaconf", "omegaconf")
     import_module(self, "protobuf", "protobuf")
     #import_module(self, "hidiffusion", "hidiffusion")
-    #import_module(self, "aura_sr", "aura-sr")
+    import_module(self, "aura_sr", "aura-sr")
 
     import_module(self, "stable_audio_tools", "stable-audio-tools")
     import_module(self, "flash_attn", "flash-attn")
@@ -982,7 +982,7 @@ class GENERATOR_OT_uninstall(Operator):
         uninstall_module_with_dependencies("torch")
         uninstall_module_with_dependencies("torchvision")
         uninstall_module_with_dependencies("torchaudio")
-        uninstall_module_with_dependencies("PySoundFile")
+        uninstall_module_with_dependencies("soundfile")
         uninstall_module_with_dependencies("diffusers")
         uninstall_module_with_dependencies("transformers")
         uninstall_module_with_dependencies("sentencepiece")
@@ -1018,6 +1018,7 @@ class GENERATOR_OT_uninstall(Operator):
         uninstall_module_with_dependencies("aura-sr")
         uninstall_module_with_dependencies("peft")
         uninstall_module_with_dependencies("ultralytics")
+        uninstall_module_with_dependencies("aura-sr")
 
         # "resemble-enhance":
 
