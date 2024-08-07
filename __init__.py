@@ -717,30 +717,36 @@ def install_modules(self):
     subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/suno-ai/bark.git", "--upgrade"])
     import_module(self, "whisperspeech", "WhisperSpeech")
     import_module(self, "pydub", "pydub")
+    import_module(self, "deepspeed", "https://github.com/daswer123/deepspeed-windows/releases/download/13.1/deepspeed-0.13.1+cu121-cp311-cp311-win_amd64.whl")
     if os_platform == "Windows":
         # resemble-enhance:
         subprocess.call(
-            [pybin, "-m", "pip", "install", "git+https://github.com/daswer123/resemble-enhance-windows.git", "--no-dependencies", "--upgrade"]
+            [pybin, "-m", "pip", "install", "git+https://github.com/tin2tin/resemble-enhance-windows.git", "--upgrade"] #"--no-dependencies", 
         )
-        deep_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deepspeed/deepspeed-0.12.4+unknown-py3-none-any.whl")
-        print("deep_speed_path: " + deep_path)
+        #deep_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deepspeed/deepspeed-0.12.4+unknown-py3-none-any.whl")
+        #deep_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deepspeed/deepspeed-0.14.4-py3-none-any.whl")
+        #print("deep_speed_path: " + deep_path)
         #import_module(self, "deepspeed", deep_path)
-        subprocess.call([pybin, "-m", deep_path, "--upgrade"])
-        import_module(self, "librosa", "librosa")
-        import_module(self, "celluloid", "celluloid")
-        import_module(self, "omegaconf", "omegaconf")
-        import_module(self, "pandas", "pandas")
-        subprocess.check_call([pybin, "-m", "pip", "install", "git+https://github.com/sovrasov/flops-counter.pytorch.git", "--upgrade"])
-        import_module(self, "rich", "rich")
-        import_module(self, "resampy", "resampy")
-        import_module(self, "tabulate", "tabulate")
+        #subprocess.call([pybin, "-m", deep_path, "--upgrade"])
+#        import_module(self, "librosa", "librosa")
+#        import_module(self, "celluloid", "celluloid")
+#        import_module(self, "omegaconf", "omegaconf")
+#        import_module(self, "pandas", "pandas")
+#        subprocess.check_call([pybin, "-m", "pip", "install", "git+https://github.com/sovrasov/flops-counter.pytorch.git", "--upgrade"])
+#        import_module(self, "rich", "rich")
+#        import_module(self, "resampy", "resampy")
+#        import_module(self, "tabulate", "tabulate")
     else:
         import_module(self, "resemble_enhance", "resemble-enhance")
 
     # import_module(self, "diffusers", "diffusers")
     import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
     subprocess.check_call([pybin, "-m", "pip", "install", "tensorflow", "--upgrade"])
-    import_module(self, "soundfile", "soundfile")
+    
+    if os_platform == "Windows":    
+        import_module(self, "soundfile", "PySoundFile")
+    else:
+        import_module(self, "soundfile", "soundfile")
     import_module(self, "sentencepiece", "sentencepiece")
     import_module(self, "safetensors", "safetensors")
     import_module(self, "cv2", "opencv_python")
@@ -753,9 +759,13 @@ def install_modules(self):
     import_module(self, "aura_sr", "aura-sr")
 
     import_module(self, "stable_audio_tools", "stable-audio-tools")
-    import_module(self, "flash_attn", "flash-attn")
+    if os_platform == "Windows":
+        pass
+        #import_module(self, "flash_attn", "https://github.com/oobabooga/flash-attention/releases/download/v2.6.1/flash_attn-2.6.1+cu122torch2.2.2cxx11abiFALSE-cp311-cp311-win_amd64.whl")
+    else:
+        import_module(self, "flash_attn", "flash-attn")
 
-    #import_module(self, "controlnet_aux", "controlnet-aux")
+    import_module(self, "controlnet_aux", "controlnet-aux")
     subprocess.call([pybin, "-m", "pip", "install", "controlnet-aux", "--upgrade"])
 
     import_module(self, "beautifulsoup4", "beautifulsoup4")
@@ -2880,23 +2890,23 @@ class SEQUENCER_OT_generate_audio(Operator):
 
         if addon_prefs.audio_model_card == "bark":
             os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-            try:
-                import numpy as np
-                from bark.generation import (
-                    generate_text_semantic,
-                    preload_models,
-                )
-                from bark.api import semantic_to_waveform
-                from bark import generate_audio, SAMPLE_RATE
+#            try:
+            import numpy as np
+            from bark.generation import (
+                generate_text_semantic,
+                preload_models,
+            )
+            from bark.api import semantic_to_waveform
+            from bark import generate_audio, SAMPLE_RATE
 
-                from resemble_enhance.enhancer.inference import denoise, enhance
-            except ModuleNotFoundError:
-                print("Dependencies needs to be installed in the add-on preferences.")
-                self.report(
-                    {"INFO"},
-                    "Dependencies needs to be installed in the add-on preferences.",
-                )
-                return {"CANCELLED"}
+            from resemble_enhance.enhancer.inference import denoise, enhance
+#            except ModuleNotFoundError:
+#                print("Dependencies needs to be installed in the add-on preferences.")
+#                self.report(
+#                    {"INFO"},
+#                    "Dependencies needs to be installed in the add-on preferences.",
+#                )
+#                return {"CANCELLED"}
 
         show_system_console(True)
         set_system_console_topmost(True)
@@ -2907,7 +2917,6 @@ class SEQUENCER_OT_generate_audio(Operator):
         print("Model:  " + addon_prefs.audio_model_card)
 
         # Load models Audio
-
         if addon_prefs.audio_model_card == "cvssp/audioldm2" or addon_prefs.audio_model_card == "cvssp/audioldm2-music":
             repo_id = addon_prefs.audio_model_card
             pipe = AudioLDM2Pipeline.from_pretrained(repo_id)
@@ -4231,7 +4240,9 @@ class SEQUENCER_OT_generate_image(Operator):
 
             ckpt_id = "black-forest-labs/FLUX.1-schnell"
 
+            #transformer = FluxTransformer2DModel.from_pretrained("sayakpaul/FLUX.1-merged", torch_dtype=torch.bfloat16)
             #transformer = FluxTransformer2DModel.from_single_file("https://huggingface.co/Kijai/flux-fp8/blob/main/flux1-dev-fp8.safetensors")
+            #pipe = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-dev", transformer=transformer)
             text_encoder = CLIPTextModel.from_pretrained(ckpt_id, revision="refs/pr/1", subfolder="text_encoder", torch_dtype=torch.bfloat16)
             text_encoder_2 = T5EncoderModel.from_pretrained(ckpt_id, revision="refs/pr/1", subfolder="text_encoder_2", torch_dtype=torch.bfloat16)
             tokenizer = CLIPTokenizer.from_pretrained(ckpt_id, subfolder="tokenizer", revision="refs/pr/1")
@@ -4239,10 +4250,15 @@ class SEQUENCER_OT_generate_image(Operator):
 
             pipe = FluxPipeline.from_pretrained(
                 ckpt_id, text_encoder=text_encoder, text_encoder_2=text_encoder_2,
-                tokenizer=tokenizer, tokenizer_2=tokenizer_2, transformer=None, vae=None, #transformer=transformer
+                tokenizer=tokenizer, tokenizer_2=tokenizer_2, vae=None, transformer=None, #transformer=transformer, #
                 revision="refs/pr/1"
             ).to(gfx_device)
 
+            if low_vram():
+                pipe.enable_model_cpu_offload()
+            else:
+                pipe.to(gfx_device)
+                
             with torch.no_grad():
                 print("Encoding prompts.")
                 prompt_embeds, pooled_prompt_embeds, text_ids = pipe.encode_prompt(prompt=prompt, prompt_2=None, max_sequence_length=256)
@@ -4252,6 +4268,7 @@ class SEQUENCER_OT_generate_image(Operator):
             del tokenizer
             del tokenizer_2
             del pipe
+
 
 
         # Flux Dev
