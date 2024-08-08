@@ -1128,6 +1128,8 @@ def input_strips_updated(self, context):
     if (image_model_card == "ChuckMcSneed/FLUX.1-dev") and type == "image":
         bpy.context.scene.movie_num_inference_steps = 25
         bpy.context.scene.movie_num_guidance = 4
+    if addon_prefs.audio_model_card == "stabilityai/stable-audio-open-1.0" and type == "audio":
+        bpy.context.scene.movie_num_inference_steps = 200
 
 
 def output_strips_updated(self, context):
@@ -1376,7 +1378,7 @@ class GeneratorAddonPreferences(AddonPreferences):
     audio_model_card: bpy.props.EnumProperty(
         name="Audio Model",
         items=[
-            ("audo/stable-audio-open-1.0", "Stable Audio Open", "audo/stable-audio-open-1.0"),
+            ("stabilityai/stable-audio-open-1.0", "Stable Audio Open", "stabilityai/stable-audio-open-1.0"),
             (
                 "facebook/musicgen-stereo-medium",
                 "Music: MusicGen Stereo",
@@ -1401,7 +1403,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             #                "Sound: AudioLDM 2",
             #            ),
         ],
-        default="audo/stable-audio-open-1.0",
+        default="stabilityai/stable-audio-open-1.0",
         update=input_strips_updated,
     )
     # For DeepFloyd
@@ -1902,7 +1904,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 col.use_property_split = False
                 col.use_property_decorate = False
                 col.prop(context.scene, "generate_movie_prompt", text="", icon="ADD")
-                if (type == "audio" and audio_model_card == "bark") or (type == "audio" and audio_model_card == "audo/stable-audio-open-1.0") or (
+                if (type == "audio" and audio_model_card == "bark") or (type == "audio" and audio_model_card == "stabilityai/stable-audio-open-1.0") or (
                     type == "image" and image_model_card == "black-forest-labs/FLUX.1-schnell") or (
                     type == "image" and image_model_card == "ChuckMcSneed/FLUX.1-dev") or (
                     type == "audio" and audio_model_card == "facebook/musicgen-stereo-medium" and audio_model_card == "WhisperSpeech"
@@ -1940,7 +1942,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 row.prop(context.scene, "audio_path", text="Speaker")
                 row.operator("sequencer.open_audio_filebrowser", text="", icon="FILEBROWSER")
                 col.prop(context.scene, "audio_speed", text="Speed")
-            elif type == "audio" and (addon_prefs.audio_model_card == "facebook/musicgen-stereo-medium" or addon_prefs.audio_model_card == "audo/stable-audio-open-1.0"):
+            elif type == "audio" and (addon_prefs.audio_model_card == "facebook/musicgen-stereo-medium" or addon_prefs.audio_model_card == "stabilityai/stable-audio-open-1.0"):
                 col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
             else:
                 if (
@@ -2847,6 +2849,7 @@ class SEQUENCER_OT_generate_audio(Operator):
         import torch
         import torchaudio
         import scipy
+        import random
         from scipy.io.wavfile import write as write_wav
 
         if addon_prefs.audio_model_card == "cvssp/audioldm2" or addon_prefs.audio_model_card == "cvssp/audioldm2-music":
@@ -2861,11 +2864,12 @@ class SEQUENCER_OT_generate_audio(Operator):
 
             import soundfile as sf
 
-        if addon_prefs.audio_model_card == "audo/stable-audio-open-1.0":
+        if addon_prefs.audio_model_card == "stabilityai/stable-audio-open-1.0":
             try:
-                from einops import rearrange
-                from stable_audio_tools import get_pretrained_model
-                from stable_audio_tools.inference.generation import generate_diffusion_cond
+                import scipy
+                import torch
+                import soundfile as sf
+                from diffusers import StableAudioPipeline                
             except ModuleNotFoundError:
                 print("Dependencies needs to be installed in the add-on preferences.")
                 self.report(
@@ -2927,15 +2931,15 @@ class SEQUENCER_OT_generate_audio(Operator):
             else:
                 pipe.to(gfx_device)
 
-        if addon_prefs.audio_model_card == "audo/stable-audio-open-1.0":
+        if addon_prefs.audio_model_card == "stabilityai/stable-audio-open-1.0":
 
+            repo_id = "ylacombe/stable-audio-1.0"
+            pipe = StableAudioPipeline.from_pretrained(repo_id, torch_dtype=torch.float16)
             device = "cuda" if torch.cuda.is_available() else "cpu"
-            # Download model
-            model, model_config = get_pretrained_model("audo/stable-audio-open-1.0")
-            sample_rate = model_config["sample_rate"]
-            sample_size = model_config["sample_size"]
-
-            model = model.to(device)
+            if low_vram():
+                pipe.enable_model_cpu_offload()
+            else:
+                pipe.to(gfx_device)
 
         elif addon_prefs.audio_model_card == "vtrungnhan9/audioldm2-music-zac2023":
             repo_id = addon_prefs.audio_model_card
@@ -2944,21 +2948,13 @@ class SEQUENCER_OT_generate_audio(Operator):
             import torch
 
             pipe = AudioLDM2Pipeline.from_pretrained(repo_id, torch_dtype=torch.float16)
-            pipe = pipe.to("cuda")
-
-            # pipe = AudioLDM2Pipeline.from_pretrained(repo_id)
-            # pipe.scheduler = DPMSolverMultistepScheduler.from_config(
-            #    pipe.scheduler.config
-            # )
 
             if low_vram():
                 pipe.enable_model_cpu_offload()
-                # pipe.enable_vae_slicing()
             else:
                 pipe.to(gfx_device)
 
         # Musicgen
-
         elif addon_prefs.audio_model_card == "facebook/musicgen-stereo-medium":
             from transformers import pipeline
             from transformers import set_seed
@@ -2973,7 +2969,6 @@ class SEQUENCER_OT_generate_audio(Operator):
                 self.report({"INFO"}, "Maximum output duration is 30 sec.")
 
         # Bark
-
         elif addon_prefs.audio_model_card == "bark":
             preload_models(
                 text_use_small=True,
@@ -3018,8 +3013,26 @@ class SEQUENCER_OT_generate_audio(Operator):
                     )
                 start_frame = scene.frame_current
 
+            # Get seed
+            seed = context.scene.movie_num_seed
+            seed = seed if not context.scene.movie_use_random else random.randint(-2147483647, 2147483647)
+            print("Seed: " + str(seed))
+            context.scene.movie_num_seed = seed
+
+            # Use cuda if possible
+            if (
+                torch.cuda.is_available()
+            ):
+                generator = torch.Generator("cuda").manual_seed(seed) if seed != 0 else None
+            else:
+                if seed != 0:
+                    generator = torch.Generator()
+                    generator.manual_seed(seed)
+                else:
+                    generator = None
+
             # Stable Open Audio
-            if addon_prefs.audio_model_card == "audo/stable-audio-open-1.0":
+            if addon_prefs.audio_model_card == "stabilityai/stable-audio-open-1.0":
                 import random
                 print("Generate: Stable Open Audio")
                 seed = context.scene.movie_num_seed
@@ -3028,44 +3041,33 @@ class SEQUENCER_OT_generate_audio(Operator):
                 context.scene.movie_num_seed = seed
                 filename = solve_path(clean_filename(str(seed) + "_" + prompt) + ".wav")
 
-                # Set up text and timing conditioning
-                conditioning = [{
-                    "prompt": prompt,
-                    "seconds_start": 0,
-                    "seconds_total": audio_length_in_s
-                }]
+                audio = pipe(
+                    prompt,
+                    negative_prompt=negative_prompt,
+                    num_inference_steps=movie_num_inference_steps,
+                    audio_end_in_s=audio_length_in_s,
+                    num_waveforms_per_prompt=1,
+                    generator=generator,
+                ).audios
 
-                device = "cuda" if torch.cuda.is_available() else "cpu"
+                output = audio[0].T.float().cpu().numpy()
+                sf.write(filename, output, pipe.vae.sampling_rate)
 
-                # Generate stereo audio
-                output = generate_diffusion_cond(
-                    model,
-                    steps=movie_num_inference_steps,
-                    cfg_scale=movie_num_guidance,
-                    conditioning=conditioning,
-                    sample_size=sample_size,
-                    sigma_min=0.3,
-                    sigma_max=500,
-                    sampler_type="dpmpp-3m-sde",
-                    device=device,
-                    seed=seed,
-                )
+#                # Rearrange audio batch to a single sequence
+#                output = rearrange(output, "b d n -> d (b n)")
 
-                # Rearrange audio batch to a single sequence
-                output = rearrange(output, "b d n -> d (b n)")
+#                # Peak normalize, clip, convert to int16, and save to file
+#                output = output.to(torch.float32).div(torch.max(torch.abs(output))).clamp(-1, 1).mul(32767).to(torch.int16).cpu()
 
-                # Peak normalize, clip, convert to int16, and save to file
-                output = output.to(torch.float32).div(torch.max(torch.abs(output))).clamp(-1, 1).mul(32767).to(torch.int16).cpu()
+#                # Ensure the output tensor has the right shape
+#                if output.ndim == 1:
+#                    output = output.unsqueeze(0)  # Make it 2D: (channels x samples)
 
-                # Ensure the output tensor has the right shape
-                if output.ndim == 1:
-                    output = output.unsqueeze(0)  # Make it 2D: (channels x samples)
+#                max_length = int(sample_rate * audio_length_in_s)
+#                if output.shape[1] > max_length:
+#                    output = output[:, :max_length]
 
-                max_length = int(sample_rate * audio_length_in_s)
-                if output.shape[1] > max_length:
-                    output = output[:, :max_length]
-
-                torchaudio.save(filename, output, sample_rate)
+#                torchaudio.save(filename, output, sample_rate)
 
             # Bark.
             elif addon_prefs.audio_model_card == "bark":
@@ -3096,7 +3098,6 @@ class SEQUENCER_OT_generate_audio(Operator):
                 write_wav(filename, rate, audio.transpose())
 
                 # resemble_enhance
-
                 dwav, sr = torchaudio.load(filename)
                 # print("sr_load " + str(sr))
 
@@ -3167,6 +3168,7 @@ class SEQUENCER_OT_generate_audio(Operator):
             # Musicgen.
 
             elif addon_prefs.audio_model_card == "facebook/musicgen-stereo-medium":
+
                 print("Generate: MusicGen Stereo")
                 #print("Prompt: " + prompt)
                 seed = context.scene.movie_num_seed
@@ -3501,8 +3503,6 @@ def load_images_from_folder(folder_path):
         return loaded_images
     else:
         return None
-
-
 
 
 def flush():
@@ -6181,9 +6181,9 @@ def register():
 
     bpy.types.Scene.movie_num_inference_steps = bpy.props.IntProperty(
         name="movie_num_inference_steps",
-        default=18,
+        default=23,
         min=1,
-        max=100,
+        max=200,
         description="Number of inference steps to improve the quality",
     )
 
