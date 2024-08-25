@@ -1133,10 +1133,10 @@ def input_strips_updated(self, context):
     if scene.input_strips == "input_prompt":
         bpy.types.Scene.movie_path = ""
         bpy.types.Scene.image_path = ""
-    if movie_model_card == "wangfuyun/AnimateLCM" and type == "movie":
-        scene.input_strips = "input_prompt"
+#    if movie_model_card == "wangfuyun/AnimateLCM" and type == "movie":
+#        scene.input_strips = "input_prompt"
     if movie_model_card == "THUDM/CogVideoX-2b" and type == "movie":
-        scene.input_strips = "input_prompt"
+        #scene.input_strips = "input_prompt"
         scene.generate_movie_x = 720
         scene.generate_movie_y = 480
         scene.generate_movie_frames = 48
@@ -2467,7 +2467,6 @@ class SEQUENCER_OT_generate_movie(Operator):
                 else:
                     pipe.to(gfx_device)
 
-
             elif movie_model_card == "THUDM/CogVideoX-2b":
 
                 from diffusers import CogVideoXPipeline
@@ -2590,6 +2589,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 (scene.movie_path or scene.image_path)
                 and input == "input_strips"
                 and movie_model_card != "THUDM/CogVideoX-2b"
+                
                 #and movie_model_card != "guoyww/animatediff-motion-adapter-sdxl-beta"
             ):
                 video_path = scene.movie_path
@@ -2658,19 +2658,23 @@ class SEQUENCER_OT_generate_movie(Operator):
                     movie_model_card == "stabilityai/stable-video-diffusion-img2vid"
                     or movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt"
                 ):
+                    
                     if scene.movie_path:
                         print("Process: Video Image to SVD Video")
                         if not os.path.isfile(scene.movie_path):
                             print("No file found.")
                             return {"CANCELLED"}
                         image = load_first_frame(bpy.path.abspath(scene.movie_path))
+                        
                     elif scene.image_path:
                         print("Process: Image to SVD Video")
                         if not os.path.isfile(scene.image_path):
                             print("No file found.")
                             return {"CANCELLED"}
                         image = load_image(bpy.path.abspath(scene.image_path))
+                        
                     image = image.resize((closest_divisible_32(int(x)), closest_divisible_32(int(y))))
+                    
                     video_frames = refiner(
                         image,
                         noise_aug_strength=1.00 - scene.image_power,
@@ -2682,6 +2686,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         num_frames=abs(duration),
                         generator=generator,
                     ).frames[0]
+                    
                 # needs to input image    
                 elif movie_model_card == "wangfuyun/AnimateLCM":
                     video_frames = pipe(
@@ -2696,54 +2701,54 @@ class SEQUENCER_OT_generate_movie(Operator):
                         generator=generator,
                     ).frames[0]
 
-            #elif movie_model_card != "guoyww/animatediff-motion-adapter-sdxl-beta":
-                if scene.movie_path:
-                    print("Process: Video to video")
-                    if not os.path.isfile(scene.movie_path):
-                        print("No file found.")
+                else:# movie_model_card != "guoyww/animatediff-motion-adapter-sdxl-beta":
+                    if scene.movie_path:
+                        print("Process: Video to video")
+                        if not os.path.isfile(scene.movie_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        video = load_video_as_np_array(video_path)
+                    elif scene.image_path:
+                        print("Process: Image to video")
+                        if not os.path.isfile(scene.image_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        video = process_image(scene.image_path, int(scene.generate_movie_frames))
+                        video = np.array(video)
+                    if not video.any():
+                        print("Loading of file failed")
                         return {"CANCELLED"}
-                    video = load_video_as_np_array(video_path)
-                elif scene.image_path:
-                    print("Process: Image to video")
-                    if not os.path.isfile(scene.image_path):
-                        print("No file found.")
-                        return {"CANCELLED"}
-                    video = process_image(scene.image_path, int(scene.generate_movie_frames))
-                    video = np.array(video)
-                if not video.any():
-                    print("Loading of file failed")
-                    return {"CANCELLED"}
 
-                # Upscale video
-                if scene.video_to_video:
-                    video = [
-                        Image.fromarray(frame).resize(
-                            (
-                                closest_divisible_32(int(x * 2)),
-                                closest_divisible_32(int(y * 2)),
+                    # Upscale video
+                    if scene.video_to_video:
+                        video = [
+                            Image.fromarray(frame).resize(
+                                (
+                                    closest_divisible_32(int(x * 2)),
+                                    closest_divisible_32(int(y * 2)),
+                                )
                             )
-                        )
-                        for frame in video
-                    ]
-                else:
-                    video = [
-                        Image.fromarray(frame).resize(
-                            (
-                                closest_divisible_32(int(x)),
-                                closest_divisible_32(int(y)),
+                            for frame in video
+                        ]
+                    else:
+                        video = [
+                            Image.fromarray(frame).resize(
+                                (
+                                    closest_divisible_32(int(x)),
+                                    closest_divisible_32(int(y)),
+                                )
                             )
-                        )
-                        for frame in video
-                    ]
-                video_frames = upscale(
-                    prompt,
-                    video=video,
-                    strength=1.00 - scene.image_power,
-                    negative_prompt=negative_prompt,
-                    num_inference_steps=movie_num_inference_steps,
-                    guidance_scale=movie_num_guidance,
-                    generator=generator,
-                ).frames[0]
+                            for frame in video
+                        ]
+                    video_frames = upscale(
+                        prompt,
+                        video=video,
+                        strength=1.00 - scene.image_power,
+                        negative_prompt=negative_prompt,
+                        num_inference_steps=movie_num_inference_steps,
+                        guidance_scale=movie_num_guidance,
+                        generator=generator,
+                    ).frames[0]
 
             # Prompt input for movies
             else:
@@ -2847,6 +2852,7 @@ class SEQUENCER_OT_generate_movie(Operator):
         # clear the VRAM
 
         clear_cuda_cache()
+        flush()
 
         bpy.types.Scene.movie_path = ""
         if input != "input_strips":
