@@ -712,8 +712,8 @@ def install_modules(self):
         pass
 
     import_module(self, "huggingface_hub", "huggingface_hub")
-    #import_module(self, "transformers", "transformers")
-    import_module(self, "transformers", "git+https://github.com/huggingface/transformers.git")
+    import_module(self, "transformers", "transformers==4.43.0")
+    #import_module(self, "transformers", "git+https://github.com/huggingface/transformers.git")
     subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/suno-ai/bark.git", "--upgrade"])
     import_module(self, "whisperspeech", "WhisperSpeech==0.8")
     import_module(self, "pydub", "pydub")
@@ -1135,7 +1135,7 @@ def input_strips_updated(self, context):
         bpy.types.Scene.image_path = ""
 #    if movie_model_card == "wangfuyun/AnimateLCM" and type == "movie":
 #        scene.input_strips = "input_prompt"
-    if movie_model_card == "THUDM/CogVideoX-2b" and type == "movie":
+    if movie_model_card == "THUDM/CogVideoX-5b" and type == "movie":
         #scene.input_strips = "input_prompt"
         scene.generate_movie_x = 720
         scene.generate_movie_y = 480
@@ -1261,7 +1261,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             #            ),
             # ("VideoCrafter/Image2Video-512", "VideoCrafter v1 (512x512)", "VideoCrafter/Image2Video-512"),
             ("wangfuyun/AnimateLCM", "AnimateLCM", "wangfuyun/AnimateLCM"),
-            ("THUDM/CogVideoX-2b", "CogVideoX-2b (720x480x48)", "THUDM/CogVideoX-2b"),
+            ("THUDM/CogVideoX-5b", "CogVideoX-5b (720x480x48)", "THUDM/CogVideoX-5b"),
 #            (
 #                "cerspense/zeroscope_v2_XL",
 #                "Zeroscope XL (1024x576x24)",
@@ -1425,7 +1425,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             ),
             ("bark", "Speech: Bark", "Bark"),
             ("WhisperSpeech", "Speech: WhisperSpeech", "WhisperSpeech"),
-# fix this:            ("parler-tts/parler-tts-large-v1", "Speech: Parler TTS Large", "parler-tts/parler-tts-large-v1"),
+            ("parler-tts/parler-tts-large-v1", "Speech: Parler TTS Large", "parler-tts/parler-tts-large-v1"),
             #            (
             #                #"vtrungnhan9/audioldm2-music-zac2023",
             #                "cvssp/audioldm2-music",
@@ -2247,7 +2247,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             and input == "input_strips"
             #and movie_model_card != "guoyww/animatediff-motion-adapter-sdxl-beta"
             and movie_model_card != "wangfuyun/AnimateLCM"
-            and movie_model_card != "THUDM/CogVideoX-2b"
+            and movie_model_card != "THUDM/CogVideoX-5b"
         ):
 
             if movie_model_card == "stabilityai/sd-turbo":  # img2img
@@ -2467,12 +2467,12 @@ class SEQUENCER_OT_generate_movie(Operator):
                 else:
                     pipe.to(gfx_device)
 
-            elif movie_model_card == "THUDM/CogVideoX-2b":
+            elif movie_model_card == "THUDM/CogVideoX-5b":
 
                 from diffusers import CogVideoXPipeline
 
                 pipe = CogVideoXPipeline.from_pretrained(
-                    "THUDM/CogVideoX-2b",
+                    "THUDM/CogVideoX-5b",
                     torch_dtype=torch.float16
                 )
 
@@ -2588,7 +2588,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             if (
                 (scene.movie_path or scene.image_path)
                 and input == "input_strips"
-                and movie_model_card != "THUDM/CogVideoX-2b"
+                and movie_model_card != "THUDM/CogVideoX-5b"
                 
                 #and movie_model_card != "guoyww/animatediff-motion-adapter-sdxl-beta"
             ):
@@ -2754,7 +2754,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             else:
 
                 print("Generate: Video from text")
-                if movie_model_card == "THUDM/CogVideoX-2b":
+                if movie_model_card == "THUDM/CogVideoX-5b":
                     video_frames = pipe(
                         prompt=prompt,
                         negative_prompt=negative_prompt,
