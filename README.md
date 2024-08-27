@@ -296,6 +296,44 @@ https://huggingface.co/blog/lcm_lora
 - Consult the individual models on HuggingFace to read up on their licenses and ex. if they can be used commercially.
 
 
+## Via the [Diffusers](https://github.com/huggingface/diffusers) lib the following weights are accesible through Pallaidium:
+
+### Video:
+- [stabilityai/stable-video-diffusion-img2vid-xt](https://huggingface.co/stabilityai/stable-video-diffusion-img2vid-xt)
+- [stabilityai/stable-video-diffusion-img2vid](https://huggingface.co/stabilityai/stable-video-diffusion-img2vid)
+- [THUDM/CogVideoX-5b](https://huggingface.co/THUDM/CogVideoX-5b)
+- [cerspense/zeroscope_v2_XL](https://huggingface.co/cerspense/zeroscope_v2_XL)
+
+### Image:
+- [stabilityai/stable-diffusion-xl-base-1.0](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0)
+- [ByteDance/SDXL-Lightning](https://huggingface.co/ByteDance/SDXL-Lightning)
+- [stabilityai/stable-diffusion-3-medium-diffusers](https://huggingface.co/stabilityai/stable-diffusion-3-medium-diffusers)
+- [black-forest-labs/FLUX.1-schnell](https://huggingface.co/black-forest-labs/FLUX.1-schnell)
+- [black-forest-labs/FLUX.1-dev](https://huggingface.co/ChuckMcSneed/FLUX.1-dev)
+- [youknownothing/Fluently-XL-Final](https://huggingface.co/youknownothing/Fluently-XL-Final)
+- [Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers](https://huggingface.co/Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers)
+- [Kwai-Kolors/Kolors-diffusers](https://huggingface.co/Kwai-Kolors/Kolors-diffusers)
+- [Corcelio/mobius](https://huggingface.co/Corcelio/mobius)
+- [dataautogpt3/OpenDalleV1.1](https://huggingface.co/dataautogpt3/OpenDalleV1.1)
+- [PixArt-alpha/PixArt-Sigma_16bit](https://huggingface.co/Vargol/PixArt-Sigma_16bit)
+- [PixArt-alpha/PixArt-Sigma_2k_16bit](https://huggingface.co/Vargol/PixArt-Sigma_2k_16bit)
+- [dataautogpt3/ProteusV0.4](https://huggingface.co/Vargol/ProteusV0.4)
+- [SG161222/RealVisXL_V4.0](https://huggingface.co/SG161222/RealVisXL_V4.0)
+- [Salesforce/blipdiffusion](https://huggingface.co/Salesforce/blipdiffusion)
+- [diffusers/controlnet-canny-sdxl-1.0-small](https://huggingface.co/diffusers/controlnet-canny-sdxl-1.0-small)
+- [xinsir/controlnet-openpose-sdxl-1.0](https://huggingface.co/xinsir/controlnet-openpose-sdxl-1.0)
+- [xinsir/controlnet-scribble-sdxl-1.0](https://huggingface.co/xinsir/controlnet-scribble-sdxl-1.0)
+
+### Audio:
+- [stabilityai/stable-audio-open-1.0](https://huggingface.co/stabilityai/stable-audio-open-1.0)
+- [facebook/musicgen-stereo-medium](https://huggingface.co/facebook/musicgen-stereo-medium)
+- [vtrungnhan9/audioldm2-music-zac2023](https://huggingface.co/vtrungnhan9/audioldm2-music-zac2023)
+- [Bark](https://github.com/suno-ai/bark)
+- [WhisperSpeech](https://github.com/collabora/WhisperSpeech)
+- [parler-tts/parler-tts-large-v1](https://huggingface.co/parler-tts/parler-tts-large-v1)
+
+
+
 
 
 
