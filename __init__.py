@@ -569,7 +569,7 @@ def low_vram():
     for i in range(torch.cuda.device_count()):
         properties = torch.cuda.get_device_properties(i)
         total_vram += properties.total_memory
-    return (total_vram / (1024**3)) < 24.1  # Y/N under 8.1 GB?
+    return (total_vram / (1024**3)) <= 16  # Y/N under 16 GB?
 
 
 def clear_cuda_cache():
@@ -1154,8 +1154,8 @@ def input_strips_updated(self, context):
 #        bpy.context.scene.use_lcm = False
     if (image_model_card == "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers") and type == "image":
         bpy.context.scene.use_lcm = False
-#    if movie_model_card == "cerspense/zeroscope_v2_XL" and type == "movie":
-#        scene.upscale = False
+    if movie_model_card == "cerspense/zeroscope_v2_XL" and type == "movie":
+        scene.upscale = False
     if (image_model_card == "black-forest-labs/FLUX.1-schnell") and type == "image":
         bpy.context.scene.movie_num_inference_steps = 4
     if (image_model_card == "ChuckMcSneed/FLUX.1-dev") and type == "image":
@@ -1204,10 +1204,8 @@ def output_strips_updated(self, context):
 #        bpy.context.scene.use_lcm = False
     if (image_model_card == "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers") and type == "image":
         bpy.context.scene.use_lcm = False
-#    if movie_model_card == "cerspense/zeroscope_v2_XL" and type == "movie":
-#        scene.upscale = False
-
-
+    if movie_model_card == "cerspense/zeroscope_v2_XL" and type == "movie":
+        scene.upscale = False
 
 
 class GeneratorAddonPreferences(AddonPreferences):
@@ -1262,11 +1260,11 @@ class GeneratorAddonPreferences(AddonPreferences):
             # ("VideoCrafter/Image2Video-512", "VideoCrafter v1 (512x512)", "VideoCrafter/Image2Video-512"),
             ("wangfuyun/AnimateLCM", "AnimateLCM", "wangfuyun/AnimateLCM"),
             ("THUDM/CogVideoX-5b", "CogVideoX-5b (720x480x48)", "THUDM/CogVideoX-5b"),
-#            (
-#                "cerspense/zeroscope_v2_XL",
-#                "Zeroscope XL (1024x576x24)",
-#                "Zeroscope XL (1024x576x24)",
-#            ),
+            (
+                "cerspense/zeroscope_v2_XL",
+                "Zeroscope XL (1024x576x24)",
+                "Zeroscope XL (1024x576x24)",
+            ),
 #            (
 #                "cerspense/zeroscope_v2_576w",
 #                "Zeroscope (576x320x24)",
@@ -2021,13 +2019,13 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             sub_row.prop(context.scene, "movie_num_seed", text="Seed")
             row.prop(context.scene, "movie_use_random", text="", icon="QUESTION")
             sub_row.active = not context.scene.movie_use_random
-#            if type == "movie" and (
-#                movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256"
-#                or movie_model_card == "cerspense/zeroscope_v2_576w"
-#                # or movie_model_card == "cerspense/zeroscope_v2_XL"
-#            ):
-#                col = col.column(heading="Upscale", align=True)
-#                col.prop(context.scene, "video_to_video", text="2x")
+            if type == "movie" and (
+                movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256"
+                or movie_model_card == "cerspense/zeroscope_v2_576w"
+                or movie_model_card == "cerspense/zeroscope_v2_XL"
+            ):
+                col = col.column(heading="Upscale", align=True)
+                col.prop(context.scene, "video_to_video", text="2x")
             if type == "image":
                 col = col.column(heading="Enhance", align=True)
                 row = col.row()
@@ -2382,14 +2380,14 @@ class SEQUENCER_OT_generate_movie(Operator):
                 else:
                     refiner.to(gfx_device)
             else:  # vid2vid / img2vid
-#                if (
-#                    movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256"
-#                    or movie_model_card == "cerspense/zeroscope_v2_576w"
-#                    or scene.image_path
-#                ):
-#                    card = "cerspense/zeroscope_v2_XL"
-#                else:
-                card = movie_model_card
+                if (
+                    movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256"
+                    or movie_model_card == "cerspense/zeroscope_v2_576w"
+                    or scene.image_path
+                ):
+                    card = "cerspense/zeroscope_v2_XL"
+                else:
+                    card = movie_model_card
 
                 from diffusers import VideoToVideoSDPipeline
 
@@ -2473,12 +2471,18 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 pipe = CogVideoXPipeline.from_pretrained(
                     "THUDM/CogVideoX-5b",
-                    torch_dtype=torch.float16
+                    torch_dtype=torch.float16,
                 )
-
-                pipe.enable_model_cpu_offload()
-                pipe.vae.enable_tiling()
-                pipe.vae.enable_slicing()
+                if low_vram():
+                    pipe.enable_model_cpu_offload()
+                    pipe.enable_sequential_cpu_offload()
+                    pipe.vae.enable_slicing()
+                    pipe.vae.enable_tiling()
+                else:
+                    pipe.enable_model_cpu_offload()
+                    #pipe.enable_sequential_cpu_offload()
+                    pipe.vae.enable_slicing()
+                    pipe.vae.enable_tiling()
 
             elif movie_model_card == "VideoCrafter/Image2Video-512":
                 from diffusers import StableDiffusionPipeline
@@ -2522,23 +2526,23 @@ class SEQUENCER_OT_generate_movie(Operator):
                 else:
                     pipe.to(gfx_device)
 
-#            # Model for upscale generated movie
-#            if scene.video_to_video:
-#                if torch.cuda.is_available():
-#                    torch.cuda.empty_cache()
-#                from diffusers import DiffusionPipeline
+            # Model for upscale generated movie
+            if scene.video_to_video:
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                from diffusers import DiffusionPipeline
 
-#                upscale = DiffusionPipeline.from_pretrained(
-#                    "cerspense/zeroscope_v2_XL",
-#                    torch_dtype=torch.float16,
-#                    use_safetensors=False,
-#                    local_files_only=local_files_only,
-#                )
-#                upscale.scheduler = DPMSolverMultistepScheduler.from_config(upscale.scheduler.config)
-#                if low_vram():
-#                    upscale.enable_model_cpu_offload()
-#                else:
-#                    upscale.to(gfx_device)
+                upscale = DiffusionPipeline.from_pretrained(
+                    "cerspense/zeroscope_v2_XL",
+                    torch_dtype=torch.float16,
+                    use_safetensors=False,
+                    local_files_only=local_files_only,
+                )
+                upscale.scheduler = DPMSolverMultistepScheduler.from_config(upscale.scheduler.config)
+                if low_vram():
+                    upscale.enable_model_cpu_offload()
+                else:
+                    upscale.to(gfx_device)
         #        if scene.use_freeU and pipe:  # Free Lunch
         #            # -------- freeu block registration
         #            print("Process: FreeU")
@@ -4337,83 +4341,92 @@ class SEQUENCER_OT_generate_image(Operator):
 #                pipe.to(gfx_device)
 
         # Flux Schnell
-        elif image_model_card == "black-forest-labs/FLUX.1-schnell":
+        elif image_model_card == "black-forest-labs/FLUX.1-schnell" or image_model_card == "ChuckMcSneed/FLUX.1-dev":
 
-            from diffusers import FluxPipeline, FluxTransformer2DModel, AutoencoderKL
-            from diffusers.image_processor import VaeImageProcessor
-            from transformers import T5EncoderModel, T5TokenizerFast, CLIPTokenizer, CLIPTextModel
-
-            flush()
-
-            ckpt_id = "black-forest-labs/FLUX.1-schnell"
-
-            #transformer = FluxTransformer2DModel.from_pretrained("sayakpaul/FLUX.1-merged", torch_dtype=torch.bfloat16)
-            #transformer = FluxTransformer2DModel.from_single_file("https://huggingface.co/Kijai/flux-fp8/blob/main/flux1-dev-fp8.safetensors")
-            #pipe = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-dev", transformer=transformer)
-            text_encoder = CLIPTextModel.from_pretrained(ckpt_id, revision="refs/pr/1", subfolder="text_encoder", torch_dtype=torch.bfloat16)
-            text_encoder_2 = T5EncoderModel.from_pretrained(ckpt_id, revision="refs/pr/1", subfolder="text_encoder_2", torch_dtype=torch.bfloat16)
-            tokenizer = CLIPTokenizer.from_pretrained(ckpt_id, subfolder="tokenizer", revision="refs/pr/1")
-            tokenizer_2 = T5TokenizerFast.from_pretrained(ckpt_id, subfolder="tokenizer_2", revision="refs/pr/1")
-
-            pipe = FluxPipeline.from_pretrained(
-                ckpt_id, text_encoder=text_encoder, text_encoder_2=text_encoder_2,
-                tokenizer=tokenizer, tokenizer_2=tokenizer_2, vae=None, transformer=None, #transformer=transformer, #
-                revision="refs/pr/1"
-            ).to(gfx_device)
-
-            if low_vram():
-                pipe.enable_model_cpu_offload()
-            else:
-                pipe.to(gfx_device)
-
-            with torch.no_grad():
-                print("Encoding prompts.")
-                prompt_embeds, pooled_prompt_embeds, text_ids = pipe.encode_prompt(prompt=prompt, prompt_2=None, max_sequence_length=256)
-
-            del text_encoder
-            del text_encoder_2
-            del tokenizer
-            del tokenizer_2
-            del pipe
-
-
-
-        # Flux Dev
-        elif image_model_card == "ChuckMcSneed/FLUX.1-dev":
-
-            from diffusers import FluxPipeline, FluxTransformer2DModel, AutoencoderKL
-            from diffusers.image_processor import VaeImageProcessor
-            from transformers import T5EncoderModel, T5TokenizerFast, CLIPTokenizer, CLIPTextModel
+            from diffusers import FluxPipeline#, FluxTransformer2DModel, AutoencoderKL
+            #from diffusers.image_processor import VaeImageProcessor
+            #from transformers import T5EncoderModel, T5TokenizerFast, CLIPTokenizer, CLIPTextModel
 
             flush()
-
-            ckpt_id = "ChuckMcSneed/FLUX.1-dev"
-
-            #transformer = FluxTransformer2DModel.from_single_file("https://huggingface.co/Kijai/flux-fp8/blob/main/flux1-dev-fp8.safetensors")
-            text_encoder = CLIPTextModel.from_pretrained(ckpt_id, subfolder="text_encoder", torch_dtype=torch.bfloat16)
-            text_encoder_2 = T5EncoderModel.from_pretrained(ckpt_id, subfolder="text_encoder_2", torch_dtype=torch.bfloat16)
-            tokenizer = CLIPTokenizer.from_pretrained(ckpt_id, subfolder="tokenizer")
-            tokenizer_2 = T5TokenizerFast.from_pretrained(ckpt_id, subfolder="tokenizer_2")
-
-            pipe = FluxPipeline.from_pretrained(
-                ckpt_id, text_encoder=text_encoder, text_encoder_2=text_encoder_2,
-                tokenizer=tokenizer, tokenizer_2=tokenizer_2, transformer=None, vae=None, #transformer=transformer
-            )
-
             if low_vram():
-                pipe.enable_model_cpu_offload()
+                pipe = FluxPipeline.from_pretrained(image_model_card, torch_dtype=torch.bfloat16)
+                pipe.enable_model_cpu_offload() #save some VRAM by offloading the model to CPU. Remove this if you have enough GPU power
+                pipe.enable_sequential_cpu_offload()
+                pipe.enable_vae_slicing()
+                pipe.enable_vae_tiling()
             else:
-                pipe.to(gfx_device)
+                from diffusers import FluxPipeline, FluxTransformer2DModel, AutoencoderKL
+                from diffusers.image_processor import VaeImageProcessor
+                from transformers import T5EncoderModel, T5TokenizerFast, CLIPTokenizer, CLIPTextModel
+                ckpt_id = image_model_card
+                if image_model_card == "black-forest-labs/FLUX.1-schnell":
+                    #transformer = FluxTransformer2DModel.from_pretrained("sayakpaul/FLUX.1-merged", torch_dtype=torch.bfloat16)
+                    #transformer = FluxTransformer2DModel.from_single_file("https://huggingface.co/Kijai/flux-fp8/blob/main/flux1-dev-fp8.safetensors")
+                    #pipe = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-dev", transformer=transformer)
+                    text_encoder = CLIPTextModel.from_pretrained(ckpt_id, revision="refs/pr/1", subfolder="text_encoder", torch_dtype=torch.bfloat16)
+                    text_encoder_2 = T5EncoderModel.from_pretrained(ckpt_id, revision="refs/pr/1", subfolder="text_encoder_2", torch_dtype=torch.bfloat16)
+                    tokenizer = CLIPTokenizer.from_pretrained(ckpt_id, subfolder="tokenizer", revision="refs/pr/1")
+                    tokenizer_2 = T5TokenizerFast.from_pretrained(ckpt_id, subfolder="tokenizer_2", revision="refs/pr/1")
 
-            with torch.no_grad():
-                print("Encoding prompts.")
-                prompt_embeds, pooled_prompt_embeds, text_ids = pipe.encode_prompt(prompt=prompt, prompt_2=None, max_sequence_length=256)
+                    pipe = FluxPipeline.from_pretrained(
+                        ckpt_id, text_encoder=text_encoder, text_encoder_2=text_encoder_2,
+                        tokenizer=tokenizer, tokenizer_2=tokenizer_2, vae=None, transformer=None, #transformer=transformer, #
+                        revision="refs/pr/1"
+                    )#.to(gfx_device)
+                else:    
+                    #transformer = FluxTransformer2DModel.from_single_file("https://huggingface.co/Kijai/flux-fp8/blob/main/flux1-dev-fp8.safetensors")
+                    text_encoder = CLIPTextModel.from_pretrained(ckpt_id, subfolder="text_encoder", torch_dtype=torch.bfloat16)
+                    text_encoder_2 = T5EncoderModel.from_pretrained(ckpt_id, subfolder="text_encoder_2", torch_dtype=torch.bfloat16)
+                    tokenizer = CLIPTokenizer.from_pretrained(ckpt_id, subfolder="tokenizer")
+                    tokenizer_2 = T5TokenizerFast.from_pretrained(ckpt_id, subfolder="tokenizer_2")
 
-            del text_encoder
-            del text_encoder_2
-            del tokenizer
-            del tokenizer_2
-            del pipe
+                    pipe = FluxPipeline.from_pretrained(
+                        ckpt_id, text_encoder=text_encoder, text_encoder_2=text_encoder_2,
+                        tokenizer=tokenizer, tokenizer_2=tokenizer_2, transformer=None, vae=None, #transformer=transformer
+                    )
+
+                if low_vram():
+                    pipe.enable_model_cpu_offload()
+                else:
+                    pipe.to(gfx_device)
+
+                #pipe.enable_model_cpu_offload() #save some VRAM by offloading the model to CPU. Remove this if you have enough GPU power
+                #pipe.enable_sequential_cpu_offload()
+                #pipe.enable_vae_slicing()#                pipe.enable_vae_tiling()
+
+                with torch.no_grad():
+                    print("Encoding prompts.")
+                    prompt_embeds, pooled_prompt_embeds, text_ids = pipe.encode_prompt(prompt=prompt, prompt_2=None, max_sequence_length=256)
+
+                del text_encoder
+                del text_encoder_2
+                del tokenizer
+                del tokenizer_2
+                del pipe
+
+
+
+#        # Flux Dev
+#        elif image_model_card == "ChuckMcSneed/FLUX.1-dev":
+
+#            from diffusers import FluxPipeline, FluxTransformer2DModel, AutoencoderKL
+#            from diffusers.image_processor import VaeImageProcessor
+#            from transformers import T5EncoderModel, T5TokenizerFast, CLIPTokenizer, CLIPTextModel
+
+#            flush()
+
+#            ckpt_id = "ChuckMcSneed/FLUX.1-dev"
+
+
+#            with torch.no_grad():
+#                print("Encoding prompts.")
+#                prompt_embeds, pooled_prompt_embeds, text_ids = pipe.encode_prompt(prompt=prompt, prompt_2=None, max_sequence_length=256)
+
+#            del text_encoder
+#            del text_encoder_2
+#            del tokenizer
+#            del tokenizer_2
+#            del pipe
 
 
         # Fluently-XL
@@ -5350,95 +5363,108 @@ class SEQUENCER_OT_generate_image(Operator):
 
                 delete_strip(mask_strip)
 
-            # Flux Schnell
-            elif image_model_card == "black-forest-labs/FLUX.1-schnell":
+            # Flux
+            elif image_model_card == "black-forest-labs/FLUX.1-schnell" or image_model_card == "ChuckMcSneed/FLUX.1-dev":
+                if low_vram(): 
+                    image = pipe(
+                        prompt=prompt,
+                        num_inference_steps=image_num_inference_steps,
+                        guidance_scale=image_num_guidance,
+                        height=y,
+                        width=x,
+                        generator=generator,
+                    ).images[0]
+                    flush()
+                else:
+                    if image_model_card == "ChuckMcSneed/FLUX.1-dev":
+                        
+                        pipe = FluxPipeline.from_pretrained(
+                            ckpt_id, text_encoder=None, text_encoder_2=None,
+                            tokenizer=None, tokenizer_2=None, vae=None,
+                            torch_dtype=torch.bfloat16
+                        ).to(gfx_device)
 
-                flush()
+                        latents = pipe(
+                            prompt_embeds=prompt_embeds,
+                            pooled_prompt_embeds=pooled_prompt_embeds,
+                            num_inference_steps=image_num_inference_steps, guidance_scale=image_num_guidance,
+                            max_sequence_length=512,
+                            height=y,
+                            width=x,
+                            generator=generator,
+                            output_type="latent"
+                        ).images
+                        del pipe.transformer
+                        del pipe
 
-                pipe = FluxPipeline.from_pretrained(
-                    ckpt_id, text_encoder=None, text_encoder_2=None,
-                    tokenizer=None, tokenizer_2=None, vae=None,
-                    revision="refs/pr/1",
-                    torch_dtype=torch.bfloat16
-                ).to(gfx_device)
+                        flush()
 
-                latents = pipe(
-                    prompt_embeds=prompt_embeds,
-                    pooled_prompt_embeds=pooled_prompt_embeds,
-                    num_inference_steps=image_num_inference_steps, guidance_scale=0.0,
-                    height=y,
-                    width=x,
-                    generator=generator,
-                    output_type="latent"
-                ).images
-                # print(f"{latents.shape=}")
+                        vae = AutoencoderKL.from_pretrained(
+                            ckpt_id,
+                            subfolder="vae",
+                            torch_dtype=torch.bfloat16
+                        ).to(gfx_device)
+                        
+                    else:    
+                        pipe = FluxPipeline.from_pretrained(
+                            ckpt_id, text_encoder=None, text_encoder_2=None,
+                            tokenizer=None, tokenizer_2=None, vae=None,
+                            revision="refs/pr/1",
+                            torch_dtype=torch.bfloat16
+                        ).to(gfx_device)
+                        latents = pipe(
+                            prompt_embeds=prompt_embeds,
+                            pooled_prompt_embeds=pooled_prompt_embeds,
+                            num_inference_steps=image_num_inference_steps, guidance_scale=0.0,
+                            height=y,
+                            width=x,
+                            generator=generator,
+                            output_type="latent"
+                        ).images
+                        # print(f"{latents.shape=}")
+                        del pipe.transformer
+                        del pipe
 
-                del pipe.transformer
-                del pipe
+                        flush()
 
-                flush()
+                        vae = AutoencoderKL.from_pretrained(
+                            ckpt_id,
+                            revision="refs/pr/1",
+                            subfolder="vae",
+                            torch_dtype=torch.bfloat16
+                        ).to(gfx_device)
 
-                vae = AutoencoderKL.from_pretrained(
-                    ckpt_id,
-                    revision="refs/pr/1",
-                    subfolder="vae",
-                    torch_dtype=torch.bfloat16
-                ).to(gfx_device)
-                vae_scale_factor = 2 ** (len(vae.config.block_out_channels))
-                image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
+                    vae_scale_factor = 2 ** (len(vae.config.block_out_channels))
+                    image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
+#                    image = image_processor.postprocess(image, output_type="pil")
+#                    image = image[0]                
 
-                with torch.no_grad():
-                    #print("Running decoding.")
-                    pipe = FluxPipeline._unpack_latents(latents, y, x, vae_scale_factor)
-                    pipe = (pipe / vae.config.scaling_factor) + vae.config.shift_factor
+                    with torch.no_grad():
+                        #print("Running decoding.")
+                        pipe = FluxPipeline._unpack_latents(latents, y, x, vae_scale_factor)
+                        pipe = (pipe / vae.config.scaling_factor) + vae.config.shift_factor
 
-                    image = vae.decode(pipe, return_dict=False)[0]
-                    image = image_processor.postprocess(image, output_type="pil")
-                    image = image[0]
+                        image = vae.decode(pipe, return_dict=False)[0]
+                        image = image_processor.postprocess(image, output_type="pil")
+                        image = image[0]
 
-            # Flux Dev
-            elif image_model_card == "ChuckMcSneed/FLUX.1-dev":
+#            # Flux Dev
+#            elif image_model_card == "ChuckMcSneed/FLUX.1-dev":
 
-                flush()
+#                flush()
 
-                pipe = FluxPipeline.from_pretrained(
-                    ckpt_id, text_encoder=None, text_encoder_2=None,
-                    tokenizer=None, tokenizer_2=None, vae=None,
-                    torch_dtype=torch.bfloat16
-                ).to(gfx_device)
 
-                latents = pipe(
-                    prompt_embeds=prompt_embeds,
-                    pooled_prompt_embeds=pooled_prompt_embeds,
-                    num_inference_steps=image_num_inference_steps, guidance_scale=image_num_guidance,
-                    max_sequence_length=512,
-                    height=y,
-                    width=x,
-                    generator=generator,
-                    output_type="latent"
-                ).images
+#                vae_scale_factor = 2 ** (len(vae.config.block_out_channels))
+#                image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
 
-                del pipe.transformer
-                del pipe
+#                with torch.no_grad():
+#                    #print("Running decoding.")
+#                    pipe = FluxPipeline._unpack_latents(latents, y, x, vae_scale_factor)
+#                    pipe = (pipe / vae.config.scaling_factor) + vae.config.shift_factor
 
-                flush()
-
-                vae = AutoencoderKL.from_pretrained(
-                    ckpt_id,
-                    subfolder="vae",
-                    torch_dtype=torch.bfloat16
-                ).to(gfx_device)
-                vae_scale_factor = 2 ** (len(vae.config.block_out_channels))
-                image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
-
-                with torch.no_grad():
-                    #print("Running decoding.")
-                    pipe = FluxPipeline._unpack_latents(latents, y, x, vae_scale_factor)
-                    pipe = (pipe / vae.config.scaling_factor) + vae.config.shift_factor
-
-                    image = vae.decode(pipe, return_dict=False)[0]
-                    image = image_processor.postprocess(image, output_type="pil")
-                    image = image[0]
+#                    image = vae.decode(pipe, return_dict=False)[0]
+#                    image = image_processor.postprocess(image, output_type="pil")
+#                    image = image[0]
 
             # Img2img
             elif do_convert and not scene.aurasr:
