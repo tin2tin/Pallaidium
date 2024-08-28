@@ -65,7 +65,8 @@ If any Python modules are missing, use this add-on to install them manually:    
 https://github.com/amb/blender_pip      |
 
 ## Change Log
-* 2024-8-25: Add: CogVideoX-5b Remove: Low-quality models
+* 2024-8-28: Make CogVideox-5b run on 6 GB VRAM & Flux on 2 GB VRAM
+* 2024-8-27: Add: CogVideoX-5b Remove: Low-quality models
 * 2024-8-5: Add: Flux Dev - NB. needs update of dependencies and 24 GB VRAM
 * 2024-8-2: Add: Flux Schnell - NB. needs update of dependencies and 24 GB VRAM
 * 2024-7-12: Add: Kwai/Kolors (txt2img & img2img)
