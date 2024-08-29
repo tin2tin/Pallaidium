@@ -49,11 +49,11 @@ For Mac and Linux, we'll have to rely on contributor support. So, post your issu
 
 * In the Generative AI add-on preferences, hit the "Uninstall Dependencies" button (to clear out any incompatible libs). 
 
-* Restart Blender.
+* Restart Blender via "Run as Administrator".
 
 * In the Generative AI add-on preferences, hit the "Install Dependencies" button.
   
-* Restart Blender.
+* Restart Blender via "Run as Administrator".
 
 * Open the add-on UI in the Sequencer > Sidebar > Generative AI.
 
