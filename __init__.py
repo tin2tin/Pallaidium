@@ -1964,7 +1964,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             col = layout.column(align=True)
             if type == "movie" or type == "image":
                 col.prop(context.scene, "generate_movie_frames", text="Frames")
-            if type == "audio" and audio_model_card != "bark" and audio_model_card != "WhisperSpeech" and audio_model_card == "parler-tts/parler-tts-large-v1":
+            if type == "audio" and audio_model_card != "bark" and audio_model_card != "WhisperSpeech" and (audio_model_card == "parler-tts/parler-tts-large-v1" or audio_model_card == "stabilityai/stable-audio-open-1.0"):
                 col.prop(context.scene, "audio_length_in_f", text="Frames")
             if type == "audio" and audio_model_card == "bark":
                 col = layout.column(align=True)
@@ -2467,22 +2467,34 @@ class SEQUENCER_OT_generate_movie(Operator):
 
             elif movie_model_card == "THUDM/CogVideoX-5b":
 
-                from diffusers import CogVideoXPipeline
+                #vid2vid
+                if ((scene.movie_path or scene.image_path)and input == "input_strips"):
+                    from diffusers.utils import load_video
+                    from diffusers import CogVideoXDPMScheduler, CogVideoXVideoToVideoPipeline
+                    pipe = CogVideoXVideoToVideoPipeline.from_pretrained("THUDM/CogVideoX-5b", torch_dtype=torch.bfloat16)
 
-                pipe = CogVideoXPipeline.from_pretrained(
-                    "THUDM/CogVideoX-5b",
-                    torch_dtype=torch.float16,
-                )
+                #txt2vid
+                else:
+                    from diffusers import CogVideoXPipeline
+
+                    pipe = CogVideoXPipeline.from_pretrained(
+                        "THUDM/CogVideoX-5b",
+                        torch_dtype=torch.float16,
+                    )
+
                 if low_vram():
                     pipe.enable_model_cpu_offload()
                     pipe.enable_sequential_cpu_offload()
-                    pipe.vae.enable_slicing()
                     pipe.vae.enable_tiling()
                 else:
+                    #pipe.to(gfx_device)
                     pipe.enable_model_cpu_offload()
                     #pipe.enable_sequential_cpu_offload()
-                    pipe.vae.enable_slicing()
-                    pipe.vae.enable_tiling()
+                    #pipe.vae.enable_tiling()
+
+                pipe.scheduler = CogVideoXDPMScheduler.from_config(pipe.scheduler.config)
+                scene.generate_movie_x = 720
+                scene.generate_movie_y = 480
 
             elif movie_model_card == "VideoCrafter/Image2Video-512":
                 from diffusers import StableDiffusionPipeline
@@ -2592,8 +2604,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             if (
                 (scene.movie_path or scene.image_path)
                 and input == "input_strips"
-                and movie_model_card != "THUDM/CogVideoX-5b"
-                
+
                 #and movie_model_card != "guoyww/animatediff-motion-adapter-sdxl-beta"
             ):
                 video_path = scene.movie_path
@@ -2662,23 +2673,23 @@ class SEQUENCER_OT_generate_movie(Operator):
                     movie_model_card == "stabilityai/stable-video-diffusion-img2vid"
                     or movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt"
                 ):
-                    
+
                     if scene.movie_path:
                         print("Process: Video Image to SVD Video")
                         if not os.path.isfile(scene.movie_path):
                             print("No file found.")
                             return {"CANCELLED"}
                         image = load_first_frame(bpy.path.abspath(scene.movie_path))
-                        
+
                     elif scene.image_path:
                         print("Process: Image to SVD Video")
                         if not os.path.isfile(scene.image_path):
                             print("No file found.")
                             return {"CANCELLED"}
                         image = load_image(bpy.path.abspath(scene.image_path))
-                        
+
                     image = image.resize((closest_divisible_32(int(x)), closest_divisible_32(int(y))))
-                    
+
                     video_frames = refiner(
                         image,
                         noise_aug_strength=1.00 - scene.image_power,
@@ -2690,8 +2701,8 @@ class SEQUENCER_OT_generate_movie(Operator):
                         num_frames=abs(duration),
                         generator=generator,
                     ).frames[0]
-                    
-                # needs to input image    
+
+                # needs to input image
                 elif movie_model_card == "wangfuyun/AnimateLCM":
                     video_frames = pipe(
                         prompt=prompt,
@@ -2704,6 +2715,41 @@ class SEQUENCER_OT_generate_movie(Operator):
                         num_frames=abs(duration),
                         generator=generator,
                     ).frames[0]
+                    
+                #vid2vid
+                elif movie_model_card == "THUDM/CogVideoX-5b":
+                    if scene.movie_path:
+                        print("Process: Video to video (CogVideoX)")
+                        if not os.path.isfile(scene.movie_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        #video = load_video_as_np_array(video_path)
+                        video = load_video(video_path)[:49]
+
+                    elif scene.image_path:
+                        print("Process: Image to video (CogVideoX)")
+                        if not os.path.isfile(scene.image_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        video = process_image(scene.image_path, int(scene.generate_movie_frames))
+                        video = np.array(video)
+#                    if not video.any():
+#                        print("Loading of file failed")
+#                        return {"CANCELLED"}
+
+                    video_frames = pipe(
+                        video=video,
+                        prompt=prompt,
+                        strength=1.00 - scene.image_power,
+                        negative_prompt=negative_prompt,
+                        num_inference_steps=movie_num_inference_steps,
+                        guidance_scale=movie_num_guidance,
+                        height=y,
+                        width=x,
+                        #num_frames=abs(duration),
+                        generator=generator,
+                    ).frames[0]
+                    #prompt=prompt, strength=0.8, guidance_scale=6, num_inference_steps=50
 
                 else:# movie_model_card != "guoyww/animatediff-motion-adapter-sdxl-beta":
                     if scene.movie_path:
@@ -2758,6 +2804,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             else:
 
                 print("Generate: Video from text")
+                
                 if movie_model_card == "THUDM/CogVideoX-5b":
                     video_frames = pipe(
                         prompt=prompt,
@@ -2767,6 +2814,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         num_videos_per_prompt=1,
                         height=480,
                         width=720,
+                        #
                         num_frames=abs(duration),
                         generator=generator,
                     ).frames[0]
@@ -3602,7 +3650,6 @@ def load_images_from_folder(folder_path):
         # Check if the current file is an image
         if os.path.isfile(file_path) and filename.lower().endswith((".png", ".jpg", ".jpeg", ".tga", ".bmp")):
             # Load the image
-
             try:
                 image = load_image(file_path)
                 loaded_images.append(image)
@@ -3622,7 +3669,8 @@ def flush():
     gc.collect()
     torch.cuda.empty_cache()
     torch.cuda.reset_max_memory_allocated()
-    torch.cuda.reset_peak_memory_stats()
+    #torch.cuda.reset_peak_memory_stats()
+
 
 def bytes_to_giga_bytes(bytes):
     return bytes / 1024 / 1024 / 1024
@@ -4373,7 +4421,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         tokenizer=tokenizer, tokenizer_2=tokenizer_2, vae=None, transformer=None, #transformer=transformer, #
                         revision="refs/pr/1"
                     )#.to(gfx_device)
-                else:    
+                else:
                     #transformer = FluxTransformer2DModel.from_single_file("https://huggingface.co/Kijai/flux-fp8/blob/main/flux1-dev-fp8.safetensors")
                     text_encoder = CLIPTextModel.from_pretrained(ckpt_id, subfolder="text_encoder", torch_dtype=torch.bfloat16)
                     text_encoder_2 = T5EncoderModel.from_pretrained(ckpt_id, subfolder="text_encoder_2", torch_dtype=torch.bfloat16)
@@ -5365,7 +5413,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             # Flux
             elif image_model_card == "black-forest-labs/FLUX.1-schnell" or image_model_card == "ChuckMcSneed/FLUX.1-dev":
-                if low_vram(): 
+                if low_vram():
                     image = pipe(
                         prompt=prompt,
                         num_inference_steps=image_num_inference_steps,
@@ -5377,7 +5425,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     flush()
                 else:
                     if image_model_card == "ChuckMcSneed/FLUX.1-dev":
-                        
+
                         pipe = FluxPipeline.from_pretrained(
                             ckpt_id, text_encoder=None, text_encoder_2=None,
                             tokenizer=None, tokenizer_2=None, vae=None,
@@ -5404,8 +5452,8 @@ class SEQUENCER_OT_generate_image(Operator):
                             subfolder="vae",
                             torch_dtype=torch.bfloat16
                         ).to(gfx_device)
-                        
-                    else:    
+
+                    else:
                         pipe = FluxPipeline.from_pretrained(
                             ckpt_id, text_encoder=None, text_encoder_2=None,
                             tokenizer=None, tokenizer_2=None, vae=None,
@@ -5437,7 +5485,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     vae_scale_factor = 2 ** (len(vae.config.block_out_channels))
                     image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
 #                    image = image_processor.postprocess(image, output_type="pil")
-#                    image = image[0]                
+#                    image = image[0]
 
                     with torch.no_grad():
                         #print("Running decoding.")
