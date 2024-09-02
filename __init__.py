@@ -1942,9 +1942,19 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 if (type == "audio" and audio_model_card == "bark") or (type == "audio" and audio_model_card == "stabilityai/stable-audio-open-1.0") or (
                     type == "image" and image_model_card == "black-forest-labs/FLUX.1-schnell") or (
                     type == "image" and image_model_card == "ChuckMcSneed/FLUX.1-dev") or (
-                    type == "audio" and audio_model_card == "facebook/musicgen-stereo-medium" and audio_model_card == "WhisperSpeech" and audio_model_card == "parler-tts/parler-tts-large-v1"
+                    type == "audio" and audio_model_card == "facebook/musicgen-stereo-medium" and audio_model_card == "WhisperSpeech"
                 ):
                     pass
+                elif audio_model_card == "parler-tts/parler-tts-large-v1":
+                    layout = col.column()
+                    col = layout.column(align=True)
+                    col.use_property_split = True
+                    col.use_property_decorate = False
+                    col.prop(
+                        context.scene,
+                        "parler_direction_prompt",
+                        text="Direction",
+                    )                
                 else:
                     col.prop(
                         context.scene,
@@ -1977,10 +1987,10 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 row.prop(context.scene, "audio_path", text="Speaker")
                 row.operator("sequencer.open_audio_filebrowser", text="", icon="FILEBROWSER")
                 col.prop(context.scene, "audio_speed", text="Speed")
-            elif type == "audio" and audio_model_card == "parler-tts/parler-tts-large-v1":
-                row = col.row(align=True)
-                row.prop(context.scene, "audio_path", text="Speaker")
-                # Speaker / Instruction
+#            elif type == "audio" and audio_model_card == "parler-tts/parler-tts-large-v1":
+#                row = col.row(align=True)
+#                row.prop(context.scene, "audio_path", text="Speaker")
+#                # Speaker / Instruction
 
             elif type == "audio" and (addon_prefs.audio_model_card == "facebook/musicgen-stereo-medium" or addon_prefs.audio_model_card == "stabilityai/stable-audio-open-1.0"):
                 col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
@@ -3407,15 +3417,14 @@ class SEQUENCER_OT_generate_audio(Operator):
                 seed = seed if not context.scene.movie_use_random else random.randint(0, 999999)
                 print("Seed: " + str(seed))
                 context.scene.movie_num_seed = seed
-                description = "Jon's voice is monotone yet slightly fast in delivery, with a very close recording that almost has no background noise."
+                description = context.scene.parler_direction_prompt
+                input_ids = tokenizer(description, return_tensors="pt").input_ids.to(gfx_device)
+                prompt_input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(gfx_device)
 
-                input_ids = tokenizer(description, return_tensors="pt").input_ids.to(device)
-                prompt_input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
-
-                generation = model.generate(input_ids=input_ids, prompt_input_ids=prompt_input_ids)
+                generation = pipe.generate(input_ids=input_ids, prompt_input_ids=prompt_input_ids)
                 audio_arr = generation.cpu().numpy().squeeze()
                 filename = solve_path(str(seed) + "_" + prompt + ".wav")
-                sf.write(filename, audio_arr, model.config.sampling_rate)
+                sf.write(filename, audio_arr, pipe.config.sampling_rate)
 
             # Add Audio Strip
             filepath = filename
@@ -6334,6 +6343,11 @@ def register():
     bpy.types.Scene.generate_movie_negative_prompt = bpy.props.StringProperty(
         name="generate_movie_negative_prompt",
         default="",
+        options={"TEXTEDIT_UPDATE"},
+    )
+    bpy.types.Scene.parler_direction_prompt = bpy.props.StringProperty(
+        name="parler_direction_prompt",
+        default="Jon's voice is monotone yet slightly fast in delivery, with a very close recording that almost has no background noise.",
         options={"TEXTEDIT_UPDATE"},
     )
     bpy.types.Scene.generate_audio_prompt = bpy.props.StringProperty(name="generate_audio_prompt", default="")
