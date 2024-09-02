@@ -774,7 +774,9 @@ def install_modules(self):
     python_version_info = sys.version_info
     python_version_str = parse_python_version(python_version_info)
 
-    import_module(self, "imageio", "imageio==2.4.1")
+    #import_module(self, "imageio", "imageio==2.4.1")
+    import_module(self, "imageio", "imageio[ffmpeg]==2.4.1")
+    import_module(self, "imageio", "imageio-ffmpeg")
     import_module(self, "imWatermark", "imWatermark")
     import_module(self, "parler_tts", "git+https://github.com/huggingface/parler-tts.git")
     if os_platform == "Windows":
@@ -1964,7 +1966,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             col = layout.column(align=True)
             if type == "movie" or type == "image":
                 col.prop(context.scene, "generate_movie_frames", text="Frames")
-            if type == "audio" and audio_model_card != "bark" and audio_model_card != "WhisperSpeech" and (audio_model_card == "parler-tts/parler-tts-large-v1" or audio_model_card == "stabilityai/stable-audio-open-1.0"):
+            if type == "audio" and audio_model_card != "bark" and audio_model_card != "WhisperSpeech"and audio_model_card != "parler-tts/parler-tts-large-v1":
                 col.prop(context.scene, "audio_length_in_f", text="Frames")
             if type == "audio" and audio_model_card == "bark":
                 col = layout.column(align=True)
