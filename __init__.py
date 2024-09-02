@@ -1945,7 +1945,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     type == "audio" and audio_model_card == "facebook/musicgen-stereo-medium" and audio_model_card == "WhisperSpeech"
                 ):
                     pass
-                elif audio_model_card == "parler-tts/parler-tts-large-v1":
+                elif type == "audio" and audio_model_card == "parler-tts/parler-tts-large-v1":
                     layout = col.column()
                     col = layout.column(align=True)
                     col.use_property_split = True
