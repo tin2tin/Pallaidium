@@ -2491,8 +2491,8 @@ class SEQUENCER_OT_generate_movie(Operator):
                     pipe.enable_model_cpu_offload()
                     #pipe.enable_sequential_cpu_offload()
                     #pipe.vae.enable_tiling()
-
-                pipe.scheduler = CogVideoXDPMScheduler.from_config(pipe.scheduler.config)
+                if ((scene.movie_path or scene.image_path)and input == "input_strips"):
+                    pipe.scheduler = CogVideoXDPMScheduler.from_config(pipe.scheduler.config)
                 scene.generate_movie_x = 720
                 scene.generate_movie_y = 480
 
