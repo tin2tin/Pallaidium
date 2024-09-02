@@ -328,7 +328,7 @@ https://huggingface.co/blog/lcm_lora
 
 ### Audio:
 - [stabilityai/stable-audio-open-1.0](https://huggingface.co/stabilityai/stable-audio-open-1.0)
-- [Parler TTS]([https://huggingface.co/facebook/musicgen-stereo-medium](https://github.com/huggingface/parler-tts))
+- [Parler TTS](https://github.com/huggingface/parler-tts)
 - [facebook/musicgen-stereo-medium](https://huggingface.co/facebook/musicgen-stereo-medium)
 - [vtrungnhan9/audioldm2-music-zac2023](https://huggingface.co/vtrungnhan9/audioldm2-music-zac2023)
 - [Bark](https://github.com/suno-ai/bark)
