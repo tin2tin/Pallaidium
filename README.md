@@ -65,6 +65,7 @@ If any Python modules are missing, use this add-on to install them manually:    
 https://github.com/amb/blender_pip      |
 
 ## Change Log
+* 2024-9_2: Add: Vid2vid for CogVideoX-5b and Parler TTS
 * 2024-8-28: Make CogVideox-5b run on 6 GB VRAM & Flux on 2 GB VRAM
 * 2024-8-27: Add: CogVideoX-5b Remove: Low-quality models
 * 2024-8-5: Add: Flux Dev - NB. needs update of dependencies and 24 GB VRAM
@@ -327,6 +328,7 @@ https://huggingface.co/blog/lcm_lora
 
 ### Audio:
 - [stabilityai/stable-audio-open-1.0](https://huggingface.co/stabilityai/stable-audio-open-1.0)
+- [Parler TTS]([https://huggingface.co/facebook/musicgen-stereo-medium](https://github.com/huggingface/parler-tts))
 - [facebook/musicgen-stereo-medium](https://huggingface.co/facebook/musicgen-stereo-medium)
 - [vtrungnhan9/audioldm2-music-zac2023](https://huggingface.co/vtrungnhan9/audioldm2-music-zac2023)
 - [Bark](https://github.com/suno-ai/bark)
