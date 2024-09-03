@@ -62,7 +62,7 @@ For Mac and Linux, we'll have to rely on contributor support. So, post your issu
 Tip           |
 :------------- |
 If any Python modules are missing, use this add-on to install them manually:      |
-https://github.com/amb/blender_pip      |
+https://github.com/tin2tin/blender_pip      |
 
 ## Change Log
 * 2024-9_2: Add: Vid2vid for CogVideoX-5b and Parler TTS
