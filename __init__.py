@@ -1415,7 +1415,7 @@ class GeneratorAddonPreferences(AddonPreferences):
         default="dataautogpt3/OpenDalleV1.1",
         update=input_strips_updated,
     )
-    if not low_vram():
+    if low_vram():
         parler = ("parler-tts/parler-tts-mini-v1", "Speech: Parler TTS Mini", "parler-tts/parler-tts-mini-v1")
     else:
         parler = ("parler-tts/parler-tts-large-v1", "Speech: Parler TTS Large", "parler-tts/parler-tts-large-v1")
