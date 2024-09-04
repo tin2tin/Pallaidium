@@ -245,20 +245,20 @@ def style_prompt(prompt):
     return return_array
 
 
-def closest_divisible_32(num):
+def closest_divisible_16(num):
     # Determine the remainder when num is divided by 64
 
-    remainder = num % 32
+    remainder = num % 16
     # If the remainder is less than or equal to 16, return num - remainder,
     # but ensure the result is not less than 192
 
-    if remainder <= 16:
+    if remainder <= 8:
         result = num - remainder
         return max(result, 192)
     # Otherwise, return num + (32 - remainder)
 
     else:
-        return max(num + (32 - remainder), 192)
+        return max(num + (16 - remainder), 192)
 
 
 def closest_divisible_128(num):
@@ -466,9 +466,8 @@ def process_frames(frame_folder_path, target_width):
 
         target_height = int((target_width / frame_width) * frame_height)
         # Ensure width and height are divisible by 64
-
-        target_width = closest_divisible_32(target_width)
-        target_height = closest_divisible_32(target_height)
+        target_width = closest_divisible_16(target_width)
+        target_height = closest_divisible_16(target_height)
         img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
         img = img.convert("RGB")
         processed_frames.append(img)
@@ -717,8 +716,9 @@ def install_modules(self):
     subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/suno-ai/bark.git", "--upgrade"])
     import_module(self, "whisperspeech", "WhisperSpeech==0.8")
     import_module(self, "pydub", "pydub")
-    import_module(self, "deepspeed", "https://github.com/daswer123/deepspeed-windows/releases/download/13.1/deepspeed-0.13.1+cu121-cp311-cp311-win_amd64.whl")
+    
     if os_platform == "Windows":
+        import_module(self, "deepspeed", "https://github.com/daswer123/deepspeed-windows/releases/download/13.1/deepspeed-0.13.1+cu121-cp311-cp311-win_amd64.whl")
         # resemble-enhance:
         subprocess.call(
             [pybin, "-m", "pip", "install", "git+https://github.com/tin2tin/resemble-enhance-windows.git", "--upgrade"] #"--no-dependencies",
@@ -737,6 +737,7 @@ def install_modules(self):
 #        import_module(self, "resampy", "resampy")
 #        import_module(self, "tabulate", "tabulate")
     else:
+        import_module(self, "deepspeed", "deepspeed==0.14.4")
         import_module(self, "resemble_enhance", "resemble-enhance")
 
     # import_module(self, "diffusers", "diffusers")
@@ -761,7 +762,7 @@ def install_modules(self):
     import_module(self, "stable_audio_tools", "stable-audio-tools")
     if os_platform == "Windows":
         pass
-        #import_module(self, "flash_attn", "https://github.com/oobabooga/flash-attention/releases/download/v2.6.1/flash_attn-2.6.1+cu122torch2.2.2cxx11abiFALSE-cp311-cp311-win_amd64.whl")
+        import_module(self, "flash_attn", "https://github.com/oobabooga/flash-attention/releases/download/v2.6.3/flash_attn-2.6.3+cu122torch2.3.1cxx11abiFALSE-cp311-cp311-win_amd64.whl")
     else:
         import_module(self, "flash_attn", "flash-attn")
 
@@ -1031,6 +1032,7 @@ class GENERATOR_OT_uninstall(Operator):
         uninstall_module_with_dependencies("protobuf")
         uninstall_module_with_dependencies("resemble-enhance")
         uninstall_module_with_dependencies("mediapipe")
+        uninstall_module_with_dependencies("flash_attn")
 
         uninstall_module_with_dependencies("controlnet-aux")
 
@@ -1137,7 +1139,7 @@ def input_strips_updated(self, context):
         bpy.types.Scene.image_path = ""
 #    if movie_model_card == "wangfuyun/AnimateLCM" and type == "movie":
 #        scene.input_strips = "input_prompt"
-    if movie_model_card == "THUDM/CogVideoX-5b" and type == "movie":
+    if (movie_model_card == "THUDM/CogVideoX-5b" or movie_model_card == "THUDM/CogVideoX-2b") and type == "movie":
         #scene.input_strips = "input_prompt"
         scene.generate_movie_x = 720
         scene.generate_movie_y = 480
@@ -1261,6 +1263,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             #            ),
             # ("VideoCrafter/Image2Video-512", "VideoCrafter v1 (512x512)", "VideoCrafter/Image2Video-512"),
             ("wangfuyun/AnimateLCM", "AnimateLCM", "wangfuyun/AnimateLCM"),
+            ("THUDM/CogVideoX-2b", "CogVideoX-2b (720x480x48)", "THUDM/CogVideoX-2b"),
             ("THUDM/CogVideoX-5b", "CogVideoX-5b (720x480x48)", "THUDM/CogVideoX-5b"),
             (
                 "cerspense/zeroscope_v2_XL",
@@ -1419,24 +1422,13 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "facebook/musicgen-stereo-medium",
             ),
             (
-                "vtrungnhan9/audioldm2-music-zac2023",
-                "Music: AudioLDM 2",
-                "vtrungnhan9/audioldm2-music-zac2023",
+                "cvssp/audioldm2-large",
+                "Audio LDM 2 Large",
+                "cvssp/audioldm2-large",
             ),
             ("bark", "Speech: Bark", "Bark"),
             ("WhisperSpeech", "Speech: WhisperSpeech", "WhisperSpeech"),
             ("parler-tts/parler-tts-large-v1", "Speech: Parler TTS Large", "parler-tts/parler-tts-large-v1"),
-            #            (
-            #                #"vtrungnhan9/audioldm2-music-zac2023",
-            #                "cvssp/audioldm2-music",
-            #                "Music: AudioLDM 2",
-            #                "Music: AudioLDM 2",
-            #            ),
-            #            (
-            #                "cvssp/audioldm2",
-            #                "Sound: AudioLDM 2",
-            #                "Sound: AudioLDM 2",
-            #            ),
         ],
         default="stabilityai/stable-audio-open-1.0",
         update=input_strips_updated,
@@ -1453,9 +1445,15 @@ class GeneratorAddonPreferences(AddonPreferences):
         items={
             (
                 "Salesforce/blip-image-captioning-large",
-                "Image Captioning",
+                "Blip Image Captioning",
                 "Salesforce/blip-image-captioning-large",
             ),
+            (
+                "gokaygokay/Florence-2-Flux-Large",
+                "Florence-2 Image Captioning",
+                "gokaygokay/Florence-2-Flux-Large",
+            ),            
+            
         },
         default="Salesforce/blip-image-captioning-large",
     )
@@ -2233,8 +2231,8 @@ class SEQUENCER_OT_generate_movie(Operator):
         negative_prompt = scene.generate_movie_negative_prompt + ", " + style_prompt(scene.generate_movie_prompt)[1] + ", nsfw, nude, nudity"
         movie_x = scene.generate_movie_x
         movie_y = scene.generate_movie_y
-        x = scene.generate_movie_x = closest_divisible_32(movie_x)
-        y = scene.generate_movie_y = closest_divisible_32(movie_y)
+        x = scene.generate_movie_x = closest_divisible_16(movie_x)
+        y = scene.generate_movie_y = closest_divisible_16(movie_y)
         duration = scene.generate_movie_frames
         movie_num_inference_steps = scene.movie_num_inference_steps
         movie_num_guidance = scene.movie_num_guidance
@@ -2258,6 +2256,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             #and movie_model_card != "guoyww/animatediff-motion-adapter-sdxl-beta"
             and movie_model_card != "wangfuyun/AnimateLCM"
             and movie_model_card != "THUDM/CogVideoX-5b"
+            and movie_model_card != "THUDM/CogVideoX-2b"
         ):
 
             if movie_model_card == "stabilityai/sd-turbo":  # img2img
@@ -2477,20 +2476,20 @@ class SEQUENCER_OT_generate_movie(Operator):
                 else:
                     pipe.to(gfx_device)
 
-            elif movie_model_card == "THUDM/CogVideoX-5b":
+            elif movie_model_card == "THUDM/CogVideoX-5b" or movie_model_card == "THUDM/CogVideoX-2b":
 
                 #vid2vid
                 if ((scene.movie_path or scene.image_path)and input == "input_strips"):
                     from diffusers.utils import load_video
                     from diffusers import CogVideoXDPMScheduler, CogVideoXVideoToVideoPipeline
-                    pipe = CogVideoXVideoToVideoPipeline.from_pretrained("THUDM/CogVideoX-5b", torch_dtype=torch.bfloat16)
+                    pipe = CogVideoXVideoToVideoPipeline.from_pretrained(movie_model_card, torch_dtype=torch.bfloat16)
 
                 #txt2vid
                 else:
                     from diffusers import CogVideoXPipeline
 
                     pipe = CogVideoXPipeline.from_pretrained(
-                        "THUDM/CogVideoX-5b",
+                        movie_model_card,
                         torch_dtype=torch.float16,
                     )
 
@@ -2700,7 +2699,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                             return {"CANCELLED"}
                         image = load_image(bpy.path.abspath(scene.image_path))
 
-                    image = image.resize((closest_divisible_32(int(x)), closest_divisible_32(int(y))))
+                    image = image.resize((closest_divisible_16(int(x)), closest_divisible_16(int(y))))
 
                     video_frames = refiner(
                         image,
@@ -2729,7 +2728,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     ).frames[0]
                     
                 #vid2vid
-                elif movie_model_card == "THUDM/CogVideoX-5b":
+                elif movie_model_card == "THUDM/CogVideoX-5b" or movie_model_card == "THUDM/CogVideoX-2b":
                     if scene.movie_path:
                         print("Process: Video to video (CogVideoX)")
                         if not os.path.isfile(scene.movie_path):
@@ -2786,8 +2785,8 @@ class SEQUENCER_OT_generate_movie(Operator):
                         video = [
                             Image.fromarray(frame).resize(
                                 (
-                                    closest_divisible_32(int(x * 2)),
-                                    closest_divisible_32(int(y * 2)),
+                                    closest_divisible_16(int(x * 2)),
+                                    closest_divisible_16(int(y * 2)),
                                 )
                             )
                             for frame in video
@@ -2796,8 +2795,8 @@ class SEQUENCER_OT_generate_movie(Operator):
                         video = [
                             Image.fromarray(frame).resize(
                                 (
-                                    closest_divisible_32(int(x)),
-                                    closest_divisible_32(int(y)),
+                                    closest_divisible_16(int(x)),
+                                    closest_divisible_16(int(y)),
                                 )
                             )
                             for frame in video
@@ -2817,7 +2816,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 print("Generate: Video from text")
                 
-                if movie_model_card == "THUDM/CogVideoX-5b":
+                if movie_model_card == "THUDM/CogVideoX-5b" or movie_model_card == "THUDM/CogVideoX-2b":
                     video_frames = pipe(
                         prompt=prompt,
                         negative_prompt=negative_prompt,
@@ -2853,7 +2852,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     print("Upscale: Video")
                     if torch.cuda.is_available():
                         torch.cuda.empty_cache()
-                    video = [Image.fromarray(frame).resize((closest_divisible_32(x * 2), closest_divisible_32(y * 2))) for frame in video_frames]
+                    video = [Image.fromarray(frame).resize((closest_divisible_16(x * 2), closest_divisible_16(y * 2))) for frame in video_frames]
                     video_frames = upscale(
                         prompt,
                         video=video,
@@ -2873,8 +2872,9 @@ class SEQUENCER_OT_generate_movie(Operator):
 #                shutil.move(src_path, dst_path)
 #            else:
             # Move to folder.
-
-            src_path = export_to_video(video_frames, fps=12)
+            render = bpy.context.scene.render
+            fps = round((render.fps / render.fps_base), 3)
+            src_path = export_to_video(video_frames, fps=fps)
             dst_path = solve_path(clean_filename(str(seed) + "_" + prompt) + ".mp4")
             shutil.move(src_path, dst_path)
 
@@ -2987,11 +2987,6 @@ class SEQUENCER_OT_generate_audio(Operator):
         import random
         from scipy.io.wavfile import write as write_wav
 
-        if addon_prefs.audio_model_card == "cvssp/audioldm2" or addon_prefs.audio_model_card == "cvssp/audioldm2-music":
-            from diffusers import AudioLDM2Pipeline, DPMSolverMultistepScheduler
-            import scipy
-            from IPython.display import Audio
-            import xformers
         if addon_prefs.audio_model_card == "facebook/musicgen-stereo-medium":
             #            if os_platform == "Darwin" or os_platform == "Linux":
             #                import sox
@@ -3044,23 +3039,23 @@ class SEQUENCER_OT_generate_audio(Operator):
 
         if addon_prefs.audio_model_card == "bark":
             os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-#            try:
-            import numpy as np
-            from bark.generation import (
-                generate_text_semantic,
-                preload_models,
-            )
-            from bark.api import semantic_to_waveform
-            from bark import generate_audio, SAMPLE_RATE
+            try:
+                import numpy as np
+                from bark.generation import (
+                    generate_text_semantic,
+                    preload_models,
+                )
+                from bark.api import semantic_to_waveform
+                from bark import generate_audio, SAMPLE_RATE
 
-            from resemble_enhance.enhancer.inference import denoise, enhance
-#            except ModuleNotFoundError:
-#                print("Dependencies needs to be installed in the add-on preferences.")
-#                self.report(
-#                    {"INFO"},
-#                    "Dependencies needs to be installed in the add-on preferences.",
-#                )
-#                return {"CANCELLED"}
+                from resemble_enhance.enhancer.inference import denoise, enhance
+            except ModuleNotFoundError:
+                print("Dependencies needs to be installed in the add-on preferences.")
+                self.report(
+                    {"INFO"},
+                    "Dependencies needs to be installed in the add-on preferences.",
+                )
+                return {"CANCELLED"}
 
         show_system_console(True)
         set_system_console_topmost(True)
@@ -3068,19 +3063,9 @@ class SEQUENCER_OT_generate_audio(Operator):
         # clear the VRAM
         clear_cuda_cache()
 
-        print("Model:  " + addon_prefs.audio_model_card)
-
         # Load models Audio
-        if addon_prefs.audio_model_card == "cvssp/audioldm2" or addon_prefs.audio_model_card == "cvssp/audioldm2-music":
-            repo_id = addon_prefs.audio_model_card
-            pipe = AudioLDM2Pipeline.from_pretrained(repo_id)
-            pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-            if low_vram():
-                pipe.enable_model_cpu_offload()
-                # pipe.enable_vae_slicing()
-            else:
-                pipe.to(gfx_device)
-
+        print("Model:  " + addon_prefs.audio_model_card)
+        
         if addon_prefs.audio_model_card == "stabilityai/stable-audio-open-1.0":
 
             repo_id = "ylacombe/stable-audio-1.0"
@@ -3091,11 +3076,9 @@ class SEQUENCER_OT_generate_audio(Operator):
             else:
                 pipe.to(gfx_device)
 
-        elif addon_prefs.audio_model_card == "vtrungnhan9/audioldm2-music-zac2023":
+        elif addon_prefs.audio_model_card == "cvssp/audioldm2-large":
             repo_id = addon_prefs.audio_model_card
-
             from diffusers import AudioLDM2Pipeline
-            import torch
 
             pipe = AudioLDM2Pipeline.from_pretrained(repo_id, torch_dtype=torch.float16)
 
@@ -3115,6 +3098,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 device="cuda:0",
                 torch_dtype=torch.float16,
             )
+
             if int(audio_length_in_s * 50) > 1503:
                 self.report({"INFO"}, "Maximum output duration is 30 sec.")
 
@@ -3349,15 +3333,13 @@ class SEQUENCER_OT_generate_audio(Operator):
                 sf.write(filename, music["audio"][0].T, music["sampling_rate"])
 
             # MusicLDM ZAC
-
-            elif addon_prefs.audio_model_card == "vtrungnhan9/audioldm2-music-zac2023":
-                print("Generate: Audio/music (Zac)")
+            elif addon_prefs.audio_model_card == "cvssp/audioldm2-large":
+                print("Generate: Audio LDM2 Large")
                 seed = context.scene.movie_num_seed
                 seed = seed if not context.scene.movie_use_random else random.randint(0, 999999)
                 print("Seed: " + str(seed))
                 context.scene.movie_num_seed = seed
                 # Use cuda if possible
-
                 if torch.cuda.is_available():
                     generator = torch.Generator("cuda").manual_seed(seed) if seed != 0 else None
                 else:
@@ -3366,7 +3348,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                         generator.manual_seed(seed)
                     else:
                         generator = None
-                #print("Prompt: " + prompt)
+
                 music = pipe(
                     prompt,
                     num_inference_steps=movie_num_inference_steps,
@@ -3375,40 +3357,11 @@ class SEQUENCER_OT_generate_audio(Operator):
                     guidance_scale=movie_num_guidance,
                     generator=generator,
                 ).audios[0]
+                
                 filename = solve_path(clean_filename(str(seed) + "_" + prompt) + ".wav")
                 rate = 16000
+                
                 write_wav(filename, rate, music.transpose())
-
-            # AudioLDM.
-
-            elif addon_prefs.audio_model_card == "vtrungnhan9/audioldm2-music-zac2023":
-                print("Generate: Audio/music (AudioLDM)")
-                seed = context.scene.movie_num_seed
-                seed = seed if not context.scene.movie_use_random else random.randint(0, 999999)
-                print("Seed: " + str(seed))
-                context.scene.movie_num_seed = seed
-                # Use cuda if possible
-
-                if torch.cuda.is_available():
-                    generator = torch.Generator("cuda").manual_seed(seed) if seed != 0 else None
-                else:
-                    if seed != 0:
-                        generator = torch.Generator()
-                        generator.manual_seed(seed)
-                    else:
-                        generator = None
-                prompt = context.scene.generate_movie_prompt
-                #print("Prompt: " + prompt)
-                audio = pipe(
-                    prompt,
-                    num_inference_steps=movie_num_inference_steps,
-                    audio_length_in_s=audio_length_in_s,
-                    guidance_scale=movie_num_guidance,
-                    generator=generator,
-                ).audios[0]
-                rate = 16000
-                filename = solve_path(str(seed) + "_" + prompt + ".wav")
-                write_wav(filename, rate, audio.transpose())
 
             # Parler
             elif addon_prefs.audio_model_card == "parler-tts/parler-tts-large-v1":
@@ -3769,8 +3722,8 @@ class SEQUENCER_OT_generate_image(Operator):
         negative_prompt = scene.generate_movie_negative_prompt + ", " + style_prompt(scene.generate_movie_prompt)[1] + ", nsfw, nude, nudity,"
         image_x = scene.generate_movie_x
         image_y = scene.generate_movie_y
-        x = scene.generate_movie_x = closest_divisible_32(image_x)
-        y = scene.generate_movie_y = closest_divisible_32(image_y)
+        x = scene.generate_movie_x = closest_divisible_16(image_x)
+        y = scene.generate_movie_y = closest_divisible_16(image_y)
         duration = scene.generate_movie_frames
         image_num_inference_steps = scene.movie_num_inference_steps
         image_num_guidance = scene.movie_num_guidance
@@ -5920,8 +5873,8 @@ class SEQUENCER_OT_generate_text(Operator):
         guidance = scene.movie_num_guidance
         current_frame = scene.frame_current
         prompt = style_prompt(scene.generate_movie_prompt)[0]
-        x = scene.generate_movie_x = closest_divisible_32(scene.generate_movie_x)
-        y = scene.generate_movie_y = closest_divisible_32(scene.generate_movie_y)
+        x = scene.generate_movie_x = closest_divisible_16(scene.generate_movie_x)
+        y = scene.generate_movie_y = closest_divisible_16(scene.generate_movie_y)
         duration = scene.generate_movie_frames
         render = bpy.context.scene.render
         fps = render.fps / render.fps_base
@@ -5932,45 +5885,83 @@ class SEQUENCER_OT_generate_text(Operator):
             scene.sequence_editor_create()
         active_strip = context.scene.sequence_editor.active_strip
 
-        try:
-            import torch
-            from PIL import Image
-            from transformers import BlipProcessor, BlipForConditionalGeneration
-        except ModuleNotFoundError:
-            print("Dependencies need to be installed in the add-on preferences.")
-            self.report(
-                {"INFO"},
-                "Dependencies need to be installed in the add-on preferences.",
-            )
-            return {"CANCELLED"}
-
+        if addon_prefs.text_model_card == "Salesforce/blip-image-captioning-large":
+            try:
+                import torch
+                from PIL import Image
+                from transformers import BlipProcessor, BlipForConditionalGeneration
+            except ModuleNotFoundError:
+                print("Dependencies need to be installed in the add-on preferences.")
+                self.report(
+                    {"INFO"},
+                    "Dependencies need to be installed in the add-on preferences.",
+                )
+                return {"CANCELLED"}
+            
+        elif addon_prefs.text_model_card == "gokaygokay/Florence-2-Flux-Large":
+            try:
+                from transformers import AutoModelForCausalLM, AutoProcessor, AutoConfig
+            except ModuleNotFoundError:
+                print("Dependencies need to be installed in the add-on preferences.")
+                self.report(
+                    {"INFO"},
+                    "Dependencies need to be installed in the add-on preferences.",
+                )
+                return {"CANCELLED"}
+            
         # clear the VRAM
 
         clear_cuda_cache()
 
-        processor = BlipProcessor.from_pretrained(
-            "Salesforce/blip-image-captioning-large",
-            local_files_only=local_files_only,
-        )
-
-        model = BlipForConditionalGeneration.from_pretrained(
-            "Salesforce/blip-image-captioning-large",
-            torch_dtype=torch.float16,
-            local_files_only=local_files_only,
-        ).to(gfx_device)
-
         init_image = load_first_frame(scene.movie_path) if scene.movie_path else load_first_frame(scene.image_path)
 
         init_image = init_image.resize((x, y))
-        text = ""
-        inputs = processor(init_image, text, return_tensors="pt").to(gfx_device, torch.float16)
 
-        out = model.generate(**inputs, max_new_tokens=256)
-        text = processor.decode(out[0], skip_special_tokens=True)
-        text = clean_string(text)
-        print("Generated text: " + text)
+        if addon_prefs.text_model_card == "Salesforce/blip-image-captioning-large":
+            processor = BlipProcessor.from_pretrained(
+                "Salesforce/blip-image-captioning-large",
+                local_files_only=local_files_only,
+            )
+
+            model = BlipForConditionalGeneration.from_pretrained(
+                "Salesforce/blip-image-captioning-large",
+                torch_dtype=torch.float16,
+                local_files_only=local_files_only,
+            ).to(gfx_device)
+
+            text = ""
+            inputs = processor(init_image, text, return_tensors="pt").to(gfx_device, torch.float16)
+
+            out = model.generate(**inputs, max_new_tokens=256)
+            text = processor.decode(out[0], skip_special_tokens=True)
+            text = clean_string(text)
+            print("Generated text: " + text)
+            
+        elif addon_prefs.text_model_card == "gokaygokay/Florence-2-Flux-Large":    
+
+            model = AutoModelForCausalLM.from_pretrained("gokaygokay/Florence-2-Flux-Large", trust_remote_code=True).to(gfx_device).eval()
+            processor = AutoProcessor.from_pretrained("gokaygokay/Florence-2-Flux-Large", trust_remote_code=True)
+
+            # Ensure the image is in RGB mode
+            if init_image.mode != "RGB":
+                init_image = init_image.convert("RGB")
+
+            inputs = processor(text="Describe", images=init_image, return_tensors="pt").to(gfx_device)
+            generated_ids = model.generate(
+                input_ids=inputs["input_ids"],
+                pixel_values=inputs["pixel_values"],
+                max_new_tokens=1024,
+                num_beams=3,
+                repetition_penalty=1.10,
+            )
+            generated_text = processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
+            parsed_answer = processor.post_process_generation(generated_text, task="Describe", image_size=(init_image.width, init_image.height))
+            text = parsed_answer["Describe"]
+            print("Generated text: " + text)
 
         # Find free space for the strip in the timeline.
+        
+        
 
 #        if active_strip.frame_final_start <= current_frame <= (active_strip.frame_final_start + active_strip.frame_final_duration):
 ##            empty_channel = find_first_empty_channel(
@@ -5978,10 +5969,10 @@ class SEQUENCER_OT_generate_text(Operator):
 ##                (scene.sequence_editor.active_strip.frame_final_duration) + scene.frame_current,
 ##            )
 #            start_frame = scene.frame_current
-#            end_frame = frame_end=int(start_frame + ((len(text) / 12) * fps))
+#            end_frame = frame_end=int(start_frame + ((len(text) / 20) * (fps/10)))
 #        else:
-        start_frame = scene.sequence_editor.active_strip.frame_final_start
-        scene.frame_current = scene.sequence_editor.active_strip.frame_final_start
+        start_frame = int(scene.sequence_editor.active_strip.frame_start)
+        #scene.frame_current = scene.sequence_editor.active_strip.frame_final_start
         end_frame = start_frame + scene.sequence_editor.active_strip.frame_final_duration
         empty_channel = find_first_empty_channel(
             start_frame,
@@ -6030,7 +6021,6 @@ class SEQUENCER_OT_generate_text(Operator):
                         else:
                             scene.frame_current = scene.sequence_editor.active_strip.frame_final_start
                         # Redraw UI to display the new strip.
-
                         bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
                         break
         scene.movie_num_guidance = guidance
