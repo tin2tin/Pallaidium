@@ -22,7 +22,7 @@ bl_info = {
     "category": "Sequencer",
 }
 
-# TO DO: Style title check, long prompts, SDXL controlnet, Move prints.
+# TO DO: Long prompts, Move prints, FLUX Controlnet & LoRA, refactor, clean-up. 
 
 
 import bpy
@@ -73,8 +73,10 @@ try:
         gfx_device = "mps"
     else:
         gfx_device = "cpu"
+    print("GFX Device: "+gfx_device)
 except:
     print("Pallaidium dependencies needs to be installed and Blender needs to be restarted.")
+
 os_platform = platform.system()  # 'Linux', 'Darwin', 'Java', 'Windows'
 if os_platform == "Windows":
     pathlib.PosixPath = pathlib.WindowsPath
@@ -3474,7 +3476,7 @@ def scale_image_within_dimensions(image, target_width=None, target_height=None):
 
 
 def get_depth_map(image):
-    image = feature_extractor(images=image, return_tensors="pt").pixel_values.to("cuda")
+    image = feature_extractor(images=image, return_tensors="pt").pixel_values.to(gfx_device)
     with torch.no_grad(), torch.autocast("cuda"):
         depth_map = depth_estimator(image).predicted_depth
     depth_map = torch.nn.functional.interpolate(
@@ -4410,7 +4412,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         ckpt_id, text_encoder=text_encoder, text_encoder_2=text_encoder_2,
                         tokenizer=tokenizer, tokenizer_2=tokenizer_2, vae=None, transformer=None, #transformer=transformer, #
                         revision="refs/pr/1"
-                    )#.to(gfx_device)
+                    )
                 else:
                     #transformer = FluxTransformer2DModel.from_single_file("https://huggingface.co/Kijai/flux-fp8/blob/main/flux1-dev-fp8.safetensors")
                     text_encoder = CLIPTextModel.from_pretrained(ckpt_id, subfolder="text_encoder", torch_dtype=torch.bfloat16)
@@ -4674,7 +4676,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
 
                 # Load model.
-                pipe = StableDiffusionXLPipeline.from_pretrained(base, torch_dtype=torch.float16, vae=vae, variant="fp16").to("cuda")
+                pipe = StableDiffusionXLPipeline.from_pretrained(base, torch_dtype=torch.float16, vae=vae, variant="fp16").to(gfx_device)
                 pipe.load_lora_weights(hf_hub_download(repo, ckpt))
                 pipe.fuse_lora()
 
