@@ -1223,7 +1223,8 @@ class GeneratorAddonPreferences(AddonPreferences):
         },
         default="ding",
     )
-    default_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sounds", "*.wav")
+    default_folder = os.path.join(__file__,"sounds", "*.wav")
+    #default_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sounds", "*.wav")
     if default_folder not in sys.path:
         sys.path.append(default_folder)
     usersound: StringProperty(
