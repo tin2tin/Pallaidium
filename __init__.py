@@ -713,8 +713,10 @@ def install_modules(self):
     import_module(self, "huggingface_hub", "huggingface_hub")
     import_module(self, "transformers", "transformers==4.43.0")
     #import_module(self, "transformers", "git+https://github.com/huggingface/transformers.git")
-    subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/suno-ai/bark.git", "--upgrade"])
-    import_module(self, "whisperspeech", "WhisperSpeech==0.8")
+    if os_platform != "Linux":
+        subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/suno-ai/bark.git", "--upgrade"])
+    if os_platform != "Linux":
+        import_module(self, "whisperspeech", "WhisperSpeech==0.8")
     import_module(self, "pydub", "pydub")
     
     if os_platform == "Windows":
@@ -1413,24 +1415,47 @@ class GeneratorAddonPreferences(AddonPreferences):
         default="dataautogpt3/OpenDalleV1.1",
         update=input_strips_updated,
     )
-    audio_model_card: bpy.props.EnumProperty(
-        name="Audio Model",
+    if not low_vram():
+        parler = ("parler-tts/parler-tts-mini-v1", "Speech: Parler TTS Mini", "parler-tts/parler-tts-mini-v1")
+    else:
+        parler = ("parler-tts/parler-tts-large-v1", "Speech: Parler TTS Large", "parler-tts/parler-tts-large-v1")
+
+    if os_platform != "Linux":
         items=[
             ("stabilityai/stable-audio-open-1.0", "Stable Audio Open", "stabilityai/stable-audio-open-1.0"),
             (
-                "facebook/musicgen-stereo-medium",
-                "Music: MusicGen Stereo",
-                "facebook/musicgen-stereo-medium",
+                "facebook/musicgen-stereo-melody-large",
+                "Music: MusicGen Stereo Melody",
+                "facebook/musicgen-stereo-melody-large",
             ),
             (
                 "cvssp/audioldm2-large",
                 "Audio LDM 2 Large",
                 "cvssp/audioldm2-large",
             ),
+            parler,    
             ("bark", "Speech: Bark", "Bark"),
-            ("WhisperSpeech", "Speech: WhisperSpeech", "WhisperSpeech"),
-            ("parler-tts/parler-tts-large-v1", "Speech: Parler TTS Large", "parler-tts/parler-tts-large-v1"),
-        ],
+            ("WhisperSpeech", "Speech: WhisperSpeech", "WhisperSpeech")
+        ]
+    else:
+        items=[
+            ("stabilityai/stable-audio-open-1.0", "Stable Audio Open", "stabilityai/stable-audio-open-1.0"),
+            (
+                "facebook/musicgen-stereo-melody-large",
+                "Music: MusicGen Stereo Melody",
+                "facebook/musicgen-stereo-melody-large",
+            ),
+            (
+                "cvssp/audioldm2-large",
+                "Audio LDM 2 Large",
+                "cvssp/audioldm2-large",
+            ),
+            parler,
+        ]
+
+    audio_model_card: bpy.props.EnumProperty(
+        name="Audio Model",
+        items=items,
         default="stabilityai/stable-audio-open-1.0",
         update=input_strips_updated,
     )
@@ -1941,10 +1966,10 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 if (type == "audio" and audio_model_card == "bark") or (type == "audio" and audio_model_card == "stabilityai/stable-audio-open-1.0") or (
                     type == "image" and image_model_card == "black-forest-labs/FLUX.1-schnell") or (
                     type == "image" and image_model_card == "ChuckMcSneed/FLUX.1-dev") or (
-                    type == "audio" and audio_model_card == "facebook/musicgen-stereo-medium" and audio_model_card == "WhisperSpeech"
+                    type == "audio" and audio_model_card == "facebook/musicgen-stereo-melody-large" and audio_model_card == "WhisperSpeech"
                 ):
                     pass
-                elif type == "audio" and audio_model_card == "parler-tts/parler-tts-large-v1":
+                elif type == "audio" and (audio_model_card == "parler-tts/parler-tts-large-v1" or audio_model_card == "parler-tts/parler-tts-mini-v1"):
                     layout = col.column()
                     col = layout.column(align=True)
                     col.use_property_split = True
@@ -1991,7 +2016,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
 #                row.prop(context.scene, "audio_path", text="Speaker")
 #                # Speaker / Instruction
 
-            elif type == "audio" and (addon_prefs.audio_model_card == "facebook/musicgen-stereo-medium" or addon_prefs.audio_model_card == "stabilityai/stable-audio-open-1.0"):
+            elif type == "audio" and (addon_prefs.audio_model_card == "facebook/musicgen-stereo-melody-large" or addon_prefs.audio_model_card == "stabilityai/stable-audio-open-1.0"):
                 col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
             else:
                 if (
@@ -2988,7 +3013,7 @@ class SEQUENCER_OT_generate_audio(Operator):
         import random
         from scipy.io.wavfile import write as write_wav
 
-        if addon_prefs.audio_model_card == "facebook/musicgen-stereo-medium":
+        if addon_prefs.audio_model_card == "facebook/musicgen-stereo-melody-large":
             #            if os_platform == "Darwin" or os_platform == "Linux":
             #                import sox
             #            else:
@@ -3023,7 +3048,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 )
                 return {"CANCELLED"}
 
-        if addon_prefs.audio_model_card == "parler-tts/parler-tts-large-v1":
+        if addon_prefs.audio_model_card == "parler-tts/parler-tts-large-v1" or addon_prefs.audio_model_card == "parler-tts/parler-tts-mini-v1":
             import numpy as np
 
             try:
@@ -3089,13 +3114,13 @@ class SEQUENCER_OT_generate_audio(Operator):
                 pipe.to(gfx_device)
 
         # Musicgen
-        elif addon_prefs.audio_model_card == "facebook/musicgen-stereo-medium":
+        elif addon_prefs.audio_model_card == "facebook/musicgen-stereo-melody-large":
             from transformers import pipeline
             from transformers import set_seed
 
             pipe = pipeline(
                 "text-to-audio",
-                "facebook/musicgen-stereo-medium",
+                "facebook/musicgen-stereo-melody-large",
                 device="cuda:0",
                 torch_dtype=torch.float16,
             )
@@ -3119,9 +3144,9 @@ class SEQUENCER_OT_generate_audio(Operator):
             pipe = Pipeline(s2a_ref="collabora/whisperspeech:s2a-q4-small-en+pl.model")
 
         # Parler
-        elif addon_prefs.audio_model_card == "parler-tts/parler-tts-large-v1":
-            pipe = ParlerTTSForConditionalGeneration.from_pretrained("parler-tts/parler-tts-large-v1").to(gfx_device)
-            tokenizer = AutoTokenizer.from_pretrained("parler-tts/parler-tts-large-v1")
+        elif addon_prefs.audio_model_card == "parler-tts/parler-tts-large-v1" or addon_prefs.audio_model_card == "parler-tts/parler-tts-mini-v1":
+            pipe = ParlerTTSForConditionalGeneration.from_pretrained(addon_prefs.audio_model_card).to(gfx_device)
+            tokenizer = AutoTokenizer.from_pretrained(addon_prefs.audio_model_card)
 
         # Deadend
         else:
@@ -3307,7 +3332,7 @@ class SEQUENCER_OT_generate_audio(Operator):
 
             # Musicgen.
 
-            elif addon_prefs.audio_model_card == "facebook/musicgen-stereo-medium":
+            elif addon_prefs.audio_model_card == "facebook/musicgen-stereo-melody-large":
 
                 print("Generate: MusicGen Stereo")
                 #print("Prompt: " + prompt)
@@ -3365,7 +3390,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 write_wav(filename, rate, music.transpose())
 
             # Parler
-            elif addon_prefs.audio_model_card == "parler-tts/parler-tts-large-v1":
+            elif addon_prefs.audio_model_card == "parler-tts/parler-tts-large-v1" or addon_prefs.audio_model_card == "parler-tts/parler-tts-mini-v1":
                 prompt = prompt
                 seed = context.scene.movie_num_seed
                 seed = seed if not context.scene.movie_use_random else random.randint(0, 999999)
