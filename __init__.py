@@ -69,7 +69,8 @@ try:
     if torch.cuda.is_available():
         gfx_device = "cuda"
     elif torch.backends.mps.is_available():
-        gfx_device = "mps"
+        #gfx_device = "mps"
+        gfx_device = "cpu"
     else:
         gfx_device = "cpu"
     print("GFX Device: "+gfx_device)
