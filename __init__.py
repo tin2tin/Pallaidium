@@ -22,7 +22,8 @@ bl_info = {
     "category": "Sequencer",
 }
 
-# TO DO: Long prompts, Move prints, FLUX Controlnet & LoRA, refactor, clean-up. 
+# TO DO: Style title check, long prompts, SDXL controlnet, Move prints.
+
 
 import bpy
 import ctypes
@@ -72,10 +73,8 @@ try:
         gfx_device = "mps"
     else:
         gfx_device = "cpu"
-    print("GFX Device: "+gfx_device)
 except:
     print("Pallaidium dependencies needs to be installed and Blender needs to be restarted.")
-
 os_platform = platform.system()  # 'Linux', 'Darwin', 'Java', 'Windows'
 if os_platform == "Windows":
     pathlib.PosixPath = pathlib.WindowsPath
@@ -562,42 +561,14 @@ def process_image(image_path, frames_nr):
     return processed_frames
 
 
-#def low_vram():
-#    import torch
-
-#    total_vram = 0
-#    for i in range(torch.cuda.device_count()):
-#        properties = torch.cuda.get_device_properties(i)
-#        total_vram += properties.total_memory
-#    return (total_vram / (1024**3)) <= 16  # Y/N under 16 GB?
-
-
 def low_vram():
-    try:
-        if sys.platform == "darwin":  # macOS
-            vram_info = subprocess.check_output(
-                ["system_profiler", "SPDisplaysDataType"], 
-                text=True
-            )
-            vram_match = re.search(r"(\d+)\s?MB", vram_info)        
-            if vram_match:
-                vram_mb = int(vram_match.group(1))
-                vram_gb = vram_mb / 1024
-        else:
-            import torch
-            vram_gb = 0
-            if torch.cuda.is_available():
-                for i in range(torch.cuda.device_count()):
-                    properties = torch.cuda.get_device_properties(i)
-                    vram_gb += properties.total_memory
-            else:
-               vram_gb = 0 
-    
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        
-    print("Vram: " + str(vram_gb / (1024**3)))
-    return (vram_gb / (1024**3)) <= 16  # Y/N under 16 GB?
+    import torch
+
+    total_vram = 0
+    for i in range(torch.cuda.device_count()):
+        properties = torch.cuda.get_device_properties(i)
+        total_vram += properties.total_memory
+    return (total_vram / (1024**3)) <= 16  # Y/N under 16 GB?
 
 
 def clear_cuda_cache():
@@ -2029,7 +2000,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             col = layout.column(align=True)
             if type == "movie" or type == "image":
                 col.prop(context.scene, "generate_movie_frames", text="Frames")
-            if type == "audio" and audio_model_card != "bark" and audio_model_card != "WhisperSpeech"and audio_model_card != "parler-tts/parler-tts-large-v1":
+            if type == "audio" and audio_model_card != "bark" and audio_model_card != "WhisperSpeech"and audio_model_card != "parler-tts/parler-tts-large-v1" and audio_model_card != "parler-tts/parler-tts-mini-v1":
                 col.prop(context.scene, "audio_length_in_f", text="Frames")
             if type == "audio" and audio_model_card == "bark":
                 col = layout.column(align=True)
@@ -2049,18 +2020,22 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
             else:
                 if (
-                    type == "image"
-                    and image_model_card == "ByteDance/SDXL-Lightning"
-                    or type == "image"
-                    and image_model_card == "Lykon/dreamshaper-xl-lightning"
+                    (type == "image"
+                    and (image_model_card == "ByteDance/SDXL-Lightning"
+                    or image_model_card == "Lykon/dreamshaper-xl-lightning"))
+                    or (type == "audio" 
+                    and (audio_model_card == "parler-tts/parler-tts-mini-v1" or audio_model_card == "parler-tts/parler-tts-large-v1" ))
                 ):
                     pass
                 else:
                     col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
+
                 if (
                     (type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid")
                     or (type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt")
                     or (type == "image" and image_model_card == "black-forest-labs/FLUX.1-schnell")
+                    or (type == "audio" 
+                    and (audio_model_card == "parler-tts/parler-tts-mini-v1" or audio_model_card == "parler-tts/parler-tts-large-v1" ))
                     #or (type == "image" and image_model_card == "ChuckMcSneed/FLUX.1-dev")
                     or (
                         scene.use_lcm
@@ -2606,7 +2581,8 @@ class SEQUENCER_OT_generate_movie(Operator):
 
             # Model for upscale generated movie
             if scene.video_to_video:
-                clear_cuda_cache()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
                 from diffusers import DiffusionPipeline
 
                 upscale = DiffusionPipeline.from_pretrained(
@@ -2631,8 +2607,9 @@ class SEQUENCER_OT_generate_movie(Operator):
         for i in range(scene.movie_num_batch):
 
             start_time = timer()
-            clear_cuda_cache()
-            
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
             if i > 0:
                 empty_channel = scene.sequence_editor.active_strip.channel
                 start_frame = scene.sequence_editor.active_strip.frame_final_start + scene.sequence_editor.active_strip.frame_final_duration
@@ -2656,7 +2633,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 and movie_model_card != "stabilityai/stable-video-diffusion-img2vid"
                 and movie_model_card != "stabilityai/stable-video-diffusion-img2vid-xt"
             ):
-                generator = torch.Generator(gfx_device).manual_seed(seed) if seed != 0 else None
+                generator = torch.Generator("cuda").manual_seed(seed) if seed != 0 else None
             else:
                 if seed != 0:
                     generator = torch.Generator()
@@ -2728,7 +2705,8 @@ class SEQUENCER_OT_generate_movie(Operator):
                             generator=generator,
                         ).images[0]
                         video_frames.append(image)
-                        clear_cuda_cache()
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
                     video_frames = np.array(video_frames)
 
                 # vid2vid / img2vid
@@ -2897,11 +2875,13 @@ class SEQUENCER_OT_generate_movie(Operator):
                     ).frames[0]
                 movie_model_card = addon_prefs.movie_model_card
 
-                clear_cuda_cache()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
                 # Upscale video.
                 if scene.video_to_video:
                     print("Upscale: Video")
-                    clear_cuda_cache()
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
                     video = [Image.fromarray(frame).resize((closest_divisible_16(x * 2), closest_divisible_16(y * 2))) for frame in video_frames]
                     video_frames = upscale(
                         prompt,
@@ -3088,7 +3068,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 return {"CANCELLED"}
 
         if addon_prefs.audio_model_card == "bark":
-            #os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+            os.environ["CUDA_VISIBLE_DEVICES"] = "0"
             try:
                 import numpy as np
                 from bark.generation import (
@@ -3120,7 +3100,7 @@ class SEQUENCER_OT_generate_audio(Operator):
 
             repo_id = "ylacombe/stable-audio-1.0"
             pipe = StableAudioPipeline.from_pretrained(repo_id, torch_dtype=torch.float16)
-
+            device = "cuda" if torch.cuda.is_available() else "cpu"
             if low_vram():
                 pipe.enable_model_cpu_offload()
             else:
@@ -3212,7 +3192,7 @@ class SEQUENCER_OT_generate_audio(Operator):
             if (
                 torch.cuda.is_available()
             ):
-                generator = torch.Generator(gfx_device).manual_seed(seed) if seed != 0 else None
+                generator = torch.Generator("cuda").manual_seed(seed) if seed != 0 else None
             else:
                 if seed != 0:
                     generator = torch.Generator()
@@ -3282,8 +3262,8 @@ class SEQUENCER_OT_generate_audio(Operator):
                     pieces += [audio_array, silence.copy()]
                 audio = np.concatenate(pieces)
                 filename = solve_path(clean_filename(prompt) + ".wav")
-
                 # Write the combined audio to a file
+
                 write_wav(filename, rate, audio.transpose())
 
                 # resemble_enhance
@@ -3291,14 +3271,26 @@ class SEQUENCER_OT_generate_audio(Operator):
                 # print("sr_load " + str(sr))
 
                 dwav = dwav.mean(dim=0)
+                # transform = torchaudio.transforms.Resample(orig_freq=sr, new_freq=44100)
+                # dwav = transform(dwav)
+                #                dwav = audio
+                # sr = rate
+
+                if torch.cuda.is_available():
+                    device = "cuda"
+                else:
+                    device = "cpu"
+                #                wav1, new_sr = denoise(dwav, sr, device)
 
                 wav2, new_sr = enhance(
-                    dwav=dwav, sr=sr, device=gfx_device, nfe=64, chunk_seconds=10, chunks_overlap=1, solver="midpoint", lambd=0.1, tau=0.5
+                    dwav=dwav, sr=sr, device=device, nfe=64, chunk_seconds=10, chunks_overlap=1, solver="midpoint", lambd=0.1, tau=0.5
                 )
+                # print("sr_save " + str(new_sr))
+                # wav1 = wav1.cpu().numpy()
 
                 wav2 = wav2.cpu().numpy()
-
                 # Write the combined audio to a file
+
                 write_wav(filename, new_sr, wav2)
 
             # WhisperSpeech
@@ -3379,7 +3371,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 context.scene.movie_num_seed = seed
                 # Use cuda if possible
                 if torch.cuda.is_available():
-                    generator = torch.Generator(gfx_device).manual_seed(seed) if seed != 0 else None
+                    generator = torch.Generator("cuda").manual_seed(seed) if seed != 0 else None
                 else:
                     if seed != 0:
                         generator = torch.Generator()
@@ -3486,8 +3478,8 @@ def scale_image_within_dimensions(image, target_width=None, target_height=None):
 
 
 def get_depth_map(image):
-    image = feature_extractor(images=image, return_tensors="pt").pixel_values.to(gfx_device)
-    with torch.no_grad(), torch.autocast(gfx_device):
+    image = feature_extractor(images=image, return_tensors="pt").pixel_values.to("cuda")
+    with torch.no_grad(), torch.autocast("cuda"):
         depth_map = depth_estimator(image).predicted_depth
     depth_map = torch.nn.functional.interpolate(
         depth_map.unsqueeze(1),
@@ -3668,11 +3660,10 @@ def load_images_from_folder(folder_path):
 def flush():
     import torch
     import gc
-    if torch.cuda.is_available():
-        gc.collect()
-        torch.cuda.empty_cache()
-        torch.cuda.reset_max_memory_allocated()
-        torch.cuda.reset_peak_memory_stats()
+    gc.collect()
+    torch.cuda.empty_cache()
+    torch.cuda.reset_max_memory_allocated()
+    #torch.cuda.reset_peak_memory_stats()
 
 
 def bytes_to_giga_bytes(bytes):
@@ -3874,11 +3865,14 @@ class SEQUENCER_OT_generate_image(Operator):
             pipe.watermark = NoWatermark()
 
             if low_vram():
+                # torch.cuda.set_per_process_memory_fraction(0.99)
+
                 pipe.enable_model_cpu_offload()
             else:
                 pipe.to(gfx_device)
 
         # Conversion img2img/vid2img.
+
         elif (
             do_convert
             and image_model_card != "warp-ai/wuerstchen"
@@ -4420,7 +4414,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         ckpt_id, text_encoder=text_encoder, text_encoder_2=text_encoder_2,
                         tokenizer=tokenizer, tokenizer_2=tokenizer_2, vae=None, transformer=None, #transformer=transformer, #
                         revision="refs/pr/1"
-                    )
+                    )#.to(gfx_device)
                 else:
                     #transformer = FluxTransformer2DModel.from_single_file("https://huggingface.co/Kijai/flux-fp8/blob/main/flux1-dev-fp8.safetensors")
                     text_encoder = CLIPTextModel.from_pretrained(ckpt_id, subfolder="text_encoder", torch_dtype=torch.bfloat16)
@@ -4684,7 +4678,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
 
                 # Load model.
-                pipe = StableDiffusionXLPipeline.from_pretrained(base, torch_dtype=torch.float16, vae=vae, variant="fp16").to(gfx_device)
+                pipe = StableDiffusionXLPipeline.from_pretrained(base, torch_dtype=torch.float16, vae=vae, variant="fp16").to("cuda")
                 pipe.load_lora_weights(hf_hub_download(repo, ckpt))
                 pipe.fuse_lora()
 
@@ -4917,8 +4911,9 @@ class SEQUENCER_OT_generate_image(Operator):
             context.scene.movie_num_seed = seed
 
             # Use cuda if possible.
+
             if torch.cuda.is_available():
-                generator = torch.Generator(gfx_device).manual_seed(seed) if seed != 0 else None
+                generator = torch.Generator("cuda").manual_seed(seed) if seed != 0 else None
             else:
                 if seed != 0:
                     generator = torch.Generator()
@@ -5815,7 +5810,7 @@ class SEQUENCER_OT_generate_image(Operator):
             image.save(out_path)
 
             if input == "input_strips":
-                old_strip = context.selected_sequences[0]
+                old_strip = context.scene.sequence_editor.active_strip #context.selected_sequences[0]
 
             # Add strip
             if os.path.isfile(out_path):
@@ -5945,6 +5940,7 @@ class SEQUENCER_OT_generate_text(Operator):
                 return {"CANCELLED"}
             
         # clear the VRAM
+
         clear_cuda_cache()
 
         init_image = load_first_frame(scene.movie_path) if scene.movie_path else load_first_frame(scene.image_path)
@@ -6139,11 +6135,10 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
 
         total_vram = 0
         for i in range(torch.cuda.device_count()):
-            if torch.cuda.is_available():
-                properties = torch.cuda.get_device_properties(i)
-                total_vram += properties.total_memory
-                print("Total VRAM: " + str(total_vram))
-                print("Total GPU Cards: " + str(torch.cuda.device_count()))
+            properties = torch.cuda.get_device_properties(i)
+            total_vram += properties.total_memory
+        print("Total VRAM: " + str(total_vram))
+        print("Total GPU Cards: " + str(torch.cuda.device_count()))
 
         for count, strip in enumerate(strips):
             for dsel_strip in bpy.context.scene.sequence_editor.sequences:
