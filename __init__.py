@@ -575,16 +575,17 @@ def process_image(image_path, frames_nr):
 def low_vram():
     try:
         if sys.platform == "darwin":  # macOS
-            vram_info = subprocess.check_output(
-                ["system_profiler", "SPDisplaysDataType"], 
-                text=True
-            )
-            vram_match = re.search(r"(\d+)\s?MB", vram_info)        
-            if vram_match:
-                vram_mb = int(vram_match.group(1))
-                vram_gb = vram_mb / 1024
-            print("Vram: " + str(vram_gb / (1024**3)))
-            vram_gb = ((vram_gb / (1024**3)) <= 16)  # Y/N under 16 GB?
+#            vram_info = subprocess.check_output(
+#                ["system_profiler", "SPDisplaysDataType"], 
+#                text=True
+#            )
+#            vram_match = re.search(r"(\d+)\s?MB", vram_info)        
+#            if vram_match:
+#                vram_mb = int(vram_match.group(1))
+#                vram_gb = vram_mb / 1024
+#            print("Vram: " + str(vram_gb / (1024**3)))
+#            vram_gb = ((vram_gb / (1024**3)) <= 16)  # Y/N under 16 GB?
+            vram_gb = True
         else:
             import torch
             vram_gb = 0
@@ -595,7 +596,7 @@ def low_vram():
                 print("Vram: " + str(vram_gb / (1024**3)))
                 vram_gb = ((vram_gb / (1024**3)) <= 16)  # Y/N under 16 GB?
             else:
-               vram_gb = 0 
+               vram_gb = False
     
     except Exception as e:
         print(f"An error occurred: {e}")
