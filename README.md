@@ -222,6 +222,9 @@ Triton for manual installation on Windows: https://huggingface.co/madbuda/triton
 
 ## Video Examples
 
+### VID2VID & TXT2VID
+[![Watch the video](https://img.youtube.com/vi/S2b7QGv-l-o/0.jpg)](https://www.youtube.com/watch?v=S2b7QGv-l-o)
+
 ### Image to Text
 https://github.com/tin2tin/Pallaidium/assets/1322593/91eb17e4-72d6-4c69-8e5c-a3d38af5a770
 
