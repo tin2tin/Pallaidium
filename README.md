@@ -3,8 +3,7 @@ AI-generate video, image, and audio from text prompts or video, image, or text s
 
 ![PallAIdium](https://github.com/tin2tin/Generative_AI/assets/1322593/1b1b232f-00d9-4b0b-86fb-5f0f24136d2c)
 
-# Discord
-[https://discord.gg/csBJhBtE](https://discord.gg/HMYpnPzbTm)
+[<img src="https://img.shields.io/badge/Discord%20-%20Invite">](https://discord.gg/HMYpnPzbTm) [<img src="https://img.shields.io/badge/X%20-%20Twitter">](https://x.com/tintwotin)
 
 ## Features
 
