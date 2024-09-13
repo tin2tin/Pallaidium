@@ -66,6 +66,7 @@ If any Python modules are missing, use this add-on to install them manually:    
 https://github.com/tin2tin/blender_pip      |
 
 ## Change Log
+* 2024-9-14: Add: Flux Inpaint & Img2img.
 * 2024-9-4: Add: Florence 2 (Image Caption), AudioLDM2-Large, CogVideox-2b, flash_attn on Win.
 * 2024-9-2: Add: Vid2vid for CogVideoX-5b and Parler TTS
 * 2024-8-28: Make CogVideox-5b run on 6 GB VRAM & Flux on 2 GB VRAM
