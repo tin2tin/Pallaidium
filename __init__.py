@@ -22,7 +22,8 @@ bl_info = {
     "category": "Sequencer",
 }
 
-# TO DO: Long prompts, Move prints, FLUX Controlnet & LoRA, refactor, clean-up. 
+# TO DO: Style title check, long prompts, SDXL controlnet, Move prints.
+
 
 import bpy
 import ctypes
@@ -69,14 +70,11 @@ try:
     if torch.cuda.is_available():
         gfx_device = "cuda"
     elif torch.backends.mps.is_available():
-        #gfx_device = "mps"
-        gfx_device = "cpu"
+        gfx_device = "mps"
     else:
         gfx_device = "cpu"
-    print("GFX Device: "+gfx_device)
 except:
     print("Pallaidium dependencies needs to be installed and Blender needs to be restarted.")
-
 os_platform = platform.system()  # 'Linux', 'Darwin', 'Java', 'Windows'
 if os_platform == "Windows":
     pathlib.PosixPath = pathlib.WindowsPath
@@ -563,46 +561,21 @@ def process_image(image_path, frames_nr):
     return processed_frames
 
 
-#def low_vram():
-#    import torch
-
-#    total_vram = 0
-#    for i in range(torch.cuda.device_count()):
-#        properties = torch.cuda.get_device_properties(i)
-#        total_vram += properties.total_memory
-#    return (total_vram / (1024**3)) <= 16  # Y/N under 16 GB?
-
-
 def low_vram():
     try:
-        if sys.platform == "darwin":  # macOS
-#            vram_info = subprocess.check_output(
-#                ["system_profiler", "SPDisplaysDataType"], 
-#                text=True
-#            )
-#            vram_match = re.search(r"(\d+)\s?MB", vram_info)        
-#            if vram_match:
-#                vram_mb = int(vram_match.group(1))
-#                vram_gb = vram_mb / 1024
-#            print("Vram: " + str(vram_gb / (1024**3)))
-#            vram_gb = ((vram_gb / (1024**3)) <= 16)  # Y/N under 16 GB?
-            vram_gb = True
-        else:
-            import torch
-            vram_gb = 0
-            if torch.cuda.is_available():
-                for i in range(torch.cuda.device_count()):
-                    properties = torch.cuda.get_device_properties(i)
-                    vram_gb += properties.total_memory
-                print("Vram: " + str(vram_gb / (1024**3)))
-                vram_gb = ((vram_gb / (1024**3)) <= 16)  # Y/N under 16 GB?
-            else:
-               vram_gb = False
-    
-    except Exception as e:
-        print(f"An error occurred: {e}")
+        if gfx_device == "mps":
+            return True
         
-    return vram_gb # Y/N under 16 GB?
+        exec("import torch")
+
+        total_vram = 0
+        for i in range(torch.cuda.device_count()):
+            properties = torch.cuda.get_device_properties(i)
+            total_vram += properties.total_memory
+        return (total_vram / (1024**3)) <= 16  # Y/N under 16 GB?
+    except:
+        print("Torch not found!")
+        return True
 
 
 def clear_cuda_cache():
@@ -715,7 +688,7 @@ def import_module(self, module, install_module):
 #    except:
     self.report({"INFO"}, "Installing: " + module + " module.")
     print("\nInstalling: " + module + " module")
-    subprocess.call([python_exe, "-m", "pip", "install", install_module, "--no-warn-script-location", "--upgrade"])
+    subprocess.call([python_exe, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", install_module, "--no-warn-script-location", "--upgrade"])
 
 #    try:
 #        exec("import " + module)
@@ -744,11 +717,12 @@ def install_modules(self):
         subprocess.call([pybin, "-m", "pip", "install", "--upgrade", "pip"])
         pass
 
+    # import_module(self, "diffusers", "diffusers")
+    import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
     import_module(self, "huggingface_hub", "huggingface_hub")
-    import_module(self, "transformers", "transformers==4.43.0")
     #import_module(self, "transformers", "git+https://github.com/huggingface/transformers.git")
     if os_platform != "Linux":
-        subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/suno-ai/bark.git", "--upgrade"])
+        subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "git+https://github.com/suno-ai/bark.git", "--upgrade"])
     if os_platform != "Linux":
         import_module(self, "whisperspeech", "WhisperSpeech==0.8")
     import_module(self, "pydub", "pydub")
@@ -757,7 +731,7 @@ def install_modules(self):
         import_module(self, "deepspeed", "https://github.com/daswer123/deepspeed-windows/releases/download/13.1/deepspeed-0.13.1+cu121-cp311-cp311-win_amd64.whl")
         # resemble-enhance:
         subprocess.call(
-            [pybin, "-m", "pip", "install", "git+https://github.com/tin2tin/resemble-enhance-windows.git", "--upgrade"] #"--no-dependencies",
+            [pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "git+https://github.com/tin2tin/resemble-enhance-windows.git", "--upgrade"] #"--no-dependencies",
         )
         #deep_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deepspeed/deepspeed-0.12.4+unknown-py3-none-any.whl")
         #deep_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deepspeed/deepspeed-0.14.4-py3-none-any.whl")
@@ -776,9 +750,7 @@ def install_modules(self):
         import_module(self, "deepspeed", "deepspeed==0.14.4")
         import_module(self, "resemble_enhance", "resemble-enhance")
 
-    # import_module(self, "diffusers", "diffusers")
-    import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
-    subprocess.check_call([pybin, "-m", "pip", "install", "tensorflow", "--upgrade"])
+    subprocess.check_call([pybin, "-m", "pip", "install", "--disable-pip-version-check","--use-deprecated=legacy-resolver", "tensorflow", "--upgrade"])
 
     if os_platform == "Windows":
         import_module(self, "soundfile", "PySoundFile")
@@ -802,8 +774,7 @@ def install_modules(self):
     else:
         import_module(self, "flash_attn", "flash-attn")
 
-    import_module(self, "controlnet_aux", "controlnet-aux")
-    subprocess.call([pybin, "-m", "pip", "install", "controlnet-aux", "--upgrade"])
+    subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "controlnet-aux", "--upgrade"])
 
     import_module(self, "beautifulsoup4", "beautifulsoup4")
     import_module(self, "ftfy", "ftfy")
@@ -817,77 +788,21 @@ def install_modules(self):
     import_module(self, "imWatermark", "imWatermark")
     import_module(self, "parler_tts", "git+https://github.com/huggingface/parler-tts.git")
     if os_platform == "Windows":
-        subprocess.call([pybin, "-m", "pip", "install", "https://hf-mirror.com/LightningJay/triton-2.1.0-python3.11-win_amd64-wheel/resolve/main/triton-2.1.0-cp311-cp311-win_amd64.whl", "--upgrade", '--user'])
+        subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "--disable-pip-version-check", "https://hf-mirror.com/LightningJay/triton-2.1.0-python3.11-win_amd64-wheel/resolve/main/triton-2.1.0-cp311-cp311-win_amd64.whl", "--upgrade", '--user'])
     else:
         try:
             exec("import triton")
         except ModuleNotFoundError:
             import_module(self, "triton", "triton")
-#    if os_platform == "Windows":
-#        if python_version_str == "3.10":
-#            subprocess.check_call(
-#                [
-#                    pybin,
-#                    "-m",
-#                    "pip",
-#                    "install",
-#                    "https://files.pythonhosted.org/packages/e2/a9/98e0197b24165113ac551aae5646005205f88347fb13ac59a75a9864e1d3/mediapipe-0.10.9-cp310-cp310-win_amd64.whl",
-#                    "--no-warn-script-location",
-#                ]
-#            )
-#        else:
-#            subprocess.check_call(
-#                [
-#                    pybin,
-#                    "-m",
-#                    "pip",
-#                    "install",
-#                    "https://files.pythonhosted.org/packages/e9/7b/cd671c5067a56e1b4a9b70d0e42ac8cdb9f63acdc186589827cf213802a5/mediapipe-0.10.9-cp311-cp311-win_amd64.whl",
-#                    "--no-warn-script-location",
-#                ]
-#            )
-#    else:
     import_module(self, "mediapipe", "mediapipe")
-#    if os_platform == "Windows":
-#        print("")
-#        if python_version_str == "3.10":
-#            subprocess.check_call(
-#                [
-#                    pybin,
-#                    "-m",
-#                    "pip",
-#                    "install",
-#                    "https://github.com/Gourieff/Assets/raw/main/Insightface/insightface-0.7.3-cp310-cp310-win_amd64.whl",
-#                    "--no-warn-script-location",
-#                ]
-#            )
-#        else:
-#            subprocess.check_call(
-#                [
-#                    pybin,
-#                    "-m",
-#                    "pip",
-#                    "install",
-#                    "https://github.com/Gourieff/Assets/raw/main/Insightface/insightface-0.7.3-cp311-cp311-win_amd64.whl",
-#                    "--no-warn-script-location",
-#                ]
-#            )
-#    else:
-#    import_module(self, "insightface", "insightface")
-#    import_module(self, "onnxruntime", "onnxruntime")
-    #import_module(self, "asdff", "git+https://github.com/theblackhatmagician/adetailer_sdxl.git")
-    #subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/theblackhatmagician/adetailer_sdxl.git", "--upgrade"])
-    #import_module(self, "ultralytics", "ultralytics")
-
-    subprocess.call([pybin, "-m", "pip", "install", "ultralytics", "--upgrade"])
-    subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/theblackhatmagician/adetailer_sdxl.git", "--upgrade"])
-    subprocess.call([pybin, "-m", "pip", "install", "lmdb", "--upgrade"])
-    subprocess.call([pybin, "-m", "pip", "install", "git+https://github.com/huggingface/accelerate.git", "--upgrade"])
+    subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "ultralytics", "--upgrade"])
+    subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "git+https://github.com/theblackhatmagician/adetailer_sdxl.git"])
+    subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "lmdb", "--upgrade"])
+    subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "git+https://github.com/huggingface/accelerate.git", "--upgrade"])
     #import_module(self, "accelerate", "git+https://github.com/huggingface/accelerate.git")
     #import_module(self, "accelerate", "accelerate")
-    subprocess.check_call([pybin, "-m", "pip", "install", "peft", "--upgrade"])
 
-
+    import_module(self, "controlnet_aux", "controlnet-aux")
     self.report({"INFO"}, "Installing: torch module.")
     print("\nInstalling: torch module")
     if os_platform == "Windows":
@@ -896,36 +811,6 @@ def install_modules(self):
         subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "torchaudio"])
         subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "xformers"])
 
-#         subprocess.call([pybin, "-m", "pip", "install", "torch torchvision torchaudio xformers", "--index-url", "https://download.pytorch.org/whl/cu121"])
-#        subprocess.check_call(
-#            [
-#                pybin,
-#                "-m",
-#                "pip",
-#                "install",
-#                #"torchvision==0.17.0+cu121",
-#                "torchvision==0.18.0+cu121",
-#                "--index-url",
-#                "https://download.pytorch.org/whl/cu121",
-#                "--no-warn-script-location",
-#                #"--user",
-#                "--upgrade",
-#            ]
-#        )
-#        subprocess.check_call(
-#            [
-#                pybin,
-#                "-m",
-#                "pip",
-#                "install",
-#                "xformers==0.0.26.post1",
-#                "--index-url",
-#                "https://download.pytorch.org/whl/cu121",
-#                "--no-warn-script-location",
-#                #"--user",
-#                "--upgrade",
-#            ]
-#        )
         subprocess.check_call(
             [
                 pybin,
@@ -956,22 +841,7 @@ def install_modules(self):
                 "--upgrade",
             ]
         )
-#        subprocess.check_call(
-#            [
-#                pybin,
-#                "-m",
-#                "pip",
-#                "install",
-#                "torchao",
-#                "--index-url",
-#                "https://download.pytorch.org/whl/cu124",
-#                #"https://download.pytorch.org/whl/cu121",
-#                "--no-warn-script-location",
-#                #"--user",
-#                "--upgrade",
-#            ]
-#
-#        )
+        
     else:
         import_module(self, "torch", "torch")
         import_module(self, "torchvision", "torchvision")
@@ -979,8 +849,10 @@ def install_modules(self):
         import_module(self, "xformers", "xformers")
         import_module(self, "torchao", "torchao")
 
+    subprocess.check_call([pybin, "-m", "pip", "install", "peft", "--upgrade"])
+    import_module(self, "transformers", "transformers==4.43.0")
     print("Dir: " + str(subprocess.check_call([pybin, "-m", "pip", "cache", "purge"])))
-
+    
 
 def get_module_dependencies(module_name):
     """
@@ -988,8 +860,11 @@ def get_module_dependencies(module_name):
     """
     pybin = python_exec()
     result = subprocess.run([pybin, "-m", "pip", "show", module_name], capture_output=True, text=True)
-    output = result.stdout.strip()
     dependencies = []
+    if result.stdout:
+        output = result.stdout.strip()
+    else:
+        return dependencies  
     for line in output.split("\n"):
         if line.startswith("Requires:"):
             dependencies = line.split(":")[1].strip().split(", ")
@@ -1011,8 +886,8 @@ def uninstall_module_with_dependencies(module_name):
     # Uninstall the dependencies
 
     for dependency in dependencies:
-        print("\n ")
-        if len(dependency) > 5 and str(dependency[5].lower) != "numpy":
+        #print("\n ")
+        if (len(dependency) > 5 and str(dependency[5].lower) != "numpy") and not dependency.find("requests"):
             subprocess.run([pybin, "-m", "pip", "uninstall", "-y", dependency])
 
 
@@ -2034,7 +1909,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             col = layout.column(align=True)
             if type == "movie" or type == "image":
                 col.prop(context.scene, "generate_movie_frames", text="Frames")
-            if type == "audio" and audio_model_card != "bark" and audio_model_card != "WhisperSpeech"and audio_model_card != "parler-tts/parler-tts-large-v1":
+            if type == "audio" and audio_model_card != "bark" and audio_model_card != "WhisperSpeech"and audio_model_card != "parler-tts/parler-tts-large-v1" and audio_model_card != "parler-tts/parler-tts-mini-v1":
                 col.prop(context.scene, "audio_length_in_f", text="Frames")
             if type == "audio" and audio_model_card == "bark":
                 col = layout.column(align=True)
@@ -2054,18 +1929,22 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
             else:
                 if (
-                    type == "image"
-                    and image_model_card == "ByteDance/SDXL-Lightning"
-                    or type == "image"
-                    and image_model_card == "Lykon/dreamshaper-xl-lightning"
+                    (type == "image"
+                    and (image_model_card == "ByteDance/SDXL-Lightning"
+                    or image_model_card == "Lykon/dreamshaper-xl-lightning"))
+                    or (type == "audio" 
+                    and (audio_model_card == "parler-tts/parler-tts-mini-v1" or audio_model_card == "parler-tts/parler-tts-large-v1" ))
                 ):
                     pass
                 else:
                     col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
+
                 if (
                     (type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid")
                     or (type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt")
                     or (type == "image" and image_model_card == "black-forest-labs/FLUX.1-schnell")
+                    or (type == "audio" 
+                    and (audio_model_card == "parler-tts/parler-tts-mini-v1" or audio_model_card == "parler-tts/parler-tts-large-v1" ))
                     #or (type == "image" and image_model_card == "ChuckMcSneed/FLUX.1-dev")
                     or (
                         scene.use_lcm
@@ -2558,12 +2437,10 @@ class SEQUENCER_OT_generate_movie(Operator):
                     pipe.enable_sequential_cpu_offload()
                     pipe.vae.enable_tiling()
                 else:
-                    if gfx_device == "cuda":
-                        pipe.enable_model_cpu_offload()
-                        #pipe.enable_sequential_cpu_offload()
-                        #pipe.vae.enable_tiling()
-                    else:    
-                        pipe.to(gfx_device)
+                    #pipe.to(gfx_device)
+                    pipe.enable_model_cpu_offload()
+                    #pipe.enable_sequential_cpu_offload()
+                    #pipe.vae.enable_tiling()
                 if ((scene.movie_path or scene.image_path)and input == "input_strips"):
                     pipe.scheduler = CogVideoXDPMScheduler.from_config(pipe.scheduler.config)
                 scene.generate_movie_x = 720
@@ -2613,7 +2490,8 @@ class SEQUENCER_OT_generate_movie(Operator):
 
             # Model for upscale generated movie
             if scene.video_to_video:
-                clear_cuda_cache()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
                 from diffusers import DiffusionPipeline
 
                 upscale = DiffusionPipeline.from_pretrained(
@@ -2638,8 +2516,9 @@ class SEQUENCER_OT_generate_movie(Operator):
         for i in range(scene.movie_num_batch):
 
             start_time = timer()
-            clear_cuda_cache()
-            
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
             if i > 0:
                 empty_channel = scene.sequence_editor.active_strip.channel
                 start_frame = scene.sequence_editor.active_strip.frame_final_start + scene.sequence_editor.active_strip.frame_final_duration
@@ -2663,7 +2542,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 and movie_model_card != "stabilityai/stable-video-diffusion-img2vid"
                 and movie_model_card != "stabilityai/stable-video-diffusion-img2vid-xt"
             ):
-                generator = torch.Generator(gfx_device).manual_seed(seed) if seed != 0 else None
+                generator = torch.Generator("cuda").manual_seed(seed) if seed != 0 else None
             else:
                 if seed != 0:
                     generator = torch.Generator()
@@ -2735,7 +2614,8 @@ class SEQUENCER_OT_generate_movie(Operator):
                             generator=generator,
                         ).images[0]
                         video_frames.append(image)
-                        clear_cuda_cache()
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
                     video_frames = np.array(video_frames)
 
                 # vid2vid / img2vid
@@ -2904,11 +2784,13 @@ class SEQUENCER_OT_generate_movie(Operator):
                     ).frames[0]
                 movie_model_card = addon_prefs.movie_model_card
 
-                clear_cuda_cache()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
                 # Upscale video.
                 if scene.video_to_video:
                     print("Upscale: Video")
-                    clear_cuda_cache()
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
                     video = [Image.fromarray(frame).resize((closest_divisible_16(x * 2), closest_divisible_16(y * 2))) for frame in video_frames]
                     video_frames = upscale(
                         prompt,
@@ -3095,7 +2977,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 return {"CANCELLED"}
 
         if addon_prefs.audio_model_card == "bark":
-            #os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+            os.environ["CUDA_VISIBLE_DEVICES"] = "0"
             try:
                 import numpy as np
                 from bark.generation import (
@@ -3127,7 +3009,7 @@ class SEQUENCER_OT_generate_audio(Operator):
 
             repo_id = "ylacombe/stable-audio-1.0"
             pipe = StableAudioPipeline.from_pretrained(repo_id, torch_dtype=torch.float16)
-
+            device = "cuda" if torch.cuda.is_available() else "cpu"
             if low_vram():
                 pipe.enable_model_cpu_offload()
             else:
@@ -3219,7 +3101,7 @@ class SEQUENCER_OT_generate_audio(Operator):
             if (
                 torch.cuda.is_available()
             ):
-                generator = torch.Generator(gfx_device).manual_seed(seed) if seed != 0 else None
+                generator = torch.Generator("cuda").manual_seed(seed) if seed != 0 else None
             else:
                 if seed != 0:
                     generator = torch.Generator()
@@ -3289,8 +3171,8 @@ class SEQUENCER_OT_generate_audio(Operator):
                     pieces += [audio_array, silence.copy()]
                 audio = np.concatenate(pieces)
                 filename = solve_path(clean_filename(prompt) + ".wav")
-
                 # Write the combined audio to a file
+
                 write_wav(filename, rate, audio.transpose())
 
                 # resemble_enhance
@@ -3298,14 +3180,26 @@ class SEQUENCER_OT_generate_audio(Operator):
                 # print("sr_load " + str(sr))
 
                 dwav = dwav.mean(dim=0)
+                # transform = torchaudio.transforms.Resample(orig_freq=sr, new_freq=44100)
+                # dwav = transform(dwav)
+                #                dwav = audio
+                # sr = rate
+
+                if torch.cuda.is_available():
+                    device = "cuda"
+                else:
+                    device = "cpu"
+                #                wav1, new_sr = denoise(dwav, sr, device)
 
                 wav2, new_sr = enhance(
-                    dwav=dwav, sr=sr, device=gfx_device, nfe=64, chunk_seconds=10, chunks_overlap=1, solver="midpoint", lambd=0.1, tau=0.5
+                    dwav=dwav, sr=sr, device=device, nfe=64, chunk_seconds=10, chunks_overlap=1, solver="midpoint", lambd=0.1, tau=0.5
                 )
+                # print("sr_save " + str(new_sr))
+                # wav1 = wav1.cpu().numpy()
 
                 wav2 = wav2.cpu().numpy()
-
                 # Write the combined audio to a file
+
                 write_wav(filename, new_sr, wav2)
 
             # WhisperSpeech
@@ -3386,7 +3280,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 context.scene.movie_num_seed = seed
                 # Use cuda if possible
                 if torch.cuda.is_available():
-                    generator = torch.Generator(gfx_device).manual_seed(seed) if seed != 0 else None
+                    generator = torch.Generator("cuda").manual_seed(seed) if seed != 0 else None
                 else:
                     if seed != 0:
                         generator = torch.Generator()
@@ -3493,8 +3387,8 @@ def scale_image_within_dimensions(image, target_width=None, target_height=None):
 
 
 def get_depth_map(image):
-    image = feature_extractor(images=image, return_tensors="pt").pixel_values.to(gfx_device)
-    with torch.no_grad(), torch.autocast(gfx_device):
+    image = feature_extractor(images=image, return_tensors="pt").pixel_values.to("cuda")
+    with torch.no_grad(), torch.autocast("cuda"):
         depth_map = depth_estimator(image).predicted_depth
     depth_map = torch.nn.functional.interpolate(
         depth_map.unsqueeze(1),
@@ -3675,11 +3569,10 @@ def load_images_from_folder(folder_path):
 def flush():
     import torch
     import gc
-    if torch.cuda.is_available():
-        gc.collect()
-        torch.cuda.empty_cache()
-        torch.cuda.reset_max_memory_allocated()
-        torch.cuda.reset_peak_memory_stats()
+    gc.collect()
+    torch.cuda.empty_cache()
+    torch.cuda.reset_max_memory_allocated()
+    #torch.cuda.reset_peak_memory_stats()
 
 
 def bytes_to_giga_bytes(bytes):
@@ -3881,11 +3774,14 @@ class SEQUENCER_OT_generate_image(Operator):
             pipe.watermark = NoWatermark()
 
             if low_vram():
+                # torch.cuda.set_per_process_memory_fraction(0.99)
+
                 pipe.enable_model_cpu_offload()
             else:
                 pipe.to(gfx_device)
 
         # Conversion img2img/vid2img.
+
         elif (
             do_convert
             and image_model_card != "warp-ai/wuerstchen"
@@ -4397,67 +4293,72 @@ class SEQUENCER_OT_generate_image(Operator):
 
         # Flux Schnell
         elif image_model_card == "black-forest-labs/FLUX.1-schnell" or image_model_card == "ChuckMcSneed/FLUX.1-dev":
-
+            print("Load: Flux Model")
             from diffusers import FluxPipeline#, FluxTransformer2DModel, AutoencoderKL
             #from diffusers.image_processor import VaeImageProcessor
             #from transformers import T5EncoderModel, T5TokenizerFast, CLIPTokenizer, CLIPTextModel
-
+            
             flush()
-            if low_vram():
-                pipe = FluxPipeline.from_pretrained(image_model_card, torch_dtype=torch.bfloat16)
-                pipe.enable_model_cpu_offload() #save some VRAM by offloading the model to CPU. Remove this if you have enough GPU power
+            #if low_vram():
+            pipe = FluxPipeline.from_pretrained(image_model_card, torch_dtype=torch.bfloat16)
+            #pipe.enable_model_cpu_offload() #save some VRAM by offloading the model to CPU. Remove this if you have enough GPU power
+            if gfx_device != "mps":
                 pipe.enable_sequential_cpu_offload()
                 pipe.enable_vae_slicing()
                 pipe.enable_vae_tiling()
+                pipe.to(torch.float16)
             else:
-                from diffusers import FluxPipeline, FluxTransformer2DModel, AutoencoderKL
-                from diffusers.image_processor import VaeImageProcessor
-                from transformers import T5EncoderModel, T5TokenizerFast, CLIPTokenizer, CLIPTextModel
-                ckpt_id = image_model_card
-                if image_model_card == "black-forest-labs/FLUX.1-schnell":
-                    #transformer = FluxTransformer2DModel.from_pretrained("sayakpaul/FLUX.1-merged", torch_dtype=torch.bfloat16)
-                    #transformer = FluxTransformer2DModel.from_single_file("https://huggingface.co/Kijai/flux-fp8/blob/main/flux1-dev-fp8.safetensors")
-                    #pipe = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-dev", transformer=transformer)
-                    text_encoder = CLIPTextModel.from_pretrained(ckpt_id, revision="refs/pr/1", subfolder="text_encoder", torch_dtype=torch.bfloat16)
-                    text_encoder_2 = T5EncoderModel.from_pretrained(ckpt_id, revision="refs/pr/1", subfolder="text_encoder_2", torch_dtype=torch.bfloat16)
-                    tokenizer = CLIPTokenizer.from_pretrained(ckpt_id, subfolder="tokenizer", revision="refs/pr/1")
-                    tokenizer_2 = T5TokenizerFast.from_pretrained(ckpt_id, subfolder="tokenizer_2", revision="refs/pr/1")
+                pipe.vae.enable_tiling()
+                
+#            else:
+#                from diffusers import FluxPipeline, FluxTransformer2DModel, AutoencoderKL
+#                from diffusers.image_processor import VaeImageProcessor
+#                from transformers import T5EncoderModel, T5TokenizerFast, CLIPTokenizer, CLIPTextModel
+#                ckpt_id = image_model_card
+#                if image_model_card == "black-forest-labs/FLUX.1-schnell":
+#                    #transformer = FluxTransformer2DModel.from_pretrained("sayakpaul/FLUX.1-merged", torch_dtype=torch.bfloat16)
+#                    #transformer = FluxTransformer2DModel.from_single_file("https://huggingface.co/Kijai/flux-fp8/blob/main/flux1-dev-fp8.safetensors")
+#                    #pipe = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-dev", transformer=transformer)
+#                    text_encoder = CLIPTextModel.from_pretrained(ckpt_id, revision="refs/pr/1", subfolder="text_encoder", torch_dtype=torch.bfloat16)
+#                    text_encoder_2 = T5EncoderModel.from_pretrained(ckpt_id, revision="refs/pr/1", subfolder="text_encoder_2", torch_dtype=torch.bfloat16)
+#                    tokenizer = CLIPTokenizer.from_pretrained(ckpt_id, subfolder="tokenizer", revision="refs/pr/1")
+#                    tokenizer_2 = T5TokenizerFast.from_pretrained(ckpt_id, subfolder="tokenizer_2", revision="refs/pr/1")
 
-                    pipe = FluxPipeline.from_pretrained(
-                        ckpt_id, text_encoder=text_encoder, text_encoder_2=text_encoder_2,
-                        tokenizer=tokenizer, tokenizer_2=tokenizer_2, vae=None, transformer=None, #transformer=transformer, #
-                        revision="refs/pr/1"
-                    )
-                else:
-                    #transformer = FluxTransformer2DModel.from_single_file("https://huggingface.co/Kijai/flux-fp8/blob/main/flux1-dev-fp8.safetensors")
-                    text_encoder = CLIPTextModel.from_pretrained(ckpt_id, subfolder="text_encoder", torch_dtype=torch.bfloat16)
-                    text_encoder_2 = T5EncoderModel.from_pretrained(ckpt_id, subfolder="text_encoder_2", torch_dtype=torch.bfloat16)
-                    tokenizer = CLIPTokenizer.from_pretrained(ckpt_id, subfolder="tokenizer")
-                    tokenizer_2 = T5TokenizerFast.from_pretrained(ckpt_id, subfolder="tokenizer_2")
+#                    pipe = FluxPipeline.from_pretrained(
+#                        ckpt_id, text_encoder=text_encoder, text_encoder_2=text_encoder_2,
+#                        tokenizer=tokenizer, tokenizer_2=tokenizer_2, vae=None, transformer=None, #transformer=transformer, #
+#                        revision="refs/pr/1"
+#                    )#.to(gfx_device)
+#                else:
+#                    #transformer = FluxTransformer2DModel.from_single_file("https://huggingface.co/Kijai/flux-fp8/blob/main/flux1-dev-fp8.safetensors")
+#                    text_encoder = CLIPTextModel.from_pretrained(ckpt_id, subfolder="text_encoder", torch_dtype=torch.bfloat16)
+#                    text_encoder_2 = T5EncoderModel.from_pretrained(ckpt_id, subfolder="text_encoder_2", torch_dtype=torch.bfloat16)
+#                    tokenizer = CLIPTokenizer.from_pretrained(ckpt_id, subfolder="tokenizer")
+#                    tokenizer_2 = T5TokenizerFast.from_pretrained(ckpt_id, subfolder="tokenizer_2")
 
-                    pipe = FluxPipeline.from_pretrained(
-                        ckpt_id, text_encoder=text_encoder, text_encoder_2=text_encoder_2,
-                        tokenizer=tokenizer, tokenizer_2=tokenizer_2, transformer=None, vae=None, #transformer=transformer
-                    )
+#                    pipe = FluxPipeline.from_pretrained(
+#                        ckpt_id, text_encoder=text_encoder, text_encoder_2=text_encoder_2,
+#                        tokenizer=tokenizer, tokenizer_2=tokenizer_2, transformer=None, vae=None, #transformer=transformer
+#                    )
 
-                if low_vram():
-                    pipe.enable_model_cpu_offload()
-                else:
-                    pipe.to(gfx_device)
+#                    pipe.enable_sequential_cpu_offload()
+#                    pipe.vae.enable_slicing()
+#                    pipe.vae.enable_tiling()
+#                    pipe.to(torch.float16)
 
-                #pipe.enable_model_cpu_offload() #save some VRAM by offloading the model to CPU. Remove this if you have enough GPU power
-                #pipe.enable_sequential_cpu_offload()
-                #pipe.enable_vae_slicing()#                pipe.enable_vae_tiling()
+#                #pipe.enable_model_cpu_offload() #save some VRAM by offloading the model to CPU. Remove this if you have enough GPU power
+#                #pipe.enable_sequential_cpu_offload()
+#                #pipe.enable_vae_slicing()#                pipe.enable_vae_tiling()
 
-                with torch.no_grad():
-                    print("Encoding prompts.")
-                    prompt_embeds, pooled_prompt_embeds, text_ids = pipe.encode_prompt(prompt=prompt, prompt_2=None, max_sequence_length=256)
+#                with torch.no_grad():
+#                    print("Encoding prompts.")
+#                    prompt_embeds, pooled_prompt_embeds, text_ids = pipe.encode_prompt(prompt=prompt, prompt_2=None, max_sequence_length=256)
 
-                del text_encoder
-                del text_encoder_2
-                del tokenizer
-                del tokenizer_2
-                del pipe
+#                del text_encoder
+#                del text_encoder_2
+#                del tokenizer
+#                del tokenizer_2
+#                del pipe
 
 
 
@@ -4691,7 +4592,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16)
 
                 # Load model.
-                pipe = StableDiffusionXLPipeline.from_pretrained(base, torch_dtype=torch.float16, vae=vae, variant="fp16").to(gfx_device)
+                pipe = StableDiffusionXLPipeline.from_pretrained(base, torch_dtype=torch.float16, vae=vae, variant="fp16").to("cuda")
                 pipe.load_lora_weights(hf_hub_download(repo, ckpt))
                 pipe.fuse_lora()
 
@@ -4924,8 +4825,9 @@ class SEQUENCER_OT_generate_image(Operator):
             context.scene.movie_num_seed = seed
 
             # Use cuda if possible.
+
             if torch.cuda.is_available():
-                generator = torch.Generator(gfx_device).manual_seed(seed) if seed != 0 else None
+                generator = torch.Generator("cuda").manual_seed(seed) if seed != 0 else None
             else:
                 if seed != 0:
                     generator = torch.Generator()
@@ -5418,89 +5320,100 @@ class SEQUENCER_OT_generate_image(Operator):
                 delete_strip(mask_strip)
 
             # Flux
-            elif image_model_card == "black-forest-labs/FLUX.1-schnell" or image_model_card == "ChuckMcSneed/FLUX.1-dev":
-                if low_vram():
-                    image = pipe(
-                        prompt=prompt,
-                        num_inference_steps=image_num_inference_steps,
-                        guidance_scale=image_num_guidance,
-                        height=y,
-                        width=x,
-                        generator=generator,
-                    ).images[0]
-                    flush()
-                else:
-                    if image_model_card == "ChuckMcSneed/FLUX.1-dev":
+            elif image_model_card == "black-forest-labs/FLUX.1-schnell":
+#                if low_vram():
+                image = pipe(
+                    prompt=prompt,
+                    #num_inference_steps=movie_num_inference_steps,
+                    guidance_scale=image_num_guidance,
+                    height=y,
+                    width=x,
+                    generator=generator,
+                ).images[0]
+            # Flux
+            elif image_model_card == "ChuckMcSneed/FLUX.1-dev":
+#                if low_vram():
+                image = pipe(
+                    prompt=prompt,
+                    num_inference_steps=image_num_inference_steps,
+                    guidance_scale=image_num_guidance,
+                    height=y,
+                    width=x,
+                    generator=image_num_guidance,
+                ).images[0]
+#                flush()
+#                else:
+#                    if image_model_card == "ChuckMcSneed/FLUX.1-dev":
 
-                        pipe = FluxPipeline.from_pretrained(
-                            ckpt_id, text_encoder=None, text_encoder_2=None,
-                            tokenizer=None, tokenizer_2=None, vae=None,
-                            torch_dtype=torch.bfloat16
-                        ).to(gfx_device)
+#                        pipe = FluxPipeline.from_pretrained(
+#                            ckpt_id, text_encoder=None, text_encoder_2=None,
+#                            tokenizer=None, tokenizer_2=None, vae=None,
+#                            torch_dtype=torch.bfloat16
+#                        ).to(gfx_device)
 
-                        latents = pipe(
-                            prompt_embeds=prompt_embeds,
-                            pooled_prompt_embeds=pooled_prompt_embeds,
-                            num_inference_steps=image_num_inference_steps, guidance_scale=image_num_guidance,
-                            max_sequence_length=512,
-                            height=y,
-                            width=x,
-                            generator=generator,
-                            output_type="latent"
-                        ).images
-                        del pipe.transformer
-                        del pipe
+#                        latents = pipe(
+#                            prompt_embeds=prompt_embeds,
+#                            pooled_prompt_embeds=pooled_prompt_embeds,
+#                            num_inference_steps=image_num_inference_steps, guidance_scale=image_num_guidance,
+#                            max_sequence_length=512,
+#                            height=y,
+#                            width=x,
+#                            generator=generator,
+#                            output_type="latent"
+#                        ).images
+#                        del pipe.transformer
+#                        del pipe
 
-                        flush()
+#                        flush()
 
-                        vae = AutoencoderKL.from_pretrained(
-                            ckpt_id,
-                            subfolder="vae",
-                            torch_dtype=torch.bfloat16
-                        ).to(gfx_device)
+#                        vae = AutoencoderKL.from_pretrained(
+#                            ckpt_id,
+#                            subfolder="vae",
+#                            torch_dtype=torch.bfloat16
+#                        ).to(gfx_device)
 
-                    else:
-                        pipe = FluxPipeline.from_pretrained(
-                            ckpt_id, text_encoder=None, text_encoder_2=None,
-                            tokenizer=None, tokenizer_2=None, vae=None,
-                            revision="refs/pr/1",
-                            torch_dtype=torch.bfloat16
-                        ).to(gfx_device)
-                        latents = pipe(
-                            prompt_embeds=prompt_embeds,
-                            pooled_prompt_embeds=pooled_prompt_embeds,
-                            num_inference_steps=image_num_inference_steps, guidance_scale=0.0,
-                            height=y,
-                            width=x,
-                            generator=generator,
-                            output_type="latent"
-                        ).images
-                        # print(f"{latents.shape=}")
-                        del pipe.transformer
-                        del pipe
+#                    else:
+#                        pipe = FluxPipeline.from_pretrained(
+#                            ckpt_id, text_encoder=None, text_encoder_2=None,
+#                            tokenizer=None, tokenizer_2=None, vae=None,
+#                            revision="refs/pr/1",
+#                            torch_dtype=torch.bfloat16
+#                        ).to(gfx_device)
+#                        latents = pipe(
+#                            prompt_embeds=prompt_embeds,
+#                            pooled_prompt_embeds=pooled_prompt_embeds,
+#                            num_inference_steps=image_num_inference_steps, guidance_scale=0.0,
+#                            height=y,
+#                            width=x,
+#                            generator=generator,
+#                            output_type="latent"
+#                        ).images
+#                        # print(f"{latents.shape=}")
+#                        del pipe.transformer
+#                        del pipe
 
-                        flush()
+#                        flush()
 
-                        vae = AutoencoderKL.from_pretrained(
-                            ckpt_id,
-                            revision="refs/pr/1",
-                            subfolder="vae",
-                            torch_dtype=torch.bfloat16
-                        ).to(gfx_device)
+#                        vae = AutoencoderKL.from_pretrained(
+#                            ckpt_id,
+#                            revision="refs/pr/1",
+#                            subfolder="vae",
+#                            torch_dtype=torch.bfloat16
+#                        ).to(gfx_device)
 
-                    vae_scale_factor = 2 ** (len(vae.config.block_out_channels))
-                    image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
-#                    image = image_processor.postprocess(image, output_type="pil")
-#                    image = image[0]
+#                    vae_scale_factor = 2 ** (len(vae.config.block_out_channels))
+#                    image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
+##                    image = image_processor.postprocess(image, output_type="pil")
+##                    image = image[0]
 
-                    with torch.no_grad():
-                        #print("Running decoding.")
-                        pipe = FluxPipeline._unpack_latents(latents, y, x, vae_scale_factor)
-                        pipe = (pipe / vae.config.scaling_factor) + vae.config.shift_factor
+#                    with torch.no_grad():
+#                        #print("Running decoding.")
+#                        pipe = FluxPipeline._unpack_latents(latents, y, x, vae_scale_factor)
+#                        pipe = (pipe / vae.config.scaling_factor) + vae.config.shift_factor
 
-                        image = vae.decode(pipe, return_dict=False)[0]
-                        image = image_processor.postprocess(image, output_type="pil")
-                        image = image[0]
+#                        image = vae.decode(pipe, return_dict=False)[0]
+#                        image = image_processor.postprocess(image, output_type="pil")
+#                        image = image[0]
 
 #            # Flux Dev
 #            elif image_model_card == "ChuckMcSneed/FLUX.1-dev":
@@ -5822,7 +5735,7 @@ class SEQUENCER_OT_generate_image(Operator):
             image.save(out_path)
 
             if input == "input_strips":
-                old_strip = context.selected_sequences[0]
+                old_strip = context.scene.sequence_editor.active_strip #context.selected_sequences[0]
 
             # Add strip
             if os.path.isfile(out_path):
@@ -5952,6 +5865,7 @@ class SEQUENCER_OT_generate_text(Operator):
                 return {"CANCELLED"}
             
         # clear the VRAM
+
         clear_cuda_cache()
 
         init_image = load_first_frame(scene.movie_path) if scene.movie_path else load_first_frame(scene.image_path)
@@ -6146,11 +6060,10 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
 
         total_vram = 0
         for i in range(torch.cuda.device_count()):
-            if torch.cuda.is_available():
-                properties = torch.cuda.get_device_properties(i)
-                total_vram += properties.total_memory
-                print("Total VRAM: " + str(total_vram))
-                print("Total GPU Cards: " + str(torch.cuda.device_count()))
+            properties = torch.cuda.get_device_properties(i)
+            total_vram += properties.total_memory
+        print("Total VRAM: " + str(total_vram))
+        print("Total GPU Cards: " + str(torch.cuda.device_count()))
 
         for count, strip in enumerate(strips):
             for dsel_strip in bpy.context.scene.sequence_editor.sequences:
