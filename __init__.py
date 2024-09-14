@@ -682,11 +682,8 @@ def install_modules(self):
     # import_module(self, "diffusers", "diffusers")
     import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
     import_module(self, "huggingface_hub", "huggingface_hub")
+    import_module(self, "protobuf", "protobuf")
     #import_module(self, "transformers", "git+https://github.com/huggingface/transformers.git")
-    if os_platform != "Linux":
-        subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "git+https://github.com/suno-ai/bark.git", "--upgrade"])
-    if os_platform != "Linux":
-        import_module(self, "whisperspeech", "WhisperSpeech==0.8")
     import_module(self, "pydub", "pydub")
     if os_platform == "Windows":
         import_module(self, "deepspeed", "https://github.com/daswer123/deepspeed-windows/releases/download/13.1/deepspeed-0.13.1+cu121-cp311-cp311-win_amd64.whl")
@@ -724,7 +721,6 @@ def install_modules(self):
     import_module(self, "scipy", "scipy")
     import_module(self, "IPython", "IPython")
     import_module(self, "omegaconf", "omegaconf")
-    import_module(self, "protobuf", "protobuf")
     #import_module(self, "hidiffusion", "hidiffusion")
     import_module(self, "aura_sr", "aura-sr")
 
@@ -779,10 +775,12 @@ def install_modules(self):
                 "pip",
                 "install",
                 "torch==2.3.1+cu121",
+                #"torch==2.4.1+cu124",
                 "xformers",
                 "torchvision",
                 "--index-url",
                 "https://download.pytorch.org/whl/cu121",
+                #"https://download.pytorch.org/whl/cu121",
                 "--no-warn-script-location",
                 #"--user",
                 "--upgrade",
@@ -795,8 +793,10 @@ def install_modules(self):
                 "pip",
                 "install",
                 "torchaudio==2.3.1+cu121",
+                #"torchaudio==2.4.1+cu124",
                 "--index-url",
                 "https://download.pytorch.org/whl/cu121",
+                #"https://download.pytorch.org/whl/cu121",
                 "--no-warn-script-location",
                 #"--user",
                 "--upgrade",
@@ -809,6 +809,10 @@ def install_modules(self):
         import_module(self, "torchaudio", "torchaudio")
         import_module(self, "xformers", "xformers")
         import_module(self, "torchao", "torchao")
+
+    if os_platform != "Linux":
+        subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "git+https://github.com/suno-ai/bark.git", "--upgrade"])
+        import_module(self, "whisperspeech", "WhisperSpeech==0.8")
 
     subprocess.check_call([pybin, "-m", "pip", "install", "peft", "--upgrade"])
     import_module(self, "transformers", "transformers==4.43.0")
@@ -4202,16 +4206,21 @@ class SEQUENCER_OT_generate_image(Operator):
         # Flux Schnell
         elif (image_model_card == "black-forest-labs/FLUX.1-schnell" or image_model_card == "ChuckMcSneed/FLUX.1-dev"):
             print("Load: Flux Model")
-            from diffusers import FluxPipeline
-                        
             flush()
+            from diffusers import FluxPipeline    
             #if low_vram():
             pipe = FluxPipeline.from_pretrained(image_model_card, torch_dtype=torch.bfloat16)
             #pipe.enable_model_cpu_offload() #save some VRAM by offloading the model to CPU. Remove this if you have enough GPU power
             if gfx_device != "mps":
+#                pipe.enable_sequential_cpu_offload()
+#                pipe.enable_vae_slicing()
+#                pipe.enable_vae_tiling()
+#                pipe.to(torch.float16)
+                
+                #pipe.enable_model_cpu_offload()
                 pipe.enable_sequential_cpu_offload()
-                pipe.enable_vae_slicing()
-                pipe.enable_vae_tiling()
+                #pipe.enable_vae_slicing()
+                pipe.vae.enable_tiling()                              
                 pipe.to(torch.float16)
             else:
                 pipe.vae.enable_tiling()
@@ -4458,9 +4467,9 @@ class SEQUENCER_OT_generate_image(Operator):
                 else:
                     pipe.to(gfx_device)
             else:
+                print("Load: Auto Pipeline")
                 try:
                     from diffusers import AutoPipelineForText2Image
-
                     pipe = AutoPipelineForText2Image.from_pretrained(
                         image_model_card,
                         torch_dtype=torch.float16,
@@ -4964,7 +4973,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 
                 init_image = init_image.resize((x, y))
                 
-                if (image_model_card == "black-forest-labs/FLUX.1-schnell" or image_model_card == "black-forest-labs/FLUX.1-schnell"):
+                if (image_model_card == "black-forest-labs/FLUX.1-schnell" or image_model_card == "ChuckMcSneed/FLUX.1-dev"):
                     print("Process Inpaint: " + image_model_card)
                     if image_model_card == "black-forest-labs/FLUX.1-schnell":
                         image_num_guidance = 0
@@ -5080,27 +5089,25 @@ class SEQUENCER_OT_generate_image(Operator):
                         generator=generator,
                     ).images[0]
 
-            # Flux
+            # Flux Schnell
             elif image_model_card == "black-forest-labs/FLUX.1-schnell":
-#                if low_vram():
-                image = pipe(
-                    prompt=prompt,
-                    #num_inference_steps=movie_num_inference_steps,
-                    guidance_scale=image_num_guidance,
-                    height=y,
-                    width=x,
-                    generator=generator,
-                ).images[0]
-            # Flux
-            elif image_model_card == "ChuckMcSneed/FLUX.1-dev":
-#                if low_vram():
                 image = pipe(
                     prompt=prompt,
                     num_inference_steps=image_num_inference_steps,
                     guidance_scale=image_num_guidance,
                     height=y,
                     width=x,
-                    generator=image_num_guidance,
+                    generator=generator,
+                ).images[0]
+            # Flux Dev
+            elif image_model_card == "ChuckMcSneed/FLUX.1-dev":
+                image = pipe(
+                    prompt=prompt,
+                    num_inference_steps=image_num_inference_steps,
+                    guidance_scale=image_num_guidance,
+                    height=y,
+                    width=x,
+                    generator=generator,
                 ).images[0]
 #                flush()
 #                else:
@@ -5775,6 +5782,10 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
             total_vram += properties.total_memory
         print("Total VRAM: " + str(total_vram))
         print("Total GPU Cards: " + str(torch.cuda.device_count()))
+        cuda_version = torch.version.cuda
+        print(f"CUDA version: {cuda_version}")
+        cudnn_version = torch.backends.cudnn.version()
+        print(f"cuDNN version: {cudnn_version}")
 
         for count, strip in enumerate(strips):
             for dsel_strip in bpy.context.scene.sequence_editor.sequences:
