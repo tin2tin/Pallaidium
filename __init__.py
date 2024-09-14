@@ -1020,6 +1020,7 @@ def input_strips_updated(self, context):
         scene.upscale = False
     if (image_model_card == "black-forest-labs/FLUX.1-schnell") and type == "image":
         bpy.context.scene.movie_num_inference_steps = 4
+        bpy.context.scene.movie_num_guidance = 0
     if (image_model_card == "ChuckMcSneed/FLUX.1-dev") and type == "image":
         bpy.context.scene.movie_num_inference_steps = 25
         bpy.context.scene.movie_num_guidance = 4
@@ -1063,6 +1064,14 @@ def output_strips_updated(self, context):
         bpy.context.scene.use_lcm = False
     if movie_model_card == "cerspense/zeroscope_v2_XL" and type == "movie":
         scene.upscale = False
+    if (image_model_card == "black-forest-labs/FLUX.1-schnell") and type == "image":
+        bpy.context.scene.movie_num_inference_steps = 4
+        bpy.context.scene.movie_num_guidance = 0
+    if (image_model_card == "ChuckMcSneed/FLUX.1-dev") and type == "image":
+        bpy.context.scene.movie_num_inference_steps = 25
+        bpy.context.scene.movie_num_guidance = 4
+    if addon_prefs.audio_model_card == "stabilityai/stable-audio-open-1.0" and type == "audio":
+        bpy.context.scene.movie_num_inference_steps = 200
 
 
 class GeneratorAddonPreferences(AddonPreferences):
@@ -1702,7 +1711,6 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         col = col.box()
         col = col.column()
         # Input
-
         if image_model_card == "Salesforce/blipdiffusion" and type == "image":
             col.prop(context.scene, "input_strips", text="Source Image")
             col.prop(context.scene, "blip_cond_subject", text="Source Subject")
@@ -5073,7 +5081,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     ).images[0]
 
             # Flux
-            elif image_model_card == " ":
+            elif image_model_card == "black-forest-labs/FLUX.1-schnell":
 #                if low_vram():
                 image = pipe(
                     prompt=prompt,
