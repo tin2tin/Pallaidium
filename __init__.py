@@ -1105,12 +1105,12 @@ class GeneratorAddonPreferences(AddonPreferences):
         items=[
             (
                 "stabilityai/stable-video-diffusion-img2vid-xt",
-                "Stable Video Diffusion XT (576x1024x24) ",
+                "Stable Video Diffusion XT (1024x576x24) ",
                 "stabilityai/stable-video-diffusion-img2vid-xt",
             ),
             (
                 "stabilityai/stable-video-diffusion-img2vid",
-                "Stable Video Diffusion (576x1024x14)",
+                "Stable Video Diffusion (1024x576x14)",
                 "stabilityai/stable-video-diffusion-img2vid",
             ),
             # Frame by Frame - disabled
@@ -1188,8 +1188,8 @@ class GeneratorAddonPreferences(AddonPreferences):
             #                "Stable Diffusion 1.5 (512x512)",
             #                "runwayml/stable-diffusion-v1-5",
             #            ),
-            ("black-forest-labs/FLUX.1-schnell", "Flux Schnell (24 GB VRAM)", "black-forest-labs/FLUX.1-schnell"),
-            ("ChuckMcSneed/FLUX.1-dev", "Flux 1 Dev (24 GB VRAM)", "ChuckMcSneed/FLUX.1-dev"),
+            ("black-forest-labs/FLUX.1-schnell", "Flux Schnell", "black-forest-labs/FLUX.1-schnell"),
+            ("ChuckMcSneed/FLUX.1-dev", "Flux 1 Dev", "ChuckMcSneed/FLUX.1-dev"),
             ("youknownothing/Fluently-XL-Final", "Fluently (1024x1024)", "youknownothing/Fluently-XL-Final"),
             ("Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers", "HunyuanDiT-v1.2", "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers"),
 #            ("RunDiffusion/Juggernaut-X-Hyper", "Juggernaut X Hyper (1024x1024)", "RunDiffusion/Juggernaut-X-Hyper"),
@@ -1886,9 +1886,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     (type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid")
                     or (type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt")
                     or (type == "image" and image_model_card == "black-forest-labs/FLUX.1-schnell")
-                    or (type == "audio"
-                    and (audio_model_card == "parler-tts/parler-tts-mini-v1" or audio_model_card == "parler-tts/parler-tts-large-v1" ))
-                    #or (type == "image" and image_model_card == "ChuckMcSneed/FLUX.1-dev")
+                    or (type == "audio" and (audio_model_card == "parler-tts/parler-tts-mini-v1" or audio_model_card == "parler-tts/parler-tts-large-v1" ))
                     or (
                         scene.use_lcm
                         and not (type == "image" and image_model_card == "Lykon/dreamshaper-8")
@@ -3654,8 +3652,8 @@ class SEQUENCER_OT_generate_image(Operator):
             or image_model_card == "Salesforce/blipdiffusion"
             or image_model_card == "Salesforce/blipdiffusion"
             or image_model_card == "Salesforce/blipdiffusion"
-            or image_model_card == "black-forest-labs/FLUX.1-schnell"
-            or image_model_card == "ChuckMcSneed/FLUX.1-dev"
+            #or image_model_card == "black-forest-labs/FLUX.1-schnell"
+            #or image_model_card == "ChuckMcSneed/FLUX.1-dev"
             and not scene.ip_adapter_face_folder
             and not scene.ip_adapter_style_folder
         ):
