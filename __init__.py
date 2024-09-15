@@ -533,7 +533,7 @@ def low_vram():
     try:
         if gfx_device == "mps":
             return True
-        
+
         exec("import torch")
 
         total_vram = 0
@@ -775,12 +775,10 @@ def install_modules(self):
                 "pip",
                 "install",
                 "torch==2.3.1+cu121",
-                #"torch==2.4.1+cu124",
                 "xformers",
                 "torchvision",
                 "--index-url",
                 "https://download.pytorch.org/whl/cu121",
-                #"https://download.pytorch.org/whl/cu121",
                 "--no-warn-script-location",
                 #"--user",
                 "--upgrade",
@@ -793,16 +791,14 @@ def install_modules(self):
                 "pip",
                 "install",
                 "torchaudio==2.3.1+cu121",
-                #"torchaudio==2.4.1+cu124",
                 "--index-url",
                 "https://download.pytorch.org/whl/cu121",
-                #"https://download.pytorch.org/whl/cu121",
                 "--no-warn-script-location",
                 #"--user",
                 "--upgrade",
             ]
         )
-        
+
     else:
         import_module(self, "torch", "torch")
         import_module(self, "torchvision", "torchvision")
@@ -817,7 +813,7 @@ def install_modules(self):
     subprocess.check_call([pybin, "-m", "pip", "install", "peft", "--upgrade"])
     import_module(self, "transformers", "transformers==4.43.0")
     print("Dir: " + str(subprocess.check_call([pybin, "-m", "pip", "cache", "purge"])))
-    
+
 
 def get_module_dependencies(module_name):
     """
@@ -829,7 +825,7 @@ def get_module_dependencies(module_name):
     if result.stdout:
         output = result.stdout.strip()
     else:
-        return dependencies  
+        return dependencies
     for line in output.split("\n"):
         if line.startswith("Requires:"):
             dependencies = line.split(":")[1].strip().split(", ")
@@ -1291,7 +1287,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Audio LDM 2 Large",
                 "cvssp/audioldm2-large",
             ),
-            parler,    
+            parler,
             ("bark", "Speech: Bark", "Bark"),
             ("WhisperSpeech", "Speech: WhisperSpeech", "WhisperSpeech")
         ]
@@ -1336,8 +1332,8 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "gokaygokay/Florence-2-Flux-Large",
                 "Florence-2 Image Captioning",
                 "gokaygokay/Florence-2-Flux-Large",
-            ),            
-            
+            ),
+
         },
         default="Salesforce/blip-image-captioning-large",
     )
@@ -1834,7 +1830,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         context.scene,
                         "parler_direction_prompt",
                         text="Direction",
-                    )                
+                    )
                 else:
                     col.prop(
                         context.scene,
@@ -1879,7 +1875,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     (type == "image"
                     and (image_model_card == "ByteDance/SDXL-Lightning"
                     or image_model_card == "Lykon/dreamshaper-xl-lightning"))
-                    or (type == "audio" 
+                    or (type == "audio"
                     and (audio_model_card == "parler-tts/parler-tts-mini-v1" or audio_model_card == "parler-tts/parler-tts-large-v1" ))
                 ):
                     pass
@@ -1890,7 +1886,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     (type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid")
                     or (type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt")
                     or (type == "image" and image_model_card == "black-forest-labs/FLUX.1-schnell")
-                    or (type == "audio" 
+                    or (type == "audio"
                     and (audio_model_card == "parler-tts/parler-tts-mini-v1" or audio_model_card == "parler-tts/parler-tts-large-v1" ))
                     #or (type == "image" and image_model_card == "ChuckMcSneed/FLUX.1-dev")
                     or (
@@ -1985,6 +1981,8 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 or image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
                 or image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
                 or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
+                or image_model_card == "black-forest-labs/FLUX.1-schnell"
+                or image_model_card == "ChuckMcSneed/FLUX.1-dev"
             )
             and type == "image"
             # and input != "input_strips"
@@ -2016,8 +2014,8 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     "lora_files_index",
                     rows=2,
                 )
-        # Output.
 
+        # Output.
         layout = self.layout
         layout.use_property_split = True
         layout.use_property_decorate = False
@@ -2101,6 +2099,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 "In the add-on preferences, install dependencies.",
             )
             return {"CANCELLED"}
+
         show_system_console(True)
         set_system_console_topmost(True)
         seq_editor = scene.sequence_editor
@@ -2109,7 +2108,6 @@ class SEQUENCER_OT_generate_movie(Operator):
         if not seq_editor:
             scene.sequence_editor_create()
         # clear the VRAM
-
         clear_cuda_cache()
 
         current_frame = scene.frame_current
@@ -2385,7 +2383,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     pipe.vae.enable_tiling()
                 else:
                     pipe.enable_model_cpu_offload()
-                    pipe.vae.enable_tiling()                    
+                    pipe.vae.enable_tiling()
                     #pipe.to(gfx_device)
                     #pipe.enable_model_cpu_offload()
                     #pipe.enable_sequential_cpu_offload()
@@ -2613,7 +2611,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         num_frames=abs(duration),
                         generator=generator,
                     ).frames[0]
-                    
+
                 #vid2vid
                 elif movie_model_card == "THUDM/CogVideoX-5b" or movie_model_card == "THUDM/CogVideoX-2b":
                     if scene.movie_path:
@@ -2647,8 +2645,8 @@ class SEQUENCER_OT_generate_movie(Operator):
                         #num_frames=abs(duration),
                         generator=generator,
                     ).frames[0]
-                    #prompt=prompt, strength=0.8, guidance_scale=6, num_inference_steps=5     
-                    
+                    #prompt=prompt, strength=0.8, guidance_scale=6, num_inference_steps=5
+
                 else:# movie_model_card != "guoyww/animatediff-motion-adapter-sdxl-beta":
                     if scene.movie_path:
                         print("Process: Video to video")
@@ -2702,7 +2700,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             else:
 
                 print("Generate: Video from text")
-                
+
                 if movie_model_card == "THUDM/CogVideoX-5b" or movie_model_card == "THUDM/CogVideoX-2b":
                     video_frames = pipe(
                         prompt=prompt,
@@ -2952,7 +2950,7 @@ class SEQUENCER_OT_generate_audio(Operator):
 
         # Load models Audio
         print("Model:  " + addon_prefs.audio_model_card)
-        
+
         if addon_prefs.audio_model_card == "stabilityai/stable-audio-open-1.0":
 
             repo_id = "ylacombe/stable-audio-1.0"
@@ -3244,10 +3242,10 @@ class SEQUENCER_OT_generate_audio(Operator):
                     guidance_scale=movie_num_guidance,
                     generator=generator,
                 ).audios[0]
-                
+
                 filename = solve_path(clean_filename(str(seed) + "_" + prompt) + ".wav")
                 rate = 16000
-                
+
                 write_wav(filename, rate, music.transpose())
 
             # Parler
@@ -3558,7 +3556,6 @@ class SEQUENCER_OT_generate_image(Operator):
         enabled_names = []
         enabled_weights = []
         # Check if there are any enabled items before loading
-
         enabled_items = [item for item in lora_files if item.enabled]
 
 #        if (
@@ -3657,7 +3654,7 @@ class SEQUENCER_OT_generate_image(Operator):
             or image_model_card == "Salesforce/blipdiffusion"
             or image_model_card == "Salesforce/blipdiffusion"
             or image_model_card == "Salesforce/blipdiffusion"
-            or image_model_card == "black-forest-labs/FLUX.1-schnell" 
+            or image_model_card == "black-forest-labs/FLUX.1-schnell"
             or image_model_card == "ChuckMcSneed/FLUX.1-dev"
             and not scene.ip_adapter_face_folder
             and not scene.ip_adapter_style_folder
@@ -3712,14 +3709,14 @@ class SEQUENCER_OT_generate_image(Operator):
                 else:
                     from diffusers import DPMSolverMultistepScheduler
                     pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-                    
+
                 pipe.watermark = NoWatermark()
                 if low_vram():
                     # torch.cuda.set_per_process_memory_fraction(0.99)
                     pipe.enable_model_cpu_offload()
                 else:
                     pipe.to(gfx_device)
-                    
+
             elif (image_model_card == "black-forest-labs/FLUX.1-schnell" or image_model_card == "ChuckMcSneed/FLUX.1-dev"):
                 print("Load Inpaint: "+image_model_card)
                 pipe = AutoPipelineForInpainting.from_pretrained(
@@ -3731,10 +3728,10 @@ class SEQUENCER_OT_generate_image(Operator):
                     #pipe.enable_model_cpu_offload()
                     pipe.enable_sequential_cpu_offload()
                     #pipe.enable_vae_slicing()
-                    pipe.vae.enable_tiling()                              
+                    pipe.vae.enable_tiling()
                     pipe.to(torch.float16)
                 else:
-                    pipe.vae.enable_tiling()                              
+                    pipe.vae.enable_tiling()
 
         # Conversion img2img/vid2img.
         elif (
@@ -3804,11 +3801,11 @@ class SEQUENCER_OT_generate_image(Operator):
                         #pipe.enable_model_cpu_offload()
                         converter.enable_sequential_cpu_offload()
                         #pipe.enable_vae_slicing()
-                        converter.vae.enable_tiling()                              
+                        converter.vae.enable_tiling()
                         converter.to(torch.float16)
                     else:
                         converter.to(gfx_device)
-                        converter.vae.enable_tiling()                    
+                        converter.vae.enable_tiling()
                 elif low_vram():
                     converter.enable_model_cpu_offload()
                 else:
@@ -4207,7 +4204,7 @@ class SEQUENCER_OT_generate_image(Operator):
         elif (image_model_card == "black-forest-labs/FLUX.1-schnell" or image_model_card == "ChuckMcSneed/FLUX.1-dev"):
             print("Load: Flux Model")
             flush()
-            from diffusers import FluxPipeline    
+            from diffusers import FluxPipeline
             #if low_vram():
             pipe = FluxPipeline.from_pretrained(image_model_card, torch_dtype=torch.bfloat16)
             #pipe.enable_model_cpu_offload() #save some VRAM by offloading the model to CPU. Remove this if you have enough GPU power
@@ -4216,11 +4213,11 @@ class SEQUENCER_OT_generate_image(Operator):
 #                pipe.enable_vae_slicing()
 #                pipe.enable_vae_tiling()
 #                pipe.to(torch.float16)
-                
+
                 #pipe.enable_model_cpu_offload()
                 pipe.enable_sequential_cpu_offload()
                 #pipe.enable_vae_slicing()
-                pipe.vae.enable_tiling()                              
+                pipe.vae.enable_tiling()
                 pipe.to(torch.float16)
             else:
                 pipe.vae.enable_tiling()
@@ -4554,6 +4551,8 @@ class SEQUENCER_OT_generate_image(Operator):
             or image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
             or image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
             or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
+            or image_model_card == "black-forest-labs/FLUX.1-schnell"
+            or image_model_card == "ChuckMcSneed/FLUX.1-dev"
         ):
             scene = context.scene
             if enabled_items:
@@ -4970,9 +4969,9 @@ class SEQUENCER_OT_generate_image(Operator):
                 if not init_image:
                     print("Loading strip failed!")
                     return {"CANCELLED"}
-                
+
                 init_image = init_image.resize((x, y))
-                
+
                 if (image_model_card == "black-forest-labs/FLUX.1-schnell" or image_model_card == "ChuckMcSneed/FLUX.1-dev"):
                     print("Process Inpaint: " + image_model_card)
                     if image_model_card == "black-forest-labs/FLUX.1-schnell":
@@ -5073,8 +5072,8 @@ class SEQUENCER_OT_generate_image(Operator):
                         height=y,
                         width=x,
                         generator=generator,
-                    ).images[0]                    
-                    
+                    ).images[0]
+
                 # Not Turbo
                 else:
                     image = converter(
@@ -5319,7 +5318,6 @@ class SEQUENCER_OT_generate_image(Operator):
                 elif image_model_card == "stabilityai/sdxl-turbo":  # or image_model_card == "thibaud/sdxl_dpo_turbo":
 
                     # LoRA.
-
                     if enabled_items:
                         image = pipe(
                             # prompt_embeds=prompt, # for compel - long prompts
@@ -5334,7 +5332,6 @@ class SEQUENCER_OT_generate_image(Operator):
                         ).images[0]
 
                     # No LoRA.
-
                     else:
                         image = pipe(
                             # prompt_embeds=prompt, # for compel - long prompts
@@ -5349,9 +5346,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
                 # Not Turbo
                 else:
-
                     # LoRA.
-
                     if enabled_items:
                         image = pipe(
                             # prompt_embeds=prompt, # for compel - long prompts
@@ -5364,7 +5359,6 @@ class SEQUENCER_OT_generate_image(Operator):
                             cross_attention_kwargs={"scale": 1.0},
                             generator=generator,
                         ).images[0]
-
                     # No LoRA.
                     else:
                         image = pipe(
@@ -5570,7 +5564,7 @@ class SEQUENCER_OT_generate_text(Operator):
                     "Dependencies need to be installed in the add-on preferences.",
                 )
                 return {"CANCELLED"}
-            
+
         elif addon_prefs.text_model_card == "gokaygokay/Florence-2-Flux-Large":
             try:
                 from transformers import AutoModelForCausalLM, AutoProcessor, AutoConfig
@@ -5581,7 +5575,7 @@ class SEQUENCER_OT_generate_text(Operator):
                     "Dependencies need to be installed in the add-on preferences.",
                 )
                 return {"CANCELLED"}
-            
+
         # clear the VRAM
 
         clear_cuda_cache()
@@ -5609,8 +5603,8 @@ class SEQUENCER_OT_generate_text(Operator):
             text = processor.decode(out[0], skip_special_tokens=True)
             text = clean_string(text)
             print("Generated text: " + text)
-            
-        elif addon_prefs.text_model_card == "gokaygokay/Florence-2-Flux-Large":    
+
+        elif addon_prefs.text_model_card == "gokaygokay/Florence-2-Flux-Large":
 
             model = AutoModelForCausalLM.from_pretrained("gokaygokay/Florence-2-Flux-Large", trust_remote_code=True).to(gfx_device).eval()
             processor = AutoProcessor.from_pretrained("gokaygokay/Florence-2-Flux-Large", trust_remote_code=True)
@@ -5633,8 +5627,8 @@ class SEQUENCER_OT_generate_text(Operator):
             print("Generated text: " + text)
 
         # Find free space for the strip in the timeline.
-        
-        
+
+
 
 #        if active_strip.frame_final_start <= current_frame <= (active_strip.frame_final_start + active_strip.frame_final_duration):
 ##            empty_channel = find_first_empty_channel(
