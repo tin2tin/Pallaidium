@@ -5768,16 +5768,17 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         else:
             print("Use file seed and prompt: No")
 
-        total_vram = 0
-        for i in range(torch.cuda.device_count()):
-            properties = torch.cuda.get_device_properties(i)
-            total_vram += properties.total_memory
-        print("Total VRAM: " + str(total_vram))
-        print("Total GPU Cards: " + str(torch.cuda.device_count()))
-        cuda_version = torch.version.cuda
-        print(f"CUDA version: {cuda_version}")
-        cudnn_version = torch.backends.cudnn.version()
-        print(f"cuDNN version: {cudnn_version}")
+        if gfx_device == "cuda":
+            total_vram = 0
+            for i in range(torch.cuda.device_count()):
+                properties = torch.cuda.get_device_properties(i)
+                total_vram += properties.total_memory
+                print("Total VRAM: " + str(total_vram))
+                print("Total GPU Cards: " + str(torch.cuda.device_count()))
+            cuda_version = torch.version.cuda
+            print(f"CUDA version: {cuda_version}")
+            cudnn_version = torch.backends.cudnn.version()
+            print(f"cuDNN version: {cudnn_version}")
 
         for count, strip in enumerate(strips):
             for dsel_strip in bpy.context.scene.sequence_editor.sequences:
