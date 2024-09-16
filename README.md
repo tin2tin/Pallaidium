@@ -1,11 +1,10 @@
-# PALLAIDIUM - a generative AI movie studio integrated into the Blender video editor.
+[<img src="https://img.shields.io/badge/Discord%20-%20Invite">](https://discord.gg/HMYpnPzbTm) ![X (formerly Twitter) Follow](https://img.shields.io/twitter/follow/tintwotin)
+ ![GitHub Repo stars](https://img.shields.io/github/stars/tin2tin/Pallaidium)
+ 
+## PALLAIDIUM - a generative AI movie studio integrated into the Blender video editor.
 AI-generate video, image, and audio from text prompts or video, image, or text strips. 
 
 ![PallAIdium](https://github.com/tin2tin/Generative_AI/assets/1322593/1b1b232f-00d9-4b0b-86fb-5f0f24136d2c)
-
-[<img src="https://img.shields.io/badge/Discord%20-%20Invite">](https://discord.gg/HMYpnPzbTm) ![X (formerly Twitter) Follow](https://img.shields.io/twitter/follow/tintwotin)
- ![GitHub Repo stars](https://img.shields.io/github/stars/tin2tin/Pallaidium)
-
 
 ## Features
 
