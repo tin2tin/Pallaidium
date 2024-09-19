@@ -65,6 +65,7 @@ If any Python modules are missing, use this add-on to install them manually:    
 https://github.com/tin2tin/blender_pip      |
 
 ## Change Log
+* 2024-9-19: Add: Image to Video for CogVideoX
 * 2024-9-15: Add: LoRA import for Flux
 * 2024-9-14: Add: Flux Inpaint & Img2img.
 * 2024-9-4: Add: Florence 2 (Image Caption), AudioLDM2-Large, CogVideox-2b, flash_attn on Win.
