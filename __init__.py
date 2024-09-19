@@ -1740,7 +1740,8 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     if input == "input_strips" and not scene.inpaint_selected_strip:
                         col = col.column(heading="Use", align=True)
                         col.prop(addon_prefs, "use_strip_data", text=" Name & Seed")
-                        col.prop(context.scene, "image_power", text="Strip Power")
+                        if type != "movie" and movie_model_card != "black-forest-labs/FLUX.1-schnell" and movie_model_card != "ChuckMcSneed/FLUX.1-dev":
+                            col.prop(context.scene, "image_power", text="Strip Power")
                         if (type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid") or (
                             type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt"
                         ):
@@ -2361,32 +2362,38 @@ class SEQUENCER_OT_generate_movie(Operator):
             elif movie_model_card == "THUDM/CogVideoX-5b" or movie_model_card == "THUDM/CogVideoX-2b":
 
                 #vid2vid
-                if ((scene.movie_path or scene.image_path)and input == "input_strips"):
+                if scene.movie_path and input == "input_strips":
                     from diffusers.utils import load_video
                     from diffusers import CogVideoXDPMScheduler, CogVideoXVideoToVideoPipeline
                     pipe = CogVideoXVideoToVideoPipeline.from_pretrained(movie_model_card, torch_dtype=torch.bfloat16)
+                    pipe.scheduler = CogVideoXDPMScheduler.from_config(pipe.scheduler.config)
+
+                #img2vid
+                elif scene.image_path and input == "input_strips":
+                    print("Load: Image to video (CogVideoX)")
+                    from diffusers import CogVideoXImageToVideoPipeline
+                    from diffusers.utils import load_image
+                    pipe = CogVideoXImageToVideoPipeline.from_pretrained("THUDM/CogVideoX-5b-I2V", torch_dtype=torch.bfloat16)
 
                 #txt2vid
                 else:
+                    print("Load: text to video (CogVideoX)")
                     from diffusers import CogVideoXPipeline
-
                     pipe = CogVideoXPipeline.from_pretrained(
                         movie_model_card,
                         torch_dtype=torch.float16,
                     )
 
-                if low_vram():
-                    pipe.enable_model_cpu_offload()
-                    pipe.enable_sequential_cpu_offload()
+                if gfx_device == "mps":
                     pipe.vae.enable_tiling()
+                elif low_vram():
+                    pipe.enable_sequential_cpu_offload()
+                    #pipe.enable_vae_slicing()
+                    pipe.vae.enable_tiling()
+                    pipe.to(torch.float16)
                 else:
                     pipe.enable_model_cpu_offload()
-                    pipe.vae.enable_tiling()
-                    #pipe.to(gfx_device)
-                    #pipe.enable_model_cpu_offload()
-                    #pipe.enable_sequential_cpu_offload()
-                if ((scene.movie_path or scene.image_path)and input == "input_strips"):
-                    pipe.scheduler = CogVideoXDPMScheduler.from_config(pipe.scheduler.config)
+                    
                 scene.generate_movie_x = 720
                 scene.generate_movie_y = 480
 
@@ -2610,7 +2617,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         generator=generator,
                     ).frames[0]
 
-                #vid2vid
+                #CogVideoX img/vid2vid
                 elif movie_model_card == "THUDM/CogVideoX-5b" or movie_model_card == "THUDM/CogVideoX-2b":
                     if scene.movie_path:
                         print("Process: Video to video (CogVideoX)")
@@ -2619,31 +2626,43 @@ class SEQUENCER_OT_generate_movie(Operator):
                             return {"CANCELLED"}
                         #video = load_video_as_np_array(video_path)
                         video = load_video(video_path)[:49]
+                        video_frames = pipe(
+                            video=video,
+                            prompt=prompt,
+                            strength=1.00 - scene.image_power,
+                            negative_prompt=negative_prompt,
+                            num_inference_steps=movie_num_inference_steps,
+                            guidance_scale=movie_num_guidance,
+                            height=y,
+                            width=x,
+                            #num_frames=abs(duration),
+                            generator=generator,
+                        ).frames[0]
 
                     elif scene.image_path:
                         print("Process: Image to video (CogVideoX)")
                         if not os.path.isfile(scene.image_path):
                             print("No file found.")
                             return {"CANCELLED"}
-                        video = process_image(scene.image_path, int(scene.generate_movie_frames))
-                        video = np.array(video)
+                        image = load_image(bpy.path.abspath(scene.image_path))
+                        image = image.resize((closest_divisible_16(int(x)), closest_divisible_16(int(y))))
+                        video_frames = pipe(
+                            image=image,
+                            prompt=prompt,
+                            #strength=1.00 - scene.image_power,
+                            #negative_prompt=negative_prompt,
+                            num_inference_steps=movie_num_inference_steps,
+                            guidance_scale=movie_num_guidance,
+                            height=y,
+                            width=x,
+                            #num_frames=abs(duration),
+                            generator=generator,
+                            use_dynamic_cfg=True,
+                        ).frames[0]                        
+                        
 #                    if not video.any():
 #                        print("Loading of file failed")
 #                        return {"CANCELLED"}
-
-                    video_frames = pipe(
-                        video=video,
-                        prompt=prompt,
-                        strength=1.00 - scene.image_power,
-                        negative_prompt=negative_prompt,
-                        num_inference_steps=movie_num_inference_steps,
-                        guidance_scale=movie_num_guidance,
-                        height=y,
-                        width=x,
-                        #num_frames=abs(duration),
-                        generator=generator,
-                    ).frames[0]
-                    #prompt=prompt, strength=0.8, guidance_scale=6, num_inference_steps=5
 
                 else:# movie_model_card != "guoyww/animatediff-motion-adapter-sdxl-beta":
                     if scene.movie_path:
@@ -3722,13 +3741,17 @@ class SEQUENCER_OT_generate_image(Operator):
                     torch_dtype=torch.float16,
                     local_files_only=local_files_only,
                 )
-                if gfx_device != "mps":
-                    #pipe.enable_model_cpu_offload()
+                if gfx_device == "mps":
+                    pipe.vae.enable_tiling()
+                elif low_vram():
                     pipe.enable_sequential_cpu_offload()
-                    #pipe.enable_vae_slicing()
+                    pipe.enable_vae_slicing()
                     pipe.vae.enable_tiling()
                     pipe.to(torch.float16)
                 else:
+                    pipe.enable_sequential_cpu_offload()
+                    #pipe.enable_model_cpu_offload()
+                    pipe.enable_vae_slicing()
                     pipe.vae.enable_tiling()
 
         # Conversion img2img/vid2img.
@@ -3795,19 +3818,20 @@ class SEQUENCER_OT_generate_image(Operator):
                         return {"CANCELLED"}
 
                 if image_model_card == "black-forest-labs/FLUX.1-schnell" or image_model_card == "ChuckMcSneed/FLUX.1-dev":
-                    if gfx_device != "mps":
-                        #pipe.enable_model_cpu_offload()
+                    if gfx_device == "mps":
+                        converter.vae.enable_tiling()
+                    elif low_vram():
                         converter.enable_sequential_cpu_offload()
                         #pipe.enable_vae_slicing()
                         converter.vae.enable_tiling()
                         converter.to(torch.float16)
                     else:
-                        converter.to(gfx_device)
-                        converter.vae.enable_tiling()
-                elif low_vram():
-                    converter.enable_model_cpu_offload()
+                        converter.enable_model_cpu_offload()
                 else:
-                    converter.to(gfx_device)
+                    if low_vram():
+                        converter.enable_model_cpu_offload()
+                    else:
+                        converter.to(gfx_device)                    
             if (
                 enabled_items
                 and input == "input_strips"
@@ -4203,23 +4227,22 @@ class SEQUENCER_OT_generate_image(Operator):
             print("Load: Flux Model")
             flush()
             from diffusers import FluxPipeline
-            #if low_vram():
             pipe = FluxPipeline.from_pretrained(image_model_card, torch_dtype=torch.bfloat16)
-            #pipe.enable_model_cpu_offload() #save some VRAM by offloading the model to CPU. Remove this if you have enough GPU power
-            if gfx_device != "mps":
-#                pipe.enable_sequential_cpu_offload()
-#                pipe.enable_vae_slicing()
-#                pipe.enable_vae_tiling()
-#                pipe.to(torch.float16)
 
-                #pipe.enable_model_cpu_offload()
+            if gfx_device == "mps":
+                pipe.vae.enable_tiling()
+            elif low_vram():
                 pipe.enable_sequential_cpu_offload()
-                #pipe.enable_vae_slicing()
+                pipe.enable_vae_slicing()
                 pipe.vae.enable_tiling()
                 pipe.to(torch.float16)
             else:
+                #pipe.to(gfx_device)
+                pipe.enable_sequential_cpu_offload()
+                #pipe.enable_model_cpu_offload()
+                pipe.enable_vae_slicing()
                 pipe.vae.enable_tiling()
-
+                #pipe.to(torch.float16)
         # Fluently-XL
         elif image_model_card == "youknownothing/Fluently-XL-Final":
             from diffusers import DiffusionPipeline, DDIMScheduler
