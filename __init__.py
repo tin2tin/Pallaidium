@@ -74,6 +74,7 @@ try:
         gfx_device = "cpu"
 except:
     print("Pallaidium dependencies needs to be installed and Blender needs to be restarted.")
+    
 os_platform = platform.system()  # 'Linux', 'Darwin', 'Java', 'Windows'
 if os_platform == "Windows":
     pathlib.PosixPath = pathlib.WindowsPath
@@ -739,7 +740,6 @@ def install_modules(self):
     subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "git+https://github.com/theblackhatmagician/adetailer_sdxl.git"])
     subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "lmdb", "--upgrade"])
     subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "git+https://github.com/huggingface/accelerate.git", "--upgrade"])
-
     #import_module(self, "accelerate", "git+https://github.com/huggingface/accelerate.git")
     #import_module(self, "accelerate", "accelerate")
 
@@ -794,6 +794,7 @@ def install_modules(self):
     if os_platform != "Linux":
         subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "git+https://github.com/suno-ai/bark.git", "--upgrade"])
         import_module(self, "whisperspeech", "WhisperSpeech==0.8")
+        import_module(self, "jaxlib", "jaxlib>=0.4.33")
 
     subprocess.check_call([pybin, "-m", "pip", "install", "peft", "--upgrade"])
     import_module(self, "transformers", "transformers==4.43.0")
@@ -1614,7 +1615,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
     """Generate Media using AI"""
 
     bl_idname = "SEQUENCER_PT_sequencer_generate_movie_panel"
-    bl_label = "Generative AI"
+    bl_label = "Pallaidium"
     bl_space_type = "SEQUENCE_EDITOR"
     bl_region_type = "UI"
     bl_category = "Generative AI"
@@ -2297,7 +2298,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             ):
                 video_path = scene.movie_path
 
-                #                # img2img
+                #                # img2img disabled
                 #                if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
                 #                    print("Process: Frame by frame (SD XL)")
                 #                    input_video_path = video_path
@@ -2711,7 +2712,6 @@ class SEQUENCER_OT_generate_audio(Operator):
         print("Model:  " + addon_prefs.audio_model_card)
 
         if addon_prefs.audio_model_card == "stabilityai/stable-audio-open-1.0":
-
             repo_id = "ylacombe/stable-audio-1.0"
             pipe = StableAudioPipeline.from_pretrained(repo_id, torch_dtype=torch.float16)
             device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -2723,7 +2723,6 @@ class SEQUENCER_OT_generate_audio(Operator):
         elif addon_prefs.audio_model_card == "cvssp/audioldm2-large":
             repo_id = addon_prefs.audio_model_card
             from diffusers import AudioLDM2Pipeline
-
             pipe = AudioLDM2Pipeline.from_pretrained(repo_id, torch_dtype=torch.float16)
 
             if low_vram():
@@ -2758,7 +2757,6 @@ class SEQUENCER_OT_generate_audio(Operator):
         # WhisperSpeech
         elif addon_prefs.audio_model_card == "WhisperSpeech":
             from whisperspeech.pipeline import Pipeline
-
             pipe = Pipeline(s2a_ref="collabora/whisperspeech:s2a-q4-small-en+pl.model")
 
         # Parler
@@ -2778,7 +2776,6 @@ class SEQUENCER_OT_generate_audio(Operator):
             start_time = timer()
 
             # Find free space for the strip in the timeline.
-
             if i > 0:
                 empty_channel = scene.sequence_editor.active_strip.channel
                 start_frame = scene.sequence_editor.active_strip.frame_final_start + scene.sequence_editor.active_strip.frame_final_duration
@@ -2949,7 +2946,6 @@ class SEQUENCER_OT_generate_audio(Operator):
                 pipe.generate_to_file(filename, prompt, speaker=speaker, lang="en", cps=int(scene.audio_speed))
 
             # Musicgen.
-
             elif addon_prefs.audio_model_card == "facebook/musicgen-stereo-melody-large":
 
                 print("Generate: MusicGen Stereo")
@@ -3039,9 +3035,9 @@ class SEQUENCER_OT_generate_audio(Operator):
                 scene.sequence_editor.active_strip = strip
                 if i > 0:
                     scene.frame_current = scene.sequence_editor.active_strip.frame_final_start
+
                 # Redraw UI to display the new strip. Remove this if Blender crashes:
                 # https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
-
                 bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
             else:
                 print("No resulting file found!")
