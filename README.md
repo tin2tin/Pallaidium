@@ -30,8 +30,6 @@ AI-generate video, image, and audio from text prompts or video, image, or text s
 | Batch upscale & refinement of movies.              | Render-to-path selector.                            | Render finished notification.                       |
 | User-defined file path for generated files.        | Seed and prompt added to strip name.                | One-click install and uninstall dependencies.       |
 
-![image](https://github.com/user-attachments/assets/a5c44a7e-c670-49ef-941f-86e521568637)
-
 ## Requirements
 * Windows (Unsupported: Linux and MacOS).
 * A CUDA-supported Nvidia card with at least 6 GB VRAM.
@@ -66,6 +64,17 @@ Tip           |
 :------------- |
 If any Python modules are missing, use this add-on to install them manually:      |
 https://github.com/tin2tin/blender_pip      |
+
+
+# Uninstall
+
+Hugging Face Diffusers models are downloaded from the hub and saved to a local cache directory. Delete the folder manually:
+
+On Linux and macOS: ~/.cache/huggingface/hub
+
+On Windows: %userprofile%\\.cache\huggingface\hub
+
+![image](https://github.com/user-attachments/assets/a5c44a7e-c670-49ef-941f-86e521568637)
 
 ## Change Log
 * 2024-9-19: Add: Image to Video for CogVideoX
@@ -138,6 +147,9 @@ https://github.com/tin2tin/Pallaidium/assets/1322593/28098eb6-3a93-4bcb-bd6f-53b
 
 # Text to Audio
 
+### Voices for Parler TTS: 
+Laura, Gary, Jon, Lea, Karen, Rick, Brenda, David, Eileen, Jordan, Mike, Yann, Joy, James, Eric, Lauren, Rose, Will, Jason, Aaron, Naomie, Alisa, Patrick, Jerry, Tina, Jenna, Bill, Tom, Carol, Barbara, Rebecca, Anna, Bruce, Emily
+
 ### Bark
 Find Bark documentation here: https://github.com/suno-ai/bark
 * [laughter]
@@ -153,9 +165,6 @@ Find Bark documentation here: https://github.com/suno-ai/bark
 
 Speaker Library: https://suno-ai.notion.site/8b8e8749ed514b0cbf3f699013548683?v=bc67cff786b04b50b3ceb756fd05f68c
 
-### Voices for Parler TTS: 
-Laura, Gary, Jon, Lea, Karen, Rick, Brenda, David, Eileen, Jordan, Mike, Yann, Joy, James, Eric, Lauren, Rose, Will, Jason, Aaron, Naomie, Alisa, Patrick, Jerry, Tina, Jenna, Bill, Tom, Carol, Barbara, Rebecca, Anna, Bruce, Emily
-
 Tip           |
 :------------- |
 If the audio breaks up, try processing longer sentences.      |
@@ -168,25 +177,35 @@ The performance can be improved by following this guide: https://nvidia.custhelp
 
 Watch this tutorial: https://youtu.be/4_MIaxzjh5Y?feature=shared
 
-# Uninstall
-
-Hugging Face Diffusers models are downloaded from the hub and saved to a local cache directory. By default, the cache directory is located at:
-
-On Linux and macOS: ~/.cache/huggingface/hub
-
-On Windows: %userprofile%\\.cache\huggingface\hub
-
-Here you can locate and delete the individual models.
-
 # Useful add-ons
 
-### Add Rendered Strips
 
-Since the Generative AI add-on can only input images or movie strips, you'll need to convert other strip types to movie-strip. For this purpose, this add-on can be used:
 
-https://github.com/tin2tin/Add_Rendered_Strips
+### Screenwriter Assistant
 
-![image](https://github.com/tin2tin/Generative_AI/assets/1322593/d8c0a184-d812-440d-a5a8-501a1282d78d)
+Use GPT4ALL to generate image prompts or stories:
+
+https://github.com/tin2tin/GPT4BLENDER
+
+![image](https://github.com/user-attachments/assets/464e0fe3-0994-4920-9ceb-ef68b331866b)
+
+
+### Text to Strip
+
+Convert text from the Text Editor to strips which can be used as prompts for batch generation.
+
+https://github.com/tin2tin/text_to_strip
+
+![image](https://github.com/user-attachments/assets/f829d338-31ba-45fc-845c-eb563e14ea77)
+
+
+### Subtitle Editor
+
+Edit and navigate in the generated text strips.
+
+https://github.com/tin2tin/Subtitle_Editor
+
+![image](https://github.com/user-attachments/assets/6e565c39-b77a-4c13-9726-39fb9f73db58)
 
 ### VSE Masking Tools
 
@@ -196,36 +215,19 @@ https://github.com/tin2tin/vse_masking_tools
 
 ![image](https://github.com/tin2tin/Generative_AI/assets/1322593/f2afd36c-34b1-4779-957b-0eb8defed296)
 
-### Subtitle Editor
+### Add Rendered Strips
 
-Edit and navigate in the generated text strips.
+Since the Generative AI add-on can only input images or movie strips, you'll need to convert other strip types to movie-strip. For this purpose, this add-on can be used:
 
-https://github.com/tin2tin/Subtitle_Editor
+https://github.com/tin2tin/Add_Rendered_Strips
 
-
-### Screenwriter Assistant
-
-Get chatGPT to generate stories, which can be used as prompts.
-
-https://github.com/tin2tin/Blender_Screenwriter_Assistant_chat_GPT
-
-
-### Text to Strip
-
-Convert text from the Text Editor to strips which can be used as prompts for batch generation.
-
-https://github.com/tin2tin/text_to_strip
+![image](https://github.com/tin2tin/Generative_AI/assets/1322593/d8c0a184-d812-440d-a5a8-501a1282d78d)
 
 
 # Useful Projects
 
-Trainer for LoRAs: 
+### Trainer for LoRAs: 
 https://github.com/Nerogar/OneTrainer
-https://github.com/johnman3032/simple-lora-dreambooth-trainer
-
-HD Horizon(LoRA for making SD 1.5 work at higher resolutions): https://civitai.com/models/238891/hd-horizon-the-resolution-frontier-multi-resolution-high-resolution-native-inferencing
-
-Triton for manual installation on Windows: https://huggingface.co/madbuda/triton-windows-builds
 
 
 # Video Examples
@@ -292,23 +294,15 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 ### Painting
 https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-455c77443535
 
-
-# Enhancement Info
-
-### LCM
-
-https://huggingface.co/blog/lcm_lora
-
-## Restrictions on using Pallaidium:
+# Restrictions on using Pallaidium:
 - It is prohibited to use Pallaidium to generate content that is demeaning or harmful to people, their environment, culture, religion, etc.
 - It is prohibited to use Pallaidium for pornographic, violent, and bloody content generation.
 - It is prohibited to use Pallaidium for error and false information generation.
 
-## Restrictions on using the AI models:
+# Restrictions on using the AI models:
 - Pallaidium does not include any genAI models(weights). If the user decides to use a model, it is downloaded from HuggingFace. 
 - In general, the models can only be used for non-commercial purposes and are meant for research purposes.
 - Consult the individual models on HuggingFace to read up on their licenses and ex. if they can be used commercially.
-
 
 ## Via the [Diffusers](https://github.com/huggingface/diffusers) lib the following weights are accesible through Pallaidium:
 
