@@ -66,7 +66,7 @@ If any Python modules are missing, use this add-on to install them manually:    
 https://github.com/tin2tin/blender_pip      |
 
 
-# Uninstall
+## Uninstall
 
 Hugging Face Diffusers models are downloaded from the hub and saved to a local cache directory. Delete the folder manually:
 
@@ -110,42 +110,25 @@ Video Sequence Editor > Sidebar > Generative AI:
 
 ![image](https://github.com/tin2tin/Pallaidium/assets/1322593/e3c1193d-5e0a-4ed2-acca-3f7a4413e4c1)
 
-### Styles:
+## Styles:
 
 ![image](https://github.com/tin2tin/Generative_AI/assets/1322593/86807264-a377-4de1-875e-471aaa3011a7)
 
 See SDXL handling most of the styles here: https://stable-diffusion-art.com/sdxl-styles/
 
-### Prompting:
-https://replicate.com/blog/get-the-best-from-stable-diffusion-3
+## Tips:
+- If the image of your renders breaks, use the resolution from the Model Card in the Preferences.
+- If the image of your playback stutters, then select a strip > Menu > Strip > Movie Strip > Set Render Size.
+- If you get the message that CUDA is out of memory, restart Blender to free up memory and make it stable again.
+- New to Blender? Watch this tutorial: https://youtu.be/4_MIaxzjh5Y?feature=shared
 
-https://github.com/invoke-ai/InvokeAI/blob/main/docs/features/PROMPTS.md
-
-https://stablediffusion.fr/prompts
-
-https://blog.segmind.com/generating-photographic-images-with-stable-diffusion/
-
-
-Tip           |
-:------------- |
-If the image of your renders breaks, use the resolution from the Model Card in the Preferences.     |
-
-Tip           |
-:------------- |
-If the image of your playback stutters, then select a strip > Menu > Strip > Movie Strip > Set Render Size.     |
-
-Tip           |
-:------------- |
-If you get the message that CUDA is out of memory, restart Blender to free up memory and make it stable again.     |
-
-
-# Batch Processing
+## Batch Processing
 
 Select multiple strips and hit Generate. When doing this, the file name, and if found the seed value, are automatically inserted into the prompt and seed value. However, in the add-on preferences, this behavior can be switched off.
 
 https://github.com/tin2tin/Pallaidium/assets/1322593/28098eb6-3a93-4bcb-bd6f-53b71faabd8d
 
-# Text to Audio
+## Text to Audio
 
 ### Voices for Parler TTS: 
 Laura, Gary, Jon, Lea, Karen, Rick, Brenda, David, Eileen, Jordan, Mike, Yann, Joy, James, Eric, Lauren, Rose, Will, Jason, Aaron, Naomie, Alisa, Patrick, Jerry, Tina, Jenna, Bill, Tom, Carol, Barbara, Rebecca, Anna, Bruce, Emily
@@ -169,26 +152,15 @@ Tip           |
 :------------- |
 If the audio breaks up, try processing longer sentences.      |
 
-## Performance
+## Useful add-ons
 
-The performance can be improved by following this guide: https://nvidia.custhelp.com/app/answers/detail/a_id/5490/~/system-memory-fallback-for-stable-diffusion
-
-# New to Blender?
-
-Watch this tutorial: https://youtu.be/4_MIaxzjh5Y?feature=shared
-
-# Useful add-ons
-
-
-
-### Screenwriter Assistant
+### GPT4BLENDER
 
 Use GPT4ALL to generate image prompts or stories:
 
 https://github.com/tin2tin/GPT4BLENDER
 
 ![image](https://github.com/user-attachments/assets/464e0fe3-0994-4920-9ceb-ef68b331866b)
-
 
 ### Text to Strip
 
@@ -224,13 +196,13 @@ https://github.com/tin2tin/Add_Rendered_Strips
 ![image](https://github.com/tin2tin/Generative_AI/assets/1322593/d8c0a184-d812-440d-a5a8-501a1282d78d)
 
 
-# Useful Projects
+## Useful Projects
 
 ### Trainer for LoRAs: 
 https://github.com/Nerogar/OneTrainer
 
 
-# Video Examples
+## Video Examples
 
 ### VID2VID & TXT2VID
 [![Watch the video](https://img.youtube.com/vi/S2b7QGv-l-o/0.jpg)](https://www.youtube.com/watch?v=S2b7QGv-l-o)
@@ -294,12 +266,12 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 ### Painting
 https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-455c77443535
 
-# Restrictions on using Pallaidium:
+## Restrictions on using Pallaidium:
 - It is prohibited to use Pallaidium to generate content that is demeaning or harmful to people, their environment, culture, religion, etc.
 - It is prohibited to use Pallaidium for pornographic, violent, and bloody content generation.
 - It is prohibited to use Pallaidium for error and false information generation.
 
-# Restrictions on using the AI models:
+## Restrictions on using the AI models:
 - Pallaidium does not include any genAI models(weights). If the user decides to use a model, it is downloaded from HuggingFace. 
 - In general, the models can only be used for non-commercial purposes and are meant for research purposes.
 - Consult the individual models on HuggingFace to read up on their licenses and ex. if they can be used commercially.
