@@ -1,31 +1,34 @@
-[<img src="https://img.shields.io/badge/Discord%20-%20Invite">](https://discord.gg/HMYpnPzbTm) ![X (formerly Twitter) Follow](https://img.shields.io/twitter/follow/tintwotin)
- ![GitHub Repo stars](https://img.shields.io/github/stars/tin2tin/Pallaidium)
- 
-## PALLAIDIUM - a generative AI movie studio integrated into the Blender video editor.
-AI-generate video, image, and audio from text prompts or video, image, or text strips. 
+<h1 align="center">PALLAIDIUM</h1>
+
+<p align="center">A generative AI movie studio integrated into the Blender Video Editor.</p>
+
+<p align="center">
+    <a href="https://discord.gg/HMYpnPzbTm"><img src="https://img.shields.io/badge/Chat%20with%20us%20on%20Discord--blue?style=social&logo=discord" alt="Chat with us" title="Chat with us"></a>
+    <a href="https://twitter.com/tintwotin"><img src="https://img.shields.io/twitter/follow/tintwotin" alt="Follow us on X" title="Follow us on X"></a>
+<p>
+
+<hr>
 
 ![PallAIdium](https://github.com/tin2tin/Generative_AI/assets/1322593/1b1b232f-00d9-4b0b-86fb-5f0f24136d2c)
+AI-generate video, image, and audio from text prompts or video, image, or text strips. 
+
 
 ## Features
 
-|                                                    |                                                     |
-|----------------------------------------------------|-----------------------------------------------------|
-| Text to video                                      | Text to audio                                       |
-| Text to speech                                     | Text to image                                      |
-| Image to image                                     | Image to video                                     |
-| Video to video                                     | Image to text                                    |
-| ControlNet                                         | OpenPose                                          |
-| ADetailer                                          | IP Adapter Face/Style                             |
-| Canny                                              | Illusion                                          |
-| Multiple LoRAs                                     | Segmind distilled SDXL                            |
-| Seed                                               | Quality steps                                     |
-| Frames                                             | Word power                                         |
-| Style selector                                     | Strip power                                        |
-| Batch conversion                                   | Batch refinement of images.                         |
-| Batch upscale & refinement of movies.              | Model card selector.                               |
-| Render-to-path selector.                           | Render finished notification.                      |
-| Model Cards                                        | One-click install and uninstall dependencies. |
-| User-defined file path for generated files.        | Seed and prompt added to strip name.   |
+|                                                    |                                                     |                                                     |
+|----------------------------------------------------|-----------------------------------------------------|-----------------------------------------------------|
+| Text to video                                      | Text to image                                       | Text to text                                        |
+| Text to speech                                     | Text to audio                                       | Text to music                                       |
+| Image to image                                     | Image to video                                      | Image to text                                       |
+| Video to video                                     | Video to Image                                      | Video to text                                       |
+| ControlNet                                         | OpenPose                                            | Canny                                               |
+| ADetailer                                          | IP Adapter Face                                     | IP Adapter Style                                    |
+| Multiple LoRAs                                     | LoRA Weight                                         | Style selector                                      |
+| Seed                                               | Quality steps                                       | Strip power                                         |
+| Frames (Duration)                                  | Word power                                          | Model card selector                                 |
+| Batch conversion                                   | Batch refinement of images.                         | Prompt batching                                     |
+| Batch upscale & refinement of movies.              | Render-to-path selector.                            | Render finished notification.                       |
+| User-defined file path for generated files.        | Seed and prompt added to strip name.                | One-click install and uninstall dependencies.       |
 
 ![image](https://github.com/user-attachments/assets/a5c44a7e-c670-49ef-941f-86e521568637)
 
@@ -150,6 +153,9 @@ Find Bark documentation here: https://github.com/suno-ai/bark
 
 Speaker Library: https://suno-ai.notion.site/8b8e8749ed514b0cbf3f699013548683?v=bc67cff786b04b50b3ceb756fd05f68c
 
+### Voices for Parler TTS: 
+Laura, Gary, Jon, Lea, Karen, Rick, Brenda, David, Eileen, Jordan, Mike, Yann, Joy, James, Eric, Lauren, Rose, Will, Jason, Aaron, Naomie, Alisa, Patrick, Jerry, Tina, Jenna, Bill, Tom, Carol, Barbara, Rebecca, Anna, Bruce, Emily
+
 Tip           |
 :------------- |
 If the audio breaks up, try processing longer sentences.      |
@@ -158,12 +164,11 @@ If the audio breaks up, try processing longer sentences.      |
 
 The performance can be improved by following this guide: https://nvidia.custhelp.com/app/answers/detail/a_id/5490/~/system-memory-fallback-for-stable-diffusion
 
-
-## New to Blender?
+# New to Blender?
 
 Watch this tutorial: https://youtu.be/4_MIaxzjh5Y?feature=shared
 
-## Uninstall
+# Uninstall
 
 Hugging Face Diffusers models are downloaded from the hub and saved to a local cache directory. By default, the cache directory is located at:
 
@@ -173,7 +178,7 @@ On Windows: %userprofile%\\.cache\huggingface\hub
 
 Here you can locate and delete the individual models.
 
-## Useful add-ons
+# Useful add-ons
 
 ### Add Rendered Strips
 
@@ -212,7 +217,7 @@ Convert text from the Text Editor to strips which can be used as prompts for bat
 https://github.com/tin2tin/text_to_strip
 
 
-## Useful Projects
+# Useful Projects
 
 Trainer for LoRAs: 
 https://github.com/Nerogar/OneTrainer
@@ -223,7 +228,7 @@ HD Horizon(LoRA for making SD 1.5 work at higher resolutions): https://civitai.c
 Triton for manual installation on Windows: https://huggingface.co/madbuda/triton-windows-builds
 
 
-## Video Examples
+# Video Examples
 
 ### VID2VID & TXT2VID
 [![Watch the video](https://img.youtube.com/vi/S2b7QGv-l-o/0.jpg)](https://www.youtube.com/watch?v=S2b7QGv-l-o)
@@ -288,7 +293,7 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-455c77443535
 
 
-## Enhancement Info
+# Enhancement Info
 
 ### LCM
 
