@@ -64,6 +64,15 @@ print("Python: " + sys.version)
 #    pathlib.PosixPath = pathlib.WindowsPath
 
 
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning, module="xformers.*")
+warnings.filterwarnings('ignore', category=UserWarning, message='1Torch was not compiled')
+warnings.filterwarnings("ignore", category=FutureWarning, module="torch.*")
+warnings.filterwarnings('ignore', category=UserWarning, message='FutureWarning: ')
+import logging
+logging.getLogger('xformers').setLevel(logging.ERROR) # shutup triton
+logging.getLogger('diffusers.models.modeling_utils').setLevel(logging.CRITICAL)
+
 try:
     exec("import torch")
     if torch.cuda.is_available():
@@ -989,7 +998,7 @@ def input_strips_updated(self, context):
     if (movie_model_card == "THUDM/CogVideoX-5b" or movie_model_card == "THUDM/CogVideoX-2b") and type == "movie":
         scene.generate_movie_x = 720
         scene.generate_movie_y = 480
-        scene.generate_movie_frames = 48
+        scene.generate_movie_frames = 49
         scene.movie_num_inference_steps = 50
         scene.movie_num_guidance = 6
 
@@ -1666,7 +1675,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     if input == "input_strips" and not scene.inpaint_selected_strip:
                         col = col.column(heading="Use", align=True)
                         col.prop(addon_prefs, "use_strip_data", text=" Name & Seed")
-                        if type != "movie" and movie_model_card != "black-forest-labs/FLUX.1-schnell" and movie_model_card != "ChuckMcSneed/FLUX.1-dev":
+                        if type != "movie" or (movie_model_card != "black-forest-labs/FLUX.1-schnell" or movie_model_card != "ChuckMcSneed/FLUX.1-dev"):
                             col.prop(context.scene, "image_power", text="Strip Power")
                         if (type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid") or (
                             type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt"
@@ -2202,7 +2211,6 @@ class SEQUENCER_OT_generate_movie(Operator):
                     pipe.enable_sequential_cpu_offload()
                     #pipe.enable_vae_slicing()
                     pipe.vae.enable_tiling()
-                    pipe.to(torch.float16)
                 else:
                     pipe.enable_model_cpu_offload()
                     
@@ -3479,7 +3487,6 @@ class SEQUENCER_OT_generate_image(Operator):
                     pipe.enable_sequential_cpu_offload()
                     pipe.enable_vae_slicing()
                     pipe.vae.enable_tiling()
-                    pipe.to(torch.float16)
                 else:
                     pipe.enable_sequential_cpu_offload()
                     #pipe.enable_model_cpu_offload()
@@ -3873,14 +3880,13 @@ class SEQUENCER_OT_generate_image(Operator):
                 pipe.enable_sequential_cpu_offload()
                 pipe.enable_vae_slicing()
                 pipe.vae.enable_tiling()
-                pipe.to(torch.float16)
             else:
                 #pipe.to(gfx_device)
                 pipe.enable_sequential_cpu_offload()
                 #pipe.enable_model_cpu_offload()
                 pipe.enable_vae_slicing()
                 pipe.vae.enable_tiling()
-                #pipe.to(torch.float16)
+
         # Fluently-XL
         elif image_model_card == "youknownothing/Fluently-XL-Final":
             from diffusers import DiffusionPipeline, DDIMScheduler
