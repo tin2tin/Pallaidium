@@ -172,7 +172,7 @@ https://github.com/tin2tin/text_to_strip
 
 ### Subtitle Editor
 
-Edit and navigate in the generated text strips.
+Edit, navigate, and i/o text strips.
 
 https://github.com/tin2tin/Subtitle_Editor
 
