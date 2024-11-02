@@ -76,6 +76,7 @@ On Windows: %userprofile%\\.cache\huggingface\hub
 ![image](https://github.com/user-attachments/assets/a5c44a7e-c670-49ef-941f-86e521568637)
 
 ## Change Log
+* 2024-11-2: Add: Image Background Removal, Stable Diffusion 3.5 Medium, Fast Flux(t2i)
 * 2024-9-19: Add: Image to Video for CogVideoX
 * 2024-9-15: Add: LoRA import for Flux
 * 2024-9-14: Add: Flux Inpaint & Img2img.
