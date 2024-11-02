@@ -1685,6 +1685,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     and image_model_card != "xinsir/controlnet-openpose-sdxl-1.0"
                     and image_model_card != "xinsir/controlnet-scribble-sdxl-1.0"
                     and image_model_card != "Salesforce/blipdiffusion"
+                    and image_model_card != "ZhengPeng7/BiRefNet"
                 ):
                     if input == "input_strips" and not scene.inpaint_selected_strip:
                         col = col.column(heading="Use", align=True)
