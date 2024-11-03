@@ -1293,7 +1293,7 @@ class GeneratorAddonPreferences(AddonPreferences):
         name="Filepath",
         description="Path to the folder where the generated files are stored",
         subtype="DIR_PATH",
-        default=join(bpy.utils.user_resource("DATAFILES"), "2D Assets"),
+        default=join(bpy.utils.user_resource("DATAFILES"), "Generative AI"),
     )
     use_strip_data: BoolProperty(
         name="Use Input Strip Data",
