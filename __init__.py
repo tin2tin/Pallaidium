@@ -810,7 +810,7 @@ def install_modules(self):
         import_module(self, "jaxlib", "jaxlib>=0.4.33")
 
     subprocess.check_call([pybin, "-m", "pip", "install", "peft", "--upgrade"])
-    import_module(self, "transformers", "transformers==4.46.0.dev0")
+    import_module(self, "transformers", "transformers==4.46.1")
     print("Dir: " + str(subprocess.check_call([pybin, "-m", "pip", "cache", "purge"])))
 
 
