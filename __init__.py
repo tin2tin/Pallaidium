@@ -692,7 +692,7 @@ def install_modules(self):
     import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
     
     import_module(self, "huggingface_hub", "huggingface_hub")
-    import_module(self, "protobuf", "protobuf")
+    import_module(self, "protobuf", "protobuf==3.20.1")
     import_module(self, "pydub", "pydub")
     
     if os_platform == "Windows":
@@ -810,7 +810,7 @@ def install_modules(self):
         import_module(self, "jaxlib", "jaxlib>=0.4.33")
 
     subprocess.check_call([pybin, "-m", "pip", "install", "peft", "--upgrade"])
-    import_module(self, "transformers", "transformers==4.46.1")
+    import_module(self, "transformers", "transformers==4.46.0.dev0")
     print("Dir: " + str(subprocess.check_call([pybin, "-m", "pip", "cache", "purge"])))
 
 
@@ -1293,7 +1293,7 @@ class GeneratorAddonPreferences(AddonPreferences):
         name="Filepath",
         description="Path to the folder where the generated files are stored",
         subtype="DIR_PATH",
-        default=join(bpy.utils.user_resource("DATAFILES"), "Generative AI"),
+        default=join(bpy.utils.user_resource("DATAFILES"), "2D Assets"),
     )
     use_strip_data: BoolProperty(
         name="Use Input Strip Data",
