@@ -276,7 +276,7 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 - In general, the models can only be used for non-commercial purposes and are meant for research purposes.
 - Consult the individual models on HuggingFace to read up on their licenses and ex. if they can be used commercially.
 
-## Via the [Diffusers](https://github.com/huggingface/diffusers) lib the following weights are accesible through Pallaidium:
+## Via the [Diffusers](https://github.com/huggingface/diffusers) lib the following weights are accessible through Pallaidium:
 
 ### Video:
 - [stabilityai/stable-video-diffusion-img2vid-xt](https://huggingface.co/stabilityai/stable-video-diffusion-img2vid-xt)
