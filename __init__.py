@@ -752,7 +752,8 @@ def install_modules(self):
     import_module(self, "mediapipe", "mediapipe")
     
     subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "ultralytics", "--no-warn-script-location", "--upgrade"])
-    subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "git+https://github.com/theblackhatmagician/adetailer_sdxl.git"])
+    subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "git+https://github.com/tin2tin/adetailer_sdxl.git"])
+    #subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "git+https://github.com/theblackhatmagician/adetailer_sdxl.git"])
     subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "lmdb", "--no-warn-script-location", "--upgrade"])
     subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "git+https://github.com/huggingface/accelerate.git", "--no-warn-script-location", "--upgrade"])
     #import_module(self, "accelerate", "git+https://github.com/huggingface/accelerate.git")
@@ -1916,13 +1917,13 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
 #                    row = col.row()
 #                    row.prop(context.scene, "hidiff", text="HiDiff")
 
-#                # ADetailer - Switch off for release:
-#                if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
-#                    col = col.column(heading="Details", align=True)
+                # ADetailer
+                if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+                    col = col.column(heading="Details", align=True)
 
                 row = col.row()
-                # enable this for Adetailer
-                #row.prop(context.scene, "adetailer", text="Face")
+                if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":                
+                    row.prop(context.scene, "adetailer", text="Faces")
 
 #                # AuraSR
 #                if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
@@ -4055,7 +4056,14 @@ class SEQUENCER_OT_generate_image(Operator):
                 )
 
                 pipe = FluxPipeline.from_pretrained(image_model_card, transformer=model_nf4, torch_dtype=torch.bfloat16)
-                pipe.enable_model_cpu_offload()
+                if gfx_device == "mps":
+                    pipe.vae.enable_tiling()
+                elif low_vram():
+                    pipe.enable_sequential_cpu_offload()
+                    pipe.enable_vae_slicing()
+                    pipe.vae.enable_tiling()
+                else:
+                    pipe.enable_model_cpu_offload()
             else:
                 pipe = FluxPipeline.from_pretrained(image_model_card, torch_dtype=torch.bfloat16)
 
@@ -4068,8 +4076,8 @@ class SEQUENCER_OT_generate_image(Operator):
                 else:
                     pipe.enable_sequential_cpu_offload()
                     #pipe.enable_model_cpu_offload()
-                    #pipe.enable_vae_slicing()
-                    #pipe.vae.enable_tiling()
+                    pipe.enable_vae_slicing()
+                    pipe.vae.enable_tiling()
 
         # Fluently-XL
         elif image_model_card == "youknownothing/Fluently-XL-Final":
