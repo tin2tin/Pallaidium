@@ -690,9 +690,11 @@ def install_modules(self):
 
     # import_module(self, "diffusers", "diffusers")
     import_module(self, "requests", "requests")
+    #import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git@refs/pull/10330/head") #ltx
     import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
     
     import_module(self, "huggingface_hub", "huggingface_hub")
+    import_module(self, "gguf", "gguf")
     #import_module(self, "protobuf", "protobuf==3.20.1")
     import_module(self, "pydub", "pydub")
     
@@ -810,7 +812,7 @@ def install_modules(self):
     if os_platform != "Linux":
         subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "git+https://github.com/suno-ai/bark.git", "--no-warn-script-location", "--upgrade"])
         import_module(self, "whisperspeech", "WhisperSpeech==0.8")
-        import_module(self, "jaxlib", "jaxlib>=0.4.33")
+        #import_module(self, "jaxlib", "jaxlib>=0.4.33")
 
     subprocess.check_call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "peft", "--no-warn-script-location", "--upgrade"])
     import_module(self, "transformers", "transformers==4.46.3")
@@ -1150,7 +1152,9 @@ class GeneratorAddonPreferences(AddonPreferences):
             ("wangfuyun/AnimateLCM", "AnimateLCM", "wangfuyun/AnimateLCM"),
             ("THUDM/CogVideoX-2b", "CogVideoX-2b (720x480x48)", "THUDM/CogVideoX-2b"),
             ("THUDM/CogVideoX-5b", "CogVideoX-5b (720x480x48)", "THUDM/CogVideoX-5b"),
-            ("genmo/mochi-1-preview", "Mochi-1", "genmo/mochi-1-preview"),
+            ("Lightricks/LTX-Video", "LTX (768x512)", "Lightricks/LTX-Video"),
+            ("FastVideo/FastHunyuan-diffusers", "Hunyuan Video (1280x720x125)", "FastVideo/FastHunyuan-diffusers"),
+#            ("genmo/mochi-1-preview", "Mochi-1", "genmo/mochi-1-preview"), #noot good enough yet!
             (
                 "cerspense/zeroscope_v2_XL",
                 "Zeroscope XL (1024x576x24)",
@@ -1319,7 +1323,7 @@ class GeneratorAddonPreferences(AddonPreferences):
         name="Filepath",
         description="Path to the folder where the generated files are stored",
         subtype="DIR_PATH",
-        default=join(bpy.utils.user_resource("DATAFILES"), "2D Assets"),
+        default=join(bpy.utils.user_resource("DATAFILES"), "Pallaidium_Media"),
     )
     use_strip_data: BoolProperty(
         name="Use Input Strip Data",
@@ -2093,6 +2097,8 @@ class SEQUENCER_OT_generate_movie(Operator):
             and movie_model_card != "wangfuyun/AnimateLCM"
             and movie_model_card != "THUDM/CogVideoX-5b"
             and movie_model_card != "THUDM/CogVideoX-2b"
+            and movie_model_card != "Lightricks/LTX-Video"
+            and movie_model_card != "FastVideo/FastHunyuan-diffusers"
             and movie_model_card != "genmo/mochi-1-preview"
         ) or movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
             # Frame by Frame
@@ -2269,6 +2275,97 @@ class SEQUENCER_OT_generate_movie(Operator):
                 scene.generate_movie_x = 720
                 scene.generate_movie_y = 480
                 
+            # LTX
+            elif movie_model_card == "Lightricks/LTX-Video":
+                
+                #vid2vid
+                if scene.movie_path and input == "input_strips":
+                    print("LTX Video doesn't support vid2vid!")                
+                    from diffusers.utils import load_video
+                    from diffusers import LTXVideoToVideoPipeline
+                    pipe = LTXVideoToVideoPipeline.from_pretrained(
+                        "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
+                        torch_dtype=torch.bfloat16,
+                    )
+                #img2vid
+                elif scene.image_path and input == "input_strips":
+                    print("LTX Video: Load Image to Video Model")
+                    import torch
+                    from diffusers.utils import load_image
+                    from diffusers import LTXImageToVideoPipeline
+                    pipe = LTXImageToVideoPipeline.from_pretrained(
+                        "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
+                        torch_dtype=torch.bfloat16,
+                    )
+                else:
+                    print("LTX Video: Load Prompt to Video Model")
+                    import torch
+                    from diffusers import LTXPipeline
+                    pipe = LTXPipeline.from_pretrained(
+                        "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
+                        torch_dtype=torch.bfloat16,
+                    )
+                    
+                if gfx_device == "mps":
+                    pipe.vae.enable_tiling()
+                elif low_vram():
+                    pipe.enable_sequential_cpu_offload()
+                    #pipe.enable_vae_slicing()
+                    pipe.vae.enable_tiling()
+                else:
+                    pipe.enable_model_cpu_offload()              
+               
+            # HunyuanVideo
+            elif movie_model_card == "FastVideo/FastHunyuan-diffusers":
+                
+                #vid2vid
+                if scene.movie_path and input == "input_strips":
+                    print("HunyuanVideo doesn't support vid2vid!")                
+                    from diffusers.utils import load_video
+                    from diffusers import LTXVideoToVideoPipeline
+                    pipe = LTXVideoToVideoPipeline.from_pretrained(
+                        "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
+                        torch_dtype=torch.bfloat16,
+                    )
+                #img2vid
+                elif scene.image_path and input == "input_strips":
+                    print("HunyuanVideo doesn't support img2vid!")
+                    import torch
+                    from diffusers.utils import load_image
+                    from diffusers import LTXImageToVideoPipeline
+                    pipe = LTXImageToVideoPipeline.from_pretrained(
+                        "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
+                        torch_dtype=torch.bfloat16,
+                    )
+                else:
+                    print("HunyuanVideo: Load Prompt to Video Model")
+                    import torch
+                    from diffusers import BitsAndBytesConfig as DiffusersBitsAndBytesConfig, HunyuanVideoTransformer3DModel, HunyuanVideoPipeline
+                    from diffusers.utils import export_to_video
+
+                    quant_config = DiffusersBitsAndBytesConfig(load_in_8bit=True)
+                    transformer_8bit = HunyuanVideoTransformer3DModel.from_pretrained(
+                        "FastVideo/FastHunyuan-diffusers",
+                        subfolder="transformer",
+                        quantization_config=quant_config,
+                        torch_dtype=torch.float16,
+                    )
+                    pipe = HunyuanVideoPipeline.from_pretrained(
+                        "FastVideo/FastHunyuan-diffusers",
+                        transformer=transformer_8bit,
+                        torch_dtype=torch.float16,
+                        device_map="balanced",
+                    )
+#                if gfx_device == "mps":
+#                    pipe.vae.enable_tiling()
+#                elif low_vram():
+#                    pipe.enable_sequential_cpu_offload()
+#                    #pipe.enable_vae_slicing()
+#                    pipe.vae.enable_tiling()
+#                else:
+#                    pipe.to("cuda")
+#                    #pipe.enable_model_cpu_offload()  
+                    
             # Mochi
             elif movie_model_card == "genmo/mochi-1-preview":
                 from diffusers import MochiPipeline
@@ -2504,7 +2601,49 @@ class SEQUENCER_OT_generate_movie(Operator):
 #                    if not video.any():
 #                        print("Loading of file failed")
 #                        return {"CANCELLED"}
-
+                # LTX 
+                elif movie_model_card == "Lightricks/LTX-Video":
+                    if scene.movie_path:
+                        print("Process: Video to video (LTX) not supported!")
+                        return {"CANCELLED"}
+                        print("Process: Video to video (LTX)")
+                        if not os.path.isfile(scene.movie_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        #video = load_video_as_np_array(video_path)
+                        video = load_video(video_path)[:49]
+                        video_frames = pipe(
+                            video=video,
+                            prompt=prompt,
+                            #strength=1.00 - scene.image_power,
+                            negative_prompt=negative_prompt,
+                            num_inference_steps=movie_num_inference_steps,
+                            guidance_scale=movie_num_guidance,
+                            height=y,
+                            width=x,
+                            #num_frames=abs(duration),
+                            generator=generator,
+                        ).frames[0]                    
+                    if scene.image_path:
+                        print("Process: Image to video (LTX)")
+                        if not os.path.isfile(scene.image_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        image = load_image(bpy.path.abspath(scene.image_path))
+                        image = image.resize((closest_divisible_16(int(x)), closest_divisible_16(int(y))))
+                        video_frames = pipe(
+                            image=image,
+                            prompt=prompt,
+                            #strength=1.00 - scene.image_power,
+                            negative_prompt=negative_prompt,
+                            num_inference_steps=movie_num_inference_steps,
+                            guidance_scale=movie_num_guidance,
+                            height=y,
+                            width=x,
+                            num_frames=abs(duration),
+                            generator=generator,
+                            #use_dynamic_cfg=True,
+                        ).frames[0]                  
                 else:
                     if scene.movie_path:
                         print("Process: Video to video")
@@ -2574,7 +2713,23 @@ class SEQUENCER_OT_generate_movie(Operator):
                     ).frames[0]
                     scene.generate_movie_x = 720
                     scene.generate_movie_y = 480
-
+                    
+                # HunyuanVideo
+                elif movie_model_card == "FastVideo/FastHunyuan-diffusers":
+                    video_frames = pipe(
+                        prompt=prompt,
+                        #negative_prompt=negative_prompt,
+                        num_inference_steps=movie_num_inference_steps,
+                        guidance_scale=movie_num_guidance,
+                        num_videos_per_prompt=1,
+                        height=720,
+                        width=1280,
+                        #
+                        num_frames=abs(duration),
+                        generator=generator,
+                    ).frames[0]
+                    scene.generate_movie_x = 1280
+                    scene.generate_movie_y = 720                    
                 else:
                     video_frames = pipe(
                         prompt=prompt,
@@ -2629,7 +2784,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                                 filepath=dst_path,
                                 frame_start=start_frame,
                                 channel=empty_channel,
-                                fit_method="STRETCH",
+                                fit_method="FIT",
                                 adjust_playback_rate=True,
                                 sound=False,
                                 use_framerate=False,
@@ -3553,22 +3708,27 @@ class SEQUENCER_OT_generate_image(Operator):
 
             elif (image_model_card == "black-forest-labs/FLUX.1-schnell" or image_model_card == "ChuckMcSneed/FLUX.1-dev"):
                 print("Load Inpaint: "+image_model_card)
-                pipe = AutoPipelineForInpainting.from_pretrained(
-                    image_model_card,
-                    torch_dtype=torch.float16,
-                    local_files_only=local_files_only,
+                from diffusers import DiffusionPipeline, FluxFillPipeline, FluxTransformer2DModel
+                from transformers import T5EncoderModel
+                orig_pipeline = DiffusionPipeline.from_pretrained("black-forest-labs/FLUX.1-dev", torch_dtype=torch.bfloat16)
+
+                transformer = FluxTransformer2DModel.from_pretrained(
+                    "sayakpaul/FLUX.1-Fill-dev-nf4", subfolder="transformer", torch_dtype=torch.bfloat16
                 )
+                text_encoder_2 = T5EncoderModel.from_pretrained(
+                    "sayakpaul/FLUX.1-Fill-dev-nf4", subfolder="text_encoder_2", torch_dtype=torch.bfloat16
+                )
+                pipe = FluxFillPipeline.from_pipe(
+                    orig_pipeline, transformer=transformer, text_encoder_2=text_encoder_2, torch_dtype=torch.bfloat16
+                )
+
                 if gfx_device == "mps":
                     pipe.vae.enable_tiling()
                 elif low_vram():
                     pipe.enable_sequential_cpu_offload()
-                    #pipe.enable_vae_slicing()
                     pipe.vae.enable_tiling()
                 else:
-                    pipe.enable_sequential_cpu_offload()
-                    #pipe.enable_model_cpu_offload()
-                    #pipe.enable_vae_slicing()
-                    #pipe.vae.enable_tiling()
+                    pipe.enable_model_cpu_offload()
 
         # Conversion img2img/vid2img.
         elif (
@@ -3610,29 +3770,38 @@ class SEQUENCER_OT_generate_image(Operator):
                     converter.to(gfx_device)
             else:
                 from diffusers import AutoPipelineForImage2Image
+                
                 if image_model_card == "stabilityai/stable-diffusion-3-medium-diffusers":# or image_model_card == "stabilityai/stable-diffusion-3.5-large":
                     import torch
                     from huggingface_hub.commands.user import login
                     result = login(token=addon_prefs.hugginface_token, add_to_git_credential=True)
-                try:
-                    converter = AutoPipelineForImage2Image.from_pretrained(
-                        image_model_card,
-                        torch_dtype=torch.float16,
-                        variant="fp16",
-                        local_files_only=local_files_only,
-                    )
-                except:
-                    try:
-                        converter = AutoPipelineForImage2Image.from_pretrained(
-                            image_model_card,
-                            torch_dtype=torch.float16,
-                            local_files_only=local_files_only,
-                        )
-                    except:
-                        print("The "+ image_model_card + " model does not work for a image to image pipeline!")
-                        return {"CANCELLED"}
 
                 if image_model_card == "black-forest-labs/FLUX.1-schnell" or image_model_card == "ChuckMcSneed/FLUX.1-dev":
+
+                    #from diffusers import FluxPipeline
+                  
+                    from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
+
+                    nf4_config = BitsAndBytesConfig(
+                        load_in_4bit=True,
+                        bnb_4bit_quant_type="nf4",
+                        bnb_4bit_compute_dtype=torch.bfloat16
+                    )
+                    model_nf4 = FluxTransformer2DModel.from_pretrained(
+                        image_model_card,
+                        subfolder="transformer",
+                        quantization_config=nf4_config,
+                        torch_dtype=torch.bfloat16
+                    )
+                    converter = AutoPipelineForImage2Image.from_pretrained(
+                        image_model_card,
+                        transformer=model_nf4,
+                        torch_dtype=torch.bfloat16,
+                        #variant="fp16",
+                        local_files_only=local_files_only,
+                    )
+                    #pipe = FluxPipeline.from_pretrained(image_model_card, transformer=model_nf4, torch_dtype=torch.bfloat16)
+
                     if gfx_device == "mps":
                         converter.vae.enable_tiling()
                     elif low_vram():
@@ -3643,11 +3812,29 @@ class SEQUENCER_OT_generate_image(Operator):
                         converter.enable_model_cpu_offload()
                         #converter.enable_vae_slicing()
                         #converter.vae.enable_tiling()
-                else:
+                else:               
+                    try:
+                        converter = AutoPipelineForImage2Image.from_pretrained(
+                            image_model_card,
+                            torch_dtype=torch.float16,
+                            variant="fp16",
+                            local_files_only=local_files_only,
+                        )
+                    except:
+                        try:
+                            converter = AutoPipelineForImage2Image.from_pretrained(
+                                image_model_card,
+                                torch_dtype=torch.float16,
+                                local_files_only=local_files_only,
+                            )
+                        except:
+                            print("The "+ image_model_card + " model does not work for a image to image pipeline!")
+                            return {"CANCELLED"}
                     if low_vram():
                         converter.enable_model_cpu_offload()
                     else:
                         converter.to(gfx_device)                    
+
             if (
                 enabled_items
                 and input == "input_strips"
@@ -4041,6 +4228,7 @@ class SEQUENCER_OT_generate_image(Operator):
             import torch
             from diffusers import FluxPipeline
             if not do_inpaint and not enabled_items and not do_convert:
+              
                 from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
 
                 nf4_config = BitsAndBytesConfig(
@@ -4056,6 +4244,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 )
 
                 pipe = FluxPipeline.from_pretrained(image_model_card, transformer=model_nf4, torch_dtype=torch.bfloat16)
+                
                 if gfx_device == "mps":
                     pipe.vae.enable_tiling()
                 elif low_vram():
@@ -4063,8 +4252,9 @@ class SEQUENCER_OT_generate_image(Operator):
                     pipe.enable_vae_slicing()
                     pipe.vae.enable_tiling()
                 else:
-                    pipe.enable_model_cpu_offload()
-            else:
+                    pipe.enable_model_cpu_offload() 
+            else: #LoRA + img2img
+                
                 pipe = FluxPipeline.from_pretrained(image_model_card, torch_dtype=torch.bfloat16)
 
                 if gfx_device == "mps":
@@ -4757,7 +4947,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         image_num_inference_steps = 4
                     image = pipe(
                         prompt=prompt,
-                        prompt_2=None,
+                        #prompt_2=None,
                         max_sequence_length=512,
                         image=init_image,
                         mask_image=mask_image,
@@ -4766,9 +4956,10 @@ class SEQUENCER_OT_generate_image(Operator):
                         height=y,
                         width=x,
                         generator=generator,
-                        padding_mask_crop=42,
-                        strength=0.5,
+                        #padding_mask_crop=42,
+                        #strength=0.5,
                     ).images[0]
+                    
                 elif image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
                     print("Process Inpaint: " + image_model_card)
                     image = pipe(
@@ -5268,7 +5459,7 @@ class SEQUENCER_OT_generate_image(Operator):
                             if i > 0:
                                 scene.frame_current = scene.sequence_editor.active_strip.frame_final_start
                             # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
-                            # bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
+                            bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
                             break
             print_elapsed_time(start_time)
         try:
@@ -5449,8 +5640,8 @@ class SEQUENCER_OT_generate_text(Operator):
             strip.font_size = 44
             strip.location[0] = 0.5
             strip.location[1] = 0.2
-            strip.align_x = "CENTER"
-            strip.align_y = "TOP"
+            strip.anchor_x = "CENTER"
+            strip.anchor_y = "TOP"
             strip.use_shadow = True
             strip.use_box = True
 #            if scene.generate_movie_frames == -1 and input == "input_strips":
@@ -5822,7 +6013,7 @@ def register():
         name="generate_movie_frames",
         default=6,
         min=-1,
-        max=125,
+        max=500,
         description="Number of frames to generate. NB. some models have fixed values.",
     )
 
