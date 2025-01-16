@@ -1023,6 +1023,12 @@ def input_strips_updated(self, context):
         scene.generate_movie_y = 480
         scene.movie_num_inference_steps = 50
         scene.input_strips == "input_prompt"
+    if movie_model_card == "hunyuanvideo-community/HunyuanVideo":
+        scene.generate_movie_x = 512
+        scene.generate_movie_y = 320
+        scene.generate_movie_frames = 81
+        scene.movie_num_inference_steps = 40
+        scene.input_strips == "input_prompt"
 
     if (image_model_card == "dataautogpt3/OpenDalleV1.1") and type == "image":
         bpy.context.scene.use_lcm = False
@@ -1153,7 +1159,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             ("THUDM/CogVideoX-2b", "CogVideoX-2b (720x480x48)", "THUDM/CogVideoX-2b"),
             ("THUDM/CogVideoX-5b", "CogVideoX-5b (720x480x48)", "THUDM/CogVideoX-5b"),
             ("Lightricks/LTX-Video", "LTX (768x512)", "Lightricks/LTX-Video"),
-            ("FastVideo/FastHunyuan-diffusers", "Hunyuan Video (1280x720x125)", "FastVideo/FastHunyuan-diffusers"),
+            ("hunyuanvideo-community/HunyuanVideo", "Hunyuan Video (512x320x81)", "hunyuanvideo-community/HunyuanVideo"),
 #            ("genmo/mochi-1-preview", "Mochi-1", "genmo/mochi-1-preview"), #noot good enough yet!
             (
                 "cerspense/zeroscope_v2_XL",
@@ -2098,7 +2104,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             and movie_model_card != "THUDM/CogVideoX-5b"
             and movie_model_card != "THUDM/CogVideoX-2b"
             and movie_model_card != "Lightricks/LTX-Video"
-            and movie_model_card != "FastVideo/FastHunyuan-diffusers"
+            and movie_model_card != "hunyuanvideo-community/HunyuanVideo"
             and movie_model_card != "genmo/mochi-1-preview"
         ) or movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
             # Frame by Frame
@@ -2316,55 +2322,60 @@ class SEQUENCER_OT_generate_movie(Operator):
                     pipe.enable_model_cpu_offload()              
                
             # HunyuanVideo
-            elif movie_model_card == "FastVideo/FastHunyuan-diffusers":
+            elif movie_model_card == "hunyuanvideo-community/HunyuanVideo":
                 
                 #vid2vid
                 if scene.movie_path and input == "input_strips":
-                    print("HunyuanVideo doesn't support vid2vid!")                
-                    from diffusers.utils import load_video
-                    from diffusers import LTXVideoToVideoPipeline
-                    pipe = LTXVideoToVideoPipeline.from_pretrained(
-                        "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
-                        torch_dtype=torch.bfloat16,
-                    )
+                    print("HunyuanVideo doesn't support vid2vid!")
+                    return {"CANCELLED"}                
+#                    from diffusers.utils import load_video
+#                    from diffusers import LTXVideoToVideoPipeline
+#                    pipe = LTXVideoToVideoPipeline.from_pretrained(
+#                        "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
+#                        torch_dtype=torch.bfloat16,
+#                    )
                 #img2vid
                 elif scene.image_path and input == "input_strips":
                     print("HunyuanVideo doesn't support img2vid!")
-                    import torch
-                    from diffusers.utils import load_image
-                    from diffusers import LTXImageToVideoPipeline
-                    pipe = LTXImageToVideoPipeline.from_pretrained(
-                        "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
-                        torch_dtype=torch.bfloat16,
-                    )
+                    return {"CANCELLED"}
+#                    import torch
+#                    from diffusers.utils import load_image
+#                    from diffusers import LTXImageToVideoPipeline
+#                    pipe = LTXImageToVideoPipeline.from_pretrained(
+#                        "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
+#                        torch_dtype=torch.bfloat16,
+#                    )
                 else:
                     print("HunyuanVideo: Load Prompt to Video Model")
-                    import torch
-                    from diffusers import BitsAndBytesConfig as DiffusersBitsAndBytesConfig, HunyuanVideoTransformer3DModel, HunyuanVideoPipeline
+                    from diffusers import HunyuanVideoTransformer3DModel, HunyuanVideoPipeline
                     from diffusers.utils import export_to_video
+                    from diffusers import GGUFQuantizationConfig
 
-                    quant_config = DiffusersBitsAndBytesConfig(load_in_8bit=True)
-                    transformer_8bit = HunyuanVideoTransformer3DModel.from_pretrained(
-                        "FastVideo/FastHunyuan-diffusers",
-                        subfolder="transformer",
-                        quantization_config=quant_config,
-                        torch_dtype=torch.float16,
+                    transformer_path = f"https://huggingface.co/city96/HunyuanVideo-gguf/blob/main/hunyuan-video-t2v-720p-Q3_K_S.gguf"
+
+                    model_id = "hunyuanvideo-community/HunyuanVideo"
+
+                    transformer = HunyuanVideoTransformer3DModel.from_single_file(
+                        transformer_path,
+                        quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16),
+                        torch_dtype=torch.bfloat16,
                     )
+
                     pipe = HunyuanVideoPipeline.from_pretrained(
-                        "FastVideo/FastHunyuan-diffusers",
-                        transformer=transformer_8bit,
-                        torch_dtype=torch.float16,
-                        device_map="balanced",
+                        model_id, 
+                        transformer=transformer,
+                        torch_dtype=torch.float16
                     )
-#                if gfx_device == "mps":
-#                    pipe.vae.enable_tiling()
-#                elif low_vram():
-#                    pipe.enable_sequential_cpu_offload()
-#                    #pipe.enable_vae_slicing()
-#                    pipe.vae.enable_tiling()
-#                else:
-#                    pipe.to("cuda")
-#                    #pipe.enable_model_cpu_offload()  
+                if gfx_device == "mps":
+                    pipe.vae.enable_tiling()
+                elif low_vram():
+                    pipe.vae.enable_tiling()
+                    pipe.enable_model_cpu_offload()
+                    #pipe.enable_sequential_cpu_offload()
+                    #pipe.enable_vae_slicing()
+                else:
+                    pipe.enable_model_cpu_offload()
+                    #pipe.enable_model_cpu_offload()  
                     
             # Mochi
             elif movie_model_card == "genmo/mochi-1-preview":
@@ -2715,21 +2726,20 @@ class SEQUENCER_OT_generate_movie(Operator):
                     scene.generate_movie_y = 480
                     
                 # HunyuanVideo
-                elif movie_model_card == "FastVideo/FastHunyuan-diffusers":
+                elif movie_model_card == "hunyuanvideo-community/HunyuanVideo":
                     video_frames = pipe(
                         prompt=prompt,
                         #negative_prompt=negative_prompt,
                         num_inference_steps=movie_num_inference_steps,
                         guidance_scale=movie_num_guidance,
                         num_videos_per_prompt=1,
-                        height=720,
-                        width=1280,
-                        #
+                        height=320,
+                        width=512,
                         num_frames=abs(duration),
                         generator=generator,
                     ).frames[0]
-                    scene.generate_movie_x = 1280
-                    scene.generate_movie_y = 720                    
+                    scene.generate_movie_y = 320                
+                    scene.generate_movie_x = 512
                 else:
                     video_frames = pipe(
                         prompt=prompt,
@@ -2997,7 +3007,7 @@ class SEQUENCER_OT_generate_audio(Operator):
 
         # Parler
         elif addon_prefs.audio_model_card == "parler-tts/parler-tts-large-v1" or addon_prefs.audio_model_card == "parler-tts/parler-tts-mini-v1":
-            pipe = ParlerTTSForConditionalGeneration.from_pretrained(addon_prefs.audio_model_card).to(gfx_device)
+            pipe = ParlerTTSForConditionalGeneration.from_pretrained("parler-tts/parler-tts-large-v1", revision= "refs/pr/9").to(gfx_device)
             tokenizer = AutoTokenizer.from_pretrained(addon_prefs.audio_model_card)
 
         # Deadend
