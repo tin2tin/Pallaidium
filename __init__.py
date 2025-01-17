@@ -1158,8 +1158,8 @@ class GeneratorAddonPreferences(AddonPreferences):
             ("wangfuyun/AnimateLCM", "AnimateLCM", "wangfuyun/AnimateLCM"),
             ("THUDM/CogVideoX-2b", "CogVideoX-2b (720x480x48)", "THUDM/CogVideoX-2b"),
             ("THUDM/CogVideoX-5b", "CogVideoX-5b (720x480x48)", "THUDM/CogVideoX-5b"),
-            ("Lightricks/LTX-Video", "LTX (768x512)", "Lightricks/LTX-Video"),
-            ("hunyuanvideo-community/HunyuanVideo", "Hunyuan Video (512x320x81)", "hunyuanvideo-community/HunyuanVideo"),
+            ("a-r-r-o-w/LTX-Video-0.9.1-diffusers", "LTX (768x512)", "a-r-r-o-w/LTX-Video-0.9.1-diffusers"),
+            ("hunyuanvideo-community/HunyuanVideo", "Hunyuan Video (512x320x(4*k+1))", "hunyuanvideo-community/HunyuanVideo"),
 #            ("genmo/mochi-1-preview", "Mochi-1", "genmo/mochi-1-preview"), #noot good enough yet!
             (
                 "cerspense/zeroscope_v2_XL",
@@ -2103,7 +2103,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             and movie_model_card != "wangfuyun/AnimateLCM"
             and movie_model_card != "THUDM/CogVideoX-5b"
             and movie_model_card != "THUDM/CogVideoX-2b"
-            and movie_model_card != "Lightricks/LTX-Video"
+            and movie_model_card != "a-r-r-o-w/LTX-Video-0.9.1-diffusers"
             and movie_model_card != "hunyuanvideo-community/HunyuanVideo"
             and movie_model_card != "genmo/mochi-1-preview"
         ) or movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
@@ -2282,35 +2282,55 @@ class SEQUENCER_OT_generate_movie(Operator):
                 scene.generate_movie_y = 480
                 
             # LTX
-            elif movie_model_card == "Lightricks/LTX-Video":
+            elif movie_model_card == "a-r-r-o-w/LTX-Video-0.9.1-diffusers":
+                from transformers import T5EncoderModel, T5Tokenizer
+                text_encoder = T5EncoderModel.from_pretrained(
+                  movie_model_card, subfolder="text_encoder", torch_dtype=torch.bfloat16
+                )
+                tokenizer = T5Tokenizer.from_pretrained(
+                  movie_model_card, subfolder="tokenizer", torch_dtype=torch.bfloat16
+                )
                 
                 #vid2vid
                 if scene.movie_path and input == "input_strips":
-                    print("LTX Video doesn't support vid2vid!")                
-                    from diffusers.utils import load_video
-                    from diffusers import LTXVideoToVideoPipeline
-                    pipe = LTXVideoToVideoPipeline.from_pretrained(
-                        "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
-                        torch_dtype=torch.bfloat16,
-                    )
+                    print("LTX Video doesn't support vid2vid!")
+                    return {"CANCELLED"}                
+#                    from diffusers.utils import load_video
+#                    from diffusers import LTXVideoToVideoPipeline
+#                    pipe = LTXVideoToVideoPipeline.from_pretrained(
+#                        "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
+#                        torch_dtype=torch.bfloat16,
+#                    )
                 #img2vid
                 elif scene.image_path and input == "input_strips":
                     print("LTX Video: Load Image to Video Model")
                     import torch
                     from diffusers.utils import load_image
                     from diffusers import LTXImageToVideoPipeline
-                    pipe = LTXImageToVideoPipeline.from_pretrained(
-                        "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
-                        torch_dtype=torch.bfloat16,
-                    )
+                    pipe = LTXImageToVideoPipeline.from_single_file(
+                        "https://huggingface.co/Lightricks/LTX-Video/blob/main/ltx-video-2b-v0.9.1.safetensors", 
+                        text_encoder=text_encoder, 
+                        tokenizer=tokenizer, 
+                        torch_dtype=torch.bfloat16
+                    )                    
+#                    pipe = LTXImageToVideoPipeline.from_pretrained(
+#                        "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
+#                        torch_dtype=torch.bfloat16,
+#                    )
                 else:
                     print("LTX Video: Load Prompt to Video Model")
                     import torch
                     from diffusers import LTXPipeline
-                    pipe = LTXPipeline.from_pretrained(
-                        "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
-                        torch_dtype=torch.bfloat16,
-                    )
+                    pipe = LTXPipeline.from_single_file(
+                        "https://huggingface.co/Lightricks/LTX-Video/blob/main/ltx-video-2b-v0.9.1.safetensors", 
+                        text_encoder=text_encoder, 
+                        tokenizer=tokenizer, 
+                        torch_dtype=torch.bfloat16
+                    )                     
+#                    pipe = LTXPipeline.from_pretrained(
+#                        "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
+#                        torch_dtype=torch.bfloat16,
+#                    )
                     
                 if gfx_device == "mps":
                     pipe.vae.enable_tiling()
@@ -2346,12 +2366,16 @@ class SEQUENCER_OT_generate_movie(Operator):
 #                        torch_dtype=torch.bfloat16,
 #                    )
                 else:
-                    print("HunyuanVideo: Load Prompt to Video Model")
+                    print("HunyuanVideo: Load Prompt to Video Model")              
+                    
                     from diffusers import HunyuanVideoTransformer3DModel, HunyuanVideoPipeline
                     from diffusers.utils import export_to_video
                     from diffusers import GGUFQuantizationConfig
 
-                    transformer_path = f"https://huggingface.co/city96/HunyuanVideo-gguf/blob/main/hunyuan-video-t2v-720p-Q3_K_S.gguf"
+                    if low_vram():
+                        transformer_path = f"https://huggingface.co/city96/HunyuanVideo-gguf/blob/main/hunyuan-video-t2v-720p-Q3_K_S.gguf"
+                    else:
+                        transformer_path = f"https://huggingface.co/city96/HunyuanVideo-gguf/blob/main/hunyuan-video-t2v-720p-Q8_0.gguf"
 
                     model_id = "hunyuanvideo-community/HunyuanVideo"
 
@@ -2374,6 +2398,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     #pipe.enable_sequential_cpu_offload()
                     #pipe.enable_vae_slicing()
                 else:
+                    pipe.vae.enable_tiling()
                     pipe.enable_model_cpu_offload()
                     #pipe.enable_model_cpu_offload()  
                     
@@ -2613,7 +2638,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 #                        print("Loading of file failed")
 #                        return {"CANCELLED"}
                 # LTX 
-                elif movie_model_card == "Lightricks/LTX-Video":
+                elif movie_model_card == "a-r-r-o-w/LTX-Video-0.9.1-diffusers":
                     if scene.movie_path:
                         print("Process: Video to video (LTX) not supported!")
                         return {"CANCELLED"}
