@@ -53,6 +53,10 @@ from bpy.props import (
     FloatProperty,
 )
 import sys
+import base64
+from io import BytesIO
+from PIL import Image
+import asyncio
 
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
@@ -458,9 +462,9 @@ def process_frames(frame_folder_path, target_width):
         # Calculate the target height to maintain the original aspect ratio
         target_height = int((target_width / frame_width) * frame_height)
         # Ensure width and height are divisible by 64
-        target_width = closest_divisible_16(target_width)
-        target_height = closest_divisible_16(target_height)
-        img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+#        target_width = closest_divisible_16(target_width)
+#        target_height = closest_divisible_16(target_height)
+#        img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
         img = img.convert("RGB")
         processed_frames.append(img)
     return processed_frames
@@ -1006,7 +1010,9 @@ def input_strips_updated(self, context):
         scene.input_strips = "input_strips"
 
     if (type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid") or (
-        type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt"
+        type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt") or (
+        type == "movie" and movie_model_card == "Hailuo/MiniMax/img2vid") or (
+        type == "movie" and movie_model_card == "Hailuo/MiniMax/subject2vid") or (
     ):
         scene.input_strips = "input_strips"
     if scene.input_strips == "input_prompt":
@@ -1073,7 +1079,9 @@ def output_strips_updated(self, context):
     if type == "text":
         scene.input_strips = "input_strips"
     if (type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid") or (
-        type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt"
+        type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt") or ( 
+        type == "movie" and movie_model_card == "Hailuo/MiniMax/img2vid") or (
+        type == "movie" and movie_model_card == "Hailuo/MiniMax/subject2vid") or (
     ):
         scene.input_strips = "input_strips"
 
@@ -1103,8 +1111,12 @@ def output_strips_updated(self, context):
         scene.generate_movie_x = 848
         scene.generate_movie_y = 480
         scene.movie_num_inference_steps = 50
-        scene.input_strips == "input_prompt" 
-
+    if movie_model_card == "hunyuanvideo-community/HunyuanVideo" and type == "movie":
+        scene.generate_movie_x = 512
+        scene.generate_movie_y = 320
+        scene.generate_movie_frames = 81
+        scene.movie_num_inference_steps = 40
+        
 
 class GeneratorAddonPreferences(AddonPreferences):
     bl_idname = __name__
@@ -1158,7 +1170,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             ("wangfuyun/AnimateLCM", "AnimateLCM", "wangfuyun/AnimateLCM"),
             ("THUDM/CogVideoX-2b", "CogVideoX-2b (720x480x48)", "THUDM/CogVideoX-2b"),
             ("THUDM/CogVideoX-5b", "CogVideoX-5b (720x480x48)", "THUDM/CogVideoX-5b"),
-            ("a-r-r-o-w/LTX-Video-0.9.1-diffusers", "LTX (768x512)", "a-r-r-o-w/LTX-Video-0.9.1-diffusers"),
+            ("a-r-r-o-w/LTX-Video-diffusers", "LTX (768x512)", "a-r-r-o-w/LTX-Video-diffusers"),
             ("hunyuanvideo-community/HunyuanVideo", "Hunyuan Video (512x320x(4*k+1))", "hunyuanvideo-community/HunyuanVideo"),
 #            ("genmo/mochi-1-preview", "Mochi-1", "genmo/mochi-1-preview"), #noot good enough yet!
             (
@@ -1176,6 +1188,9 @@ class GeneratorAddonPreferences(AddonPreferences):
 #                "Zeroscope (448x256x30)",
 #                "Zeroscope (448x256x30)",
 #            ),
+            ("Hailuo/MiniMax/txt2vid", "MiniMax (txt2vid)", "Hailuo/MiniMax/txt2vid"),
+            ("Hailuo/MiniMax/img2vid", "MiniMax (img2vid)", "Hailuo/MiniMax/img2vid"),
+            ("Hailuo/MiniMax/subject2vid", "MiniMax (subject2vid)", "Hailuo/MiniMax/subject2vid"),
         ],
         default="stabilityai/stable-video-diffusion-img2vid",
         update=input_strips_updated,
@@ -1754,6 +1769,15 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                                     text="Inpaint Mask",
                                     icon="SEQ_STRIP_DUPLICATE",
                                 )
+            if type == "movie" and "Hailuo/MiniMax/subject2vid":
+                col.prop_search(
+                    scene,
+                    "minimax_subject",
+                    scene.sequence_editor,
+                    "sequences",
+                    text="Subject MiniMax",
+                    icon="SEQ_STRIP_DUPLICATE",
+                )              
             if image_model_card == "xinsir/controlnet-openpose-sdxl-1.0" and type == "image":
                 col = col.column(heading="Read as", align=True)
                 col.prop(context.scene, "openpose_use_bones", text="OpenPose Rig Image")
@@ -1783,7 +1807,6 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 row = col.row(align=True)
                 row.prop(scene, "ip_adapter_face_folder", text="Adapter Face")
                 row.operator("ip_adapter_face.file_browser", text="", icon="FILE_FOLDER")
-                # if not scene.inpaint_selected_strip:
 
                 row = col.row(align=True)
                 row.prop(scene, "ip_adapter_style_folder", text="Adapter Style")
@@ -1989,12 +2012,14 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         col = layout.box()
         col = col.column(align=True)
         col.prop(context.scene, "generatorai_typeselect", text="Output")
+        
         if type == "image":
             col.prop(addon_prefs, "image_model_card", text=" ")
             if addon_prefs.image_model_card == "stabilityai/stable-diffusion-3-medium-diffusers" or addon_prefs.image_model_card == "stabilityai/stable-diffusion-3.5-large":
                 row = col.row(align=True)
                 row.prop(addon_prefs, "hugginface_token")
                 row.operator("wm.url_open", text="", icon="URL").url = "https://huggingface.co/settings/tokens"
+                
         if type == "movie":
             col.prop(addon_prefs, "movie_model_card", text=" ")
         if type == "audio":
@@ -2034,6 +2059,209 @@ class NoWatermark:
     def apply_watermark(self, img):
         return img
 
+DEBUG = True  # Set to False to suppress debug prints
+
+def debug_print(*args):
+    if DEBUG:
+        print(*args)
+
+# MiniMax
+def invoke_video_generation(prompt, api_key, image_url, movie_model_card):
+    import requests
+    import json
+    import base64
+
+    debug_print("-----------------Submit video generation task-----------------")
+    url = "https://api.minimaxi.chat/v1/video_generation"
+    #debug_print("Movie model card:", movie_model_card)
+    debug_print("Prompt:", prompt)
+    debug_print("Image URL:", image_url)
+
+    if movie_model_card == "Hailuo/MiniMax/img2vid":
+        with open(image_url, "rb") as image_file:
+            data = base64.b64encode(image_file.read()).decode('utf-8')
+
+        payload = json.dumps({
+          "model": "video-01", 
+          "prompt": prompt,
+          "first_frame_image": f"data:image/jpeg;base64,{data}"
+        })
+        
+    elif movie_model_card == "Hailuo/MiniMax/subject2vid":
+        with open(image_url, "rb") as image_file:
+            data = base64.b64encode(image_file.read()).decode('utf-8')
+        #debug_print("Base64 encoded image data:", data)
+
+        payload = json.dumps({
+            "model": "S2V-01", 
+            "prompt": prompt,
+            "subject_reference": [
+                {
+                    "type": "character",
+                    "image": [
+                        f"data:image/jpeg;base64,{data}"
+                    ]
+                }
+            ]
+        })  
+    else:
+        payload = json.dumps({
+          "model": "video-01",
+          "prompt": prompt,
+        })
+    
+    #debug_print("Payload:", payload)
+
+    headers = {
+      'authorization': f'Bearer {api_key}',
+      'Content-Type': 'application/json'
+    }
+    #debug_print("Headers:", headers)
+
+    response = requests.request("POST", url, headers=headers, data=payload)
+    debug_print("Response text:", response.text)
+
+    task_id = response.json()['task_id']
+    debug_print("Task ID:", task_id)
+    print("Video generation task submitted successfully, task ID："+task_id)
+    return task_id
+
+# MiniMax
+def query_video_generation(task_id, api_key):
+    debug_print("Task ID:", task_id)
+
+    import requests
+    url = f"https://api.minimaxi.chat/v1/query/video_generation?task_id={task_id}"
+    debug_print("Query URL:", url)
+    
+    headers = {
+      'authorization': f'Bearer {api_key}'
+    }
+    #debug_print("Headers:", headers)
+
+    response = requests.request("GET", url, headers=headers)
+    debug_print("Response text:", response.text)
+
+    status = response.json()['status']
+    debug_print("Task Status:", status)
+
+    if status == 'Preparing':
+        print("...Preparing...")
+        return "", 'Preparing'   
+    elif status == 'Queueing':
+        print("...In the queue...")
+        return "", 'Queueing'
+    elif status == 'Processing':
+        print("...Generating...")
+        return "", 'Processing'
+    elif status == 'Success':
+        return response.json()['file_id'], "Finished"
+    elif status == 'Fail':
+        return "", "Fail"
+    else:
+        return "", "Unknown"
+
+# MiniMax
+def fetch_video_result(file_id, api_key, output_file_name):
+    debug_print("File ID:", file_id)
+    debug_print("Out file name:", output_file_name)
+    import requests
+    debug_print("---------------Video generated successfully, downloading now---------------")
+    url = f"https://api.minimaxi.chat/v1/files/retrieve?file_id={file_id}"
+    debug_print("Retrieve URL:", url)
+
+    headers = {
+        'authorization': f'Bearer {api_key}',
+    }
+    #debug_print("Headers:", headers)
+
+    response = requests.request("GET", url, headers=headers)
+    debug_print("Response text:", response.text)
+
+    download_url = response.json()['file']['download_url']
+    debug_print("Download URL:", download_url)
+    
+    print("Video download link：" + download_url)
+    with open(output_file_name, 'wb') as f:
+        video_content = requests.get(download_url).content
+        f.write(video_content)
+    debug_print("Video content written to:", output_file_name)
+    print("The video has been downloaded in："+output_file_name)  # os.getcwd()+'/'+
+    return output_file_name
+
+
+def minimax_validate_image(file_path):
+    """
+    Validate an image based on the following criteria:
+    - Format: JPG, JPEG, PNG
+    - Aspect ratio: Greater than 2:5 and less than 5:2
+    - Shorter side > 300 pixels
+    - File size <= 20MB
+
+    Args:
+        file_path (str): Path to the local image file
+
+    Returns:
+        bool: True if the image is valid, False otherwise
+    """
+    MAX_FILE_SIZE_MB = 20
+    MIN_SHORT_SIDE = 300
+    MIN_ASPECT_RATIO = 2 / 5
+    MAX_ASPECT_RATIO = 5 / 2
+    SUPPORTED_FORMATS = {"JPEG", "JPG", "PNG"}
+
+    try:
+        # Check file size
+        file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+        if file_size_mb > MAX_FILE_SIZE_MB:
+            print("MiniMax Image Input Failure Reason: File size exceeds 20MB.")
+            return False
+
+        # Load image using PIL
+        image = Image.open(file_path)
+
+        # Check format
+        if image.format not in SUPPORTED_FORMATS:
+            print(f"Failure Reason: Unsupported image format: {image.format}.")
+            return False
+
+        # Check dimensions
+        width, height = image.size
+        shorter_side = min(width, height)
+        aspect_ratio = width / height
+
+        if shorter_side <= MIN_SHORT_SIDE:
+            print("Failure Reason: Shorter side must exceed 300 pixels.")
+            return False
+
+        if not (MIN_ASPECT_RATIO < aspect_ratio < MAX_ASPECT_RATIO):
+            print("Failure Reason: Aspect ratio must be between 2:5 and 5:2.")
+            return False
+
+        # Passed all checks
+        return True
+
+    except Exception as e:
+        print(f"Failure Reason: {str(e)}")
+        return False
+
+def read_file(path):
+    try:
+        with open(path, 'r') as file:
+            return file.read()
+    except Exception as e:
+        return str(e)
+
+
+def progress_bar(duration):
+    total_steps = 60
+    for i in range(total_steps + 1):
+        completed = int((i / total_steps) * 100)
+        bar = f"[{'█' * i}{'.' * (total_steps - i)}] {completed}%"
+        sys.stdout.write(f"\r{bar}")
+        sys.stdout.flush()
+        time.sleep(duration / total_steps)
+        
 
 class SEQUENCER_OT_generate_movie(Operator):
     """Generate Video"""
@@ -2045,7 +2273,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
     def execute(self, context):
         scene = context.scene
-
+        
 #        if not scene.generate_movie_prompt:
 #            self.report({"INFO"}, "Text prompt in the Generative AI tab is empty!")
 #            return {"CANCELLED"}
@@ -2081,7 +2309,7 @@ class SEQUENCER_OT_generate_movie(Operator):
         movie_y = scene.generate_movie_y
         x = scene.generate_movie_x = closest_divisible_16(movie_x)
         y = scene.generate_movie_y = closest_divisible_16(movie_y)
-        duration = scene.generate_movie_frames
+        old_duration = duration = scene.generate_movie_frames
         movie_num_inference_steps = scene.movie_num_inference_steps
         movie_num_guidance = scene.movie_num_guidance
         input = scene.input_strips
@@ -2091,6 +2319,11 @@ class SEQUENCER_OT_generate_movie(Operator):
         movie_model_card = addon_prefs.movie_model_card
         image_model_card = addon_prefs.image_model_card
         pipe = None
+        if duration == -1 and input == "input_strips":
+            strip = scene.sequence_editor.active_strip
+            if strip:
+                duration = scene.generate_movie_frames = strip.frame_final_duration
+                print(str(strip.frame_final_duration))
         flush()
 
         # LOADING MODELS
@@ -2103,9 +2336,12 @@ class SEQUENCER_OT_generate_movie(Operator):
             and movie_model_card != "wangfuyun/AnimateLCM"
             and movie_model_card != "THUDM/CogVideoX-5b"
             and movie_model_card != "THUDM/CogVideoX-2b"
-            and movie_model_card != "a-r-r-o-w/LTX-Video-0.9.1-diffusers"
+            and movie_model_card != "a-r-r-o-w/LTX-Video-diffusers"
             and movie_model_card != "hunyuanvideo-community/HunyuanVideo"
             and movie_model_card != "genmo/mochi-1-preview"
+            and movie_model_card != "Hailuo/MiniMax/txt2vid"
+            and movie_model_card != "Hailuo/MiniMax/img2vid"
+            and movie_model_card != "Hailuo/MiniMax/subject2vid"
         ) or movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
             # Frame by Frame
 #            if movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
@@ -2220,10 +2456,9 @@ class SEQUENCER_OT_generate_movie(Operator):
                     upscale.to(gfx_device)
 
         # Models for movie generation
-        else:
+        elif movie_model_card != "Hailuo/MiniMax/txt2vid" and movie_model_card != "Hailuo/MiniMax/img2vid" and movie_model_card != "Hailuo/MiniMax/subject2vid":
 
             if movie_model_card == "wangfuyun/AnimateLCM":
-
                 import torch
                 from diffusers import AnimateDiffPipeline, LCMScheduler, MotionAdapter
                 from diffusers.utils import export_to_gif
@@ -2282,14 +2517,17 @@ class SEQUENCER_OT_generate_movie(Operator):
                 scene.generate_movie_y = 480
                 
             # LTX
-            elif movie_model_card == "a-r-r-o-w/LTX-Video-0.9.1-diffusers":
+            elif movie_model_card == "a-r-r-o-w/LTX-Video-diffusers":
                 from transformers import T5EncoderModel, T5Tokenizer
+                from diffusers import AutoencoderKLLTXVideo
                 text_encoder = T5EncoderModel.from_pretrained(
                   movie_model_card, subfolder="text_encoder", torch_dtype=torch.bfloat16
                 )
                 tokenizer = T5Tokenizer.from_pretrained(
                   movie_model_card, subfolder="tokenizer", torch_dtype=torch.bfloat16
                 )
+                vae = AutoencoderKLLTXVideo.from_single_file("https://huggingface.co/Lightricks/LTX-Video/ltx-video-2b-v0.9.1.safetensors", torch_dtype=torch.bfloat16)
+                #vae = AutoencoderKLLTXVideo.from_single_file("https://huggingface.co/calcuis/ltxv-gguf/ltxv-0.9.1-vae.safetensors", torch_dtype=torch.bfloat16)
                 
                 #vid2vid
                 if scene.movie_path and input == "input_strips":
@@ -2298,7 +2536,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 #                    from diffusers.utils import load_video
 #                    from diffusers import LTXVideoToVideoPipeline
 #                    pipe = LTXVideoToVideoPipeline.from_pretrained(
-#                        "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
+#                        "a-r-r-o-w/LTX-Video-diffusers",
 #                        torch_dtype=torch.bfloat16,
 #                    )
                 #img2vid
@@ -2307,16 +2545,29 @@ class SEQUENCER_OT_generate_movie(Operator):
                     import torch
                     from diffusers.utils import load_image
                     from diffusers import LTXImageToVideoPipeline
+                    from transformers import T5EncoderModel, T5Tokenizer
+                    
+                    single_file_url = "https://huggingface.co/Lightricks/LTX-Video/blob/main/ltx-video-2b-v0.9.1.safetensors"
+                    text_encoder = T5EncoderModel.from_pretrained(
+                      movie_model_card, subfolder="text_encoder", torch_dtype=torch.bfloat16
+                    )
+                    tokenizer = T5Tokenizer.from_pretrained(
+                      movie_model_card, subfolder="tokenizer", torch_dtype=torch.bfloat16
+                    )
                     pipe = LTXImageToVideoPipeline.from_single_file(
-                        "https://huggingface.co/Lightricks/LTX-Video/blob/main/ltx-video-2b-v0.9.1.safetensors", 
+                        single_file_url, 
                         text_encoder=text_encoder, 
-                        tokenizer=tokenizer, 
-                        torch_dtype=torch.bfloat16
-                    )                    
-#                    pipe = LTXImageToVideoPipeline.from_pretrained(
-#                        "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
-#                        torch_dtype=torch.bfloat16,
-#                    )
+                        tokenizer=tokenizer,
+                        vae=vae,
+                        torch_dtype=torch.bfloat16,
+                        max_sequence_length=256
+                    )
+#                    pipe = LTXImageToVideoPipeline.from_single_file(
+#                        "https://huggingface.co/Lightricks/LTX-Video/blob/main/ltx-video-2b-v0.9.1.safetensors", 
+#                        text_encoder=text_encoder, 
+#                        tokenizer=tokenizer, 
+#                        torch_dtype=torch.bfloat16
+#                    )  
                 else:
                     print("LTX Video: Load Prompt to Video Model")
                     import torch
@@ -2325,12 +2576,10 @@ class SEQUENCER_OT_generate_movie(Operator):
                         "https://huggingface.co/Lightricks/LTX-Video/blob/main/ltx-video-2b-v0.9.1.safetensors", 
                         text_encoder=text_encoder, 
                         tokenizer=tokenizer, 
-                        torch_dtype=torch.bfloat16
+                        vae=vae,
+                        torch_dtype=torch.bfloat16,
+                        max_sequence_length=256
                     )                     
-#                    pipe = LTXPipeline.from_pretrained(
-#                        "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
-#                        torch_dtype=torch.bfloat16,
-#                    )
                     
                 if gfx_device == "mps":
                     pipe.vae.enable_tiling()
@@ -2348,23 +2597,10 @@ class SEQUENCER_OT_generate_movie(Operator):
                 if scene.movie_path and input == "input_strips":
                     print("HunyuanVideo doesn't support vid2vid!")
                     return {"CANCELLED"}                
-#                    from diffusers.utils import load_video
-#                    from diffusers import LTXVideoToVideoPipeline
-#                    pipe = LTXVideoToVideoPipeline.from_pretrained(
-#                        "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
-#                        torch_dtype=torch.bfloat16,
-#                    )
                 #img2vid
                 elif scene.image_path and input == "input_strips":
                     print("HunyuanVideo doesn't support img2vid!")
                     return {"CANCELLED"}
-#                    import torch
-#                    from diffusers.utils import load_image
-#                    from diffusers import LTXImageToVideoPipeline
-#                    pipe = LTXImageToVideoPipeline.from_pretrained(
-#                        "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
-#                        torch_dtype=torch.bfloat16,
-#                    )
                 else:
                     print("HunyuanVideo: Load Prompt to Video Model")              
                     
@@ -2638,7 +2874,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 #                        print("Loading of file failed")
 #                        return {"CANCELLED"}
                 # LTX 
-                elif movie_model_card == "a-r-r-o-w/LTX-Video-0.9.1-diffusers":
+                elif movie_model_card == "a-r-r-o-w/LTX-Video-diffusers":
                     if scene.movie_path:
                         print("Process: Video to video (LTX) not supported!")
                         return {"CANCELLED"}
@@ -2680,24 +2916,26 @@ class SEQUENCER_OT_generate_movie(Operator):
                             generator=generator,
                             #use_dynamic_cfg=True,
                         ).frames[0]                  
-                else:
+                elif movie_model_card != "Hailuo/MiniMax/txt2vid" and movie_model_card != "Hailuo/MiniMax/img2vid" and movie_model_card != "Hailuo/MiniMax/subject2vid":
+
                     if scene.movie_path:
                         print("Process: Video to video")
                         if not os.path.isfile(scene.movie_path):
                             print("No file found.")
                             return {"CANCELLED"}
-                        video = load_video_as_np_array(video_path)
                     elif scene.image_path:
                         print("Process: Image to video")
                         if not os.path.isfile(scene.image_path):
                             print("No file found.")
                             return {"CANCELLED"}
-                        video = process_image(scene.image_path, int(scene.generate_movie_frames))
-                        video = np.array(video)
-                    if not video.any():
-                        print("Loading of file failed")
-                        return {"CANCELLED"}
+#                    if not video.any():
+#                        print("Loading of file failed")
+#                        return {"CANCELLED"}
 
+                    video = load_video_as_np_array(video_path)
+                    video = process_image(scene.image_path, int(scene.generate_movie_frames))
+                    video = np.array(video)
+                    
                     # Upscale video
                     if scene.video_to_video:
                         video = [
@@ -2730,7 +2968,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     ).frames[0]
 
             # Prompt input for movies
-            else:
+            elif movie_model_card != "Hailuo/MiniMax/txt2vid" and movie_model_card != "Hailuo/MiniMax/img2vid" and movie_model_card != "Hailuo/MiniMax/subject2vid":
 
                 print("Generate: Video from text")
 
@@ -2796,13 +3034,84 @@ class SEQUENCER_OT_generate_movie(Operator):
                         guidance_scale=movie_num_guidance,
                         generator=generator,
                     ).frames[0]
+                    
+            if movie_model_card == "Hailuo/MiniMax/txt2vid" or movie_model_card == "Hailuo/MiniMax/img2vid" or movie_model_card == "Hailuo/MiniMax/subject2vid":
+                current_dir = os.path.dirname(__file__)
+                init_file_path = os.path.join(current_dir, 'MiniMax_API.txt')
+                api_key = str(read_file(init_file_path))
+                if api_key =="":
+                    print("API key is missing!")
+                    return {"CANCELLED"}
+                
+                image_path = None
 
-            # Move to folder.
-            render = bpy.context.scene.render
-            fps = round((render.fps / render.fps_base), 3)
-            src_path = export_to_video(video_frames, fps=fps)
-            dst_path = solve_path(clean_filename(str(seed) + "_" + prompt) + ".mp4")
-            shutil.move(src_path, dst_path)
+                if movie_model_card == "Hailuo/MiniMax/img2vid":
+                    if scene.image_path and minimax_validate_image(bpy.path.abspath(scene.image_path)):
+                        image_path = bpy.path.abspath(scene.image_path)
+                        print("Image Path: "+image_path)
+                 
+                elif movie_model_card == "Hailuo/MiniMax/subject2vid":
+                    print("Entered movie_model_card == 'Hailuo/MiniMax/subject2vid'")
+                    print("scene.minimax_subject:", scene.minimax_subject)
+
+                    if scene.minimax_subject:
+                        subject_strip = find_strip_by_name(scene, scene.minimax_subject)
+                        print("image_strip from find_strip_by_name:", subject_strip)
+
+                        if subject_strip.type == "IMAGE":
+                            print("image_strip type is IMAGE")
+                            image_path_chk = bpy.path.abspath(os.path.join(subject_strip.directory, subject_strip.elements[0].filename))
+                            #subject_strip = bpy.path.abspath(get_render_strip(self, context, subject_strip))
+                            print("image_strip after get_render_strip:", image_path_chk)
+
+                            #image_path_chk = bpy.path.abspath(get_strip_path(image_strip))
+                            #print("image_path_chk (validated path):", image_path_chk)
+
+                            if minimax_validate_image(image_path_chk):
+                                print("Image path is valid")
+                                image_path = image_path_chk
+                                #print("Image Path:", image_path)
+                            else:
+                                print("Image path failed validation:", image_path_chk)
+                        else:
+                            print("image_strip type is not IMAGE:", image_strip.type)
+                    else:
+                        print("scene.minimax_subject is None or empty")
+
+
+                if not image_path:
+                    print("Loading strip failed!")
+                    return {"CANCELLED"}              
+
+                task_id = invoke_video_generation(prompt[:2000], api_key, image_path, movie_model_card)
+                src_path = solve_path(clean_filename(prompt[:20]) + ".mp4")
+                print("Generating: "+src_path)
+                print("-----------------Video generation task submitted to MiniMax-----------------")
+                while True:
+                    progress_bar(10)
+
+                    file_id, status = query_video_generation(task_id, api_key)
+                    if file_id != "":
+                        print("Image Path: "+src_path)
+                        dst_path = fetch_video_result(file_id, api_key, src_path)
+                        if os.path.exists(dst_path):
+                            print("---------------Successful---------------")
+                            break
+                        else:
+                            print("---------------Failed---------------")
+                            return {"CANCELLED"}
+                    elif status == "Fail" or status == "Unknown":
+                        print("---------------Failed---------------")
+                        return {"CANCELLED"}
+
+                print("Result: "+dst_path)       
+            else:
+                # Move to folder.
+                render = bpy.context.scene.render
+                fps = round((render.fps / render.fps_base), 3)
+                src_path = export_to_video(video_frames, fps=fps)
+                dst_path = solve_path(clean_filename(str(seed) + "_" + prompt) + ".mp4")
+                shutil.move(src_path, dst_path)
 
             # Add strip.
             if not os.path.isfile(dst_path):
@@ -2836,6 +3145,8 @@ class SEQUENCER_OT_generate_movie(Operator):
                             bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
                             break
             print_elapsed_time(start_time)
+        if old_duration == -1 and input == "input_strips":
+            scene.generate_movie_frames = -1    
         pipe = None
         refiner = None
         converter = None
@@ -3763,6 +4074,8 @@ class SEQUENCER_OT_generate_image(Operator):
                     pipe.enable_sequential_cpu_offload()
                     pipe.vae.enable_tiling()
                 else:
+                    #pipe.enable_sequential_cpu_offload()
+                    #pipe.vae.enable_tiling()
                     pipe.enable_model_cpu_offload()
 
         # Conversion img2img/vid2img.
@@ -4289,8 +4602,23 @@ class SEQUENCER_OT_generate_image(Operator):
                 else:
                     pipe.enable_model_cpu_offload() 
             else: #LoRA + img2img
-                
-                pipe = FluxPipeline.from_pretrained(image_model_card, torch_dtype=torch.bfloat16)
+                from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
+
+                nf4_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_quant_type="nf4",
+                    bnb_4bit_compute_dtype=torch.bfloat16
+                )
+                model_nf4 = FluxTransformer2DModel.from_pretrained(
+                    image_model_card,
+                    subfolder="transformer",
+                    quantization_config=nf4_config,
+                    torch_dtype=torch.bfloat16
+                )
+
+                pipe = FluxPipeline.from_pretrained(image_model_card, transformer=model_nf4, torch_dtype=torch.bfloat16)
+                                
+                #pipe = FluxPipeline.from_pretrained(image_model_card, torch_dtype=torch.bfloat16)
 
                 if gfx_device == "mps":
                     pipe.vae.enable_tiling()
@@ -4299,10 +4627,11 @@ class SEQUENCER_OT_generate_image(Operator):
                     pipe.enable_vae_slicing()
                     pipe.vae.enable_tiling()
                 else:
-                    pipe.enable_sequential_cpu_offload()
+                    pipe.enable_model_cpu_offload() 
+                    #pipe.enable_sequential_cpu_offload()
                     #pipe.enable_model_cpu_offload()
-                    pipe.enable_vae_slicing()
-                    pipe.vae.enable_tiling()
+                    #pipe.enable_vae_slicing()
+                    #pipe.vae.enable_tiling()
 
         # Fluently-XL
         elif image_model_card == "youknownothing/Fluently-XL-Final":
@@ -5460,7 +5789,7 @@ class SEQUENCER_OT_generate_image(Operator):
             bpy.types.Scene.genai_out_path = out_path
 
             if input == "input_strips":
-                old_strip = context.scene.sequence_editor.active_strip #context.selected_sequences[0]
+                old_strip = active_strip
 
             # Add strip
             if os.path.isfile(out_path):
@@ -5672,7 +6001,7 @@ class SEQUENCER_OT_generate_text(Operator):
             )
             strip.text = text
             strip.wrap_width = 0.68
-            strip.font_size = 44
+            strip.font_size = 23
             strip.location[0] = 0.5
             strip.location[1] = 0.2
             strip.anchor_x = "CENTER"
@@ -6028,7 +6357,7 @@ def register():
     bpy.types.Scene.generate_movie_x = bpy.props.IntProperty(
         name="generate_movie_x",
         default=1024,
-        step=64,
+        step=32,
         min=256,
         max=4096,
         description="Use the power of 64",
@@ -6036,7 +6365,7 @@ def register():
     bpy.types.Scene.generate_movie_y = bpy.props.IntProperty(
         name="generate_movie_y",
         default=576,
-        step=64,
+        step=32,
         min=256,
         max=4096,
         description="Use the power of 64",
@@ -6335,6 +6664,8 @@ def register():
 
     bpy.types.Scene.genai_out_path = bpy.props.StringProperty(name="genai_out_path", default="")
     bpy.types.Scene.genai_out_path = ""
+    
+    bpy.types.Scene.minimax_subject = bpy.props.StringProperty(name="minimax_subject", default="")
 
 def unregister():
     for cls in classes:
