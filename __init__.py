@@ -69,7 +69,6 @@ site_packages_dir = os.path.join(python_exe_dir, 'lib', 'site-packages')
 
 # Add the site-packages directory to the top of sys.path
 sys.path.insert(0, site_packages_dir)
-
 dir_path = os.path.join(bpy.utils.user_resource("DATAFILES"), "Pallaidium Media")
 os.makedirs(dir_path, exist_ok=True)
 
@@ -7453,13 +7452,11 @@ def register():
     bpy.types.Scene.generate_movie_prompt = bpy.props.StringProperty(
         name="generate_movie_prompt",
         default="",
-        length_max = 0,
         options={"TEXTEDIT_UPDATE"},
     )
     bpy.types.Scene.generate_movie_negative_prompt = bpy.props.StringProperty(
         name="generate_movie_negative_prompt",
         default="",
-        length_max = 0,
         options={"TEXTEDIT_UPDATE"},
     )
     bpy.types.Scene.parler_direction_prompt = bpy.props.StringProperty(
