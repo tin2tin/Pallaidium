@@ -1219,7 +1219,9 @@ class GeneratorAddonPreferences(AddonPreferences):
             ),
             ("black-forest-labs/FLUX.1-schnell", "Flux Schnell", "black-forest-labs/FLUX.1-schnell"),
             ("ChuckMcSneed/FLUX.1-dev", "Flux 1 Dev", "ChuckMcSneed/FLUX.1-dev"),
-            ("youknownothing/Fluently-XL-Final", "Fluently (1024x1024)", "youknownothing/Fluently-XL-Final"),
+            ("fluently/Fluently-XL-Final", "Fluently (1024x1024)", "fluently/Fluently-XL-Final"),
+            # Must be optimized    
+            #("shuttleai/shuttle-jaguar", "Shuttle Jaguar (1024x1024)", "shuttleai/shuttle-jaguar"),
             ("Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers", "HunyuanDiT-v1.2", "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers"),
             ("Kwai-Kolors/Kolors-diffusers", "Kolors", "Kwai-Kolors/Kolors-diffusers"),
             ("Corcelio/mobius", "Mobius (1024x1024)", "Corcelio/mobius"),
@@ -4056,7 +4058,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 print("Load Inpaint: "+image_model_card)
                 from diffusers import DiffusionPipeline, FluxFillPipeline, FluxTransformer2DModel
                 from transformers import T5EncoderModel
-                orig_pipeline = DiffusionPipeline.from_pretrained("black-forest-labs/FLUX.1-dev", torch_dtype=torch.bfloat16)
+                orig_pipeline = DiffusionPipeline.from_pretrained("ChuckMcSneed/FLUX.1-dev", torch_dtype=torch.bfloat16)
 
                 transformer = FluxTransformer2DModel.from_pretrained(
                     "sayakpaul/FLUX.1-Fill-dev-nf4", subfolder="transformer", torch_dtype=torch.bfloat16
@@ -4634,11 +4636,11 @@ class SEQUENCER_OT_generate_image(Operator):
                     #pipe.vae.enable_tiling()
 
         # Fluently-XL
-        elif image_model_card == "youknownothing/Fluently-XL-Final":
+        elif image_model_card == "fluently/Fluently-XL-Final":
             from diffusers import DiffusionPipeline, DDIMScheduler
 
             pipe = DiffusionPipeline.from_pretrained(
-                "youknownothing/Fluently-XL-Final",
+                image_model_card,
                 torch_dtype=torch.float16,
                 scheduler=DDIMScheduler(
                     beta_start=0.00085,
@@ -4653,8 +4655,28 @@ class SEQUENCER_OT_generate_image(Operator):
                 pipe.enable_model_cpu_offload()
             else:
                 pipe.to(gfx_device)
+                
+        # Shuttle-Jaguar # mneeds a quantinized version
+        elif image_model_card == "shuttleai/shuttle-jaguar":
+            from diffusers import DiffusionPipeline
 
+            pipe = DiffusionPipeline.from_pretrained(
+                image_model_card,
+                torch_dtype=torch.float16,
+            )
+            
+            #pipe.to("cuda")
 
+            pipe.enable_sequential_cpu_offload()
+            #pipe.enable_model_cpu_offload()
+            pipe.enable_vae_slicing()
+            pipe.vae.enable_tiling()
+            pipe.transformer.to(memory_format=torch.channels_last)
+            pipe.transformer = torch.compile(
+             pipe.transformer, mode="max-autotune", fullgraph=True
+            )
+
+                
         # Stable diffusion etc.
         else:
             print("Load: " + image_model_card + " Model")
