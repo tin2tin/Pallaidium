@@ -1733,7 +1733,18 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             col.prop(context.scene, "input_strips", text="Input")
         if type != "text":
             if type != "audio":
-                if (type == "movie") or (
+                if type == "movie" and "Hailuo/MiniMax/" in movie_model_card:
+                    if movie_model_card == "Hailuo/MiniMax/subject2vid":
+                        col.prop_search(
+                            scene,
+                            "minimax_subject",
+                            scene.sequence_editor,
+                            "sequences",
+                            text="Subject",
+                            icon="USER",
+                        ) 
+                                     
+                elif (type == "movie") or (
                     type == "image"
                     and image_model_card != "xinsir/controlnet-openpose-sdxl-1.0"
                     and image_model_card != "xinsir/controlnet-scribble-sdxl-1.0"
@@ -1771,15 +1782,6 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                                     text="Inpaint Mask",
                                     icon="SEQ_STRIP_DUPLICATE",
                                 )
-            if type == "movie" and "Hailuo/MiniMax/subject2vid":
-                col.prop_search(
-                    scene,
-                    "minimax_subject",
-                    scene.sequence_editor,
-                    "sequences",
-                    text="Subject MiniMax",
-                    icon="SEQ_STRIP_DUPLICATE",
-                )              
             if image_model_card == "xinsir/controlnet-openpose-sdxl-1.0" and type == "image":
                 col = col.column(heading="Read as", align=True)
                 col.prop(context.scene, "openpose_use_bones", text="OpenPose Rig Image")
@@ -1833,7 +1835,8 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 if (type == "audio" and audio_model_card == "bark") or (type == "audio" and audio_model_card == "stabilityai/stable-audio-open-1.0") or (
                     type == "image" and image_model_card == "black-forest-labs/FLUX.1-schnell") or (
                     type == "image" and image_model_card == "ChuckMcSneed/FLUX.1-dev") or (
-                    type == "audio" and audio_model_card == "facebook/musicgen-stereo-melody-large" and audio_model_card == "WhisperSpeech"
+                    type == "audio" and audio_model_card == "facebook/musicgen-stereo-melody-large" and audio_model_card == "WhisperSpeech") or (        
+                    type == "movie" and "Hailuo/MiniMax/" in movie_model_card
                 ):
                     pass
                 elif type == "audio" and (audio_model_card == "parler-tts/parler-tts-large-v1" or audio_model_card == "parler-tts/parler-tts-mini-v1"):
@@ -1859,153 +1862,156 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 col.use_property_decorate = False
                 if type != "audio" and not (type == "image" and image_model_card == "ZhengPeng7/BiRefNet"):
                     col.prop(context.scene, "generatorai_styles", text="Style")
-            layout = col.column()
-            if type == "movie" or type == "image" and not (type == "image" and image_model_card == "ZhengPeng7/BiRefNet"):
-                col = layout.column(align=True)
-                col.prop(context.scene, "generate_movie_x", text="X")
-                col.prop(context.scene, "generate_movie_y", text="Y")
-            col = layout.column(align=True)
-            if type == "movie" or type == "image" and not (type == "image" and image_model_card == "ZhengPeng7/BiRefNet"):
-                col.prop(context.scene, "generate_movie_frames", text="Frames")
-            if type == "audio" and audio_model_card != "bark" and audio_model_card != "WhisperSpeech"and audio_model_card != "parler-tts/parler-tts-large-v1" and audio_model_card != "parler-tts/parler-tts-mini-v1":
-                col.prop(context.scene, "audio_length_in_f", text="Frames")
-            if type == "audio" and audio_model_card == "bark":
-                col = layout.column(align=True)
-                col.prop(context.scene, "speakers", text="Speaker")
-                col.prop(context.scene, "languages", text="Language")
-            elif type == "audio" and audio_model_card == "WhisperSpeech":
-                row = col.row(align=True)
-                row.prop(context.scene, "audio_path", text="Speaker")
-                row.operator("sequencer.open_audio_filebrowser", text="", icon="FILEBROWSER")
-                col.prop(context.scene, "audio_speed", text="Speed")
-#            elif type == "audio" and audio_model_card == "parler-tts/parler-tts-large-v1":
-#                row = col.row(align=True)
-#                row.prop(context.scene, "audio_path", text="Speaker")
-#                # Speaker / Instruction
-
-            elif type == "audio" and (addon_prefs.audio_model_card == "facebook/musicgen-stereo-melody-large" or addon_prefs.audio_model_card == "stabilityai/stable-audio-open-1.0"):
-                col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
+            if type == "movie" and "Hailuo/MiniMax/" in movie_model_card:
+                pass
             else:
-                if (
-                    (type == "image"
-                    and (image_model_card == "ByteDance/SDXL-Lightning")
-                    or (type == "audio"
-                    and (audio_model_card == "parler-tts/parler-tts-mini-v1" or audio_model_card == "parler-tts/parler-tts-large-v1" )
-                    or (type == "image" and image_model_card == "ZhengPeng7/BiRefNet"))
-                )):
-                    pass
-                else:
+                layout = col.column()
+                if type == "movie" or type == "image" and not (type == "image" and image_model_card == "ZhengPeng7/BiRefNet"):
+                    col = layout.column(align=True)
+                    col.prop(context.scene, "generate_movie_x", text="X")
+                    col.prop(context.scene, "generate_movie_y", text="Y")
+                col = layout.column(align=True)
+                if type == "movie" or type == "image" and not (type == "image" and image_model_card == "ZhengPeng7/BiRefNet"):
+                    col.prop(context.scene, "generate_movie_frames", text="Frames")
+                if type == "audio" and audio_model_card != "bark" and audio_model_card != "WhisperSpeech"and audio_model_card != "parler-tts/parler-tts-large-v1" and audio_model_card != "parler-tts/parler-tts-mini-v1":
+                    col.prop(context.scene, "audio_length_in_f", text="Frames")
+                if type == "audio" and audio_model_card == "bark":
+                    col = layout.column(align=True)
+                    col.prop(context.scene, "speakers", text="Speaker")
+                    col.prop(context.scene, "languages", text="Language")
+                elif type == "audio" and audio_model_card == "WhisperSpeech":
+                    row = col.row(align=True)
+                    row.prop(context.scene, "audio_path", text="Speaker")
+                    row.operator("sequencer.open_audio_filebrowser", text="", icon="FILEBROWSER")
+                    col.prop(context.scene, "audio_speed", text="Speed")
+    #            elif type == "audio" and audio_model_card == "parler-tts/parler-tts-large-v1":
+    #                row = col.row(align=True)
+    #                row.prop(context.scene, "audio_path", text="Speaker")
+    #                # Speaker / Instruction
+
+                elif type == "audio" and (addon_prefs.audio_model_card == "facebook/musicgen-stereo-melody-large" or addon_prefs.audio_model_card == "stabilityai/stable-audio-open-1.0"):
                     col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
-
-                if (
-                    (type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid")
-                    or (type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt")
-                    or (type == "image" and image_model_card == "black-forest-labs/FLUX.1-schnell")
-                    or (type == "image" and image_model_card == "ZhengPeng7/BiRefNet")
-                    or (type == "audio" and (audio_model_card == "parler-tts/parler-tts-mini-v1" or audio_model_card == "parler-tts/parler-tts-large-v1" ))
-                    or (
-                        scene.use_lcm
-                        and not (type == "image" and image_model_card == "Lykon/dreamshaper-8")
-                        and not (
-                            type == "image"
-                            and image_model_card == image_model_card == "ByteDance/SDXL-Lightning"
-                        )
-                    )
-                ):
-                    pass
                 else:
-                    col.prop(context.scene, "movie_num_guidance", text="Word Power")
-            if not (type == "image" and image_model_card == "ZhengPeng7/BiRefNet"):
-                col = col.column()
-                row = col.row(align=True)
-                sub_row = row.row(align=True)
-                sub_row.prop(context.scene, "movie_num_seed", text="Seed")
-                row.prop(context.scene, "movie_use_random", text="", icon="QUESTION")
-                sub_row.active = not context.scene.movie_use_random
-            if type == "movie" and (
-                movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256"
-                or movie_model_card == "cerspense/zeroscope_v2_576w"
-                or movie_model_card == "cerspense/zeroscope_v2_XL"
-            ):
-                col = col.column(heading="Upscale", align=True)
-                col.prop(context.scene, "video_to_video", text="2x")
-            if type == "image" and not (type == "image" and image_model_card == "ZhengPeng7/BiRefNet"):
-                col = col.column(heading="Enhance", align=True)
-                row = col.row()
-                row.prop(context.scene, "refine_sd", text="Quality")
-                sub_col = col.row()
-                sub_col.active = context.scene.refine_sd
+                    if (
+                        (type == "image"
+                        and (image_model_card == "ByteDance/SDXL-Lightning")
+                        or (type == "audio"
+                        and (audio_model_card == "parler-tts/parler-tts-mini-v1" or audio_model_card == "parler-tts/parler-tts-large-v1" )
+                        or (type == "image" and image_model_card == "ZhengPeng7/BiRefNet"))
+                    )):
+                        pass
+                    else:
+                        col.prop(context.scene, "movie_num_inference_steps", text="Quality Steps")
 
-                if (
-                    (type == "image" and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0")
-                    or (type == "image" and image_model_card == "xinsir/controlnet-openpose-sdxl-1.0")
-                    or (type == "image" and image_model_card == "xinsir/controlnet-scribble-sdxl-1.0")
-                    or (type == "image" and image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small")
-                    or (type == "image" and image_model_card == "segmind/Segmind-Vega")
-                    or (type == "image" and image_model_card == "Lykon/dreamshaper-8")
-                    or (type == "image" and image_model_card == "Vargol/PixArt-Sigma_16bit")
-                    or (type == "image" and image_model_card == "Vargol/PixArt-Sigma_2k_16bit")
+                    if (
+                        (type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid")
+                        or (type == "movie" and movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt")
+                        or (type == "image" and image_model_card == "black-forest-labs/FLUX.1-schnell")
+                        or (type == "image" and image_model_card == "ZhengPeng7/BiRefNet")
+                        or (type == "audio" and (audio_model_card == "parler-tts/parler-tts-mini-v1" or audio_model_card == "parler-tts/parler-tts-large-v1" ))
+                        or (
+                            scene.use_lcm
+                            and not (type == "image" and image_model_card == "Lykon/dreamshaper-8")
+                            and not (
+                                type == "image"
+                                and image_model_card == image_model_card == "ByteDance/SDXL-Lightning"
+                            )
+                        )
+                    ):
+                        pass
+                    else:
+                        col.prop(context.scene, "movie_num_guidance", text="Word Power")
+                if not (type == "image" and image_model_card == "ZhengPeng7/BiRefNet"):
+                    col = col.column()
+                    row = col.row(align=True)
+                    sub_row = row.row(align=True)
+                    sub_row.prop(context.scene, "movie_num_seed", text="Seed")
+                    row.prop(context.scene, "movie_use_random", text="", icon="QUESTION")
+                    sub_row.active = not context.scene.movie_use_random
+                if type == "movie" and (
+                    movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256"
+                    or movie_model_card == "cerspense/zeroscope_v2_576w"
+                    or movie_model_card == "cerspense/zeroscope_v2_XL"
                 ):
-                    row.prop(context.scene, "use_lcm", text="Speed")
-#                if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
-#                    col = col.column(heading="Resolution", align=True)
-#                    row = col.row()
-#                    row.prop(context.scene, "hidiff", text="HiDiff")
+                    col = col.column(heading="Upscale", align=True)
+                    col.prop(context.scene, "video_to_video", text="2x")
+                if type == "image" and not (type == "image" and image_model_card == "ZhengPeng7/BiRefNet"):
+                    col = col.column(heading="Enhance", align=True)
+                    row = col.row()
+                    row.prop(context.scene, "refine_sd", text="Quality")
+                    sub_col = col.row()
+                    sub_col.active = context.scene.refine_sd
 
-                # ADetailer
-                if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
-                    col = col.column(heading="Details", align=True)
+                    if (
+                        (type == "image" and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0")
+                        or (type == "image" and image_model_card == "xinsir/controlnet-openpose-sdxl-1.0")
+                        or (type == "image" and image_model_card == "xinsir/controlnet-scribble-sdxl-1.0")
+                        or (type == "image" and image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small")
+                        or (type == "image" and image_model_card == "segmind/Segmind-Vega")
+                        or (type == "image" and image_model_card == "Lykon/dreamshaper-8")
+                        or (type == "image" and image_model_card == "Vargol/PixArt-Sigma_16bit")
+                        or (type == "image" and image_model_card == "Vargol/PixArt-Sigma_2k_16bit")
+                    ):
+                        row.prop(context.scene, "use_lcm", text="Speed")
+    #                if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+    #                    col = col.column(heading="Resolution", align=True)
+    #                    row = col.row()
+    #                    row.prop(context.scene, "hidiff", text="HiDiff")
 
-                row = col.row()
-                if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":                
-                    row.prop(context.scene, "adetailer", text="Faces")
+                    # ADetailer
+                    if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+                        col = col.column(heading="Details", align=True)
 
-#                # AuraSR
-#                if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
-                #col = col.column(heading="Upscale", align=True)
-                #row = col.row()
-                row.prop(context.scene, "aurasr", text="Upscale 4x")
+                    row = col.row()
+                    if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":                
+                        row.prop(context.scene, "adetailer", text="Faces")
 
-        # LoRA.
-        if (
-            (
-                image_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
-                or image_model_card == "stabilityai/sdxl-turbo"
-                or image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
-                or image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
-                or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
-                or image_model_card == "black-forest-labs/FLUX.1-schnell"
-                or image_model_card == "ChuckMcSneed/FLUX.1-dev"
-            )
-            and type == "image"
-        ):
-            layout = self.layout
-            layout.use_property_split = True
-            layout.use_property_decorate = False
-            col = layout.column(align=True)
-            col = col.box()
-            col = col.column(align=True)
-            col.use_property_split = False
-            col.use_property_decorate = False
+    #                # AuraSR
+    #                if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+                    #col = col.column(heading="Upscale", align=True)
+                    #row = col.row()
+                    row.prop(context.scene, "aurasr", text="Upscale 4x")
 
-            # Folder selection and refresh button
-            row = col.row(align=True)
-            row.prop(scene, "lora_folder", text="LoRA")
-            row.operator("lora.refresh_files", text="", icon="FILE_REFRESH")
-
-            # Custom UIList
-            lora_files = scene.lora_files
-            list_len = len(lora_files)
-            if list_len > 0:
-                col.template_list(
-                    "LORABROWSER_UL_files",
-                    "The_List",
-                    scene,
-                    "lora_files",
-                    scene,
-                    "lora_files_index",
-                    rows=2,
+            # LoRA.
+            if (
+                (
+                    image_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
+                    or image_model_card == "stabilityai/sdxl-turbo"
+                    or image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
+                    or image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
+                    or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
+                    or image_model_card == "black-forest-labs/FLUX.1-schnell"
+                    or image_model_card == "ChuckMcSneed/FLUX.1-dev"
                 )
+                and type == "image"
+            ):
+                layout = self.layout
+                layout.use_property_split = True
+                layout.use_property_decorate = False
+                col = layout.column(align=True)
+                col = col.box()
+                col = col.column(align=True)
+                col.use_property_split = False
+                col.use_property_decorate = False
+
+                # Folder selection and refresh button
+                row = col.row(align=True)
+                row.prop(scene, "lora_folder", text="LoRA")
+                row.operator("lora.refresh_files", text="", icon="FILE_REFRESH")
+
+                # Custom UIList
+                lora_files = scene.lora_files
+                list_len = len(lora_files)
+                if list_len > 0:
+                    col.template_list(
+                        "LORABROWSER_UL_files",
+                        "The_List",
+                        scene,
+                        "lora_files",
+                        scene,
+                        "lora_files_index",
+                        rows=2,
+                    )
 
         # Output.
         layout = self.layout
@@ -2028,7 +2034,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             col.prop(addon_prefs, "audio_model_card", text=" ")
         if type == "text":
             col.prop(addon_prefs, "text_model_card", text=" ")
-        if type != "text":
+        if type != "text" and (type == "movie" and "Hailuo/MiniMax/" not in movie_model_card):
             col = col.column()
             col.prop(context.scene, "movie_num_batch", text="Batch Count")
 
