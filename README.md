@@ -76,6 +76,11 @@ On Windows: %userprofile%\\.cache\huggingface\hub
 ![image](https://github.com/user-attachments/assets/a5c44a7e-c670-49ef-941f-86e521568637)
 
 ## Change Log
+* 2025-2-10: 
+Update: a-r-r-o-w/LTX-Video-0.9.1-diffusers ZhengPeng7/BiRefNet_HR MiaoshouAI/Florence-2-large-PromptGen-v2.0
+New: ostris/Flex.1-alpha Alpha-VLLM/Lumina-Image-2.0 Efficient-Large-Model/Sana_1600M_1024px_diffusers
+Fix: Frame by frame (SD XL)
+Remove: Corcelio/mobius
 * 2025-1-26: Add: MiniMax Cloud txt/img/subject to video (insert your MiniMax API key in MiniMax_API.txt) and fast FLUX LoRA
 * 2025-1-15: FLUX: faster img2img and inpaint
 * 2024-11-2: Add: Image Background Removal, Stable Diffusion 3.5 Medium, Fast Flux(t2i)
@@ -298,7 +303,6 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 - [shuttleai/shuttle-jaguar](https://huggingface.co/shuttleai/shuttle-jaguar)
 - [Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers](https://huggingface.co/Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers)
 - [Kwai-Kolors/Kolors-diffusers](https://huggingface.co/Kwai-Kolors/Kolors-diffusers)
-- [Corcelio/mobius](https://huggingface.co/Corcelio/mobius)
 - [dataautogpt3/OpenDalleV1.1](https://huggingface.co/dataautogpt3/OpenDalleV1.1)
 - [PixArt-alpha/PixArt-Sigma_16bit](https://huggingface.co/Vargol/PixArt-Sigma_16bit)
 - [PixArt-alpha/PixArt-Sigma_2k_16bit](https://huggingface.co/Vargol/PixArt-Sigma_2k_16bit)
@@ -309,6 +313,9 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 - [xinsir/controlnet-openpose-sdxl-1.0](https://huggingface.co/xinsir/controlnet-openpose-sdxl-1.0)
 - [xinsir/controlnet-scribble-sdxl-1.0](https://huggingface.co/xinsir/controlnet-scribble-sdxl-1.0)
 - [ZhengPeng7/BiRefNet](https://huggingface.co/ZhengPeng7/BiRefNet)
+- [Flex](https://huggingface.co/ostris/Flex.1-alpha)
+- [Lumina 2](https://huggingface.co/Alpha-VLLM/Lumina-Image-2.0)
+- [Sana](https://huggingface.co/Efficient-Large-Model/Sana_1600M_1024px_diffusers)
 
 ### Audio:
 - [stabilityai/stable-audio-open-1.0](https://huggingface.co/stabilityai/stable-audio-open-1.0)
@@ -318,6 +325,12 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 - [Bark](https://github.com/suno-ai/bark)
 - [WhisperSpeech](https://github.com/collabora/WhisperSpeech)
 - [parler-tts/parler-tts-large-v1](https://huggingface.co/parler-tts/parler-tts-large-v1)
+
+### Background Removal:
+- [BiRefNet_HR](https://huggingface.co/ZhengPeng7/BiRefNet_HR)
+
+### Text Captions:
+- [Florence-2-large-PromptGen](https://huggingface.co/MiaoshouAI/Florence-2-large-PromptGen-v2.0)
 
 
 
