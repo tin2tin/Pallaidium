@@ -2118,14 +2118,14 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
 
         # Input
         if image_model_card == "Shitao/OmniGen-v1-diffusers" and type == "image":
-            col.prop(context.scene, "omnigen_prompt_1", text="OmniGen", icon="ADD")
-            col.prop_search(scene, "omnigen_strip_1", scene.sequence_editor, "sequences", text="Image", icon="FILE_IMAGE")
+            col.prop(context.scene, "omnigen_prompt_1", text="Input", icon="ADD")
+            col.prop_search(scene, "omnigen_strip_1", scene.sequence_editor, "sequences", text=" ", icon="FILE_IMAGE")
 
             col.prop(context.scene, "omnigen_prompt_2", text=" ", icon="ADD")
-            col.prop_search(scene, "omnigen_strip_2", scene.sequence_editor, "sequences", text="Image", icon="FILE_IMAGE")
+            col.prop_search(scene, "omnigen_strip_2", scene.sequence_editor, "sequences", text=" ", icon="FILE_IMAGE")
 
             col.prop(context.scene, "omnigen_prompt_3", text=" ", icon="ADD")
-            col.prop_search(scene, "omnigen_strip_3", scene.sequence_editor, "sequences", text="Image", icon="FILE_IMAGE")
+            col.prop_search(scene, "omnigen_strip_3", scene.sequence_editor, "sequences", text=" ", icon="FILE_IMAGE")
             
         elif image_model_card == "Salesforce/blipdiffusion" and type == "image":
             col.prop(context.scene, "input_strips", text="Source Image")
