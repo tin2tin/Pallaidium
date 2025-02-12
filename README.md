@@ -76,6 +76,7 @@ On Windows: %userprofile%\\.cache\huggingface\hub
 ![image](https://github.com/user-attachments/assets/a5c44a7e-c670-49ef-941f-86e521568637)
 
 ## Change Log
+* 2025-2-12: Add multi media prompting via: [OmniGen](https://github.com/VectorSpaceLab/OmniGen)
 * 2025-2-10: 
 Update: a-r-r-o-w/LTX-Video-0.9.1-diffusers ZhengPeng7/BiRefNet_HR MiaoshouAI/Florence-2-large-PromptGen-v2.0
 New: ostris/Flex.1-alpha Alpha-VLLM/Lumina-Image-2.0 Efficient-Large-Model/Sana_1600M_1024px_diffusers
@@ -285,7 +286,9 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 - In general, the models can only be used for non-commercial purposes and are meant for research purposes.
 - Consult the individual models on HuggingFace to read up on their licenses and ex. if they can be used commercially.
 
-## Via the [Diffusers](https://github.com/huggingface/diffusers) lib the following weights are accessible through Pallaidium:
+## Credits 
+
+- The [Diffusers](https://github.com/huggingface/diffusers) lib makes the following weights accessible through the Pallaidium UI:
 
 ### Video:
 - [stabilityai/stable-video-diffusion-img2vid-xt](https://huggingface.co/stabilityai/stable-video-diffusion-img2vid-xt)
@@ -316,6 +319,7 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 - [Flex](https://huggingface.co/ostris/Flex.1-alpha)
 - [Lumina 2](https://huggingface.co/Alpha-VLLM/Lumina-Image-2.0)
 - [Sana](https://huggingface.co/Efficient-Large-Model/Sana_1600M_1024px_diffusers)
+- [OmniGen](https://github.com/VectorSpaceLab/OmniGen)
 
 ### Audio:
 - [stabilityai/stable-audio-open-1.0](https://huggingface.co/stabilityai/stable-audio-open-1.0)
