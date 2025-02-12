@@ -921,6 +921,7 @@ def install_modules(self):
             import_module(self, "triton", "triton")
 
     import_module(self, "mediapipe", "mediapipe")
+    import_module(self, "image_gen_aux", "git+https://github.com/huggingface/image_gen_aux")
 
     subprocess.call(
         [
@@ -1512,7 +1513,11 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Flux Schnell",
                 "black-forest-labs/FLUX.1-schnell",
             ),
-            ("ostris/Flex.1-alpha", "Flex 1 ", "ostris/Flex.1-alpha"),            
+            # Not ready for 4bit and depth has tensor problems
+#            ("black-forest-labs/FLUX.1-Canny-dev-lora", "FLUX Canny", "black-forest-labs/FLUX.1-Canny-dev-lora"),            
+#            ("black-forest-labs/FLUX.1-Depth-dev-lora", "FLUX Depth", "black-forest-labs/FLUX.1-Depth-dev-lora"),            
+#            ("black-forest-labs/FLUX.1-Redux-dev", "FLUX Redux", "black-forest-labs/FLUX.1-Redux-dev"),            
+            ("ostris/Flex.1-alpha", "Flex 1 ", "ostris/Flex.1-alpha"),
             (
                 "stabilityai/stable-diffusion-xl-base-1.0",
                 "Stable Diffusion XL 1.0 (1024x1024)",
@@ -1611,6 +1616,11 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "xinsir/controlnet-scribble-sdxl-1.0",
                 "Scribble (1024x1024)",
                 "xinsir/controlnet-scribble-sdxl-1.0",
+            ),
+            (
+                "Shitao/OmniGen-v1-diffusers",
+                "OmniGen",
+                "Shitao/OmniGen-v1-diffusers",
             ),
             (
                 "ZhengPeng7/BiRefNet_HR",
@@ -2102,8 +2112,22 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         col.use_property_decorate = False
         col = col.box()
         col = col.column()
+
+        if scene.sequence_editor is None:
+            scene.sequence_editor_create()
+
         # Input
-        if image_model_card == "Salesforce/blipdiffusion" and type == "image":
+        if image_model_card == "Shitao/OmniGen-v1-diffusers" and type == "image":
+            col.prop(context.scene, "omnigen_prompt_1", text="OmniGen", icon="ADD")
+            col.prop_search(scene, "omnigen_strip_1", scene.sequence_editor, "sequences", text="Image", icon="FILE_IMAGE")
+
+            col.prop(context.scene, "omnigen_prompt_2", text=" ", icon="ADD")
+            col.prop_search(scene, "omnigen_strip_2", scene.sequence_editor, "sequences", text="Image", icon="FILE_IMAGE")
+
+            col.prop(context.scene, "omnigen_prompt_3", text=" ", icon="ADD")
+            col.prop_search(scene, "omnigen_strip_3", scene.sequence_editor, "sequences", text="Image", icon="FILE_IMAGE")
+            
+        elif image_model_card == "Salesforce/blipdiffusion" and type == "image":
             col.prop(context.scene, "input_strips", text="Source Image")
             col.prop(context.scene, "blip_cond_subject", text="Source Subject")
 
@@ -2137,6 +2161,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     and image_model_card != "xinsir/controlnet-scribble-sdxl-1.0"
                     and image_model_card != "Salesforce/blipdiffusion"
                     and image_model_card != "ZhengPeng7/BiRefNet_HR"
+                    and image_model_card != "Shitao/OmniGen-v1-diffusers"
                 ):
                     if input == "input_strips" and not scene.inpaint_selected_strip:
                         col = col.column(heading="Use", align=True)
@@ -2236,6 +2261,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     and movie_model_card
                     == "stabilityai/stable-video-diffusion-img2vid-xt"
                 )
+                or (image_model_card == "Shitao/OmniGen-v1-diffusers" and type == "image")
             ):
                 pass
             else:
@@ -2259,6 +2285,18 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     or (
                         type == "image"
                         and image_model_card == "ostris/Flex.1-alpha"
+                    )
+                    or (
+                        type == "image"
+                        and image_model_card == "black-forest-labs/FLUX.1-Canny-dev-lora"
+                    )
+                    or (
+                        type == "image"
+                        and image_model_card == "black-forest-labs/FLUX.1-Depth-dev-lora"
+                    )
+                    or (
+                        type == "image"
+                        and image_model_card == "black-forest-labs/FLUX.1-Redux-dev"
                     )
                     or (
                         type == "audio"
@@ -2410,7 +2448,10 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     ):
                         pass
                     else:
+                        if image_model_card == "Shitao/OmniGen-v1-diffusers" and type == "image":
+                            col.prop(context.scene, "img_guidance_scale", text="Image Power")                        
                         col.prop(context.scene, "movie_num_guidance", text="Word Power")
+                        
                 if not (type == "image" and image_model_card == "ZhengPeng7/BiRefNet_HR"):
                     col = col.column()
                     row = col.row(align=True)
@@ -2499,6 +2540,9 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 or image_model_card == "black-forest-labs/FLUX.1-schnell"
                 or image_model_card == "ostris/Flex.1-alpha"
                 or image_model_card == "ChuckMcSneed/FLUX.1-dev"
+                or image_model_card == "black-forest-labs/FLUX.1-Canny-dev-lora"
+                or image_model_card == "black-forest-labs/FLUX.1-Depth-dev-lora"
+                or image_model_card == "black-forest-labs/FLUX.1-Redux-dev"
             ) and type == "image") or (type == "movie" and movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0"):
                 layout = self.layout
                 layout.use_property_split = True
@@ -2898,17 +2942,18 @@ class SEQUENCER_OT_generate_movie(Operator):
                 enabled_weights = []
                 # Check if there are any enabled items before loading
                 enabled_items = [item for item in lora_files if item.enabled]
-#                vae = AutoencoderKL.from_pretrained(
-#                    "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
-#                )
-#                pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
-#                    movie_model_card,
-#                    torch_dtype=torch.float16,
-#                    variant="fp16",
-#                    vae=vae,
-#                )
-                pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained("stabilityai/sdxl-turbo", torch_dtype=torch.float16, variant="fp16")
-#                pipe.watermark = NoWatermark()
+                vae = AutoencoderKL.from_pretrained(
+                    "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
+                )
+                pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
+                    movie_model_card,
+                    torch_dtype=torch.float16,
+                    variant="fp16",
+                    vae=vae,
+                )
+#                pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", vae=vae, torch_dtype=torch.float16, variant="fp16")
+#                pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained("stabilityai/sdxl-turbo", torch_dtype=torch.float16, variant="fp16")
+                pipe.watermark = NoWatermark()
 
                 scene = context.scene
 
@@ -3365,9 +3410,8 @@ class SEQUENCER_OT_generate_movie(Operator):
                             if (new_width, new_height) != (width, height):
                                 print(f"Resizing frame {frame_idx} to {new_width}x{new_height}")
                                 frame = frame.resize((new_width, new_height), Image.Resampling.LANCZOS)
-
                             
-                            frame = transforms.functional.invert(frame)
+                            #frame = transforms.functional.invert(frame)
 
                             frame_tensor = pil_to_tensor(frame)
                             frame_tensor = frame_tensor.float()
@@ -3541,6 +3585,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         width=x,
                         num_frames=abs(duration)+2,
                         generator=generator,
+                        max_sequence_length=512,
                         # use_dynamic_cfg=True,
                     ).frames[0]
                 elif (
@@ -4762,8 +4807,6 @@ class SEQUENCER_OT_generate_image(Operator):
             or image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
             or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
             or image_model_card == "Salesforce/blipdiffusion"
-            # or image_model_card == "black-forest-labs/FLUX.1-schnell"
-            # or image_model_card == "ChuckMcSneed/FLUX.1-dev"
             and not scene.ip_adapter_face_folder
             and not scene.ip_adapter_style_folder
         ):
@@ -4952,7 +4995,6 @@ class SEQUENCER_OT_generate_image(Operator):
                         image_model_card,
                         transformer=model_nf4,
                         torch_dtype=torch.bfloat16,
-                        # variant="fp16",
                         local_files_only=local_files_only,
                     )
                     # pipe = FluxPipeline.from_pretrained(image_model_card, transformer=model_nf4, torch_dtype=torch.bfloat16)
@@ -4965,8 +5007,55 @@ class SEQUENCER_OT_generate_image(Operator):
                         converter.vae.enable_tiling()
                     else:
                         converter.enable_model_cpu_offload()
-                        # converter.enable_vae_slicing()
-                        # converter.vae.enable_tiling()
+
+                # FLUX ControlNets
+                elif (image_model_card == "black-forest-labs/FLUX.1-Canny-dev-lora") or (image_model_card == "black-forest-labs/FLUX.1-Depth-dev-lora"):
+
+                    from diffusers import FluxControlPipeline
+                    from diffusers.utils import load_image
+                    
+        # https://github.com/huggingface/diffusers/issues/10588            
+        #            from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
+
+        #            nf4_config = BitsAndBytesConfig(
+        #                load_in_4bit=True,
+        #                bnb_4bit_quant_type="nf4",
+        #                bnb_4bit_compute_dtype=torch.bfloat16,
+        #            )
+        #            model_nf4 = FluxTransformer2DModel.from_pretrained(
+        #                "ChuckMcSneed/FLUX.1-dev",
+        #                subfolder="transformer",
+        #                quantization_config=nf4_config,
+        #                torch_dtype=torch.bfloat16,
+        #            )
+        #            pipe = FluxControlPipeline.from_pretrained(
+        #                "ChuckMcSneed/FLUX.1-dev",
+        #                transformer=model_nf4,
+        #                torch_dtype=torch.bfloat16,
+        #                local_files_only=local_files_only,
+        #            )
+                    pipe = FluxControlPipeline.from_pretrained("ChuckMcSneed/FLUX.1-dev", torch_dtype=torch.bfloat16)
+
+                    if gfx_device == "mps":
+                        pipe.vae.enable_tiling()
+                    elif low_vram():
+                        pipe.enable_sequential_cpu_offload()
+                        pipe.enable_vae_slicing()
+                        pipe.vae.enable_tiling()
+                    else:
+                        pipe.enable_model_cpu_offload()
+
+                    #pipe = FluxControlPipeline.from_pretrained("ChuckMcSneed/FLUX.1-dev", torch_dtype=torch.bfloat16).to("cuda")
+
+                    #pipe.load_lora_weights("camenduru/FLUX.1-dev/flux1-canny-dev-lora.safetensors")
+                    pipe.load_lora_weights(image_model_card)
+                    
+                    if image_model_card == "black-forest-labs/FLUX.1-Canny-dev-lora":
+                        from controlnet_aux import CannyDetector
+                        processor = CannyDetector()
+                    else:
+                        from image_gen_aux import DepthPreprocessor
+                        processor = DepthPreprocessor.from_pretrained("LiheYoung/depth-anything-large-hf")
                 else:
                     try:
                         converter = AutoPipelineForImage2Image.from_pretrained(
@@ -4993,19 +5082,6 @@ class SEQUENCER_OT_generate_image(Operator):
                         converter.enable_model_cpu_offload()
                     else:
                         converter.to(gfx_device)
-
-#            if (
-#                enabled_items
-#                and input == "input_strips"
-#                and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
-#                and (scene.image_path or scene.movie_path)
-#                and not do_inpaint
-#            ):
-#                print("LoRAs will be ignored for image or movie input.")
-#                enabled_items = False
-            #            if enabled_items and input == "input_strips" and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0" and (scene.ip_adapter_face_folder or scene.ip_adapter_style_folder):
-            #                print("Adapters will be ignored for image or movie input.")
-            #                enabled_items = False
 
             if enabled_items:
                 if scene.use_lcm:
@@ -5370,38 +5446,6 @@ class SEQUENCER_OT_generate_image(Operator):
         #            else:
         #                pipe.to(gfx_device)
 
-#        # Mobius
-#        elif do_convert == False and image_model_card == "Corcelio/mobius":
-#            print("Load: Mobius Model")
-#            import torch
-#            from diffusers import (
-#                StableDiffusionXLPipeline,
-#                KDPM2AncestralDiscreteScheduler,
-#                AutoencoderKL,
-#            )
-
-#            # Load VAE component
-
-#            vae = AutoencoderKL.from_pretrained(
-#                "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
-#            )
-
-#            # Configure the pipeline
-#            pipe = StableDiffusionXLPipeline.from_pretrained(
-#                "Corcelio/mobius",
-#                vae=vae,
-#                torch_dtype=torch.float16,
-#                variant="fp16",
-#                local_files_only=local_files_only,
-#            )
-#            pipe.scheduler = KDPM2AncestralDiscreteScheduler.from_config(
-#                pipe.scheduler.config
-#            )
-
-#            if low_vram():
-#                pipe.enable_model_cpu_offload()
-#            else:
-#                pipe.to(gfx_device)
 
         # Flux
         elif (
@@ -5560,6 +5604,25 @@ class SEQUENCER_OT_generate_image(Operator):
                 device_map="balanced",
                 low_cpu_mem_usage=True,
             )
+
+        #OmniGen
+        elif image_model_card == "Shitao/OmniGen-v1-diffusers":
+            from diffusers import OmniGenPipeline
+
+            pipe = OmniGenPipeline.from_pretrained(
+                "Shitao/OmniGen-v1-diffusers",
+                torch_dtype=torch.bfloat16
+            )      
+  
+            if gfx_device == "mps":
+                pipe.vae.enable_tiling()
+            elif low_vram():
+                pipe.enable_sequential_cpu_offload()
+                pipe.vae.enable_tiling()
+            else:
+                # pipe.enable_sequential_cpu_offload()
+                # pipe.vae.enable_tiling()
+                pipe.enable_model_cpu_offload()            
 
         # Stable diffusion etc.
         else:
@@ -6078,6 +6141,40 @@ class SEQUENCER_OT_generate_image(Operator):
                     generator=generator,
                 ).images[0]
 
+
+            # FLUX ControlNets
+            elif (image_model_card == "black-forest-labs/FLUX.1-Canny-dev-lora") or (image_model_card == "black-forest-labs/FLUX.1-Depth-dev-lora"):
+
+                print("Process: Flux ControlNets")
+                init_image = None
+
+                if scene.image_path:
+                    init_image = load_first_frame(scene.image_path)
+                if scene.movie_path:
+                    init_image = load_first_frame(scene.movie_path)
+                if not init_image:
+                    print("Loading strip failed!")
+                    return {"CANCELLED"}
+                image = scale_image_within_dimensions(np.array(init_image), x, None)
+                
+                if image_model_card == "black-forest-labs/FLUX.1-Canny-dev-lora":
+                    image = processor(image, low_threshold=50, high_threshold=200, detect_resolution=x, image_resolution=x)
+                else:
+                    image = get_depth_map(image)
+ 
+                image = pipe(
+                    prompt=prompt,
+                    #negative_prompt=negative_prompt,
+                    control_image=image,
+                    num_inference_steps=image_num_inference_steps,
+                    guidance_scale=image_num_guidance,
+                    # controlnet_conditioning_scale=1.0,
+                    height=y,
+                    width=x,
+                    generator=generator
+                ).images[0]
+            
+
             # Remove Background
             elif image_model_card == "ZhengPeng7/BiRefNet_HR":
                 init_image = None
@@ -6242,6 +6339,43 @@ class SEQUENCER_OT_generate_image(Operator):
                     width=x,
                     generator=generator,
                 ).images[0]
+            elif image_model_card == "Shitao/OmniGen-v1-diffusers":
+                omnigen_images=[]
+                
+                prompt = scene.omnigen_prompt_1
+                if find_strip_by_name(scene, scene.omnigen_strip_1):
+                    omnigen_images.append(load_first_frame(get_strip_path(find_strip_by_name(scene, scene.omnigen_strip_1))))
+                    prompt = prompt + " <img><|image_1|></img> "
+                    
+                prompt = prompt + scene.omnigen_prompt_2
+                if find_strip_by_name(scene, scene.omnigen_strip_2):
+                    omnigen_images.append(load_first_frame(get_strip_path(find_strip_by_name(scene, scene.omnigen_strip_2))))
+                    prompt = prompt + " <img><|image_2|></img> "
+
+                prompt = prompt + scene.omnigen_prompt_3
+                if find_strip_by_name(scene, scene.omnigen_strip_3):
+                    omnigen_images.append(load_first_frame(get_strip_path(find_strip_by_name(scene, scene.omnigen_strip_3))))
+                    prompt = prompt + " <img><|image_3|></img> "
+                print(prompt)
+                
+                if not omnigen_images:
+                    omnigen_images = None
+                    img_size = False
+                else:
+                    img_size = True
+
+                image = pipe(
+                    prompt=prompt, 
+                    input_images=omnigen_images, 
+                    img_guidance_scale=scene.img_guidance_scale,
+                    use_input_image_size_as_output=img_size,
+                    num_inference_steps=image_num_inference_steps,
+                    guidance_scale=image_num_guidance,
+                    height=y,
+                    width=x,
+                    generator=generator,
+                    ).images[0]   
+                                 
             # Inpaint
             elif do_inpaint:
                 init_image = None
@@ -7644,6 +7778,38 @@ def register():
 
     bpy.types.Scene.minimax_subject = bpy.props.StringProperty(
         name="minimax_subject", default=""
+    )
+
+    bpy.types.Scene.omnigen_prompt_1 = bpy.props.StringProperty(
+        name="omnigen_prompt_1",
+        default="",
+        options={"TEXTEDIT_UPDATE"},
+    )
+    bpy.types.Scene.omnigen_prompt_2 = bpy.props.StringProperty(
+        name="omnigen_prompt_2",
+        default="",
+        options={"TEXTEDIT_UPDATE"},
+    )
+    bpy.types.Scene.omnigen_prompt_3 = bpy.props.StringProperty(
+        name="omnigen_prompt_3",
+        default="",
+        options={"TEXTEDIT_UPDATE"},
+    )
+    bpy.types.Scene.omnigen_strip_1 = bpy.props.StringProperty(
+        name="omnigen_strip_1", options={"TEXTEDIT_UPDATE"}, default=""
+    )
+    bpy.types.Scene.omnigen_strip_2 = bpy.props.StringProperty(
+        name="omnigen_strip_2", options={"TEXTEDIT_UPDATE"}, default=""
+    )
+    bpy.types.Scene.omnigen_strip_3 = bpy.props.StringProperty(
+        name="omnigen_strip_3", options={"TEXTEDIT_UPDATE"}, default=""
+    )
+    # The guidance number.
+    bpy.types.Scene.img_guidance_scale = bpy.props.FloatProperty(
+        name="img_guidance_scale",
+        default=1.6,
+        min=0,
+        max=100,
     )
 
 
