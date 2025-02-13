@@ -3528,8 +3528,8 @@ class SEQUENCER_OT_generate_movie(Operator):
                             negative_prompt=negative_prompt,
                             num_inference_steps=movie_num_inference_steps,
                             guidance_scale=movie_num_guidance,
-                            height=y,
-                            width=x,
+                            height=480,
+                            width=720,
                             # num_frames=abs(duration),
                             generator=generator,
                         ).frames[0]
@@ -3550,8 +3550,8 @@ class SEQUENCER_OT_generate_movie(Operator):
                             # negative_prompt=negative_prompt,
                             num_inference_steps=movie_num_inference_steps,
                             guidance_scale=movie_num_guidance,
-                            height=y,
-                            width=x,
+                            height=480,
+                            width=720,
                             # num_frames=abs(duration),
                             generator=generator,
                             use_dynamic_cfg=True,
@@ -4783,6 +4783,7 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "adamo1139/stable-diffusion-3.5-medium-ungated"
             and not image_model_card == "Vargol/ProteusV0.4"
             and not image_model_card == "ZhengPeng7/BiRefNet_HR"
+            and not image_model_card == "Shitao/OmniGen-v1-diffusers"
             and not scene.ip_adapter_face_folder
             and not scene.ip_adapter_style_folder
         )
@@ -4795,6 +4796,7 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "ByteDance/SDXL-Lightning"
             and not image_model_card == "Vargol/ProteusV0.4"
             and not image_model_card == "ZhengPeng7/BiRefNet_HR"
+            and not image_model_card == "Shitao/OmniGen-v1-diffusers"
             and not scene.ip_adapter_face_folder
             and not scene.ip_adapter_style_folder
             and not do_inpaint
@@ -5014,26 +5016,26 @@ class SEQUENCER_OT_generate_image(Operator):
                     from diffusers import FluxControlPipeline
                     from diffusers.utils import load_image
                     
-        # https://github.com/huggingface/diffusers/issues/10588            
-        #            from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
+                    # https://github.com/huggingface/diffusers/issues/10588            
+                    #            from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
 
-        #            nf4_config = BitsAndBytesConfig(
-        #                load_in_4bit=True,
-        #                bnb_4bit_quant_type="nf4",
-        #                bnb_4bit_compute_dtype=torch.bfloat16,
-        #            )
-        #            model_nf4 = FluxTransformer2DModel.from_pretrained(
-        #                "ChuckMcSneed/FLUX.1-dev",
-        #                subfolder="transformer",
-        #                quantization_config=nf4_config,
-        #                torch_dtype=torch.bfloat16,
-        #            )
-        #            pipe = FluxControlPipeline.from_pretrained(
-        #                "ChuckMcSneed/FLUX.1-dev",
-        #                transformer=model_nf4,
-        #                torch_dtype=torch.bfloat16,
-        #                local_files_only=local_files_only,
-        #            )
+                    #            nf4_config = BitsAndBytesConfig(
+                    #                load_in_4bit=True,
+                    #                bnb_4bit_quant_type="nf4",
+                    #                bnb_4bit_compute_dtype=torch.bfloat16,
+                    #            )
+                    #            model_nf4 = FluxTransformer2DModel.from_pretrained(
+                    #                "ChuckMcSneed/FLUX.1-dev",
+                    #                subfolder="transformer",
+                    #                quantization_config=nf4_config,
+                    #                torch_dtype=torch.bfloat16,
+                    #            )
+                    #            pipe = FluxControlPipeline.from_pretrained(
+                    #                "ChuckMcSneed/FLUX.1-dev",
+                    #                transformer=model_nf4,
+                    #                torch_dtype=torch.bfloat16,
+                    #                local_files_only=local_files_only,
+                    #            )
                     pipe = FluxControlPipeline.from_pretrained("ChuckMcSneed/FLUX.1-dev", torch_dtype=torch.bfloat16)
 
                     if gfx_device == "mps":
