@@ -918,7 +918,8 @@ def install_modules(self):
                 "install",
                 "--disable-pip-version-check",
                 "--use-deprecated=legacy-resolver",
-                "https://hf-mirror.com/LightningJay/triton-2.1.0-python3.11-win_amd64-wheel/resolve/main/triton-2.1.0-cp311-cp311-win_amd64.whl",
+                "https://github.com/woct0rdho/triton-windows/releases/download/v3.2.0-windows.post9/triton-3.2.0-cp311-cp311-win_amd64.whl",
+                #"https://hf-mirror.com/LightningJay/triton-2.1.0-python3.11-win_amd64-wheel/resolve/main/triton-2.1.0-cp311-cp311-win_amd64.whl",
                 "--no-warn-script-location",
                 "--upgrade",
             ]
@@ -1249,7 +1250,7 @@ def input_strips_updated(self, context):
 
     if image_model_card == "Shitao/OmniGen-v1-diffusers" and type == "image":
         bpy.context.scene.input_strips = "input_prompt"
-    if (
+    elif (
         movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
         and type == "movie"
     ):
@@ -1260,7 +1261,7 @@ def input_strips_updated(self, context):
         or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
     ):
         scene.inpaint_selected_strip = ""
-    if (
+    elif (
         type == "image"
         and scene.input_strips != "input_strips"
         and (
@@ -1273,12 +1274,12 @@ def input_strips_updated(self, context):
     ):
         scene.input_strips = "input_strips"
 
-    if context.scene.lora_folder:
+    elif context.scene.lora_folder:
         bpy.ops.lora.refresh_files()
-    if type == "text":
+    elif type == "text":
         scene.input_strips = "input_strips"
 
-    if (
+    elif (
         (
             type == "movie"
             and movie_model_card == "stabilityai/stable-video-diffusion-img2vid"
@@ -1292,10 +1293,10 @@ def input_strips_updated(self, context):
         or ()
     ):
         scene.input_strips = "input_strips"
-    if scene.input_strips == "input_prompt":
+    elif scene.input_strips == "input_prompt":
         bpy.types.Scene.movie_path = ""
         bpy.types.Scene.image_path = ""
-    if (
+    elif (
         movie_model_card == "THUDM/CogVideoX-5b"
         or movie_model_card == "THUDM/CogVideoX-2b"
     ) and type == "movie":
@@ -1304,38 +1305,38 @@ def input_strips_updated(self, context):
         scene.generate_movie_frames = 49
         scene.movie_num_inference_steps = 50
         scene.movie_num_guidance = 6
-    if movie_model_card == "genmo/mochi-1-preview" and type == "movie":
+    elif movie_model_card == "genmo/mochi-1-preview" and type == "movie":
         scene.generate_movie_x = 848
         scene.generate_movie_y = 480
         scene.movie_num_inference_steps = 50
         scene.input_strips == "input_prompt"
-    if movie_model_card == "hunyuanvideo-community/HunyuanVideo":
+    elif movie_model_card == "hunyuanvideo-community/HunyuanVideo" and type == "movie":
         scene.generate_movie_x = 512
         scene.generate_movie_y = 320
         scene.generate_movie_frames = 81
         scene.movie_num_inference_steps = 40
         scene.input_strips == "input_prompt"
 
-    if (image_model_card == "dataautogpt3/OpenDalleV1.1") and type == "image":
+    elif (image_model_card == "dataautogpt3/OpenDalleV1.1") and type == "image":
         bpy.context.scene.use_lcm = False
-    if (image_model_card == "Kwai-Kolors/Kolors-diffusers") and type == "image":
+    elif (image_model_card == "Kwai-Kolors/Kolors-diffusers") and type == "image":
         bpy.context.scene.use_lcm = False
-    if (
+    elif (
         image_model_card == "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers"
     ) and type == "image":
         bpy.context.scene.use_lcm = False
-    if movie_model_card == "cerspense/zeroscope_v2_XL" and type == "movie":
+    elif movie_model_card == "cerspense/zeroscope_v2_XL" and type == "movie":
         scene.upscale = False
-    if (image_model_card == "black-forest-labs/FLUX.1-schnell") and type == "image":
+    elif (image_model_card == "black-forest-labs/FLUX.1-schnell") and type == "image":
         bpy.context.scene.movie_num_inference_steps = 4
         bpy.context.scene.movie_num_guidance = 0
-    if (image_model_card == "ChuckMcSneed/FLUX.1-dev") and type == "image":
+    elif (image_model_card == "ChuckMcSneed/FLUX.1-dev") and type == "image":
         bpy.context.scene.movie_num_inference_steps = 25
         bpy.context.scene.movie_num_guidance = 4
-    if (image_model_card == "ostris/Flex.1-alpha") and type == "image":
+    elif (image_model_card == "ostris/Flex.1-alpha") and type == "image":
         bpy.context.scene.movie_num_inference_steps = 28
         bpy.context.scene.movie_num_guidance = 3.5
-    if audio_model_card == "stabilityai/stable-audio-open-1.0" and type == "audio":
+    elif audio_model_card == "stabilityai/stable-audio-open-1.0" and type == "audio":
         bpy.context.scene.movie_num_inference_steps = 200
 
 
@@ -1351,7 +1352,7 @@ def output_strips_updated(self, context):
 
     if image_model_card == "Shitao/OmniGen-v1-diffusers" and type == "image":
         scene.input_strips = "input_prompt"
-    if (
+    elif (
         type == "movie"
         or type == "audio"
         or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
@@ -1359,7 +1360,7 @@ def output_strips_updated(self, context):
         scene.inpaint_selected_strip = ""
         if context.scene.lora_folder:
             bpy.ops.lora.refresh_files()
-    if (
+    elif (
         image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
         or image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
         or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
@@ -1368,9 +1369,9 @@ def output_strips_updated(self, context):
     ) and type == "image":
         scene.input_strips = "input_strips"
 
-    if type == "text":
+    elif type == "text":
         scene.input_strips = "input_strips"
-    if (
+    elif (
         (
             type == "movie"
             and movie_model_card == "stabilityai/stable-video-diffusion-img2vid"
@@ -1385,28 +1386,28 @@ def output_strips_updated(self, context):
     ):
         scene.input_strips = "input_strips"
 
-    if (image_model_card == "dataautogpt3/OpenDalleV1.1") and type == "image":
+    elif (image_model_card == "dataautogpt3/OpenDalleV1.1") and type == "image":
         bpy.context.scene.use_lcm = False
-    if (image_model_card == "Kwai-Kolors/Kolors-diffusers") and type == "image":
+    elif (image_model_card == "Kwai-Kolors/Kolors-diffusers") and type == "image":
         bpy.context.scene.use_lcm = False
-    if (
+    elif (
         image_model_card == "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers"
     ) and type == "image":
         bpy.context.scene.use_lcm = False
-    if movie_model_card == "cerspense/zeroscope_v2_XL" and type == "movie":
+    elif movie_model_card == "cerspense/zeroscope_v2_XL" and type == "movie":
         scene.upscale = False
-    if (image_model_card == "black-forest-labs/FLUX.1-schnell") and type == "image":
+    elif (image_model_card == "black-forest-labs/FLUX.1-schnell") and type == "image":
         bpy.context.scene.movie_num_inference_steps = 4
         bpy.context.scene.movie_num_guidance = 0
-    if (image_model_card == "ChuckMcSneed/FLUX.1-dev") and type == "image":
+    elif (image_model_card == "ChuckMcSneed/FLUX.1-dev") and type == "image":
         bpy.context.scene.movie_num_inference_steps = 25
         bpy.context.scene.movie_num_guidance = 4
-    if (image_model_card == "ostris/Flex.1-alpha") and type == "image":
+    elif (image_model_card == "ostris/Flex.1-alpha") and type == "image":
         bpy.context.scene.movie_num_inference_steps = 28
         bpy.context.scene.movie_num_guidance = 3.5
-    if audio_model_card == "stabilityai/stable-audio-open-1.0" and type == "audio":
+    elif audio_model_card == "stabilityai/stable-audio-open-1.0" and type == "audio":
         bpy.context.scene.movie_num_inference_steps = 200
-    if (
+    elif (
         movie_model_card == "THUDM/CogVideoX-5b"
         or movie_model_card == "THUDM/CogVideoX-2b"
     ) and type == "movie":
@@ -1415,11 +1416,11 @@ def output_strips_updated(self, context):
         scene.generate_movie_frames = 49
         scene.movie_num_inference_steps = 50
         scene.movie_num_guidance = 6
-    if movie_model_card == "genmo/mochi-1-preview" and type == "movie":
+    elif movie_model_card == "genmo/mochi-1-preview" and type == "movie":
         scene.generate_movie_x = 848
         scene.generate_movie_y = 480
         scene.movie_num_inference_steps = 50
-    if movie_model_card == "hunyuanvideo-community/HunyuanVideo" and type == "movie":
+    elif movie_model_card == "hunyuanvideo-community/HunyuanVideo" and type == "movie":
         scene.generate_movie_x = 512
         scene.generate_movie_y = 320
         scene.generate_movie_frames = 81
@@ -5064,7 +5065,8 @@ class SEQUENCER_OT_generate_image(Operator):
                     if gfx_device == "mps":
                         converter.vae.enable_tiling()
                     elif low_vram():
-                        converter.enable_sequential_cpu_offload()
+                        #converter.enable_sequential_cpu_offload()
+                        converter.enable_model_cpu_offload()
                         converter.enable_vae_slicing()
                         converter.vae.enable_tiling()
                     else:
@@ -5104,7 +5106,8 @@ class SEQUENCER_OT_generate_image(Operator):
                     if gfx_device == "mps":
                         pipe.vae.enable_tiling()
                     elif low_vram():
-                        pipe.enable_sequential_cpu_offload()
+                        #pipe.enable_sequential_cpu_offload()
+                        pipe.enable_model_cpu_offload()
                         pipe.enable_vae_slicing()
                         pipe.vae.enable_tiling()
                     else:
@@ -5546,7 +5549,8 @@ class SEQUENCER_OT_generate_image(Operator):
                 if gfx_device == "mps":
                     pipe.vae.enable_tiling()
                 elif low_vram():
-                    pipe.enable_sequential_cpu_offload()
+                    #pipe.enable_sequential_cpu_offload()
+                    pipe.enable_model_cpu_offload()
                     pipe.enable_vae_slicing()
                     pipe.vae.enable_tiling()
                 else:
@@ -5575,7 +5579,8 @@ class SEQUENCER_OT_generate_image(Operator):
                 if gfx_device == "mps":
                     pipe.vae.enable_tiling()
                 elif low_vram():
-                    pipe.enable_sequential_cpu_offload()
+                    #pipe.enable_sequential_cpu_offload()
+                    pipe.enable_model_cpu_offload()
                     pipe.enable_vae_slicing()
                     pipe.vae.enable_tiling()
                 else:
