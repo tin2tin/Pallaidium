@@ -1871,7 +1871,7 @@ def get_render_strip(self, context, strip):
     current_scene = context.scene
     sequencer = current_scene.sequence_editor
     current_frame_old = bpy.context.scene.frame_current
-    selected_sequences = strip
+    selected_strips = strip
 
     # Get the first empty channel above all strips
     insert_channel_total = 1
@@ -1944,7 +1944,7 @@ def get_render_strip(self, context, strip):
 
         # Get the new strip in the new scene
         new_strip = new_scene.sequence_editor.active_strip = (
-            bpy.context.selected_sequences[0]
+            bpy.context.selected_strips[0]
         )
 
         copy_struct(strip, new_strip)
@@ -4776,7 +4776,7 @@ class SEQUENCER_OT_generate_image(Operator):
         local_files_only = addon_prefs.local_files_only
         image_model_card = addon_prefs.image_model_card
         image_power = scene.image_power
-        strips = context.selected_sequences
+        strips = context.selected_strips
         type = scene.generatorai_typeselect
 
         pipe = None
@@ -6987,7 +6987,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             # Add strip
             if os.path.isfile(out_path):
-                strip = scene.sequence_editor.sequences.new_image(
+                strip = scene.sequence_editor.strips.new_image(
                     name=str(seed) + "_" + context.scene.generate_movie_prompt,
                     frame_start=start_frame,
                     filepath=out_path,
@@ -7205,7 +7205,7 @@ class SEQUENCER_OT_generate_text(Operator):
         # Add strip
         if text:
             print(str(start_frame))
-            strip = scene.sequence_editor.sequences.new_effect(
+            strip = scene.sequence_editor.strips.new_effect(
                 name=str(text),
                 type="TEXT",
                 frame_start=start_frame,
@@ -7282,8 +7282,8 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         addon_prefs.playsound = False
         scene = context.scene
         sequencer = bpy.ops.sequencer
-        sequences = bpy.context.sequences
-        strips = context.selected_sequences
+        sequences = bpy.context.strips
+        strips = context.selected_strips
         active_strip = context.scene.sequence_editor.active_strip
         prompt = scene.generate_movie_prompt
         negative_prompt = scene.generate_movie_negative_prompt
@@ -7365,7 +7365,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                                 "use_accurate": False,
                             },
                         )
-                        intermediate_strip = bpy.context.selected_sequences[0]
+                        intermediate_strip = bpy.context.selected_strips[0]
                         intermediate_strip.frame_start = strip.frame_start
                         intermediate_strip.frame_offset_start = int(trim_frame)
                         intermediate_strip.frame_final_duration = 1
@@ -7379,7 +7379,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     elif type == "text":
                         bpy.ops.sequencer.copy()
                         bpy.ops.sequencer.paste(keep_offset=True)
-                        intermediate_strip = bpy.context.selected_sequences[0]
+                        intermediate_strip = bpy.context.selected_strips[0]
                         intermediate_strip.frame_start = strip.frame_start
 
                         # intermediate_strip.frame_offset_start = int(trim_frame)
