@@ -76,6 +76,7 @@ On Windows: %userprofile%\\.cache\huggingface\hub
 ![image](https://github.com/user-attachments/assets/a5c44a7e-c670-49ef-941f-86e521568637)
 
 ## Change Log
+* 2025-2-15: Add: LoRA support for HunyuanVideo + better preset  
 * 2025-2-12: Add multi-media prompting via: [OmniGen](https://github.com/VectorSpaceLab/OmniGen)
 * 2025-2-10: 
 Update: a-r-r-o-w/LTX-Video-0.9.1-diffusers ZhengPeng7/BiRefNet_HR MiaoshouAI/Florence-2-large-PromptGen-v2.0
