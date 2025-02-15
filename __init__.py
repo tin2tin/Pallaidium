@@ -918,8 +918,8 @@ def install_modules(self):
                 "install",
                 "--disable-pip-version-check",
                 "--use-deprecated=legacy-resolver",
-                "https://github.com/woct0rdho/triton-windows/releases/download/v3.2.0-windows.post9/triton-3.2.0-cp311-cp311-win_amd64.whl",
-                #"https://hf-mirror.com/LightningJay/triton-2.1.0-python3.11-win_amd64-wheel/resolve/main/triton-2.1.0-cp311-cp311-win_amd64.whl",
+                #"https://github.com/woct0rdho/triton-windows/releases/download/v3.2.0-windows.post9/triton-3.2.0-cp311-cp311-win_amd64.whl",
+                "https://hf-mirror.com/LightningJay/triton-2.1.0-python3.11-win_amd64-wheel/resolve/main/triton-2.1.0-cp311-cp311-win_amd64.whl",
                 "--no-warn-script-location",
                 "--upgrade",
             ]
@@ -1255,7 +1255,14 @@ def input_strips_updated(self, context):
         and type == "movie"
     ):
         scene.input_strips = "input_strips"
-    if (
+    elif movie_model_card == "hunyuanvideo-community/HunyuanVideo" and type == "movie":
+        scene.input_strips = "input_prompt"
+        scene.generate_movie_x = 960
+        scene.generate_movie_y = 544
+        scene.generate_movie_frames = 49
+        scene.movie_num_inference_steps = 20
+        scene.movie_num_guidance = 4
+    elif (
         type == "movie"
         or type == "audio"
         or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
@@ -1310,12 +1317,6 @@ def input_strips_updated(self, context):
         scene.generate_movie_y = 480
         scene.movie_num_inference_steps = 50
         scene.input_strips == "input_prompt"
-    elif movie_model_card == "hunyuanvideo-community/HunyuanVideo" and type == "movie":
-        scene.generate_movie_x = 512
-        scene.generate_movie_y = 320
-        scene.generate_movie_frames = 81
-        scene.movie_num_inference_steps = 40
-        scene.input_strips == "input_prompt"
 
     elif (image_model_card == "dataautogpt3/OpenDalleV1.1") and type == "image":
         bpy.context.scene.use_lcm = False
@@ -1352,6 +1353,13 @@ def output_strips_updated(self, context):
 
     if image_model_card == "Shitao/OmniGen-v1-diffusers" and type == "image":
         scene.input_strips = "input_prompt"
+    elif movie_model_card == "hunyuanvideo-community/HunyuanVideo" and type == "movie":
+        scene.input_strips = "input_prompt"
+        scene.generate_movie_x = 960
+        scene.generate_movie_y = 544
+        scene.generate_movie_frames = 49
+        scene.movie_num_inference_steps = 20
+        scene.movie_num_guidance = 4
     elif (
         type == "movie"
         or type == "audio"
@@ -1420,12 +1428,6 @@ def output_strips_updated(self, context):
         scene.generate_movie_x = 848
         scene.generate_movie_y = 480
         scene.movie_num_inference_steps = 50
-    elif movie_model_card == "hunyuanvideo-community/HunyuanVideo" and type == "movie":
-        scene.generate_movie_x = 512
-        scene.generate_movie_y = 320
-        scene.generate_movie_frames = 81
-        scene.movie_num_inference_steps = 40
-
 
 class GeneratorAddonPreferences(AddonPreferences):
     bl_idname = __name__
@@ -1469,7 +1471,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             ("THUDM/CogVideoX-5b", "CogVideoX-5b (720x480x48)", "THUDM/CogVideoX-5b"),
             (
                 "hunyuanvideo-community/HunyuanVideo",
-                "Hunyuan Video (512x320x(4*k+1))",
+                "Hunyuan Video (960x544x(4*k+1))f",
                 "hunyuanvideo-community/HunyuanVideo",
             ),
             ("Hailuo/MiniMax/txt2vid", "MiniMax (txt2vid)", "Hailuo/MiniMax/txt2vid"),
@@ -2586,10 +2588,11 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     or image_model_card == "black-forest-labs/FLUX.1-Redux-dev"
                 )
                 and type == "image"
-            ) or (
-                type == "movie"
-                and movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
-            ):
+            ) or ((
+                type == "movie")
+                and (movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
+                or (movie_model_card == "hunyuanvideo-community/HunyuanVideo")
+            )):
                 layout = self.layout
                 layout.use_property_split = True
                 layout.use_property_decorate = False
@@ -3250,31 +3253,49 @@ class SEQUENCER_OT_generate_movie(Operator):
                 else:
                     print("HunyuanVideo: Load Prompt to Video Model")
 
-                    from diffusers import (
-                        HunyuanVideoTransformer3DModel,
-                        HunyuanVideoPipeline,
-                    )
-                    from diffusers.utils import export_to_video
+                    enabled_items = None
+
+                    lora_files = scene.lora_files
+                    enabled_names = []
+                    enabled_weights = []
+                    # Check if there are any enabled items before loading
+                    enabled_items = [item for item in lora_files if item.enabled]
+
+                    from diffusers import HunyuanVideoPipeline, HunyuanVideoTransformer3DModel
                     from diffusers import GGUFQuantizationConfig
+                    from diffusers.utils import export_to_video
 
                     if low_vram():
                         transformer_path = f"https://huggingface.co/city96/HunyuanVideo-gguf/blob/main/hunyuan-video-t2v-720p-Q3_K_S.gguf"
                     else:
-                        transformer_path = f"https://huggingface.co/city96/HunyuanVideo-gguf/blob/main/hunyuan-video-t2v-720p-Q8_0.gguf"
-
-                    model_id = "hunyuanvideo-community/HunyuanVideo"
+                        transformer_path = f"https://huggingface.co/city96/HunyuanVideo-gguf/blob/main/hunyuan-video-t2v-720p-Q4_K_S.gguf"
 
                     transformer = HunyuanVideoTransformer3DModel.from_single_file(
                         transformer_path,
-                        quantization_config=GGUFQuantizationConfig(
-                            compute_dtype=torch.bfloat16
-                        ),
+                        quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16),
                         torch_dtype=torch.bfloat16,
                     )
 
                     pipe = HunyuanVideoPipeline.from_pretrained(
-                        model_id, transformer=transformer, torch_dtype=torch.float16
+                        movie_model_card, 
+                        transformer=transformer,
+                        torch_dtype=torch.float16
                     )
+        
+                    if enabled_items:
+                        for item in enabled_items:
+                            enabled_names.append(
+                                (clean_filename(item.name)).replace(".", "")
+                            )
+                            enabled_weights.append(item.weight_value)
+                            pipe.load_lora_weights(
+                                bpy.path.abspath(scene.lora_folder),
+                                weight_name=item.name + ".safetensors",
+                                adapter_name=((clean_filename(item.name)).replace(".", "")),
+                            )
+                        pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)
+                        print("Load LoRAs: " + " ".join(enabled_names))          
+            
                 if gfx_device == "mps":
                     pipe.vae.enable_tiling()
                 elif low_vram():
@@ -3742,13 +3763,11 @@ class SEQUENCER_OT_generate_movie(Operator):
                         num_inference_steps=movie_num_inference_steps,
                         guidance_scale=movie_num_guidance,
                         num_videos_per_prompt=1,
-                        height=320,
-                        width=512,
+                        height=y,
+                        width=x,
                         num_frames=abs(duration),
                         generator=generator,
                     ).frames[0]
-                    scene.generate_movie_y = 320
-                    scene.generate_movie_x = 512
                 else:
                     video_frames = pipe(
                         prompt=prompt,
@@ -5641,7 +5660,8 @@ class SEQUENCER_OT_generate_image(Operator):
             if gfx_device == "mps":
                 pipe.vae.enable_tiling()
             elif low_vram():
-                pipe.enable_sequential_cpu_offload()
+                pipe.enable_model_cpu_offload()
+                #pipe.enable_sequential_cpu_offload()
                 pipe.vae.enable_tiling()
             else:
                 # pipe.enable_sequential_cpu_offload()
