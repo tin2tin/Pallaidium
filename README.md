@@ -42,7 +42,7 @@ For Mac and Linux, we'll have to rely on contributor support. So, post your issu
 
 * First, download and install git (must be on PATH): https://git-scm.com/downloads
 
-* Download the add-on: https://github.com/tin2tin/text_to_video/archive/refs/heads/main.zip
+* Download the add-on: [https://github.com/tin2tin/text_to_video/archive/refs/heads/main.zip](https://github.com/tin2tin/Pallaidium/archive/refs/heads/main.zip)
 
 * On Windows, right-click on the Blender icon and "Run Blender as Administrator"(or you'll get write permission errors).
 
