@@ -58,11 +58,13 @@ For Mac and Linux, we'll have to rely on contributor support. So, post your issu
 
 * Open the add-on UI in the Sequencer > Sidebar > Generative AI.
 
-* The first time any model is executed, 5-10 GB will have to be downloaded first. 
+* 5-10 GB must be downloaded first the first time any model is executed. 
 
-If any Python modules are missing, use this add-on to install them manually     |
+If any Python modules are missing, use this add-on to install them manually:     |
 :------------- |
 https://github.com/tin2tin/blender_pip      |
+If "WARNING: Failed to find MSVC", install "Tools for Visual Studio":
+https://aka.ms/vs/17/release/vs_BuildTools.exe
 
 
 ## Uninstall
