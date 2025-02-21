@@ -295,6 +295,9 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 - The [Diffusers](https://github.com/huggingface/diffusers) lib makes the following weights accessible through the Pallaidium UI:
 
 ### Video:
+- [SkyReels-V1-Hunyuan-I2V/T2V](https://huggingface.co/Skywork/SkyReels-V1-Hunyuan-I2V)
+- [HunyuanVideo](https://huggingface.co/tencent/HunyuanVideo)
+- [Lightricks/LTX-Video](https://huggingface.co/Lightricks/LTX-Video)
 - [stabilityai/stable-video-diffusion-img2vid-xt](https://huggingface.co/stabilityai/stable-video-diffusion-img2vid-xt)
 - [stabilityai/stable-video-diffusion-img2vid](https://huggingface.co/stabilityai/stable-video-diffusion-img2vid)
 - [THUDM/CogVideoX-5b](https://huggingface.co/THUDM/CogVideoX-5b)
