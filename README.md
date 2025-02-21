@@ -78,7 +78,7 @@ On Windows: %userprofile%\\.cache\huggingface\hub
 ![image](https://github.com/user-attachments/assets/a5c44a7e-c670-49ef-941f-86e521568637)
 
 ## Change Log
-* 2025-2-21: Support for Skywork/SkyReels-V1-Hunyuan-T2V/I2V. Need a full update of dependencies!
+* 2025-2-21: Support for Skywork/SkyReels-V1-Hunyuan-T2V/I2V. Need a full update of dependencies! (Thx newgenai79 for int4 transformer)
 * 2025-2-15: Add: LoRA support for HunyuanVideo + better preset  
 * 2025-2-12: Add multi-media prompting via: [OmniGen](https://github.com/VectorSpaceLab/OmniGen)
 * 2025-2-10: 
