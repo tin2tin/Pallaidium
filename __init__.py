@@ -1005,7 +1005,7 @@ def install_modules(self):
                 "-m",
                 "pip",
                 "install",
-                "torch==2.3.1+cu121",
+                "torch==2.4.0+cu121",
                 "xformers",
                 "torchvision",
                 "--index-url",
@@ -1021,7 +1021,8 @@ def install_modules(self):
                 "-m",
                 "pip",
                 "install",
-                "torchaudio==2.3.1+cu121",
+                "torchaudio==2.4.0+cu121",
+                #"torchaudio==2.3.1+cu121",
                 "--index-url",
                 "https://download.pytorch.org/whl/cu121",
                 "--no-warn-script-location",
@@ -1474,6 +1475,18 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Hunyuan Video (960x544x(4*k+1))f",
                 "hunyuanvideo-community/HunyuanVideo",
             ),
+            (
+                "Skywork/SkyReels-V1-Hunyuan-T2V",
+                "SkyReels-V1-Hunyuan (960x544x97)",
+                "Skywork/SkyReels-V1-Hunyuan-T2V",
+            ),
+            (
+                "hunyuanvideo-community/HunyuanVideo",
+                "Hunyuan Video (960x544x(4*k+1))f",
+                "hunyuanvideo-community/HunyuanVideo",
+            ),
+
+
             ("Hailuo/MiniMax/txt2vid", "MiniMax (txt2vid)", "Hailuo/MiniMax/txt2vid"),
             ("Hailuo/MiniMax/img2vid", "MiniMax (img2vid)", "Hailuo/MiniMax/img2vid"),
             (
@@ -2978,6 +2991,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             and movie_model_card != "Hailuo/MiniMax/txt2vid"
             and movie_model_card != "Hailuo/MiniMax/img2vid"
             and movie_model_card != "Hailuo/MiniMax/subject2vid"
+            and movie_model_card != "Skywork/SkyReels-V1-Hunyuan-T2V"
         ) or movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
             # Frame by Frame
             if (
@@ -3261,10 +3275,36 @@ class SEQUENCER_OT_generate_movie(Operator):
                     # Check if there are any enabled items before loading
                     enabled_items = [item for item in lora_files if item.enabled]
 
-                    from diffusers import HunyuanVideoPipeline, HunyuanVideoTransformer3DModel
-                    from diffusers import GGUFQuantizationConfig
+                    from diffusers.models import HunyuanVideoTransformer3DModel
                     from diffusers.utils import export_to_video
+                    from diffusers import HunyuanVideoPipeline
+                    from diffusers import BitsAndBytesConfig
+                    from transformers import LlamaModel, CLIPTextModel
+                    from diffusers import GGUFQuantizationConfig
 
+
+                    model_id = "hunyuanvideo-community/HunyuanVideo"
+
+                    quantization_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=torch.bfloat16)
+                    text_encoder = LlamaModel.from_pretrained(
+                        model_id, 
+                        subfolder="text_encoder", 
+                        quantization_config=quantization_config,
+                        torch_dtype=torch.float16
+                    )
+                    text_encoder_2 = CLIPTextModel.from_pretrained(
+                        model_id, 
+                        subfolder="text_encoder_2", 
+                        quantization_config=quantization_config,
+                        torch_dtype=torch.float16
+                    )
+                    
+#                    transformer = HunyuanVideoTransformer3DModel.from_pretrained(
+#                        model_id, 
+#                        subfolder="transformer",
+#                        quantization_config=quantization_config,
+#                        torch_dtype=torch.bfloat16
+#                    )
                     if low_vram():
                         transformer_path = f"https://huggingface.co/city96/HunyuanVideo-gguf/blob/main/hunyuan-video-t2v-720p-Q3_K_S.gguf"
                     else:
@@ -3275,12 +3315,34 @@ class SEQUENCER_OT_generate_movie(Operator):
                         quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16),
                         torch_dtype=torch.bfloat16,
                     )
-
                     pipe = HunyuanVideoPipeline.from_pretrained(
-                        movie_model_card, 
-                        transformer=transformer,
-                        torch_dtype=torch.float16
+                        model_id, 
+                        text_encoder=text_encoder,
+                        text_encoder_2=text_encoder_2,
+                        transformer=transformer, 
+                        torch_dtype=torch.float16, 
                     )
+
+#                    from diffusers import HunyuanVideoPipeline, HunyuanVideoTransformer3DModel
+#                    from diffusers import GGUFQuantizationConfig
+#                    from diffusers.utils import export_to_video
+
+#                    if low_vram():
+#                        transformer_path = f"https://huggingface.co/city96/HunyuanVideo-gguf/blob/main/hunyuan-video-t2v-720p-Q3_K_S.gguf"
+#                    else:
+#                        transformer_path = f"https://huggingface.co/city96/HunyuanVideo-gguf/blob/main/hunyuan-video-t2v-720p-Q4_K_S.gguf"
+
+#                    transformer = HunyuanVideoTransformer3DModel.from_single_file(
+#                        transformer_path,
+#                        quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16),
+#                        torch_dtype=torch.bfloat16,
+#                    )
+
+#                    pipe = HunyuanVideoPipeline.from_pretrained(
+#                        movie_model_card, 
+#                        transformer=transformer,
+#                        torch_dtype=torch.float16
+#                    )
         
                     if enabled_items:
                         for item in enabled_items:
@@ -3305,6 +3367,60 @@ class SEQUENCER_OT_generate_movie(Operator):
                 else:
                     pipe.vae.enable_tiling()
                     pipe.enable_model_cpu_offload()
+
+            #Skyreel
+            elif movie_model_card == "Skywork/SkyReels-V1-Hunyuan-T2V":
+
+                # vid2vid
+                if scene.movie_path and input == "input_strips":
+                    print("SkyReels-V1-Hunyuan doesn't support vid2vid!")
+                    return {"CANCELLED"}
+
+                # img2vid
+                elif scene.image_path and input == "input_strips":
+                    print("Load: Image to video (SkyReels-V1-Hunyuan-I2V)")
+                    import torch._dynamo.config
+                    from diffusers import HunyuanSkyreelsImageToVideoPipeline, HunyuanVideoTransformer3DModel
+                    from diffusers.utils import load_image, export_to_video
+                    torch._dynamo.config.inline_inbuilt_nn_modules = True
+                    model_id = "hunyuanvideo-community/HunyuanVideo"
+                    transformer_model_id = "newgenai79/SkyReels-V1-Hunyuan-I2V-int4"
+                    transformer = HunyuanVideoTransformer3DModel.from_pretrained(
+                        transformer_model_id, torch_dtype=torch.bfloat16, subfolder="transformer",
+                    )
+                    pipe = HunyuanSkyreelsImageToVideoPipeline.from_pretrained(
+                        model_id, transformer=transformer, torch_dtype=torch.float16
+                    )
+
+                # txt2vid
+                else:
+                    print("Load: text to video (SkyReels-V1-Hunyuan-T2V)")
+
+                    import torch._dynamo.config
+                    from diffusers import HunyuanVideoPipeline, HunyuanVideoTransformer3DModel
+                    from diffusers.utils import export_to_video
+
+                    torch._dynamo.config.inline_inbuilt_nn_modules = True
+
+                    model_id = "newgenai79/HunyuanVideo-int4"
+                    transformer_model_id = "newgenai79/SkyReels-V1-Hunyuan-T2V-int4"
+                    transformer = HunyuanVideoTransformer3DModel.from_pretrained(
+                        transformer_model_id,
+                        subfolder="transformer",
+                        torch_dtype=torch.bfloat16
+                    )
+                    pipe = HunyuanVideoPipeline.from_pretrained(model_id, transformer=transformer, torch_dtype=torch.float16)
+
+                if gfx_device == "mps":
+                    pipe.vae.enable_tiling()
+                elif low_vram():
+                    #pipe.enable_sequential_cpu_offload()
+                    # pipe.enable_vae_slicing()
+                    pipe.vae.enable_tiling()
+                    pipe.enable_model_cpu_offload()                
+                else:
+                    pipe.vae.enable_tiling()
+                    pipe.enable_model_cpu_offload()                
 
             # Mochi
             elif movie_model_card == "genmo/mochi-1-preview":
@@ -3675,6 +3791,39 @@ class SEQUENCER_OT_generate_movie(Operator):
                         max_sequence_length=512,
                         # use_dynamic_cfg=True,
                     ).frames[0]
+
+                #Skyreel
+                elif movie_model_card == "Skywork/SkyReels-V1-Hunyuan-T2V":
+                    from diffusers.utils import load_image, export_to_video
+                    if scene.movie_path:
+                        print("Process: Video Image to Video (SkyReels-V1-Hunyuan-T2V)")
+                        if not os.path.isfile(scene.movie_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        image = load_first_frame(bpy.path.abspath(scene.movie_path))
+                    if scene.image_path:
+                        print("Process: Image to video (SkyReels-V1-Hunyuan-T2V)")
+                        if not os.path.isfile(scene.image_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        image = load_image(bpy.path.abspath(scene.image_path))
+                    #                    image = image.resize(
+                    #                        (closest_divisible_32(int(x)), closest_divisible_32(int(y)))
+                    #                    )
+                    video_frames = pipe(
+                        image=image,
+                        prompt=prompt,
+                        # strength=1.00 - scene.image_power,
+                        negative_prompt=negative_prompt,
+                        num_inference_steps=movie_num_inference_steps,
+                        guidance_scale=movie_num_guidance,
+                        height=y,
+                        width=x,
+                        num_frames=abs(duration) + 2,
+                        generator=generator,
+                        max_sequence_length=512,
+                        # use_dynamic_cfg=True,
+                    ).frames[0]                    
                 elif (
                     movie_model_card != "Hailuo/MiniMax/txt2vid"
                     and movie_model_card != "Hailuo/MiniMax/img2vid"
