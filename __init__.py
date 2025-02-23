@@ -69,6 +69,7 @@ site_packages_dir = os.path.join(python_exe_dir, "lib", "site-packages")
 
 # Add the site-packages directory to the top of sys.path
 sys.path.insert(0, site_packages_dir)
+
 dir_path = os.path.join(bpy.utils.user_resource("DATAFILES"), "Pallaidium Media")
 os.makedirs(dir_path, exist_ok=True)
 
@@ -1319,6 +1320,13 @@ def input_strips_updated(self, context):
         scene.movie_num_inference_steps = 50
         scene.input_strips == "input_prompt"
 
+    elif movie_model_card == "Skywork/SkyReels-V1-Hunyuan-T2V" and type == "movie":
+        scene.generate_movie_x = 960
+        scene.generate_movie_y = 544
+        scene.generate_movie_frames = 49
+        scene.movie_num_inference_steps = 40
+        scene.movie_num_guidance = 1
+
     elif (image_model_card == "dataautogpt3/OpenDalleV1.1") and type == "image":
         bpy.context.scene.use_lcm = False
     elif (image_model_card == "Kwai-Kolors/Kolors-diffusers") and type == "image":
@@ -1395,6 +1403,13 @@ def output_strips_updated(self, context):
     ):
         scene.input_strips = "input_strips"
 
+    elif movie_model_card == "Skywork/SkyReels-V1-Hunyuan-T2V" and type == "movie":
+        scene.generate_movie_x = 960
+        scene.generate_movie_y = 544
+        scene.generate_movie_frames = 49
+        scene.movie_num_inference_steps = 40
+        scene.movie_num_guidance = 1        
+        
     elif (image_model_card == "dataautogpt3/OpenDalleV1.1") and type == "image":
         bpy.context.scene.use_lcm = False
     elif (image_model_card == "Kwai-Kolors/Kolors-diffusers") and type == "image":
@@ -1480,13 +1495,6 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "SkyReels-V1-Hunyuan (960x544x97)",
                 "Skywork/SkyReels-V1-Hunyuan-T2V",
             ),
-            (
-                "hunyuanvideo-community/HunyuanVideo",
-                "Hunyuan Video (960x544x(4*k+1))f",
-                "hunyuanvideo-community/HunyuanVideo",
-            ),
-
-
             ("Hailuo/MiniMax/txt2vid", "MiniMax (txt2vid)", "Hailuo/MiniMax/txt2vid"),
             ("Hailuo/MiniMax/img2vid", "MiniMax (img2vid)", "Hailuo/MiniMax/img2vid"),
             (
@@ -1798,6 +1806,9 @@ class GeneratorAddonPreferences(AddonPreferences):
         row_row.label(text="")
         row_row.label(text="")
         row_row.label(text="")
+        box.operator("sequencer.generate_requirements")
+        box.operator("sequencer.sync_requirements")
+        
 
 
 class GENERATOR_OT_sound_notification(Operator):
@@ -3382,7 +3393,9 @@ class SEQUENCER_OT_generate_movie(Operator):
                     import torch._dynamo.config
                     from diffusers import HunyuanSkyreelsImageToVideoPipeline, HunyuanVideoTransformer3DModel
                     from diffusers.utils import load_image, export_to_video
+                    
                     torch._dynamo.config.inline_inbuilt_nn_modules = True
+                    
                     model_id = "hunyuanvideo-community/HunyuanVideo"
                     transformer_model_id = "newgenai79/SkyReels-V1-Hunyuan-I2V-int4"
                     transformer = HunyuanVideoTransformer3DModel.from_pretrained(
@@ -3813,15 +3826,16 @@ class SEQUENCER_OT_generate_movie(Operator):
                     video_frames = pipe(
                         image=image,
                         prompt=prompt,
-                        # strength=1.00 - scene.image_power,
+                        #strength=1.00 - scene.image_power,
                         negative_prompt=negative_prompt,
                         num_inference_steps=movie_num_inference_steps,
-                        guidance_scale=movie_num_guidance,
+                        guidance_scale=1,#movie_num_guidance,
                         height=y,
                         width=x,
-                        num_frames=abs(duration) + 2,
+                        num_frames=abs(duration),
                         generator=generator,
                         max_sequence_length=512,
+                        true_cfg_scale=6.0,
                         # use_dynamic_cfg=True,
                     ).frames[0]                    
                 elif (
@@ -3917,6 +3931,21 @@ class SEQUENCER_OT_generate_movie(Operator):
                         num_frames=abs(duration),
                         generator=generator,
                     ).frames[0]
+                # Skyreel
+                elif movie_model_card == "Skywork/SkyReels-V1-Hunyuan-T2V":
+                    video_frames = pipe(
+                        prompt=prompt,
+                        negative_prompt=negative_prompt,
+                        num_inference_steps=movie_num_inference_steps,
+                        guidance_scale=1,#movie_num_guidance,
+                        height=y,
+                        width=x,
+                        num_frames=abs(duration),
+                        generator=generator,
+                        max_sequence_length=512,
+                        true_cfg_scale=6.0,
+                        # use_dynamic_cfg=True,
+                    ).frames[0]  
                 else:
                     video_frames = pipe(
                         prompt=prompt,
