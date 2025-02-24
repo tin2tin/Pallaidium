@@ -753,38 +753,38 @@ def ensure_unique_filename(file_name):
         return file_name
 
 
-def import_module(self, module, install_module):
-    show_system_console(True)
-    set_system_console_topmost(True)
-    module = str(module)
-    python_exe = python_exec()
+#def import_module(self, module, install_module):
+#    show_system_console(True)
+#    set_system_console_topmost(True)
+#    module = str(module)
+#    python_exe = python_exec()
 
-    #    try:
-    #        #exec("import " + module)
-    #        subprocess.call([python_exe, "import ", module])
-    #    except:
-    self.report({"INFO"}, "Installing: " + module + " module.")
-    print("\nInstalling: " + module + " module")
-    subprocess.call(
-        [
-            python_exe,
-            "-m",
-            "pip",
-            "install",
-            "--disable-pip-version-check",
-            "--use-deprecated=legacy-resolver",
-            install_module,
-            "--no-warn-script-location",
-            "--upgrade",
-        ]
-    )
+#    #    try:
+#    #        #exec("import " + module)
+#    #        subprocess.call([python_exe, "import ", module])
+#    #    except:
+#    self.report({"INFO"}, "Installing: " + module + " module.")
+#    print("\nInstalling: " + module + " module")
+#    subprocess.call(
+#        [
+#            python_exe,
+#            "-m",
+#            "pip",
+#            "install",
+#            "--disable-pip-version-check",
+#            "--use-deprecated=legacy-resolver",
+#            install_module,
+#            "--no-warn-script-location",
+#            "--upgrade",
+#        ]
+#    )
 
-    #    try:
-    #        exec("import " + module)
-    #    except ModuleNotFoundError:
-    #        print("Module not found: " + module)
-    #        return False
-    return True
+#    #    try:
+#    #        exec("import " + module)
+#    #    except ModuleNotFoundError:
+#    #        print("Module not found: " + module)
+#    #        return False
+#    return True
 
 
 def parse_python_version(version_info):
@@ -794,148 +794,106 @@ def parse_python_version(version_info):
 
 def install_modules(self):
     os_platform = platform.system()
-    app_path = site.USER_SITE
-
     pybin = python_exec()
-    print("Ensuring: pip")
 
-    try:
-        subprocess.call([pybin, "-m", "ensurepip"])
-    except ImportError:
-        subprocess.call([pybin, "-m", "pip", "install", "--upgrade", "pip"])
-        pass
+    def ensure_pip():
+        print("Ensuring: pip")
+        try:
+            subprocess.check_call([pybin, "-m", "pip", "install", "--upgrade", "pip"])
+        except Exception as e:
+            print(f"Error installing pip: {e}")
+            return False
+        return True
 
-    # import_module(self, "diffusers", "diffusers")
-    import_module(self, "requests", "requests")
-    # import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git@refs/pull/10330/head") #ltx
-    import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
+    def install_module(name, package=None, use_git=False):
+        package = package if package else name
+        try:
+            subprocess.check_call([
+                pybin, "-m", "pip", "install", "--disable-pip-version-check",
+                "--use-deprecated=legacy-resolver", package,
+                "--no-warn-script-location", "--upgrade"
+            ])
+            print(f"Successfully installed {name}")
+        except subprocess.CalledProcessError as e:
+            print(f"Error installing {name}: {e}")
+            return False
+        return True
 
-    import_module(self, "huggingface_hub", "huggingface_hub")
-    import_module(self, "gguf", "gguf")
-    # import_module(self, "protobuf", "protobuf==3.20.1")
-    import_module(self, "pydub", "pydub")
+    # Common modules
+    common_modules = [
+        ("requests", "requests"),
+        ("huggingface_hub", "huggingface_hub"),
+        ("gguf", "gguf"),
+        ("pydub", "pydub"),
+        ("sentencepiece", "sentencepiece"),
+        ("safetensors", "safetensors"),
+        ("cv2", "opencv_python"),
+        ("PIL", "pillow"),
+        ("IPython", "IPython"),
+        ("omegaconf", "omegaconf"),
+        ("aura_sr", "aura-sr"),
+        ("stable_audio_tools", "stable-audio-tools"),
+        ("beautifulsoup4", "beautifulsoup4"),
+        ("ftfy", "ftfy"),
+        ("imageio", "imageio[ffmpeg]==2.4.1"),
+        ("imageio", "imageio-ffmpeg"),
+        ("imWatermark", "imWatermark"),
+        ("mediapipe", "mediapipe"),
+        ("scipy", "scipy==1.12.0"),
+        ("protobuf", "protobuf==3.20.1"),
+        ("scikit_learn", "scikit-learn==1.2.2"),
+        ("bitsandbytes", "bitsandbytes"),
+        ("numpy", "numpy==1.26.4"),
+    ]
 
+    show_system_console(True)
+    set_system_console_topmost(True)
+    ensure_pip()
+
+    for module_name, package_name in common_modules:
+        install_module(module_name, package_name)
+
+    # Platform-specific installations
     if os_platform == "Windows":
-        # import_module(self, "deepspeed", "https://github.com/daswer123/deepspeed-windows/releases/download/13.1/deepspeed-0.13.1+cu121-cp311-cp311-win_amd64.whl")
-        subprocess.call(
-            [
-                pybin,
-                "-m",
-                "pip",
-                "install",
-                "--disable-pip-version-check",
-                "--use-deprecated=legacy-resolver",
-                "https://github.com/daswer123/deepspeed-windows/releases/download/13.1/deepspeed-0.13.1+cu121-cp311-cp311-win_amd64.whl",
-                "--no-warn-script-location",
-                "--upgrade",
-            ]
-        )
-
-        # resemble-enhance:
-        subprocess.call(
-            [
-                pybin,
-                "-m",
-                "pip",
-                "install",
-                "--disable-pip-version-check",
-                "--use-deprecated=legacy-resolver",
-                "git+https://github.com/tin2tin/resemble-enhance-windows.git",
-                "--no-warn-script-location",
-                "--upgrade",
-            ]  # "--no-dependencies",
-        )
-        # deep_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deepspeed/deepspeed-0.12.4+unknown-py3-none-any.whl")
-    else:
-        import_module(self, "deepspeed", "deepspeed==0.14.4")
-        import_module(self, "resemble_enhance", "resemble-enhance")
-
-    subprocess.check_call(
-        [
-            pybin,
-            "-m",
-            "pip",
-            "install",
-            "--disable-pip-version-check",
-            "--use-deprecated=legacy-resolver",
-            "tensorflow",
-            "--upgrade",
+        windows_modules = [
+            ("diffusers", "git+https://github.com/huggingface/diffusers.git"),
+            ("deepspeed", "https://github.com/daswer123/deepspeed-windows/releases/download/13.1/deepspeed-0.13.1+cu121-cp311-cp311-win_amd64.whl"),
+            ("resemble_enhance", "git+https://github.com/tin2tin/resemble-enhance-windows.git"),
+            ("flash_attn", "https://github.com/oobabooga/flash-attention/releases/download/v2.6.3/flash_attn-2.6.3+cu122torch2.3.1cxx11abiFALSE-cp311-cp311-win_amd64.whl"),
+            ("triton", "https://hf-mirror.com/LightningJay/triton-2.1.0-python3.11-win_amd64-wheel/resolve/main/triton-2.1.0-cp311-cp311-win_amd64.whl"),
         ]
-    )
 
-    import_module(self, "sentencepiece", "sentencepiece")
-    import_module(self, "safetensors", "safetensors")
-    import_module(self, "cv2", "opencv_python")
-    import_module(self, "PIL", "pillow")
-    import_module(self, "IPython", "IPython")
-    import_module(self, "omegaconf", "omegaconf")
-    import_module(self, "aura_sr", "aura-sr")
-    import_module(self, "stable_audio_tools", "stable-audio-tools")
-
-    if os_platform == "Windows":
-        pass
-        import_module(
-            self,
-            "flash_attn",
-            "https://github.com/oobabooga/flash-attention/releases/download/v2.6.3/flash_attn-2.6.3+cu122torch2.3.1cxx11abiFALSE-cp311-cp311-win_amd64.whl",
-        )
+        for module_name, package_name in windows_modules:
+            install_module(module_name, package_name)
     else:
-        import_module(self, "flash_attn", "flash-attn")
-
-    subprocess.call(
-        [
-            pybin,
-            "-m",
-            "pip",
-            "install",
-            "--disable-pip-version-check",
-            "--use-deprecated=legacy-resolver",
-            "controlnet-aux",
-            "--no-warn-script-location",
-            "--upgrade",
+        other_modules = [
+            ("diffusers", "git+https://github.com/huggingface/diffusers.git"),
+            ("deepspeed", "deepspeed==0.14.4"),
+            ("resemble_enhance", "resemble-enhance"),
+            ("flash_attn", "flash-attn"),
+            ("triton", "triton"),
         ]
-    )
 
-    import_module(self, "beautifulsoup4", "beautifulsoup4")
-    import_module(self, "ftfy", "ftfy")
+        for module_name, package_name in other_modules:
+            install_module(module_name, package_name)
 
-    python_version_info = sys.version_info
-    python_version_str = parse_python_version(python_version_info)
+    # Python version-specific installations
+    from packaging import version
+    python_version = sys.version_info
+    if version.parse(".".join(map(str, python_version[:3]))) >= version.parse("3.8"):
+        install_module("image_gen_aux", "git+https://github.com/huggingface/image_gen_aux")
 
-    import_module(self, "imageio", "imageio[ffmpeg]==2.4.1")
-    import_module(self, "imageio", "imageio-ffmpeg")
-    import_module(self, "imWatermark", "imWatermark")
-    import_module(
+    # Additional installations
+    subprocess.check_call([
+        pybin, "-m", "pip", "install", "--disable-pip-version-check",
+        "--use-deprecated=legacy-resolver", "tensorflow", "--upgrade"
+    ])
+    install_module("controlnet-aux")
+    install_module(self, "whisperspeech", "WhisperSpeech==0.8")
+    install_module(
         self, "parler_tts", "git+https://github.com/huggingface/parler-tts.git"
     )
-    import_module(self, "laion_clap", "laion-clap==1.1.6")
-
-    if os_platform == "Windows":
-        subprocess.call(
-            [
-                pybin,
-                "-m",
-                "pip",
-                "install",
-                "--disable-pip-version-check",
-                "--use-deprecated=legacy-resolver",
-                #"https://github.com/woct0rdho/triton-windows/releases/download/v3.2.0-windows.post9/triton-3.2.0-cp311-cp311-win_amd64.whl",
-                "https://hf-mirror.com/LightningJay/triton-2.1.0-python3.11-win_amd64-wheel/resolve/main/triton-2.1.0-cp311-cp311-win_amd64.whl",
-                "--no-warn-script-location",
-                "--upgrade",
-            ]
-        )
-    else:
-        try:
-            exec("import triton")
-        except ModuleNotFoundError:
-            import_module(self, "triton", "triton")
-
-    import_module(self, "mediapipe", "mediapipe")
-    import_module(
-        self, "image_gen_aux", "git+https://github.com/huggingface/image_gen_aux"
-    )
-
+    install_module(self, "laion_clap", "laion-clap==1.1.6")
     subprocess.call(
         [
             pybin,
@@ -960,7 +918,7 @@ def install_modules(self):
             "git+https://github.com/tin2tin/adetailer_sdxl.git",
         ]
     )
-    # subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "git+https://github.com/theblackhatmagician/adetailer_sdxl.git"])
+    #subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "git+https://github.com/theblackhatmagician/adetailer_sdxl.git"])
     subprocess.call(
         [
             pybin,
@@ -987,103 +945,474 @@ def install_modules(self):
             "--upgrade",
         ]
     )
-    # import_module(self, "accelerate", "git+https://github.com/huggingface/accelerate.git")
-    # import_module(self, "accelerate", "accelerate")
-
-    import_module(self, "controlnet_aux", "controlnet-aux")
-
-    self.report({"INFO"}, "Installing: torch module.")
-    print("\nInstalling: torch module")
-    if os_platform == "Windows":
-        subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "torch"])
-        subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "torchvision"])
-        subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "torchaudio"])
-        subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "xformers"])
-
-        subprocess.check_call(
-            [
-                pybin,
-                "-m",
-                "pip",
-                "install",
-                "torch==2.4.0+cu121",
-                "xformers",
-                "torchvision",
-                "--index-url",
-                "https://download.pytorch.org/whl/cu121",
-                "--no-warn-script-location",
-                # "--user",
-                "--upgrade",
-            ]
-        )
-        subprocess.check_call(
-            [
-                pybin,
-                "-m",
-                "pip",
-                "install",
-                "torchaudio==2.4.0+cu121",
-                #"torchaudio==2.3.1+cu121",
-                "--index-url",
-                "https://download.pytorch.org/whl/cu121",
-                "--no-warn-script-location",
-                # "--user",
-                "--upgrade",
-            ]
-        )
-
-    else:
-        import_module(self, "torch", "torch")
-        import_module(self, "torchvision", "torchvision")
-        import_module(self, "torchaudio", "torchaudio")
-        import_module(self, "xformers", "xformers")
-        import_module(self, "torchao", "torchao")
-
-    if os_platform != "Linux":
-        subprocess.call(
-            [
-                pybin,
-                "-m",
-                "pip",
-                "install",
-                "--disable-pip-version-check",
-                "--use-deprecated=legacy-resolver",
-                "git+https://github.com/suno-ai/bark.git",
-                "--no-warn-script-location",
-                "--upgrade",
-            ]
-        )
-        import_module(self, "whisperspeech", "WhisperSpeech==0.8")
-        # import_module(self, "jaxlib", "jaxlib>=0.4.33")
-
-    subprocess.check_call(
+    subprocess.call(
         [
             pybin,
             "-m",
             "pip",
             "install",
             "--disable-pip-version-check",
-            "--use-deprecated=legacy-resolver",
-            "peft",
+            "git+https://github.com/suno-ai/bark.git",
             "--no-warn-script-location",
             "--upgrade",
         ]
     )
-    import_module(self, "transformers", "transformers==4.46.3")
-    import_module(self, "scipy", "scipy==1.12.0")
-    import_module(self, "protobuf", "protobuf==3.20.1")
-    import_module(self, "scikit_learn", "scikit-learn==1.2.2")
-    import_module(self, "bitsandbytes", "bitsandbytes")
-    import_module(self, "numpy", "numpy==1.26.4")
-    print(
-        "Dir: "
-        + str(
-            subprocess.check_call(
-                [pybin, "-m", "pip", "--disable-pip-version-check", "cache", "purge"]
-            )
-        )
-    )
-    subprocess.call([pybin, "-m", "pip", "--disable-pip-version-check", "list"])
+
+    # Torch installations
+    if os_platform == "Windows":
+        subprocess.check_call([
+            pybin, "-m", "pip", "uninstall", "-y", "torch", "torchvision", "torchaudio", "xformers"
+        ])
+        subprocess.check_call([
+            pybin, "-m", "pip", "install",
+            "torch==2.3.1+cu121", "xformers", "torchvision",
+            "--index-url", "https://download.pytorch.org/whl/cu121",
+            "--no-warn-script-location", "--upgrade"
+        ])
+        subprocess.check_call([
+            pybin, "-m", "pip", "install",
+            "torchaudio==2.3.1+cu121",
+            "--index-url", "https://download.pytorch.org/whl/cu121",
+            "--no-warn-script-location", "--upgrade"
+        ])
+    else:
+        install_module("torch", "torch")
+        install_module("torchvision", "torchvision")
+        install_module("torchaudio", "torchaudio")
+        install_module("xformers", "xformers")
+        install_module("torchao", "torchao")
+
+    # Final tasks
+    subprocess.check_call([
+        pybin, "-m", "pip", "install", "--disable-pip-version-check",
+        "peft", "--upgrade"
+    ])
+    install_module("protobuf", "protobuf==3.20.1")
+    install_module("numpy", "numpy==1.26.4")
+    install_module("transformers", "transformers==4.46.0")
+    print("Cleaning up cache...")
+    subprocess.check_call([pybin, "-m", "pip", "cache", "purge"])
+    subprocess.check_call([pybin, "-m", "pip", "list"])
+
+    self.report({"INFO"}, "All modules installed successfully.")
+
+#def install_modules(self):
+#    os_platform = platform.system()
+#    pybin = python_exec()
+
+#    def ensure_pip():
+#        print("Ensuring: pip")
+#        try:
+#            subprocess.check_call([pybin, "-m", "ensurepip"])
+#        except ImportError:
+#            subprocess.check_call([pybin, "-m", "pip", "install", "--upgrade", "pip"])
+
+#    def install_module(name, package=None):
+#        if package is None:
+#            package = name
+#        return import_module(self, name, package)
+
+#    ensure_pip()
+
+#    # Common modules
+#    common_modules = [
+
+#        ("requests", "requests"),
+#        ("huggingface_hub", "huggingface_hub"),
+#        ("gguf", "gguf"),
+#        ("pydub", "pydub"),
+#        ("sentencepiece", "sentencepiece"),
+#        ("safetensors", "safetensors"),
+#        ("cv2", "opencv_python"),
+#        ("PIL", "pillow"),
+#        ("IPython", "IPython"),
+#        ("omegaconf", "omegaconf"),
+#        ("aura_sr", "aura-sr"),
+#        ("stable_audio_tools", "stable-audio-tools"),
+#        ("beautifulsoup4", "beautifulsoup4"),
+#        ("ftfy", "ftfy"),
+#        ("imageio", "imageio[ffmpeg]==2.4.1"),
+#        ("imageio", "imageio-ffmpeg"),
+#        ("imWatermark", "imWatermark"),
+#        ("mediapipe", "mediapipe"),
+#        ("scipy", "scipy==1.12.0"),
+#        ("protobuf", "protobuf==3.20.1"),
+#        ("scikit_learn", "scikit-learn==1.2.2"),
+#        ("bitsandbytes", "bitsandbytes"),
+#        ("numpy", "numpy==1.26.4"),
+#    ]
+
+#    for module in common_modules:
+#        install_module(*module)
+
+#    # Platform-specific modules
+#    if os_platform == "Windows":
+#        # Windows-specific modules
+#        windows_modules = [
+#            ("diffusers", "git+https://github.com/huggingface/diffusers.git"),
+#            ("deepspeed", "https://github.com/daswer123/deepspeed-windows/releases/download/13.1/deepspeed-0.13.1+cu121-cp311-cp311-win_amd64.whl"),
+#            ("resemble_enhance", "git+https://github.com/tin2tin/resemble-enhance-windows.git"),
+#            ("flash_attn", "https://github.com/oobabooga/flash-attention/releases/download/v2.6.3/flash_attn-2.6.3+cu122torch2.3.1cxx11abiFALSE-cp311-cp311-win_amd64.whl"),
+#            ("triton", "https://hf-mirror.com/LightningJay/triton-2.1.0-python3.11-win_amd64-wheel/resolve/main/triton-2.1.0-cp311-cp311-win_amd64.whl"),
+#        ]
+
+#        for module in windows_modules:
+#            install_module(*module)
+
+#        # Install via pip directly
+#        subprocess.check_call([
+#            pybin, "-m", "pip", "install", "--disable-pip-version-check",
+#            "--use-deprecated=legacy-resolver", "tensorflow", "--upgrade"
+#        ])
+
+#    else:
+#        # Linux/macOS modules
+#        install_module("diffusers", "git+https://github.com/huggingface/diffusers.git")
+#        install_module("deepspeed", "deepspeed==0.14.4")
+#        install_module("resemble_enhance", "resemble-enhance")
+#        install_module("flash_attn", "flash-attn")
+#        install_module("triton", "triton")
+
+#    # Python version-specific modules
+#    python_version_info = sys.version_info
+#    python_version_str = version.parse(".".join(map(str, python_version_info[:3])))
+#    if python_version_str >= version.parse("3.8"):
+#        install_module("image_gen_aux", "git+https://github.com/huggingface/image_gen_aux")
+
+#    # Additional modules
+#    subprocess.check_call([
+#        pybin, "-m", "pip", "install", "--disable-pip-version-check",
+#        "--use-deprecated=legacy-resolver", "controlnet-aux", "--no-warn-script-location",
+#        "--upgrade"
+#    ])
+
+#    # Torch installation
+#    if os_platform == "Windows":
+#        subprocess.check_call([
+#            pybin, "-m", "pip", "uninstall", "-y", "torch", "torchvision", "torchaudio", "xformers"
+#        ])
+#        
+#        subprocess.check_call([
+#            pybin, "-m", "pip", "install", "torch==2.4.0+cu121", "xformers", "torchvision",
+#            "--index-url", "https://download.pytorch.org/whl/cu121", "--no-warn-script-location",
+#            "--upgrade"
+#        ])
+
+#        subprocess.check_call([
+#            pybin, "-m", "pip", "install", "torchaudio==2.4.0+cu121",
+#            "--index-url", "https://download.pytorch.org/whl/cu121", "--no-warn-script-location",
+#            "--upgrade"
+#        ])
+#    else:
+#        install_module("torch", "torch")
+#        install_module("torchvision", "torchvision")
+#        install_module("torchaudio", "torchaudio")
+#        install_module("xformers", "xformers")
+#        install_module("torchao", "torchao")
+
+#    # Final cleanup
+#    subprocess.check_call(
+#        [pybin, "-m", "pip", "install", "--disable-pip-version-check", "peft", "--upgrade"]
+#    )
+#    install_module("transformers", "transformers==4.46.0")
+#    import_module(self, "numpy", "numpy==1.26.4")
+#    
+#    # Cleanup cache
+#    print("Cleaning up cache...")
+#    subprocess.check_call([pybin, "-m", "pip", "cache", "purge"])
+#    subprocess.check_call([pybin, "-m", "pip", "list"])
+##def install_modules(self):
+#    os_platform = platform.system()
+#    app_path = site.USER_SITE
+
+#    pybin = python_exec()
+#    print("Ensuring: pip")
+
+#    try:
+#        subprocess.call([pybin, "-m", "ensurepip"])
+#    except ImportError:
+#        subprocess.call([pybin, "-m", "pip", "install", "--upgrade", "pip"])
+#        pass
+
+#    # import_module(self, "diffusers", "diffusers")
+#    import_module(self, "requests", "requests")
+#    # import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git@refs/pull/10330/head") #ltx
+#    import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
+
+#    import_module(self, "huggingface_hub", "huggingface_hub")
+#    import_module(self, "gguf", "gguf")
+#    # import_module(self, "protobuf", "protobuf==3.20.1")
+#    import_module(self, "pydub", "pydub")
+
+#    if os_platform == "Windows":
+#        # import_module(self, "deepspeed", "https://github.com/daswer123/deepspeed-windows/releases/download/13.1/deepspeed-0.13.1+cu121-cp311-cp311-win_amd64.whl")
+#        subprocess.call(
+#            [
+#                pybin,
+#                "-m",
+#                "pip",
+#                "install",
+#                "--disable-pip-version-check",
+#                "--use-deprecated=legacy-resolver",
+#                "https://github.com/daswer123/deepspeed-windows/releases/download/13.1/deepspeed-0.13.1+cu121-cp311-cp311-win_amd64.whl",
+#                "--no-warn-script-location",
+#                "--upgrade",
+#            ]
+#        )
+
+#        # resemble-enhance:
+#        subprocess.call(
+#            [
+#                pybin,
+#                "-m",
+#                "pip",
+#                "install",
+#                "--disable-pip-version-check",
+#                "--use-deprecated=legacy-resolver",
+#                "git+https://github.com/tin2tin/resemble-enhance-windows.git",
+#                "--no-warn-script-location",
+#                "--upgrade",
+#            ]  # "--no-dependencies",
+#        )
+#        # deep_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deepspeed/deepspeed-0.12.4+unknown-py3-none-any.whl")
+#    else:
+#        import_module(self, "deepspeed", "deepspeed==0.14.4")
+#        import_module(self, "resemble_enhance", "resemble-enhance")
+
+#    subprocess.check_call(
+#        [
+#            pybin,
+#            "-m",
+#            "pip",
+#            "install",
+#            "--disable-pip-version-check",
+#            "--use-deprecated=legacy-resolver",
+#            "tensorflow",
+#            "--upgrade",
+#        ]
+#    )
+
+#    import_module(self, "sentencepiece", "sentencepiece")
+#    import_module(self, "safetensors", "safetensors")
+#    import_module(self, "cv2", "opencv_python")
+#    import_module(self, "PIL", "pillow")
+#    import_module(self, "IPython", "IPython")
+#    import_module(self, "omegaconf", "omegaconf")
+#    import_module(self, "aura_sr", "aura-sr")
+#    import_module(self, "stable_audio_tools", "stable-audio-tools")
+
+#    if os_platform == "Windows":
+#        pass
+#        import_module(
+#            self,
+#            "flash_attn",
+#            "https://github.com/oobabooga/flash-attention/releases/download/v2.6.3/flash_attn-2.6.3+cu122torch2.3.1cxx11abiFALSE-cp311-cp311-win_amd64.whl",
+#        )
+#    else:
+#        import_module(self, "flash_attn", "flash-attn")
+
+#    subprocess.call(
+#        [
+#            pybin,
+#            "-m",
+#            "pip",
+#            "install",
+#            "--disable-pip-version-check",
+#            "--use-deprecated=legacy-resolver",
+#            "controlnet-aux",
+#            "--no-warn-script-location",
+#            "--upgrade",
+#        ]
+#    )
+
+#    import_module(self, "beautifulsoup4", "beautifulsoup4")
+#    import_module(self, "ftfy", "ftfy")
+
+#    python_version_info = sys.version_info
+#    python_version_str = parse_python_version(python_version_info)
+
+#    import_module(self, "imageio", "imageio[ffmpeg]==2.4.1")
+#    import_module(self, "imageio", "imageio-ffmpeg")
+#    import_module(self, "imWatermark", "imWatermark")
+#    import_module(
+#        self, "parler_tts", "git+https://github.com/huggingface/parler-tts.git"
+#    )
+#    import_module(self, "laion_clap", "laion-clap==1.1.6")
+
+#    if os_platform == "Windows":
+#        subprocess.call(
+#            [
+#                pybin,
+#                "-m",
+#                "pip",
+#                "install",
+#                "--disable-pip-version-check",
+#                "--use-deprecated=legacy-resolver",
+#                #"https://github.com/woct0rdho/triton-windows/releases/download/v3.2.0-windows.post9/triton-3.2.0-cp311-cp311-win_amd64.whl",
+#                "https://hf-mirror.com/LightningJay/triton-2.1.0-python3.11-win_amd64-wheel/resolve/main/triton-2.1.0-cp311-cp311-win_amd64.whl",
+#                "--no-warn-script-location",
+#                "--upgrade",
+#            ]
+#        )
+#    else:
+#        try:
+#            exec("import triton")
+#        except ModuleNotFoundError:
+#            import_module(self, "triton", "triton")
+
+#    import_module(self, "mediapipe", "mediapipe")
+#    import_module(
+#        self, "image_gen_aux", "git+https://github.com/huggingface/image_gen_aux"
+#    )
+
+#    subprocess.call(
+#        [
+#            pybin,
+#            "-m",
+#            "pip",
+#            "install",
+#            "--disable-pip-version-check",
+#            "--use-deprecated=legacy-resolver",
+#            "ultralytics",
+#            "--no-warn-script-location",
+#            "--upgrade",
+#        ]
+#    )
+#    subprocess.call(
+#        [
+#            pybin,
+#            "-m",
+#            "pip",
+#            "install",
+#            "--disable-pip-version-check",
+#            "--use-deprecated=legacy-resolver",
+#            "git+https://github.com/tin2tin/adetailer_sdxl.git",
+#        ]
+#    )
+#    # subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "git+https://github.com/theblackhatmagician/adetailer_sdxl.git"])
+#    subprocess.call(
+#        [
+#            pybin,
+#            "-m",
+#            "pip",
+#            "install",
+#            "--disable-pip-version-check",
+#            "--use-deprecated=legacy-resolver",
+#            "lmdb",
+#            "--no-warn-script-location",
+#            "--upgrade",
+#        ]
+#    )
+#    subprocess.call(
+#        [
+#            pybin,
+#            "-m",
+#            "pip",
+#            "install",
+#            "--disable-pip-version-check",
+#            "--use-deprecated=legacy-resolver",
+#            "git+https://github.com/huggingface/accelerate.git",
+#            "--no-warn-script-location",
+#            "--upgrade",
+#        ]
+#    )
+#    # import_module(self, "accelerate", "git+https://github.com/huggingface/accelerate.git")
+#    # import_module(self, "accelerate", "accelerate")
+
+#    import_module(self, "controlnet_aux", "controlnet-aux")
+
+#    self.report({"INFO"}, "Installing: torch module.")
+#    print("\nInstalling: torch module")
+#    if os_platform == "Windows":
+#        subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "torch"])
+#        subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "torchvision"])
+#        subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "torchaudio"])
+#        subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "xformers"])
+
+#        subprocess.check_call(
+#            [
+#                pybin,
+#                "-m",
+#                "pip",
+#                "install",
+#                "torch==2.4.0+cu121",
+#                "xformers",
+#                "torchvision",
+#                "--index-url",
+#                "https://download.pytorch.org/whl/cu121",
+#                "--no-warn-script-location",
+#                # "--user",
+#                "--upgrade",
+#            ]
+#        )
+#        subprocess.check_call(
+#            [
+#                pybin,
+#                "-m",
+#                "pip",
+#                "install",
+#                "torchaudio==2.4.0+cu121",
+#                #"torchaudio==2.3.1+cu121",
+#                "--index-url",
+#                "https://download.pytorch.org/whl/cu121",
+#                "--no-warn-script-location",
+#                # "--user",
+#                "--upgrade",
+#            ]
+#        )
+
+#    else:
+#        import_module(self, "torch", "torch")
+#        import_module(self, "torchvision", "torchvision")
+#        import_module(self, "torchaudio", "torchaudio")
+#        import_module(self, "xformers", "xformers")
+#        import_module(self, "torchao", "torchao")
+
+#    if os_platform != "Linux":
+#        subprocess.call(
+#            [
+#                pybin,
+#                "-m",
+#                "pip",
+#                "install",
+#                "--disable-pip-version-check",
+#                "--use-deprecated=legacy-resolver",
+#                "git+https://github.com/suno-ai/bark.git",
+#                "--no-warn-script-location",
+#                "--upgrade",
+#            ]
+#        )
+#        import_module(self, "whisperspeech", "WhisperSpeech==0.8")
+#        # import_module(self, "jaxlib", "jaxlib>=0.4.33")
+
+#    subprocess.check_call(
+#        [
+#            pybin,
+#            "-m",
+#            "pip",
+#            "install",
+#            "--disable-pip-version-check",
+#            "--use-deprecated=legacy-resolver",
+#            "peft",
+#            "--no-warn-script-location",
+#            "--upgrade",
+#        ]
+#    )
+#    import_module(self, "transformers", "transformers==4.46.3")
+#    import_module(self, "scipy", "scipy==1.12.0")
+#    import_module(self, "protobuf", "protobuf==3.20.1")
+#    import_module(self, "scikit_learn", "scikit-learn==1.2.2")
+#    import_module(self, "bitsandbytes", "bitsandbytes")
+#    import_module(self, "numpy", "numpy==1.26.4")
+#    print(
+#        "Dir: "
+#        + str(
+#            subprocess.check_call(
+#                [pybin, "-m", "pip", "--disable-pip-version-check", "cache", "purge"]
+#            )
+#        )
+#    )
+#    subprocess.call([pybin, "-m", "pip", "--disable-pip-version-check", "list"])
 
 
 def get_module_dependencies(module_name):
@@ -1153,70 +1482,40 @@ class GENERATOR_OT_uninstall(Operator):
         pybin = python_exec()
         preferences = context.preferences
         addon_prefs = preferences.addons[__name__].preferences
-        uninstall_module_with_dependencies("torch")
-        uninstall_module_with_dependencies("torchvision")
-        uninstall_module_with_dependencies("torchaudio")
-        uninstall_module_with_dependencies("diffusers")
-        uninstall_module_with_dependencies("transformers")
-        uninstall_module_with_dependencies("sentencepiece")
-        uninstall_module_with_dependencies("safetensors")
-        uninstall_module_with_dependencies("opencv_python")
-        uninstall_module_with_dependencies("scipy")
-        uninstall_module_with_dependencies("IPython")
-        uninstall_module_with_dependencies("bark")
-        uninstall_module_with_dependencies("xformers")
-        uninstall_module_with_dependencies("imageio")
-        uninstall_module_with_dependencies("imWatermark")
-        uninstall_module_with_dependencies("pillow")
-        uninstall_module_with_dependencies("libtorrent")
-        uninstall_module_with_dependencies("accelerate")
-        uninstall_module_with_dependencies("triton")
-        uninstall_module_with_dependencies("cv2")
-        uninstall_module_with_dependencies("protobuf")
-        uninstall_module_with_dependencies("resemble-enhance")
-        uninstall_module_with_dependencies("mediapipe")
-        uninstall_module_with_dependencies("flash_attn")
 
-        uninstall_module_with_dependencies("controlnet-aux")
-        uninstall_module_with_dependencies("bitsandbytes")
+        # List of modules to uninstall grouped by category
+        modules_to_uninstall = {
+            "AI Tools": [
+                "torch", "torchvision", "torchaudio", "diffusers", "transformers",
+                "sentencepiece", "safetensors", "bark", "xformers", "imageio",
+                "imWatermark", "controlnet-aux", "bitsandbytes"
+            ],
+            "ML Frameworks": [
+                "opencv_python", "scipy", "IPython", "pillow", "libtorrent", "accelerate",
+                "triton", "cv2", "protobuf"
+            ],
+            "Model Tools": [
+                "resemble-enhance", "mediapipe", "flash_attn", "stable-audio-tools",
+                "beautifulsoup4", "ftfy", "deepspeed",
+                "gradio-client" , "suno-bark", "peft", "ultralytics",
+                "parler-tts"
+            ], # "albumentations", "datasets", "insightface"
+            "Utils": [
+                "celluloid", "omegaconf", "pandas", "ptflops", "rich", "resampy",
+                "tabulate", "gradio"
+            ],
+            "WhisperSpeech Components": [
+                "ruamel.yaml.clib", "fastprogress", "fastcore", "ruamel.yaml",
+                "hyperpyyaml", "speechbrain", "vocos", "WhisperSpeech", "pydub"
+            ]
+        }
 
-        uninstall_module_with_dependencies("stable-audio-tools")
+        # Uninstall all modules and their dependencies
+        for category, modules in modules_to_uninstall.items():
+            for module in modules:
+                uninstall_module_with_dependencies(module)
 
-        uninstall_module_with_dependencies("beautifulsoup4")
-        uninstall_module_with_dependencies("ftfy")
-        uninstall_module_with_dependencies("albumentations")
-        uninstall_module_with_dependencies("datasets")
-        uninstall_module_with_dependencies("deepspeed")
-        uninstall_module_with_dependencies("gradio-client")
-        uninstall_module_with_dependencies("insightface")
-        uninstall_module_with_dependencies("suno-bark")
-        uninstall_module_with_dependencies("aura-sr")
-        uninstall_module_with_dependencies("peft")
-        uninstall_module_with_dependencies("ultralytics")
-        uninstall_module_with_dependencies("aura-sr")
-        uninstall_module_with_dependencies("parler-tts")
-
-        # "resemble-enhance":
-        uninstall_module_with_dependencies("celluloid")
-        uninstall_module_with_dependencies("omegaconf")
-        uninstall_module_with_dependencies("pandas")
-        uninstall_module_with_dependencies("ptflops")
-        uninstall_module_with_dependencies("rich")
-        uninstall_module_with_dependencies("resampy")
-        uninstall_module_with_dependencies("tabulate")
-        uninstall_module_with_dependencies("gradio")
-
-        # WhisperSpeech
-        uninstall_module_with_dependencies("ruamel.yaml.clib")
-        uninstall_module_with_dependencies("fastprogress")
-        uninstall_module_with_dependencies("fastcore")
-        uninstall_module_with_dependencies("ruamel.yaml")
-        uninstall_module_with_dependencies("hyperpyyaml")
-        uninstall_module_with_dependencies("speechbrain")
-        uninstall_module_with_dependencies("vocos")
-        uninstall_module_with_dependencies("WhisperSpeech")
-        uninstall_module_with_dependencies("pydub")
-
+        # Clear pip cache
         subprocess.check_call([pybin, "-m", "pip", "cache", "purge"])
 
         self.report(
@@ -1224,6 +1523,89 @@ class GENERATOR_OT_uninstall(Operator):
             "\nRemove AI Models manually: \nLinux and macOS: ~/.cache/huggingface/hub\nWindows: %userprofile%\\.cache\\huggingface\\hub",
         )
         return {"FINISHED"}
+
+#class GENERATOR_OT_uninstall(Operator):
+#    """Uninstall all dependencies"""
+
+#    bl_idname = "sequencer.uninstall_generator"
+#    bl_label = "Uninstall Dependencies"
+#    bl_options = {"REGISTER", "UNDO"}
+
+#    def execute(self, context):
+#        pybin = python_exec()
+#        preferences = context.preferences
+#        addon_prefs = preferences.addons[__name__].preferences
+#        uninstall_module_with_dependencies("torch")
+#        uninstall_module_with_dependencies("torchvision")
+#        uninstall_module_with_dependencies("torchaudio")
+#        uninstall_module_with_dependencies("diffusers")
+#        uninstall_module_with_dependencies("transformers")
+#        uninstall_module_with_dependencies("sentencepiece")
+#        uninstall_module_with_dependencies("safetensors")
+#        uninstall_module_with_dependencies("opencv_python")
+#        uninstall_module_with_dependencies("scipy")
+#        uninstall_module_with_dependencies("IPython")
+#        uninstall_module_with_dependencies("bark")
+#        uninstall_module_with_dependencies("xformers")
+#        uninstall_module_with_dependencies("imageio")
+#        uninstall_module_with_dependencies("imWatermark")
+#        uninstall_module_with_dependencies("pillow")
+#        uninstall_module_with_dependencies("libtorrent")
+#        uninstall_module_with_dependencies("accelerate")
+#        uninstall_module_with_dependencies("triton")
+#        uninstall_module_with_dependencies("cv2")
+#        uninstall_module_with_dependencies("protobuf")
+#        uninstall_module_with_dependencies("resemble-enhance")
+#        uninstall_module_with_dependencies("mediapipe")
+#        uninstall_module_with_dependencies("flash_attn")
+
+#        uninstall_module_with_dependencies("controlnet-aux")
+#        uninstall_module_with_dependencies("bitsandbytes")
+
+#        uninstall_module_with_dependencies("stable-audio-tools")
+
+#        uninstall_module_with_dependencies("beautifulsoup4")
+#        uninstall_module_with_dependencies("ftfy")
+#        uninstall_module_with_dependencies("albumentations")
+#        uninstall_module_with_dependencies("datasets")
+#        uninstall_module_with_dependencies("deepspeed")
+#        uninstall_module_with_dependencies("gradio-client")
+#        uninstall_module_with_dependencies("insightface")
+#        uninstall_module_with_dependencies("suno-bark")
+#        uninstall_module_with_dependencies("aura-sr")
+#        uninstall_module_with_dependencies("peft")
+#        uninstall_module_with_dependencies("ultralytics")
+#        uninstall_module_with_dependencies("aura-sr")
+#        uninstall_module_with_dependencies("parler-tts")
+
+#        # "resemble-enhance":
+#        uninstall_module_with_dependencies("celluloid")
+#        uninstall_module_with_dependencies("omegaconf")
+#        uninstall_module_with_dependencies("pandas")
+#        uninstall_module_with_dependencies("ptflops")
+#        uninstall_module_with_dependencies("rich")
+#        uninstall_module_with_dependencies("resampy")
+#        uninstall_module_with_dependencies("tabulate")
+#        uninstall_module_with_dependencies("gradio")
+
+#        # WhisperSpeech
+#        uninstall_module_with_dependencies("ruamel.yaml.clib")
+#        uninstall_module_with_dependencies("fastprogress")
+#        uninstall_module_with_dependencies("fastcore")
+#        uninstall_module_with_dependencies("ruamel.yaml")
+#        uninstall_module_with_dependencies("hyperpyyaml")
+#        uninstall_module_with_dependencies("speechbrain")
+#        uninstall_module_with_dependencies("vocos")
+#        uninstall_module_with_dependencies("WhisperSpeech")
+#        uninstall_module_with_dependencies("pydub")
+
+#        subprocess.check_call([pybin, "-m", "pip", "cache", "purge"])
+
+#        self.report(
+#            {"INFO"},
+#            "\nRemove AI Models manually: \nLinux and macOS: ~/.cache/huggingface/hub\nWindows: %userprofile%\\.cache\\huggingface\\hub",
+#        )
+#        return {"FINISHED"}
 
 
 def lcm_updated(self, context):
@@ -1243,207 +1625,210 @@ def filter_updated(self, context):
 def input_strips_updated(self, context):
     preferences = context.preferences
     addon_prefs = preferences.addons[__name__].preferences
-    movie_model_card = addon_prefs.movie_model_card
-    image_model_card = addon_prefs.image_model_card
-    audio_model_card = addon_prefs.audio_model_card
     scene = context.scene
-    type = scene.generatorai_typeselect
-    input = scene.input_strips
+    scene_type = scene.generatorai_typeselect
+    input_strips = scene.input_strips
+    image_model = addon_prefs.image_model_card
+    movie_model = addon_prefs.movie_model_card
+    audio_model = addon_prefs.audio_model_card
 
-    if image_model_card == "Shitao/OmniGen-v1-diffusers" and type == "image":
-        bpy.context.scene.input_strips = "input_prompt"
-    elif (
-        movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
-        and type == "movie"
-    ):
-        scene.input_strips = "input_strips"
-    elif movie_model_card == "hunyuanvideo-community/HunyuanVideo" and type == "movie":
-        scene.input_strips = "input_prompt"
-        scene.generate_movie_x = 960
-        scene.generate_movie_y = 544
-        scene.generate_movie_frames = 49
-        scene.movie_num_inference_steps = 20
-        scene.movie_num_guidance = 4
-    elif (
-        type == "movie"
-        or type == "audio"
-        or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
-    ):
+    # Image Type Handling
+    if scene_type == "image":
+        if image_model == "Shitao/OmniGen-v1-diffusers":
+            scene.input_strips = "input_prompt"
+        elif scene.input_strips != "input_strips" and image_model in {
+            "diffusers/controlnet-canny-sdxl-1.0-small",
+            "xinsir/controlnet-openpose-sdxl-1.0",
+            "xinsir/controlnet-scribble-sdxl-1.0",
+            "ZhengPeng7/BiRefNet_HR",
+            "Salesforce/blipdiffusion"
+        }:
+            scene.input_strips = "input_strips"
+
+        # Handle specific image models
+        if image_model in {
+            "dataautogpt3/OpenDalleV1.1",
+            "Kwai-Kolors/Kolors-diffusers",
+            "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers"
+        }:
+            scene.use_lcm = False
+        if image_model == "black-forest-labs/FLUX.1-schnell":
+            scene.movie_num_inference_steps = 4
+            scene.movie_num_guidance = 0
+        elif image_model == "ChuckMcSneed/FLUX.1-dev":
+            scene.movie_num_inference_steps = 25
+            scene.movie_num_guidance = 4
+        elif image_model == "ostris/Flex.1-alpha":
+            scene.movie_num_inference_steps = 28
+            scene.movie_num_guidance = 3.5
+
+    # Movie Type Handling
+    if scene_type == "movie":
+        if movie_model == "hunyuanvideo-community/HunyuanVideo":
+            scene.input_strips = "input_prompt"
+            scene.generate_movie_x = 960
+            scene.generate_movie_y = 544
+            scene.generate_movie_frames = 49
+            scene.movie_num_inference_steps = 20
+            scene.movie_num_guidance = 4
+        elif movie_model in {
+            "THUDM/CogVideoX-5b",
+            "THUDM/CogVideoX-2b"
+        }:
+            scene.generate_movie_x = 720
+            scene.generate_movie_y = 480
+            scene.generate_movie_frames = 49
+            scene.movie_num_inference_steps = 50
+            scene.movie_num_guidance = 6
+        elif movie_model == "genmo/mochi-1-preview":
+            scene.generate_movie_x = 848
+            scene.generate_movie_y = 480
+            scene.input_strips = "input_prompt"
+        elif movie_model == "Skywork/SkyReels-V1-Hunyuan-T2V":
+            scene.generate_movie_x = 960
+            scene.generate_movie_y = 544
+            scene.generate_movie_frames = 49
+            scene.movie_num_inference_steps = 40
+            scene.movie_num_guidance = 1
+        elif movie_model == "cerspense/zeroscope_v2_XL":
+            scene.upscale = False
+
+        # Handle specific input strips for movie types
+        if (
+            movie_model in {
+                "stabilityai/stable-video-diffusion-img2vid",
+                "stabilityai/stable-video-diffusion-img2vid-xt",
+                "Hailuo/MiniMax/img2vid",
+                "Hailuo/MiniMax/subject2vid"
+            }
+        ):
+            scene.input_strips = "input_strips"
+
+    # Audio Type Handling
+    if scene_type == "audio":
+        if audio_model == "stabilityai/stable-audio-open-1.0":
+            scene.movie_num_inference_steps = 200
+
+    # Common Handling for Selected Strip
+    if scene_type in {"movie", "audio"} or image_model == "xinsir/controlnet-scribble-sdxl-1.0":
         scene.inpaint_selected_strip = ""
-    elif (
-        type == "image"
-        and scene.input_strips != "input_strips"
-        and (
-            image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
-            or image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
-            or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
-            or image_model_card == "ZhengPeng7/BiRefNet_HR"
-            or image_model_card == "Salesforce/blipdiffusion"
-        )
-    ):
-        scene.input_strips = "input_strips"
 
-    elif context.scene.lora_folder:
+    # LORA Handling
+    if scene.lora_folder:
         bpy.ops.lora.refresh_files()
-    elif type == "text":
+
+    # Text Type Handling
+    if scene_type == "text":
         scene.input_strips = "input_strips"
 
-    elif (
-        (
-            type == "movie"
-            and movie_model_card == "stabilityai/stable-video-diffusion-img2vid"
-        )
-        or (
-            type == "movie"
-            and movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt"
-        )
-        or (type == "movie" and movie_model_card == "Hailuo/MiniMax/img2vid")
-        or (type == "movie" and movie_model_card == "Hailuo/MiniMax/subject2vid")
-        or ()
-    ):
-        scene.input_strips = "input_strips"
-    elif scene.input_strips == "input_prompt":
+    # Clear Paths if Input is Prompt
+    if scene.input_strips == "input_prompt":
         bpy.types.Scene.movie_path = ""
         bpy.types.Scene.image_path = ""
-    elif (
-        movie_model_card == "THUDM/CogVideoX-5b"
-        or movie_model_card == "THUDM/CogVideoX-2b"
-    ) and type == "movie":
-        scene.generate_movie_x = 720
-        scene.generate_movie_y = 480
-        scene.generate_movie_frames = 49
-        scene.movie_num_inference_steps = 50
-        scene.movie_num_guidance = 6
-    elif movie_model_card == "genmo/mochi-1-preview" and type == "movie":
-        scene.generate_movie_x = 848
-        scene.generate_movie_y = 480
-        scene.movie_num_inference_steps = 50
-        scene.input_strips == "input_prompt"
-
-    elif movie_model_card == "Skywork/SkyReels-V1-Hunyuan-T2V" and type == "movie":
-        scene.generate_movie_x = 960
-        scene.generate_movie_y = 544
-        scene.generate_movie_frames = 49
-        scene.movie_num_inference_steps = 40
-        scene.movie_num_guidance = 1
-
-    elif (image_model_card == "dataautogpt3/OpenDalleV1.1") and type == "image":
-        bpy.context.scene.use_lcm = False
-    elif (image_model_card == "Kwai-Kolors/Kolors-diffusers") and type == "image":
-        bpy.context.scene.use_lcm = False
-    elif (
-        image_model_card == "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers"
-    ) and type == "image":
-        bpy.context.scene.use_lcm = False
-    elif movie_model_card == "cerspense/zeroscope_v2_XL" and type == "movie":
-        scene.upscale = False
-    elif (image_model_card == "black-forest-labs/FLUX.1-schnell") and type == "image":
-        bpy.context.scene.movie_num_inference_steps = 4
-        bpy.context.scene.movie_num_guidance = 0
-    elif (image_model_card == "ChuckMcSneed/FLUX.1-dev") and type == "image":
-        bpy.context.scene.movie_num_inference_steps = 25
-        bpy.context.scene.movie_num_guidance = 4
-    elif (image_model_card == "ostris/Flex.1-alpha") and type == "image":
-        bpy.context.scene.movie_num_inference_steps = 28
-        bpy.context.scene.movie_num_guidance = 3.5
-    elif audio_model_card == "stabilityai/stable-audio-open-1.0" and type == "audio":
-        bpy.context.scene.movie_num_inference_steps = 200
 
 
 def output_strips_updated(self, context):
-    preferences = context.preferences
-    addon_prefs = preferences.addons[__name__].preferences
-    movie_model_card = addon_prefs.movie_model_card
-    image_model_card = addon_prefs.image_model_card
-    audio_model_card = addon_prefs.audio_model_card
+    prefs = context.preferences
+    addon_prefs = prefs.addons[__name__].preferences
     scene = context.scene
+    
+    image_model = addon_prefs.image_model_card
+    movie_model = addon_prefs.movie_model_card
+    audio_model = addon_prefs.audio_model_card
+    
     type = scene.generatorai_typeselect
-    input = scene.input_strips
+    strip_input = scene.input_strips
+    
+    # Default values for movie generation settings
+    movie_res_x = scene.generate_movie_x
+    movie_res_y = scene.generate_movie_y
+    movie_frames = scene.generate_movie_frames
+    movie_inference = scene.movie_num_inference_steps
+    movie_guidance = scene.movie_num_guidance
 
-    if image_model_card == "Shitao/OmniGen-v1-diffusers" and type == "image":
-        scene.input_strips = "input_prompt"
-    elif movie_model_card == "hunyuanvideo-community/HunyuanVideo" and type == "movie":
-        scene.input_strips = "input_prompt"
-        scene.generate_movie_x = 960
-        scene.generate_movie_y = 544
-        scene.generate_movie_frames = 49
-        scene.movie_num_inference_steps = 20
-        scene.movie_num_guidance = 4
-    elif (
-        type == "movie"
-        or type == "audio"
-        or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
-    ):
+    # === IMAGE TYPE === #
+    if type == "image":
+        if image_model == "Shitao/OmniGen-v1-diffusers":
+            strip_input = "input_prompt"
+        elif image_model in [
+            "diffusers/controlnet-canny-sdxl-1.0",
+            "xinsir/controlnet-openpose-sdxl-1.0",
+            "xinsir/controlnet-scribble-sdxl-1.0",
+            "ZhengPeng7/BiRefNet_HR",
+            "Salesforce/blipdiffusion"
+        ]:
+            strip_input = "input_strips"
+        elif image_model == "dataautogpt3/OpenDalleV1.1":
+            scene.use_lcm = False
+        elif image_model == "Kwai-Kolors/Kolors-diffusers":
+            scene.use_lcm = False
+        elif image_model == "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers":
+            scene.use_lcm = False
+        elif image_model == "black-forest-labs/FLUX.1-schnell":
+            movie_inference = 4
+            movie_guidance = 0
+        elif image_model == "ChuckMcSneed/FLUX.1-dev":
+            movie_inference = 25
+            movie_guidance = 4
+        elif image_model == "ostris/Flex.1-alpha":
+            movie_inference = 28
+            movie_guidance = 3.5
+
+    # === MOVIE TYPE === #
+    elif type == "movie":
+        if movie_model == "hunyuanvideo-community/HunyuanVideo":
+            strip_input = "input_prompt"
+            movie_res_x = 960
+            movie_res_y = 544
+            movie_frames = 49
+            movie_inference = 20
+            movie_guidance = 4
+        elif movie_model == "Skywork/SkyReels-V1-Hunyuan-T2V":
+            movie_res_x = 960
+            movie_res_y = 544
+            movie_frames = 49
+            movie_inference = 40
+            movie_guidance = 1
+        elif movie_model == "cerspense/zeroscope_v2_XL":
+            scene.upscale = False
+        elif movie_model in ["THUDM/CogVideoX-5b", "THUDM/CogVideoX-2b"]:
+            movie_res_x = 720
+            movie_res_y = 480
+            movie_frames = 49
+            movie_inference = 50
+            movie_guidance = 6
+        elif movie_model == "genmo/mochi-1-preview":
+            movie_res_x = 848
+            movie_res_y = 480
+            movie_inference = 50
+        elif movie_model in [
+            "stabilityai/stable-video-diffusion-img2vid",
+            "stabilityai/stable-video-diffusion-img2vid-xt",
+            "Hailuo/MiniMax/img2vid",
+            "Hailuo/MiniMax/subject2vid"
+        ]:
+            strip_input = "input_strips"
+
+    # === AUDIO TYPE === #
+    elif type == "audio":
+        if audio_model == "stabilityai/stable-audio-open-1.0":
+            movie_inference = 200
+
+    # === COMMON SETTINGS === #
+    if type in ["movie", "audio"] or image_model == "xinsir/controlnet-scribble-sdxl-1.0":
         scene.inpaint_selected_strip = ""
-        if context.scene.lora_folder:
+        if scene.lora_folder:
             bpy.ops.lora.refresh_files()
-    elif (
-        image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
-        or image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
-        or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
-        or image_model_card == "ZhengPeng7/BiRefNet_HR"
-        or image_model_card == "Salesforce/blipdiffusion"
-    ) and type == "image":
-        scene.input_strips = "input_strips"
 
-    elif type == "text":
-        scene.input_strips = "input_strips"
-    elif (
-        (
-            type == "movie"
-            and movie_model_card == "stabilityai/stable-video-diffusion-img2vid"
-        )
-        or (
-            type == "movie"
-            and movie_model_card == "stabilityai/stable-video-diffusion-img2vid-xt"
-        )
-        or (type == "movie" and movie_model_card == "Hailuo/MiniMax/img2vid")
-        or (type == "movie" and movie_model_card == "Hailuo/MiniMax/subject2vid")
-        or ()
-    ):
-        scene.input_strips = "input_strips"
+    # Update scene properties
+    scene.input_strips = strip_input
+    if type == "movie":
+        scene.generate_movie_x = movie_res_x
+        scene.generate_movie_y = movie_res_y
+        scene.generate_movie_frames = movie_frames
+        scene.movie_num_inference_steps = movie_inference
+        scene.movie_num_guidance = movie_guidance
 
-    elif movie_model_card == "Skywork/SkyReels-V1-Hunyuan-T2V" and type == "movie":
-        scene.generate_movie_x = 960
-        scene.generate_movie_y = 544
-        scene.generate_movie_frames = 49
-        scene.movie_num_inference_steps = 40
-        scene.movie_num_guidance = 1        
-        
-    elif (image_model_card == "dataautogpt3/OpenDalleV1.1") and type == "image":
-        bpy.context.scene.use_lcm = False
-    elif (image_model_card == "Kwai-Kolors/Kolors-diffusers") and type == "image":
-        bpy.context.scene.use_lcm = False
-    elif (
-        image_model_card == "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers"
-    ) and type == "image":
-        bpy.context.scene.use_lcm = False
-    elif movie_model_card == "cerspense/zeroscope_v2_XL" and type == "movie":
-        scene.upscale = False
-    elif (image_model_card == "black-forest-labs/FLUX.1-schnell") and type == "image":
-        bpy.context.scene.movie_num_inference_steps = 4
-        bpy.context.scene.movie_num_guidance = 0
-    elif (image_model_card == "ChuckMcSneed/FLUX.1-dev") and type == "image":
-        bpy.context.scene.movie_num_inference_steps = 25
-        bpy.context.scene.movie_num_guidance = 4
-    elif (image_model_card == "ostris/Flex.1-alpha") and type == "image":
-        bpy.context.scene.movie_num_inference_steps = 28
-        bpy.context.scene.movie_num_guidance = 3.5
-    elif audio_model_card == "stabilityai/stable-audio-open-1.0" and type == "audio":
-        bpy.context.scene.movie_num_inference_steps = 200
-    elif (
-        movie_model_card == "THUDM/CogVideoX-5b"
-        or movie_model_card == "THUDM/CogVideoX-2b"
-    ) and type == "movie":
-        scene.generate_movie_x = 720
-        scene.generate_movie_y = 480
-        scene.generate_movie_frames = 49
-        scene.movie_num_inference_steps = 50
-        scene.movie_num_guidance = 6
-    elif movie_model_card == "genmo/mochi-1-preview" and type == "movie":
-        scene.generate_movie_x = 848
-        scene.generate_movie_y = 480
-        scene.movie_num_inference_steps = 50
 
 class GeneratorAddonPreferences(AddonPreferences):
     bl_idname = __name__
@@ -1806,9 +2191,6 @@ class GeneratorAddonPreferences(AddonPreferences):
         row_row.label(text="")
         row_row.label(text="")
         row_row.label(text="")
-        box.operator("sequencer.generate_requirements")
-        box.operator("sequencer.sync_requirements")
-        
 
 
 class GENERATOR_OT_sound_notification(Operator):
@@ -3390,11 +3772,11 @@ class SEQUENCER_OT_generate_movie(Operator):
                 # img2vid
                 elif scene.image_path and input == "input_strips":
                     print("Load: Image to video (SkyReels-V1-Hunyuan-I2V)")
-                    import torch._dynamo.config
+                    #import torch._dynamo.config
                     from diffusers import HunyuanSkyreelsImageToVideoPipeline, HunyuanVideoTransformer3DModel
                     from diffusers.utils import load_image, export_to_video
                     
-                    torch._dynamo.config.inline_inbuilt_nn_modules = True
+                    #torch._dynamo.config.inline_inbuilt_nn_modules = True
                     
                     model_id = "hunyuanvideo-community/HunyuanVideo"
                     transformer_model_id = "newgenai79/SkyReels-V1-Hunyuan-I2V-int4"
@@ -3409,11 +3791,11 @@ class SEQUENCER_OT_generate_movie(Operator):
                 else:
                     print("Load: text to video (SkyReels-V1-Hunyuan-T2V)")
 
-                    import torch._dynamo.config
+                    #import torch._dynamo.config
                     from diffusers import HunyuanVideoPipeline, HunyuanVideoTransformer3DModel
                     from diffusers.utils import export_to_video
 
-                    torch._dynamo.config.inline_inbuilt_nn_modules = True
+                    #torch._dynamo.config.inline_inbuilt_nn_modules = True
 
                     model_id = "newgenai79/HunyuanVideo-int4"
                     transformer_model_id = "newgenai79/SkyReels-V1-Hunyuan-T2V-int4"
@@ -3427,11 +3809,11 @@ class SEQUENCER_OT_generate_movie(Operator):
                 if gfx_device == "mps":
                     pipe.vae.enable_tiling()
                 elif low_vram():
-                    #pipe.enable_sequential_cpu_offload()
                     # pipe.enable_vae_slicing()
                     pipe.vae.enable_tiling()
                     pipe.enable_model_cpu_offload()                
                 else:
+                    #pipe.enable_sequential_cpu_offload()
                     pipe.vae.enable_tiling()
                     pipe.enable_model_cpu_offload()                
 
@@ -3799,7 +4181,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         guidance_scale=movie_num_guidance,
                         height=y,
                         width=x,
-                        num_frames=abs(duration) + 2,
+                        num_frames=abs(duration),
                         generator=generator,
                         max_sequence_length=512,
                         # use_dynamic_cfg=True,
@@ -3829,13 +4211,13 @@ class SEQUENCER_OT_generate_movie(Operator):
                         #strength=1.00 - scene.image_power,
                         negative_prompt=negative_prompt,
                         num_inference_steps=movie_num_inference_steps,
-                        guidance_scale=1,#movie_num_guidance,
+                        guidance_scale=movie_num_guidance,
                         height=y,
                         width=x,
                         num_frames=abs(duration),
                         generator=generator,
                         max_sequence_length=512,
-                        true_cfg_scale=6.0,
+                        #true_cfg_scale=6.0,
                         # use_dynamic_cfg=True,
                     ).frames[0]                    
                 elif (
@@ -3937,13 +4319,13 @@ class SEQUENCER_OT_generate_movie(Operator):
                         prompt=prompt,
                         negative_prompt=negative_prompt,
                         num_inference_steps=movie_num_inference_steps,
-                        guidance_scale=1,#movie_num_guidance,
+                        guidance_scale=movie_num_guidance,
                         height=y,
                         width=x,
                         num_frames=abs(duration),
                         generator=generator,
                         max_sequence_length=512,
-                        true_cfg_scale=6.0,
+                        #true_cfg_scale=6.0,
                         # use_dynamic_cfg=True,
                     ).frames[0]  
                 else:
