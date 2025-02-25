@@ -835,6 +835,8 @@ def install_modules(self):
         ("stable_audio_tools", "stable-audio-tools"),
         ("beautifulsoup4", "beautifulsoup4"),
         ("ftfy", "ftfy"),
+        ("librosa", "librosa"),
+        ("timm", "timm>=1.0.12"),
         ("imageio", "imageio[ffmpeg]==2.4.1"),
         ("imageio", "imageio-ffmpeg"),
         ("imWatermark", "imWatermark"),
@@ -850,6 +852,13 @@ def install_modules(self):
     set_system_console_topmost(True)
     ensure_pip()
 
+    subprocess.check_call([
+        pybin, "-m", "pip", "uninstall", "-y", "timm"
+    ])
+    subprocess.check_call([
+        pybin, "pip", "install", "timm>=1.0.12"
+    ])
+
     for module_name, package_name in common_modules:
         install_module(module_name, package_name)
 
@@ -857,10 +866,14 @@ def install_modules(self):
     if os_platform == "Windows":
         windows_modules = [
             ("diffusers", "git+https://github.com/huggingface/diffusers.git"),
-            ("deepspeed", "https://github.com/daswer123/deepspeed-windows/releases/download/13.1/deepspeed-0.13.1+cu121-cp311-cp311-win_amd64.whl"),
+            ("mmaudio", "git+https://github.com/hkchengrex/MMAudio.git"),
+            #("deepspeed", "https://github.com/daswer123/deepspeed-windows/releases/download/13.1/deepspeed-0.13.1+cu121-cp311-cp311-win_amd64.whl"),
+            ("deepspeed", "https://github.com/agwosdz/DeepSpeed-Wheels-for-Windows/releases/download/DeepSpeed/deepspeed-0.15.1+51c6eae-cp311-cp311-win_amd64_cu124.whl"),
             ("resemble_enhance", "git+https://github.com/tin2tin/resemble-enhance-windows.git"),
-            ("flash_attn", "https://github.com/oobabooga/flash-attention/releases/download/v2.6.3/flash_attn-2.6.3+cu122torch2.3.1cxx11abiFALSE-cp311-cp311-win_amd64.whl"),
-            ("triton", "https://hf-mirror.com/LightningJay/triton-2.1.0-python3.11-win_amd64-wheel/resolve/main/triton-2.1.0-cp311-cp311-win_amd64.whl"),
+            ("flash_attn", "https://huggingface.co/lldacing/flash-attention-windows-wheel/blob/main/flash_attn-2.7.0.post2%2Bcu124torch2.5.1cxx11abiFALSE-cp311-cp311-win_amd64.whl"),
+            #("flash_attn", "https://github.com/oobabooga/flash-attention/releases/download/v2.6.3/flash_attn-2.6.3+cu122torch2.3.1cxx11abiFALSE-cp311-cp311-win_amd64.whl"),
+            ("triton", "https://github.com/woct0rdho/triton-windows/releases/download/v3.2.0-windows.post10/triton-3.2.0-cp311-cp311-win_amd64.whl"),
+            #("triton", "https://hf-mirror.com/LightningJay/triton-2.1.0-python3.11-win_amd64-wheel/resolve/main/triton-2.1.0-cp311-cp311-win_amd64.whl"),
         ]
 
         for module_name, package_name in windows_modules:
@@ -965,16 +978,22 @@ def install_modules(self):
         ])
         subprocess.check_call([
             pybin, "-m", "pip", "install",
-            "torch==2.3.1+cu121", "xformers", "torchvision",
-            "--index-url", "https://download.pytorch.org/whl/cu121",
+            "torch", "xformers", "torchvision", "torchaudio",
+            "--index-url", "https://download.pytorch.org/whl/cu124",
             "--no-warn-script-location", "--upgrade"
         ])
-        subprocess.check_call([
-            pybin, "-m", "pip", "install",
-            "torchaudio==2.3.1+cu121",
-            "--index-url", "https://download.pytorch.org/whl/cu121",
-            "--no-warn-script-location", "--upgrade"
-        ])
+#        subprocess.check_call([
+#            pybin, "-m", "pip", "install",
+#            "torch==2.3.1+cu121", "xformers", "torchvision",
+#            "--index-url", "https://download.pytorch.org/whl/cu121",
+#            "--no-warn-script-location", "--upgrade"
+#        ])
+#        subprocess.check_call([
+#            pybin, "-m", "pip", "install",
+#            "torchaudio==2.3.1+cu121",
+#            "--index-url", "https://download.pytorch.org/whl/cu121",
+#            "--no-warn-script-location", "--upgrade"
+#        ])
     else:
         install_module("torch", "torch")
         install_module("torchvision", "torchvision")
@@ -1708,6 +1727,8 @@ def input_strips_updated(self, context):
     if scene_type == "audio":
         if audio_model == "stabilityai/stable-audio-open-1.0":
             scene.movie_num_inference_steps = 200
+        if addon_prefs.audio_model_card == "MMAudio":
+            scene.input_strips = "input_strips"
 
     # Common Handling for Selected Strip
     if scene_type in {"movie", "audio"} or image_model == "xinsir/controlnet-scribble-sdxl-1.0":
@@ -1813,6 +1834,8 @@ def output_strips_updated(self, context):
     elif type == "audio":
         if audio_model == "stabilityai/stable-audio-open-1.0":
             movie_inference = 200
+        if addon_prefs.audio_model_card == "MMAudio":
+            scene.input_strips = "input_strips"
 
     # === COMMON SETTINGS === #
     if type in ["movie", "audio"] or image_model == "xinsir/controlnet-scribble-sdxl-1.0":
@@ -2067,18 +2090,19 @@ class GeneratorAddonPreferences(AddonPreferences):
         items = [
             (
                 "stabilityai/stable-audio-open-1.0",
-                "Stable Audio Open",
+                "Audio: Stable Audio Open",
                 "stabilityai/stable-audio-open-1.0",
+            ),
+            ("MMAudio", "Audio: Video to Audio", "MMAudio"),
+            (
+                "cvssp/audioldm2-large",
+                "Audio:Audio LDM 2 Large",
+                "cvssp/audioldm2-large",
             ),
             (
                 "facebook/musicgen-stereo-melody-large",
                 "Music: MusicGen Stereo Melody",
                 "facebook/musicgen-stereo-melody-large",
-            ),
-            (
-                "cvssp/audioldm2-large",
-                "Audio LDM 2 Large",
-                "cvssp/audioldm2-large",
             ),
             parler,
             ("bark", "Speech: Bark", "Bark"),
@@ -2086,6 +2110,7 @@ class GeneratorAddonPreferences(AddonPreferences):
         ]
     else:
         items = [
+            ("MMAudio", "Audio: Video to Audio", "MMAudio"),
             (
                 "stabilityai/stable-audio-open-1.0",
                 "Stable Audio Open",
@@ -4184,7 +4209,6 @@ class SEQUENCER_OT_generate_movie(Operator):
                         num_frames=abs(duration),
                         generator=generator,
                         max_sequence_length=512,
-                        # use_dynamic_cfg=True,
                     ).frames[0]
 
                 #Skyreel
@@ -4208,7 +4232,6 @@ class SEQUENCER_OT_generate_movie(Operator):
                     video_frames = pipe(
                         image=image,
                         prompt=prompt,
-                        #strength=1.00 - scene.image_power,
                         negative_prompt=negative_prompt,
                         num_inference_steps=movie_num_inference_steps,
                         guidance_scale=movie_num_guidance,
@@ -4217,8 +4240,6 @@ class SEQUENCER_OT_generate_movie(Operator):
                         num_frames=abs(duration),
                         generator=generator,
                         max_sequence_length=512,
-                        #true_cfg_scale=6.0,
-                        # use_dynamic_cfg=True,
                     ).frames[0]                    
                 elif (
                     movie_model_card != "Hailuo/MiniMax/txt2vid"
@@ -4635,6 +4656,39 @@ class SEQUENCER_OT_generate_audio(Operator):
                 )
                 return {"CANCELLED"}
 
+        if addon_prefs.audio_model_card == "MMAudio":
+            #try:
+            #import spaces
+            #import logging
+            from datetime import datetime
+            from pathlib import Path
+            import librosa
+
+            import gradio as gr
+            import torch
+            import torchaudio
+            import os
+            import numpy as np
+            import mmaudio
+
+            from mmaudio.eval_utils import (ModelConfig, all_model_cfg, generate, load_video, make_video,
+                                            setup_eval_logging)
+            from mmaudio.model.flow_matching import FlowMatching
+            from mmaudio.model.networks import MMAudio, get_my_mmaudio
+            from mmaudio.model.sequence_config import SequenceConfig
+            from mmaudio.model.utils.features_utils import FeaturesUtils
+            import tempfile
+
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
+#            except ModuleNotFoundError:
+#                print("Dependencies needs to be installed in the add-on preferences.")
+#                self.report(
+#                    {"INFO"},
+#                    "Dependencies needs to be installed in the add-on preferences.",
+#                )
+#                return {"CANCELLED"}
+
         show_system_console(True)
         set_system_console_topmost(True)
 
@@ -4705,6 +4759,36 @@ class SEQUENCER_OT_generate_audio(Operator):
                 "parler-tts/parler-tts-large-v1", revision="refs/pr/9"
             ).to(gfx_device)
             tokenizer = AutoTokenizer.from_pretrained(addon_prefs.audio_model_card)
+
+        #MMAudio
+        if addon_prefs.audio_model_card == "MMAudio":
+
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
+
+            #logger = logging.getLogger()
+
+            device = gfx_device
+            dtype = torch.bfloat16
+
+            model_config: ModelConfig = all_model_cfg['large_44k_v2']
+            model_config.download_if_needed()
+            #setup_eval_logging()
+
+            scheduler_config = model_config.seq_cfg
+            model: MMAudio = get_my_mmaudio(model_config.model_name).to(device, dtype).eval()
+            model.load_weights(torch.load(model_config.model_path, map_location=device, weights_only=True))
+            print(f'Loaded weights from {model_config.model_path}')
+
+            feature_extractor = FeaturesUtils(
+                tod_vae_ckpt=model_config.vae_path,
+                synchformer_ckpt=model_config.synchformer_ckpt,
+                enable_conditions=True,
+                mode=model_config.mode,
+                bigvgan_vocoder_ckpt=model_config.bigvgan_16k_path,
+                need_vae_encoder=False
+            ).to(device, dtype)#.eval()
+
 
         # Deadend
         else:
@@ -5019,12 +5103,77 @@ class SEQUENCER_OT_generate_audio(Operator):
                 filename = solve_path(str(seed) + "_" + prompt + ".wav")
                 write_wav(filename, pipe.config.sampling_rate, audio_arr)
 
+            #MMAudio
+            if addon_prefs.audio_model_card == "MMAudio":
+                strip = scene.sequence_editor.active_strip
+                
+                if strip.type != "MOVIE":
+                    print("Incompatible strip input type!")
+                    return {"CANCELLED"}
+                
+                scheduler = FlowMatching(min_sigma=0, inference_mode='euler', num_steps=movie_num_inference_steps)
+                #scheduler = FlowMatching(min_sigma=0, num_steps=movie_num_inference_steps)
+
+                seed = context.scene.movie_num_seed
+                seed = (
+                    seed
+                    if not context.scene.movie_use_random
+                    else random.randint(0, 999999)
+                )
+                print("Seed: " + str(seed))
+                context.scene.movie_num_seed = seed
+                # Use cuda if possible
+                if torch.cuda.is_available():
+                    generator = (
+                        torch.Generator("cuda").manual_seed(seed) if seed != 0 else None
+                    )
+                else:
+                    if seed != 0:
+                        generator = torch.Generator()
+                        generator.manual_seed(seed)
+                    else:
+                        generator = None
+                
+                if scene.movie_path:
+                    print("Process: Video to audio")
+                    if not os.path.isfile(scene.movie_path):
+                        print("No file found.")
+                        return {"CANCELLED"}
+                    video_path = scene.movie_path
+                elif scene.image_path:
+                    print("Process: Image to audio")
+                    if not os.path.isfile(scene.image_path):
+                        print("No file found.")
+                        return {"CANCELLED"}
+                    video_path = scene.image_path
+                video_data = load_video(video_path, audio_length_in_s)#duration)
+                video_frames = video_data.clip_frames.unsqueeze(0)
+                sync_frames = video_data.sync_frames.unsqueeze(0)
+                duration = video_data.duration_sec
+                scheduler_config.duration = video_data.duration_sec
+                model.update_seq_lengths(scheduler_config.latent_seq_len, scheduler_config.clip_seq_len, scheduler_config.sync_seq_len)
+                with torch.no_grad():
+                    generated_audio = generate(
+                        video_frames, sync_frames, [prompt],
+                        negative_text=[negative_prompt],
+                        feature_utils=feature_extractor,
+                        net=model, fm=scheduler, rng=generator,
+                        cfg_strength=movie_num_guidance,
+                    )
+                
+                audio_output = generated_audio.float().cpu()[0]
+                target_sr = int((context.preferences.system.audio_sample_rate).split('_')[1])
+                filename = video_output_path = solve_path(str(seed) + "_" + prompt + ".mp4")#tempfile.NamedTemporaryFile(delete=False, suffix='.mp4').name
+
+                #audio_output = torch.from_numpy(audio_output)
+                print(str(scheduler_config.sampling_rate))
+                print(str(target_sr))
+                make_video(video_data, video_output_path, audio_output, sampling_rate=target_sr)#scheduler_config.sampling_rate)
+                print(f'Saved video to {video_output_path}')                
+
             # Add Audio Strip
             filepath = filename
             if os.path.isfile(filepath):
-                #                empty_channel = find_first_empty_channel(
-                #                    start_frame, start_frame + scene.audio_length_in_f
-                #                )
 
                 strip = scene.sequence_editor.sequences.new_sound(
                     name=prompt,
