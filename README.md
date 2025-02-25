@@ -78,6 +78,7 @@ On Windows: %userprofile%\\.cache\huggingface\hub
 ![image](https://github.com/user-attachments/assets/a5c44a7e-c670-49ef-941f-86e521568637)
 
 ## Change Log
+* 2025-2-25: Add: MMAudio for Video to Sync Audio 
 * 2025-2-21: Support for Skywork/SkyReels-V1-Hunyuan-T2V/I2V. Need a full update of dependencies! (Thx newgenai79 for int4 transformer)
 * 2025-2-15: Add: LoRA support for HunyuanVideo + better preset  
 * 2025-2-12: Add multi-media prompting via: [OmniGen](https://github.com/VectorSpaceLab/OmniGen)
@@ -336,6 +337,7 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 - [Bark](https://github.com/suno-ai/bark)
 - [WhisperSpeech](https://github.com/collabora/WhisperSpeech)
 - [parler-tts/parler-tts-large-v1](https://huggingface.co/parler-tts/parler-tts-large-v1)
+- [MMAudio](https://github.com/hkchengrex/MMAudio)
 
 ### Background Removal:
 - [BiRefNet_HR](https://huggingface.co/ZhengPeng7/BiRefNet_HR)
