@@ -1,6 +1,8 @@
+# WARNING: Scammers are using my free software, Pallaidium, and the name of it, as bait on a site called: "pallaidium . com". Please, help me stop them, or I'll have to delete this GitHub repository.
+
 <h1 align="center">PALLAIDIUM</h1>
 
-<p align="center">A generative AI movie studio integrated into the Blender Video Editor.</p>
+<p align="center">A free generative AI movie studio integrated into the Blender Video Editor.</p>
 
 <p align="center">
     <a href="https://discord.gg/HMYpnPzbTm"><img src="https://img.shields.io/badge/Chat%20with%20us%20on%20Discord--blue?style=social&logo=discord" alt="Chat with us" title="Chat with us"></a>
