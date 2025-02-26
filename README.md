@@ -1,4 +1,5 @@
-# WARNING: Scammers are using my free software, Pallaidium, and the name of it, as bait on a site called: "pallaidium . com". Please, help me stop them, or I'll have to delete this GitHub repository.
+> [!WARNING]
+> WARNING: Scammers are using my free software, Pallaidium, and the name of it, as bait on a site called: "pallaidium . com". I'm NOT associated with that site. Please, help me stop them, or I'll have to delete this GitHub repository.
 
 <h1 align="center">PALLAIDIUM</h1>
 
@@ -289,6 +290,7 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 - It is prohibited to use Pallaidium for error and false information generation.
 
 ## Restrictions on using the AI models:
+- I, tintwotin, do not endorse or take responsibility for third-party use.
 - Pallaidium does not include any genAI models(weights). If the user decides to use a model, it is downloaded from HuggingFace. 
 - In general, the models can only be used for non-commercial purposes and are meant for research purposes.
 - Consult the individual models on HuggingFace to read up on their licenses and ex. if they can be used commercially.
