@@ -836,7 +836,6 @@ def install_modules(self):
         ("beautifulsoup4", "beautifulsoup4"),
         ("ftfy", "ftfy"),
         ("librosa", "librosa"),
-        ("timm", "timm>=1.0.12"),
         ("imageio", "imageio[ffmpeg]==2.4.1"),
         ("imageio", "imageio-ffmpeg"),
         ("imWatermark", "imWatermark"),
@@ -851,13 +850,6 @@ def install_modules(self):
     show_system_console(True)
     set_system_console_topmost(True)
     ensure_pip()
-
-    subprocess.check_call([
-        pybin, "-m", "pip", "uninstall", "-y", "timm"
-    ])
-    subprocess.check_call([
-        pybin, "pip", "install", "timm>=1.0.12"
-    ])
 
     for module_name, package_name in common_modules:
         install_module(module_name, package_name)
@@ -970,7 +962,10 @@ def install_modules(self):
             "--upgrade",
         ]
     )
-
+    uninstall_module_with_dependencies("timm")
+#    subprocess.check_call([
+#        pybin, "-m", "pip", "uninstall", "-y", "timm",
+#    ])
     # Torch installations
     if os_platform == "Windows":
         subprocess.check_call([
@@ -1005,6 +1000,14 @@ def install_modules(self):
     subprocess.check_call([
         pybin, "-m", "pip", "install", "--disable-pip-version-check",
         "peft", "--upgrade"
+    ])
+    subprocess.call([
+        pybin, "pip", "install", "--disable-pip-version-check",
+        "--use-deprecated=legacy-resolver", "timm", "--upgrade"
+    ])
+    subprocess.call([
+        pybin, "-m", "pip", "install", "--disable-pip-version-check",
+        "--use-deprecated=legacy-resolver", "timm", "--upgrade"
     ])
     install_module("protobuf", "protobuf==3.20.1")
     install_module("numpy", "numpy==1.26.4")
@@ -4657,37 +4660,37 @@ class SEQUENCER_OT_generate_audio(Operator):
                 return {"CANCELLED"}
 
         if addon_prefs.audio_model_card == "MMAudio":
-            #try:
-            #import spaces
-            #import logging
-            from datetime import datetime
-            from pathlib import Path
-            import librosa
+            try:
+                #import spaces
+                #import logging
+                from datetime import datetime
+                from pathlib import Path
+                import librosa
 
-            import gradio as gr
-            import torch
-            import torchaudio
-            import os
-            import numpy as np
-            import mmaudio
+                import gradio as gr
+                import torch
+                import torchaudio
+                import os
+                import numpy as np
+                import mmaudio
 
-            from mmaudio.eval_utils import (ModelConfig, all_model_cfg, generate, load_video, make_video,
-                                            setup_eval_logging)
-            from mmaudio.model.flow_matching import FlowMatching
-            from mmaudio.model.networks import MMAudio, get_my_mmaudio
-            from mmaudio.model.sequence_config import SequenceConfig
-            from mmaudio.model.utils.features_utils import FeaturesUtils
-            import tempfile
+                from mmaudio.eval_utils import (ModelConfig, all_model_cfg, generate, load_video, make_video,
+                                                setup_eval_logging)
+                from mmaudio.model.flow_matching import FlowMatching
+                from mmaudio.model.networks import MMAudio, get_my_mmaudio
+                from mmaudio.model.sequence_config import SequenceConfig
+                from mmaudio.model.utils.features_utils import FeaturesUtils
+                import tempfile
 
-            torch.backends.cuda.matmul.allow_tf32 = True
-            torch.backends.cudnn.allow_tf32 = True
-#            except ModuleNotFoundError:
-#                print("Dependencies needs to be installed in the add-on preferences.")
-#                self.report(
-#                    {"INFO"},
-#                    "Dependencies needs to be installed in the add-on preferences.",
-#                )
-#                return {"CANCELLED"}
+                torch.backends.cuda.matmul.allow_tf32 = True
+                torch.backends.cudnn.allow_tf32 = True
+            except ModuleNotFoundError:
+                print("Dependencies needs to be installed in the add-on preferences.")
+                self.report(
+                    {"INFO"},
+                    "Dependencies needs to be installed in the add-on preferences.",
+                )
+                return {"CANCELLED"}
 
         show_system_console(True)
         set_system_console_topmost(True)
