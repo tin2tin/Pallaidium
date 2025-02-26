@@ -287,12 +287,14 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-455c77443535
 
 ## Restrictions on using Pallaidium:
+- The team behind Pallaidium does not endorse or take responsibility for third-party use.
+- The team behind Pallaidium requires verification or explicit permission for redistribution.
 - It is prohibited to use Pallaidium to generate content that is demeaning or harmful to people, their environment, culture, religion, etc.
 - It is prohibited to use Pallaidium for pornographic, violent, and bloody content generation.
 - It is prohibited to use Pallaidium for error and false information generation.
-
+- It is prohibited to use Pallaidium for commercial misuse or misrepresentation.
+  
 ## Restrictions on using the AI models:
-- I, tintwotin, do not endorse or take responsibility for third-party use.
 - Pallaidium does not include any genAI models(weights). If the user decides to use a model, it is downloaded from HuggingFace. 
 - In general, the models can only be used for non-commercial purposes and are meant for research purposes.
 - Consult the individual models on HuggingFace to read up on their licenses and ex. if they can be used commercially.
