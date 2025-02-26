@@ -1,5 +1,7 @@
 > [!WARNING]
-> WARNING: Scammers are using our free software, Pallaidium, our web content, and the name of it, as on a phishing site called: "pallaidium . com". We're NOT associated with that site! Please, help us stop them, or we'll have to delete this GitHub repository.
+> SCAM ALERT!
+> Scammers are misusing our free software, Pallaidium, along with our content and name, on a phishing site: pallaidium . com. We are NOT associated with this site!
+> 🚨 Please help us report this scam — otherwise, we may be forced to take down this GitHub repository.
 
 <h1 align="center">PALLAIDIUM</h1>
 
