@@ -2181,8 +2181,11 @@ class GeneratorAddonPreferences(AddonPreferences):
         row = box.row()
         row.operator("sequencer.install_generator")
         row.operator("sequencer.uninstall_generator")
-        box.prop(self, "movie_model_card")
-        box.prop(self, "image_model_card")
+        try:
+            box.prop(self, "movie_model_card")
+            box.prop(self, "image_model_card")
+        except:
+            pass        
         if (
             self.image_model_card == "stabilityai/stable-diffusion-3-medium-diffusers"
             or self.image_model_card == "stabilityai/stable-diffusion-3.5-large"
@@ -2192,7 +2195,10 @@ class GeneratorAddonPreferences(AddonPreferences):
             row.operator(
                 "wm.url_open", text="", icon="URL"
             ).url = "https://huggingface.co/settings/tokens"
-        box.prop(self, "audio_model_card")
+        try:
+            box.prop(self, "audio_model_card")
+        except:
+            pass
         box.prop(self, "generator_ai")
         row = box.row(align=True)
         row.label(text="Notification:")
@@ -2609,7 +2615,10 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             )
             col.prop(context.scene, "blip_tgt_subject", text="Target Subject")
         else:
-            col.prop(context.scene, "input_strips", text="Input")
+            try:
+                col.prop(context.scene, "input_strips", text="Input")
+            except:
+                pass
         if type != "text":
             if type != "audio":
                 if type == "movie" and "Hailuo/MiniMax/" in movie_model_card:
@@ -3061,7 +3070,10 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         layout.use_property_decorate = False
         col = layout.box()
         col = col.column(align=True)
-        col.prop(context.scene, "generatorai_typeselect", text="Output")
+        try:
+            col.prop(context.scene, "generatorai_typeselect", text="Output")
+        except:
+            pass
 
         if type == "image":
             col.prop(addon_prefs, "image_model_card", text=" ")
@@ -3145,7 +3157,8 @@ def invoke_video_generation(prompt, api_key, image_url, movie_model_card):
 
         payload = json.dumps(
             {
-                "model": "video-01",
+                #"model": "I2V-01-Director",
+                "model": "I2V-01",
                 "prompt": prompt,
                 # "prompt_optimizer": False,
                 "first_frame_image": f"data:image/jpeg;base64,{data}",
@@ -3170,7 +3183,7 @@ def invoke_video_generation(prompt, api_key, image_url, movie_model_card):
     else:
         payload = json.dumps(
             {
-                "model": "video-01",
+                "model": "T2V-01-Director",
                 "prompt": prompt,
                 # "prompt_optimizer": False,
             }
@@ -3208,18 +3221,18 @@ def query_video_generation(task_id, api_key):
     status = response.json()["status"]
     debug_print("Task Status:", status)
 
-    if status == "Preparing":
+    if status == 'Preparing':
         print("...Preparing...")
-        return "", "Preparing"
-    elif status == "Queueing":
+        return "", 'Preparing'
+    elif status == 'Queueing':
         print("...In the queue...")
-        return "", "Queueing"
-    elif status == "Processing":
+        return "", 'Queueing'
+    elif status == 'Processing':
         print("...Generating...")
-        return "", "Processing"
-    elif status == "Success":
-        return response.json()["file_id"], "Finished"
-    elif status == "Fail":
+        return "", 'Processing'
+    elif status == 'Success':
+        return response.json()['file_id'], "Finished"
+    elif status == 'Fail':
         return "", "Fail"
     else:
         return "", "Unknown"
@@ -4026,7 +4039,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                                     (new_width, new_height), Image.Resampling.LANCZOS
                                 )
 
-                            # frame = transforms.functional.invert(frame)
+                            frame = transforms.functional.invert(frame)
 
                             frame_tensor = pil_to_tensor(frame)
                             frame_tensor = frame_tensor.float()
@@ -4389,6 +4402,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         generator=generator,
                     ).frames[0]
 
+            # MiniMax
             if (
                 movie_model_card == "Hailuo/MiniMax/txt2vid"
                 or movie_model_card == "Hailuo/MiniMax/img2vid"
@@ -4409,6 +4423,9 @@ class SEQUENCER_OT_generate_movie(Operator):
                     ):
                         image_path = bpy.path.abspath(scene.image_path)
                         print("Image Path: " + image_path)
+                    else:
+                        print("Image path not found: " + bpy.path.abspath(scene.image_path))
+                        return {"CANCELLED"}
 
                 elif movie_model_card == "Hailuo/MiniMax/subject2vid":
                     print("Entered movie_model_card == 'Hailuo/MiniMax/subject2vid'")
@@ -4438,12 +4455,15 @@ class SEQUENCER_OT_generate_movie(Operator):
                                 # print("Image Path:", image_path)
                             else:
                                 print("Image path failed validation:", image_path_chk)
+                                return {"CANCELLED"}
                         else:
                             print("image_strip type is not IMAGE:", image_strip.type)
+                            return {"CANCELLED"}
                     else:
-                        print("scene.minimax_subject is None or empty")
+                        print("Subject is empty!")
+                        return {"CANCELLED"}
 
-                if not image_path:
+                if not image_path and not movie_model_card == "Hailuo/MiniMax/txt2vid":
                     print("Loading strip failed!")
                     return {"CANCELLED"}
 
@@ -4451,12 +4471,13 @@ class SEQUENCER_OT_generate_movie(Operator):
                     prompt[:2000], api_key, image_path, movie_model_card
                 )
                 src_path = solve_path(clean_filename(prompt[:20]) + ".mp4")
+                print("Task ID: "+str(task_id))
                 print("Generating: " + src_path)
                 print(
                     "-----------------Video generation task submitted to MiniMax-----------------"
                 )
                 while True:
-                    progress_bar(10)
+                    #progress_bar(10)
 
                     file_id, status = query_video_generation(task_id, api_key)
                     if file_id != "":
