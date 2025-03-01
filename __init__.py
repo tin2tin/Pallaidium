@@ -845,6 +845,8 @@ def install_modules(self):
         ("scikit_learn", "scikit-learn==1.2.2"),
         ("bitsandbytes", "bitsandbytes"),
         ("numpy", "numpy==1.26.4"),
+        ("jax", "jax>=0.5.1")
+        #("jaxlib", "jaxlib>=0.5.1")
     ]
 
     show_system_console(True)
@@ -1524,7 +1526,7 @@ class GENERATOR_OT_uninstall(Operator):
             ], # "albumentations", "datasets", "insightface"
             "Utils": [
                 "celluloid", "omegaconf", "pandas", "ptflops", "rich", "resampy",
-                "tabulate", "gradio"
+                "tabulate", "gradio", "jax", "jaxlib"
             ],
             "WhisperSpeech Components": [
                 "ruamel.yaml.clib", "fastprogress", "fastcore", "ruamel.yaml",
@@ -4606,9 +4608,8 @@ class SEQUENCER_OT_generate_audio(Operator):
         negative_prompt = scene.generate_movie_negative_prompt
         movie_num_inference_steps = scene.movie_num_inference_steps
         movie_num_guidance = scene.movie_num_guidance
-        audio_length_in_s = scene.audio_length_in_f / (
-            scene.render.fps / scene.render.fps_base
-        )
+        strip = scene.sequence_editor.active_strip
+        input = scene.input_strips
         pipe = None
         import torch
         import torchaudio
@@ -4820,9 +4821,28 @@ class SEQUENCER_OT_generate_audio(Operator):
             self.report({"INFO"}, "Audio model not found.")
             return {"CANCELLED"}
 
+        old_duration = duration = scene.audio_length_in_f
+        
         # Main loop Audio
         for i in range(scene.movie_num_batch):
             start_time = timer()
+            strip = scene.sequence_editor.active_strip
+            if strip and input == "input_strips" and duration == -1:
+                duration = scene.audio_length_in_f = (
+                    strip.frame_final_duration + 1
+                )
+                print("Input duration: "+str(strip.frame_final_duration))
+
+                audio_length_in_s = duration = duration / (
+                    scene.render.fps / scene.render.fps_base
+                )
+#                
+            else:
+                audio_length_in_s = duration = duration / (
+                    scene.render.fps / scene.render.fps_base
+                )
+#                print("No input strip found!")
+#                return {"CANCELLED"}
 
             # Find free space for the strip in the timeline.
             if i > 0:
@@ -4844,8 +4864,9 @@ class SEQUENCER_OT_generate_audio(Operator):
                 else:
                     empty_channel = find_first_empty_channel(
                         active_strip.frame_final_start,
-                        (scene.movie_num_batch * (len(prompt) * 4))
-                        + scene.frame_current,
+                        (duration
+                        + scene.frame_current)
+                        
                     )
                 start_frame = scene.frame_current
 
@@ -5129,7 +5150,6 @@ class SEQUENCER_OT_generate_audio(Operator):
 
             #MMAudio
             if addon_prefs.audio_model_card == "MMAudio":
-                strip = scene.sequence_editor.active_strip
                 
                 if strip.type != "MOVIE":
                     print("Incompatible strip input type!")
@@ -5170,6 +5190,8 @@ class SEQUENCER_OT_generate_audio(Operator):
                         print("No file found.")
                         return {"CANCELLED"}
                     video_path = scene.image_path
+                print("Video Path: "+video_path)
+                print("audio_length_in_s: "+str(audio_length_in_s))
                 video_data = load_video(video_path, audio_length_in_s)#duration)
                 video_frames = video_data.clip_frames.unsqueeze(0)
                 sync_frames = video_data.sync_frames.unsqueeze(0)
@@ -5217,6 +5239,8 @@ class SEQUENCER_OT_generate_audio(Operator):
             else:
                 print("No resulting file found!")
             print_elapsed_time(start_time)
+            if old_duration == -1 and input == "input_strips":
+                scene.audio_length_in_f = scene.generate_movie_frames = -1
         if pipe:
             pipe = None
 
