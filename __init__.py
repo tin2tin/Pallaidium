@@ -846,7 +846,7 @@ def install_modules(self):
         ("bitsandbytes", "bitsandbytes"),
         ("numpy", "numpy==1.26.4"),
         ("jax", "jax>=0.5.1")
-        #("jaxlib", "jaxlib>=0.5.1")
+        ("jaxlib", "jaxlib>=0.5.1")
     ]
 
     show_system_console(True)
