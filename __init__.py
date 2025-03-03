@@ -845,7 +845,7 @@ def install_modules(self):
         ("scikit_learn", "scikit-learn==1.2.2"),
         ("bitsandbytes", "bitsandbytes"),
         ("numpy", "numpy==1.26.4"),
-        ("jax", "jax>=0.5.1")
+        #("jax", "jax>=0.5.1")
         ("jaxlib", "jaxlib>=0.5.1")
     ]
 
@@ -1716,8 +1716,6 @@ def input_strips_updated(self, context):
             scene.movie_num_guidance = 1
         elif movie_model == "cerspense/zeroscope_v2_XL":
             scene.upscale = False
-        elif movie_model == "Wan-AI/Wan2.1-T2V-1.3B-Diffusers":
-            scene.input_strips = "input_prompt"
 
         # Handle specific input strips for movie types
         if (
@@ -1836,8 +1834,6 @@ def output_strips_updated(self, context):
             "Hailuo/MiniMax/subject2vid"
         ]:
             strip_input = "input_strips"
-        elif movie_model == "Wan-AI/Wan2.1-T2V-1.3B-Diffusers":
-            scene.input_strips = "input_prompt"
 
     # === AUDIO TYPE === #
     elif type == "audio":
@@ -4403,6 +4399,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         width=x,
                         num_frames=abs(duration),
                         generator=generator,
+                        max_sequence_length=256,
                     ).frames[0]
                 movie_model_card = addon_prefs.movie_model_card
 
