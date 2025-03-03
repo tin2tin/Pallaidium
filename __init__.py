@@ -1716,6 +1716,8 @@ def input_strips_updated(self, context):
             scene.movie_num_guidance = 1
         elif movie_model == "cerspense/zeroscope_v2_XL":
             scene.upscale = False
+        elif movie_model == "Wan-AI/Wan2.1-T2V-1.3B-Diffusers":
+            scene.input_strips = "input_prompt"
 
         # Handle specific input strips for movie types
         if (
@@ -1834,6 +1836,8 @@ def output_strips_updated(self, context):
             "Hailuo/MiniMax/subject2vid"
         ]:
             strip_input = "input_strips"
+        elif movie_model == "Wan-AI/Wan2.1-T2V-1.3B-Diffusers":
+            scene.input_strips = "input_prompt"
 
     # === AUDIO TYPE === #
     elif type == "audio":
@@ -1890,7 +1894,12 @@ class GeneratorAddonPreferences(AddonPreferences):
 
     movie_model_card: bpy.props.EnumProperty(
         name="Video Model",
-        items=[
+            items=[
+            (
+                "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
+                "Wan2.1-T2V (832x480x81)",
+                "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
+            ),
             (
                 "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
                 "LTX (768x512)",
@@ -3886,6 +3895,23 @@ class SEQUENCER_OT_generate_movie(Operator):
             ):
                 print("Stable Video Diffusion needs image input")
                 return {"CANCELLED"}
+            
+            elif movie_model_card == "Wan-AI/Wan2.1-T2V-1.3B-Diffusers":
+                from diffusers import AutoencoderKLWan, WanPipeline
+                from diffusers.utils import export_to_video
+
+                vae = AutoencoderKLWan.from_pretrained(movie_model_card, subfolder="vae", torch_dtype=torch.float32)
+                pipe = WanPipeline.from_pretrained(movie_model_card, vae=vae, torch_dtype=torch.bfloat16)
+
+                if gfx_device == "mps":
+                    pass
+                elif low_vram():
+                    # pipe.enable_vae_slicing()
+                    pipe.enable_model_cpu_offload()                
+                else:
+                    #pipe.enable_sequential_cpu_offload()
+                    #pipe.vae.enable_tiling()
+                    pipe.enable_model_cpu_offload()                   
 
             else:
                 from diffusers import TextToVideoSDPipeline
