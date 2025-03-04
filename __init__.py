@@ -845,8 +845,8 @@ def install_modules(self):
         ("scikit_learn", "scikit-learn==1.2.2"),
         ("bitsandbytes", "bitsandbytes"),
         ("numpy", "numpy==1.26.4"),
-        #("jax", "jax>=0.5.1")
-        ("jaxlib", "jaxlib>=0.5.1")
+        ("jax", "jax")
+        #("jaxlib", "jaxlib>=0.5.0")
     ]
 
     show_system_console(True)
@@ -2004,6 +2004,11 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Alpha-VLLM/Lumina-Image-2.0",
                 "Lumina Image 2.0",
                 "Alpha-VLLM/Lumina-Image-2.0",
+            ),
+            (
+                "THUDM/CogView4-6B",
+                "CogView4-6B (2048x2048)",
+                "THUDM/CogView4-6B",
             ),
             (
                 "Efficient-Large-Model/Sana_1600M_1024px_diffusers",
@@ -3416,6 +3421,11 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         flush()
 
+        def ensure_skyreel(prompt: str) -> str:
+            if not prompt.startswith("FPS-24,"):
+                return "FPS-24, " + prompt
+            return prompt
+
         # LOADING MODELS
         print("Model:  " + movie_model_card)
 
@@ -3812,6 +3822,9 @@ class SEQUENCER_OT_generate_movie(Operator):
             #Skyreel
             elif movie_model_card == "Skywork/SkyReels-V1-Hunyuan-T2V":
 
+                prompt = ensure_skyreel(prompt)
+                print("Corrected Prompt: "+prompt)
+
                 # vid2vid
                 if scene.movie_path and input == "input_strips":
                     print("SkyReels-V1-Hunyuan doesn't support vid2vid!")
@@ -3893,6 +3906,10 @@ class SEQUENCER_OT_generate_movie(Operator):
                 return {"CANCELLED"}
             
             elif movie_model_card == "Wan-AI/Wan2.1-T2V-1.3B-Diffusers":
+                if (scene.movie_path or scene.image_path) and input == "input_strips":
+                    print("Wan2.1-T2V doesn't support img/vid2vid!")
+                    return {"CANCELLED"}
+
                 from diffusers import AutoencoderKLWan, WanPipeline
                 from diffusers.utils import export_to_video
 
@@ -4285,6 +4302,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     movie_model_card != "Hailuo/MiniMax/txt2vid"
                     and movie_model_card != "Hailuo/MiniMax/img2vid"
                     and movie_model_card != "Hailuo/MiniMax/subject2vid"
+                    and movie_model_card != "Wan-AI/Wan2.1-T2V-1.3B-Diffusers"
                 ):
                     if scene.movie_path:
                         print("Process: Video to video")
@@ -4333,6 +4351,12 @@ class SEQUENCER_OT_generate_movie(Operator):
                         guidance_scale=movie_num_guidance,
                         generator=generator,
                     ).frames[0]
+
+                elif movie_model_card == "Wan-AI/Wan2.1-T2V-1.3B-Diffusers":
+                    if (scene.movie_path or scene.image_path) and input == "input_strips":
+                        print("Wan2.1-T2V doesn't support img/vid2vid!")
+                        return {"CANCELLED"}
+
 
             # Prompt input for movies
             elif (
@@ -6447,7 +6471,20 @@ class SEQUENCER_OT_generate_image(Operator):
                 # pipe.enable_sequential_cpu_offload()
                 # pipe.vae.enable_tiling()
                 pipe.enable_model_cpu_offload()
-
+        elif image_model_card == "THUDM/CogView4-6B":
+            from diffusers import CogView4Pipeline
+            pipe = CogView4Pipeline.from_pretrained("THUDM/CogView4-6B", torch_dtype=torch.bfloat16)
+            if gfx_device == "mps":
+                pipe.vae.enable_tiling()
+            elif low_vram():
+                #pipe.enable_sequential_cpu_offload()
+                pipe.enable_model_cpu_offload()
+                pipe.vae.enable_tiling()
+            else:
+                # pipe.enable_sequential_cpu_offload()
+                # pipe.vae.enable_tiling()
+                pipe.enable_model_cpu_offload()
+                        
         elif image_model_card == "Efficient-Large-Model/Sana_1600M_1024px_diffusers":
             from diffusers import (
                 BitsAndBytesConfig as DiffusersBitsAndBytesConfig,
