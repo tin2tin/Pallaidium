@@ -75,6 +75,7 @@ On Linux and macOS: ~/.cache/huggingface/hub
 
 On Windows: %userprofile%\\.cache\huggingface\hub
 
+## Pallaidium, Blender Screenwriter, and GPT4Blender
 
 https://github.com/user-attachments/assets/81d30bc1-01f6-4b52-8ce7-abf53d53e854
 
