@@ -30,6 +30,10 @@ AI-generate video, image, and audio from text prompts or video, image, or text s
 | Batch upscale & refinement of movies.              | Render-to-path selector.                            | Render finished notification.                       |
 | User-defined file path for generated files.        | Seed and prompt added to strip name.                | One-click install and uninstall dependencies.       |
 
+## Pallaidium, Blender Screenwriter, and GPT4Blender
+
+https://github.com/user-attachments/assets/81d30bc1-01f6-4b52-8ce7-abf53d53e854
+
 ## Requirements
 * Windows (Unsupported: Linux and MacOS).
 * A CUDA-supported Nvidia card with at least 6 GB VRAM.
@@ -74,11 +78,6 @@ Hugging Face Diffusers models are downloaded from the hub and saved to a local c
 On Linux and macOS: ~/.cache/huggingface/hub
 
 On Windows: %userprofile%\\.cache\huggingface\hub
-
-## Pallaidium, Blender Screenwriter, and GPT4Blender
-
-https://github.com/user-attachments/assets/81d30bc1-01f6-4b52-8ce7-abf53d53e854
-
 
 ## Change Log
 * 2025-2-25: Add: MMAudio for Video to Sync Audio 
