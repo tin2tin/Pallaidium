@@ -75,7 +75,9 @@ On Linux and macOS: ~/.cache/huggingface/hub
 
 On Windows: %userprofile%\\.cache\huggingface\hub
 
-![image](https://github.com/user-attachments/assets/a5c44a7e-c670-49ef-941f-86e521568637)
+
+https://github.com/user-attachments/assets/81d30bc1-01f6-4b52-8ce7-abf53d53e854
+
 
 ## Change Log
 * 2025-2-25: Add: MMAudio for Video to Sync Audio 
@@ -134,6 +136,8 @@ See SDXL handling most of the styles here: https://stable-diffusion-art.com/sdxl
 - If the image of your playback stutters, then select a strip > Menu > Strip > Movie Strip > Set Render Size.
 - If you get the message that CUDA is out of memory, restart Blender to free up memory and make it stable again.
 - New to Blender? Watch this tutorial: https://youtu.be/4_MIaxzjh5Y?feature=shared
+
+![image](https://github.com/user-attachments/assets/a5c44a7e-c670-49ef-941f-86e521568637)
 
 ## Batch Processing
 
