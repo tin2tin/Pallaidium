@@ -865,8 +865,10 @@ def install_modules(self):
             ("deepspeed", "https://github.com/agwosdz/DeepSpeed-Wheels-for-Windows/releases/download/DeepSpeed/deepspeed-0.15.1+51c6eae-cp311-cp311-win_amd64_cu124.whl"),
             ("resemble_enhance", "git+https://github.com/tin2tin/resemble-enhance-windows.git"),
             ("flash_attn", "https://huggingface.co/lldacing/flash-attention-windows-wheel/blob/main/flash_attn-2.7.0.post2%2Bcu124torch2.5.1cxx11abiFALSE-cp311-cp311-win_amd64.whl"),
+            #("flash_attn", "git+https://github.com/ROCm/flash-attention.git"),
             #("flash_attn", "https://github.com/oobabooga/flash-attention/releases/download/v2.6.3/flash_attn-2.6.3+cu122torch2.3.1cxx11abiFALSE-cp311-cp311-win_amd64.whl"),
             ("triton", "https://github.com/woct0rdho/triton-windows/releases/download/v3.2.0-windows.post10/triton-3.2.0-cp311-cp311-win_amd64.whl"),
+            # Use this for low cards/cuda?
             #("triton", "https://hf-mirror.com/LightningJay/triton-2.1.0-python3.11-win_amd64-wheel/resolve/main/triton-2.1.0-cp311-cp311-win_amd64.whl"),
         ]
 
@@ -1689,7 +1691,6 @@ def input_strips_updated(self, context):
     # Movie Type Handling
     if scene_type == "movie":
         if movie_model == "hunyuanvideo-community/HunyuanVideo":
-            scene.input_strips = "input_prompt"
             scene.generate_movie_x = 960
             scene.generate_movie_y = 544
             scene.generate_movie_frames = 49
@@ -1803,7 +1804,6 @@ def output_strips_updated(self, context):
     # === MOVIE TYPE === #
     elif type == "movie":
         if movie_model == "hunyuanvideo-community/HunyuanVideo":
-            strip_input = "input_prompt"
             movie_res_x = 960
             movie_res_y = 544
             movie_frames = 49
@@ -1891,15 +1891,12 @@ class GeneratorAddonPreferences(AddonPreferences):
     movie_model_card: bpy.props.EnumProperty(
         name="Video Model",
             items=[
+            ("Hailuo/MiniMax/txt2vid", "API MiniMax (txt2vid)", "Purchased API access needed!"),
+            ("Hailuo/MiniMax/img2vid", "API MiniMax (img2vid)", "Purchased API access needed!"),
             (
-                "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
-                "Wan2.1-T2V (832x480x81)",
-                "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
-            ),
-            (
-                "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
-                "LTX (768x512)",
-                "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
+                "Hailuo/MiniMax/subject2vid",
+                "API MiniMax (subject2vid)",
+                "Purchased API access needed!",
             ),
             ("THUDM/CogVideoX-2b", "CogVideoX-2b (720x480x48)", "THUDM/CogVideoX-2b"),
             ("THUDM/CogVideoX-5b", "CogVideoX-5b (720x480x48)", "THUDM/CogVideoX-5b"),
@@ -1909,29 +1906,37 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "hunyuanvideo-community/HunyuanVideo",
             ),
             (
+                "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
+                "LTX (768x512)",
+                "a-r-r-o-w/LTX-Video-0.9.1-diffusers",
+            ),
+            (
                 "Skywork/SkyReels-V1-Hunyuan-T2V",
                 "SkyReels-V1-Hunyuan (960x544x97)",
                 "Skywork/SkyReels-V1-Hunyuan-T2V",
             ),
-            ("Hailuo/MiniMax/txt2vid", "MiniMax (txt2vid)", "Hailuo/MiniMax/txt2vid"),
-            ("Hailuo/MiniMax/img2vid", "MiniMax (img2vid)", "Hailuo/MiniMax/img2vid"),
-            (
-                "Hailuo/MiniMax/subject2vid",
-                "MiniMax (subject2vid)",
-                "Hailuo/MiniMax/subject2vid",
-            ),
-            ("wangfuyun/AnimateLCM", "AnimateLCM", "wangfuyun/AnimateLCM"),
-            (
-                "stabilityai/stable-video-diffusion-img2vid-xt",
-                "Stable Video Diffusion XT (1024x576x24) ",
-                "stabilityai/stable-video-diffusion-img2vid-xt",
-            ),
-            (
-                "stabilityai/stable-video-diffusion-img2vid",
-                "Stable Video Diffusion (1024x576x14)",
-                "stabilityai/stable-video-diffusion-img2vid",
-            ),
+#            ("wangfuyun/AnimateLCM", "AnimateLCM", "wangfuyun/AnimateLCM"),
+#            (
+#                "stabilityai/stable-video-diffusion-img2vid-xt",
+#                "Stable Video Diffusion XT (1024x576x24) ",
+#                "stabilityai/stable-video-diffusion-img2vid-xt",
+#            ),
+#            (
+#                "stabilityai/stable-video-diffusion-img2vid",
+#                "Stable Video Diffusion (1024x576x14)",
+#                "stabilityai/stable-video-diffusion-img2vid",
+#            ),
             #            ("genmo/mochi-1-preview", "Mochi-1", "genmo/mochi-1-preview"), #noot good enough yet!
+            (
+                "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
+                "Wan2.1-T2V (832x480x81)",
+                "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
+            ),
+            (
+                "Wan-AI/Wan2.1-I2V-14B-480P-Diffusers",
+                "Wan2.1-I2V-14B-480P (832x480x81)",
+                "Wan-AI/Wan2.1-I2V-14B-480P-Diffusers",
+            ),
             (
                 "cerspense/zeroscope_v2_XL",
                 "Zeroscope XL (1024x576x24)",
@@ -1975,11 +1980,11 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Stable Diffusion XL 1.0 (1024x1024)",
                 "stabilityai/stable-diffusion-xl-base-1.0",
             ),
-            (
-                "ByteDance/SDXL-Lightning",
-                "Stable Diffusion XL Lightning (1024x1024)",
-                "ByteDance/SDXL-Lightning",
-            ),
+#            (
+#                "ByteDance/SDXL-Lightning",
+#                "Stable Diffusion XL Lightning (1024x1024)",
+#                "ByteDance/SDXL-Lightning",
+#            ),
             (
                 "stabilityai/stable-diffusion-3.5-large",
                 "Stable Diffusion 3.5 Large",
@@ -1990,16 +1995,16 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Stable Diffusion 3.5 Medium",
                 "adamo1139/stable-diffusion-3.5-medium-ungated",
             ),
-            (
-                "stabilityai/stable-diffusion-3-medium-diffusers",
-                "Stable Diffusion 3",
-                "stabilityai/stable-diffusion-3-medium-diffusers",
-            ),
-            (
-                "stabilityai/sdxl-turbo",
-                "Stable Diffusion XL Turbo (1024 x 1024)",
-                "stabilityai/sdxl-turbo",
-            ),
+#            (
+#                "stabilityai/stable-diffusion-3-medium-diffusers",
+#                "Stable Diffusion 3",
+#                "stabilityai/stable-diffusion-3-medium-diffusers",
+#            ),
+#            (
+#                "stabilityai/sdxl-turbo",
+#                "Stable Diffusion XL Turbo (1024 x 1024)",
+#                "stabilityai/sdxl-turbo",
+#            ),
             (
                 "Alpha-VLLM/Lumina-Image-2.0",
                 "Lumina Image 2.0",
@@ -2015,11 +2020,11 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Sana 1600M 1024px",
                 "Efficient-Large-Model/Sana_1600M_1024px_diffusers",
             ),
-            (
-                "fluently/Fluently-XL-Final",
-                "Fluently (1024x1024)",
-                "fluently/Fluently-XL-Final",
-            ),
+#            (
+#                "fluently/Fluently-XL-Final",
+#                "Fluently (1024x1024)",
+#                "fluently/Fluently-XL-Final",
+#            ),
             (
                 "Vargol/PixArt-Sigma_16bit",
                 "PixArt Sigma XL 16 bit(1024x1024)",
@@ -2032,12 +2037,12 @@ class GeneratorAddonPreferences(AddonPreferences):
             ),
             # Must be optimized
             # ("shuttleai/shuttle-jaguar", "Shuttle Jaguar (1024x1024)", "shuttleai/shuttle-jaguar"),
-            (
-                "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers",
-                "HunyuanDiT-v1.2",
-                "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers",
-            ),
-            ("Kwai-Kolors/Kolors-diffusers", "Kolors", "Kwai-Kolors/Kolors-diffusers"),
+#            (
+#                "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers",
+#                "HunyuanDiT-v1.2",
+#                "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers",
+#            ),
+#            ("Kwai-Kolors/Kolors-diffusers", "Kolors", "Kwai-Kolors/Kolors-diffusers"),
             # ("Corcelio/mobius", "Mobius (1024x1024)", "Corcelio/mobius"),
             (
                 "dataautogpt3/OpenDalleV1.1",
@@ -2054,30 +2059,30 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "RealVisXL_V4 (1024x1024)",
                 "SG161222/RealVisXL_V4.0",
             ),
-            (
-                "Salesforce/blipdiffusion",
-                "Blip Subject (512x512)",
-                "Salesforce/blipdiffusion",
-            ),
+#            (
+#                "Salesforce/blipdiffusion",
+#                "Blip Subject (512x512)",
+#                "Salesforce/blipdiffusion",
+#            ),
             (
                 "diffusers/controlnet-canny-sdxl-1.0-small",
-                "Canny ControlNet (1024 x 1024)",
+                "Canny ControlNet XL (1024 x 1024)",
                 "diffusers/controlnet-canny-sdxl-1.0-small",
             ),
             (
                 "xinsir/controlnet-openpose-sdxl-1.0",
-                "OpenPose ControlNet (1024 x 1024)",
+                "OpenPose ControlNet XL (1024 x 1024)",
                 "xinsir/controlnet-openpose-sdxl-1.0",
             ),
             (
                 "xinsir/controlnet-scribble-sdxl-1.0",
-                "Scribble (1024x1024)",
+                "Scribble ControlNet XL (1024x1024)",
                 "xinsir/controlnet-scribble-sdxl-1.0",
             ),
             (
                 "Shitao/OmniGen-v1-diffusers",
                 "OmniGen",
-                "Shitao/OmniGen-v1-diffusers",
+                "Text and image input.",
             ),
             (
                 "ZhengPeng7/BiRefNet_HR",
@@ -3443,6 +3448,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             and movie_model_card != "Hailuo/MiniMax/img2vid"
             and movie_model_card != "Hailuo/MiniMax/subject2vid"
             and movie_model_card != "Skywork/SkyReels-V1-Hunyuan-T2V"
+            and movie_model_card != "Wan-AI/Wan2.1-I2V-14B-480P-Diffusers"
         ) or movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
             # Frame by Frame
             if (
@@ -3649,18 +3655,20 @@ class SEQUENCER_OT_generate_movie(Operator):
                 from transformers import T5EncoderModel, T5Tokenizer
                 from diffusers import AutoencoderKLLTXVideo
 
-                text_encoder = T5EncoderModel.from_pretrained(
-                    movie_model_card,
-                    subfolder="text_encoder",
-                    torch_dtype=torch.bfloat16,
-                )
-                tokenizer = T5Tokenizer.from_pretrained(
-                    movie_model_card, subfolder="tokenizer", torch_dtype=torch.bfloat16
-                )
-                vae = AutoencoderKLLTXVideo.from_single_file(
-                    "https://huggingface.co/Lightricks/LTX-Video/ltx-video-2b-v0.9.1.safetensors",
-                    torch_dtype=torch.bfloat16,
-                )
+#                text_encoder = T5EncoderModel.from_pretrained(
+#                    movie_model_card,
+#                    #"a-r-r-o-w/LTX-Video-0.9.1-diffusers",
+#                    subfolder="text_encoder",
+#                    torch_dtype=torch.bfloat16,
+#                )
+#                tokenizer = T5Tokenizer.from_pretrained(
+#                    movie_model_card, subfolder="tokenizer", torch_dtype=torch.bfloat16
+#                )
+#                vae = AutoencoderKLLTXVideo.from_single_file(
+#                    "https://huggingface.co/Lightricks/LTX-Video/ltx-video-2b-v0.9.1.safetensors",
+#                    #"https://huggingface.co/Lightricks/LTX-Video/ltx-video-2b-v0.9.5.safetensors",
+#                    torch_dtype=torch.bfloat16,
+#                )
 
                 # vid2vid
                 if scene.movie_path and input == "input_strips":
@@ -3671,100 +3679,114 @@ class SEQUENCER_OT_generate_movie(Operator):
                     print("LTX Video: Load Image to Video Model")
                     from diffusers.utils import load_image
                     from diffusers import LTXImageToVideoPipeline
+                    pipe = LTXImageToVideoPipeline.from_pretrained("Lightricks/LTX-Video", torch_dtype=torch.bfloat16)
 
-                    single_file_url = "https://huggingface.co/Lightricks/LTX-Video/blob/main/ltx-video-2b-v0.9.1.safetensors"
+#                    #single_file_url = "https://huggingface.co/Lightricks/LTX-Video/blob/main/ltx-video-2b-v0.9.5.safetensors"
+#                    single_file_url = "https://huggingface.co/Lightricks/LTX-Video/blob/main/ltx-video-2b-v0.9.1.safetensors"
 
-                    pipe = LTXImageToVideoPipeline.from_single_file(
-                        single_file_url,
-                        text_encoder=text_encoder,
-                        tokenizer=tokenizer,
-                        vae=vae,
-                        torch_dtype=torch.bfloat16,
-                        max_sequence_length=256,
-                    )
+#                    pipe = LTXImageToVideoPipeline.from_single_file(
+#                        single_file_url,
+#                        text_encoder=text_encoder,
+#                        tokenizer=tokenizer,
+#                        vae=vae,
+#                        torch_dtype=torch.bfloat16,
+#                        max_sequence_length=256,
+#                    )
                 else:
                     print("LTX Video: Load Prompt to Video Model")
                     import torch
                     from diffusers import LTXPipeline
+                    pipe = LTXPipeline.from_pretrained("Lightricks/LTX-Video", torch_dtype=torch.bfloat16)
 
-                    pipe = LTXPipeline.from_single_file(
-                        "https://huggingface.co/Lightricks/LTX-Video/blob/main/ltx-video-2b-v0.9.1.safetensors",
-                        text_encoder=text_encoder,
-                        tokenizer=tokenizer,
-                        vae=vae,
-                        torch_dtype=torch.bfloat16,
-                        max_sequence_length=256,
-                    )
+#                    pipe = LTXPipeline.from_single_file(
+#                        "https://huggingface.co/Lightricks/LTX-Video/blob/main/ltx-video-2b-v0.9.1.safetensors",
+#                        #"https://huggingface.co/Lightricks/LTX-Video/blob/main/ltx-video-2b-v0.9.5.safetensors",
+#                        text_encoder=text_encoder,
+#                        tokenizer=tokenizer,
+#                        vae=vae,
+#                        torch_dtype=torch.bfloat16,
+#                        max_sequence_length=256,
+#                    )
 
                 if gfx_device == "mps":
                     pipe.vae.enable_tiling()
                 elif low_vram():
-                    pipe.enable_sequential_cpu_offload()
+                    #pipe.enable_sequential_cpu_offload()
                     # pipe.enable_vae_slicing()
                     pipe.vae.enable_tiling()
+                    pipe.enable_model_cpu_offload()
                 else:
+                    pipe.vae.enable_tiling()
                     pipe.enable_model_cpu_offload()
 
             # HunyuanVideo
             elif movie_model_card == "hunyuanvideo-community/HunyuanVideo":
                 # vid2vid
                 if scene.movie_path and input == "input_strips":
-                    print("HunyuanVideo doesn't support vid2vid!")
-                    return {"CANCELLED"}
+                    print("HunyuanVideo doesn't support vid2vid! Using img2vid instead...")
+
                 # img2vid
-                elif scene.image_path and input == "input_strips":
-                    print("HunyuanVideo doesn't support img2vid!")
-                    return {"CANCELLED"}
+                if (scene.image_path or scene.movie_path) and input == "input_strips":
+                    print("HunyuanVideo: Load Image to Video Model")
+                    from diffusers import HunyuanVideoImageToVideoPipeline
+                    model_id = "hunyuanvideo-community/HunyuanVideo-I2V"
+                    if low_vram():
+                        transformer_path = f"https://huggingface.co/city96/HunyuanVideo-I2V-gguf/blob/main/hunyuan-video-i2v-720p-Q4_K_S.gguf"
+                    else:
+                        transformer_path = f"https://huggingface.co/city96/HunyuanVideo-I2V-gguf/blob/main/hunyuan-video-i2v-720p-Q4_K_S.gguf"
+                        #transformer_path = f"https://huggingface.co/city96/HunyuanVideo-I2V-gguf/blob/main/hunyuan-video-i2v-720p-Q5_K_S.gguf"
+                # prompt to video
                 else:
                     print("HunyuanVideo: Load Prompt to Video Model")
-
-                    enabled_items = None
-
-                    lora_files = scene.lora_files
-                    enabled_names = []
-                    enabled_weights = []
-                    # Check if there are any enabled items before loading
-                    enabled_items = [item for item in lora_files if item.enabled]
-
-                    from diffusers.models import HunyuanVideoTransformer3DModel
-                    from diffusers.utils import export_to_video
-                    from diffusers import HunyuanVideoPipeline
-                    from diffusers import BitsAndBytesConfig
-                    from transformers import LlamaModel, CLIPTextModel
-                    from diffusers import GGUFQuantizationConfig
-
-
                     model_id = "hunyuanvideo-community/HunyuanVideo"
-
-                    quantization_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=torch.bfloat16)
-                    text_encoder = LlamaModel.from_pretrained(
-                        model_id, 
-                        subfolder="text_encoder", 
-                        quantization_config=quantization_config,
-                        torch_dtype=torch.float16
-                    )
-                    text_encoder_2 = CLIPTextModel.from_pretrained(
-                        model_id, 
-                        subfolder="text_encoder_2", 
-                        quantization_config=quantization_config,
-                        torch_dtype=torch.float16
-                    )
-                    
-#                    transformer = HunyuanVideoTransformer3DModel.from_pretrained(
-#                        model_id, 
-#                        subfolder="transformer",
-#                        quantization_config=quantization_config,
-#                        torch_dtype=torch.bfloat16
-#                    )
+                    from diffusers import HunyuanVideoPipeline
                     if low_vram():
                         transformer_path = f"https://huggingface.co/city96/HunyuanVideo-gguf/blob/main/hunyuan-video-t2v-720p-Q3_K_S.gguf"
                     else:
                         transformer_path = f"https://huggingface.co/city96/HunyuanVideo-gguf/blob/main/hunyuan-video-t2v-720p-Q4_K_S.gguf"
 
-                    transformer = HunyuanVideoTransformer3DModel.from_single_file(
-                        transformer_path,
-                        quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16),
-                        torch_dtype=torch.bfloat16,
+                enabled_items = None
+                lora_files = scene.lora_files
+                enabled_names = []
+                enabled_weights = []
+                # Check if there are any enabled items before loading
+                enabled_items = [item for item in lora_files if item.enabled]
+
+                from diffusers.models import HunyuanVideoTransformer3DModel
+                from diffusers.utils import export_to_video
+                from diffusers import BitsAndBytesConfig
+                from transformers import LlamaModel, CLIPTextModel
+                from diffusers import GGUFQuantizationConfig
+
+                quantization_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=torch.bfloat16)
+                transformer = HunyuanVideoTransformer3DModel.from_single_file(
+                    transformer_path,
+                    quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16),
+                    torch_dtype=torch.bfloat16,
+                )
+                
+                if (scene.image_path or scene.movie_path) and input == "input_strips":
+                    pipe = HunyuanVideoImageToVideoPipeline.from_pretrained(
+                        model_id, 
+                        #text_encoder=text_encoder,
+                        #text_encoder_2=text_encoder_2,
+                        transformer=transformer, 
+                        torch_dtype=torch.float16, 
+                    )                    
+                else:
+                    text_encoder = LlamaModel.from_pretrained(
+                        model_id,
+                        #"hunyuanvideo-community/HunyuanVideo", 
+                        subfolder="text_encoder", 
+                        quantization_config=quantization_config,
+                        torch_dtype=torch.float16
+                    )
+                    text_encoder_2 = CLIPTextModel.from_pretrained(
+                        model_id,
+                        #"hunyuanvideo-community/HunyuanVideo", 
+                        subfolder="text_encoder_2", 
+                        quantization_config=quantization_config,
+                        torch_dtype=torch.float16
                     )
                     pipe = HunyuanVideoPipeline.from_pretrained(
                         model_id, 
@@ -3795,19 +3817,19 @@ class SEQUENCER_OT_generate_movie(Operator):
 #                        torch_dtype=torch.float16
 #                    )
         
-                    if enabled_items:
-                        for item in enabled_items:
-                            enabled_names.append(
-                                (clean_filename(item.name)).replace(".", "")
-                            )
-                            enabled_weights.append(item.weight_value)
-                            pipe.load_lora_weights(
-                                bpy.path.abspath(scene.lora_folder),
-                                weight_name=item.name + ".safetensors",
-                                adapter_name=((clean_filename(item.name)).replace(".", "")),
-                            )
-                        pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)
-                        print("Load LoRAs: " + " ".join(enabled_names))          
+                if enabled_items:
+                    for item in enabled_items:
+                        enabled_names.append(
+                            (clean_filename(item.name)).replace(".", "")
+                        )
+                        enabled_weights.append(item.weight_value)
+                        pipe.load_lora_weights(
+                            bpy.path.abspath(scene.lora_folder),
+                            weight_name=item.name + ".safetensors",
+                            adapter_name=((clean_filename(item.name)).replace(".", "")),
+                        )
+                    pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)
+                    print("Load LoRAs: " + " ".join(enabled_names))          
             
                 if gfx_device == "mps":
                     pipe.vae.enable_tiling()
@@ -3816,7 +3838,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     pipe.enable_model_cpu_offload()
 
                 else:
-                    pipe.vae.enable_tiling()
+                    #pipe.vae.enable_tiling()
                     pipe.enable_model_cpu_offload()
 
             #Skyreel
@@ -3836,14 +3858,26 @@ class SEQUENCER_OT_generate_movie(Operator):
                     #import torch._dynamo.config
                     from diffusers import HunyuanSkyreelsImageToVideoPipeline, HunyuanVideoTransformer3DModel
                     from diffusers.utils import load_image, export_to_video
+                    from diffusers.hooks import apply_group_offloading
                     
                     #torch._dynamo.config.inline_inbuilt_nn_modules = True
                     
                     model_id = "hunyuanvideo-community/HunyuanVideo"
                     transformer_model_id = "newgenai79/SkyReels-V1-Hunyuan-I2V-int4"
+                    
                     transformer = HunyuanVideoTransformer3DModel.from_pretrained(
                         transformer_model_id, torch_dtype=torch.bfloat16, subfolder="transformer",
                     )
+
+                    apply_group_offloading(
+                        transformer,
+                        onload_device=torch.device("cuda"),
+                        offload_device=torch.device("cpu"),
+                        offload_type="block_level",
+                        num_blocks_per_group=2,
+                        use_stream=True,
+                    )
+                    
                     pipe = HunyuanSkyreelsImageToVideoPipeline.from_pretrained(
                         model_id, transformer=transformer, torch_dtype=torch.float16
                     )
@@ -3865,6 +3899,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         subfolder="transformer",
                         torch_dtype=torch.bfloat16
                     )
+                    transformer.enable_layerwise_casting(storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16)
                     pipe = HunyuanVideoPipeline.from_pretrained(model_id, transformer=transformer, torch_dtype=torch.float16)
 
                 if gfx_device == "mps":
@@ -3874,9 +3909,10 @@ class SEQUENCER_OT_generate_movie(Operator):
                     pipe.vae.enable_tiling()
                     pipe.enable_model_cpu_offload()                
                 else:
-                    #pipe.enable_sequential_cpu_offload()
-                    pipe.vae.enable_tiling()
                     pipe.enable_model_cpu_offload()                
+                    #pipe.enable_sequential_cpu_offload()
+                    #pipe.enable_xformers_memory_efficient_attention()
+                    #pipe.to("cuda")
 
             # Mochi
             elif movie_model_card == "genmo/mochi-1-preview":
@@ -3910,11 +3946,20 @@ class SEQUENCER_OT_generate_movie(Operator):
                     print("Wan2.1-T2V doesn't support img/vid2vid!")
                     return {"CANCELLED"}
 
-                from diffusers import AutoencoderKLWan, WanPipeline
+                #from diffusers import AutoencoderKLWan, WanPipeline
                 from diffusers.utils import export_to_video
+                from diffusers import WanPipeline, WanTransformer3DModel
+                import numpy as np
+                from diffusers.utils import export_to_video, load_image
+                from transformers import CLIPVisionModel
+                ckpt_path = "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/blob/main/split_files/diffusion_models/wan2.1_t2v_1.3B_bf16.safetensors"
+                #ckpt_path = "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/blob/main/split_files/diffusion_models/wan2.1_t2v_1.3B_bf16.safetensors"
+                transformer = WanTransformer3DModel.from_single_file(ckpt_path, torch_dtype=torch.bfloat16)
 
-                vae = AutoencoderKLWan.from_pretrained(movie_model_card, subfolder="vae", torch_dtype=torch.float32)
-                pipe = WanPipeline.from_pretrained(movie_model_card, vae=vae, torch_dtype=torch.bfloat16)
+                pipe = WanPipeline.from_pretrained("Wan-AI/Wan2.1-T2V-1.3B-Diffusers", transformer=transformer)
+
+#                vae = AutoencoderKLWan.from_pretrained(movie_model_card, subfolder="vae", torch_dtype=torch.float32)
+#                pipe = WanPipeline.from_pretrained(movie_model_card, vae=vae, torch_dtype=torch.bfloat16)
 
                 if gfx_device == "mps":
                     pass
@@ -3925,6 +3970,112 @@ class SEQUENCER_OT_generate_movie(Operator):
                     #pipe.enable_sequential_cpu_offload()
                     #pipe.vae.enable_tiling()
                     pipe.enable_model_cpu_offload()                   
+
+            elif movie_model_card == "Wan-AI/Wan2.1-I2V-14B-480P-Diffusers":
+                if (not scene.movie_path and not scene.image_path) and not input == "input_strips":
+                    print("Wan2.1-I2V doesn't support txt2vid!")
+                    return {"CANCELLED"}
+
+                print("Load: Wan2.1-I2V-14B-480P-Diffusers")
+#                from diffusers import AutoencoderKLWan, WanImageToVideoPipeline
+#                from diffusers.utils import export_to_video, load_image
+#                from transformers import CLIPVisionModel
+
+#                # Available models: Wan-AI/Wan2.1-I2V-14B-480P-Diffusers, Wan-AI/Wan2.1-I2V-14B-720P-Diffusers
+#                model_id = "Wan-AI/Wan2.1-I2V-14B-480P-Diffusers"
+#                image_encoder = CLIPVisionModel.from_pretrained(model_id, subfolder="image_encoder", torch_dtype=torch.float32)
+#                vae = AutoencoderKLWan.from_pretrained(model_id, subfolder="vae", torch_dtype=torch.float32)
+#                pipe = WanImageToVideoPipeline.from_pretrained(model_id, vae=vae, image_encoder=image_encoder, torch_dtype=torch.bfloat16)
+                from diffusers.utils import export_to_video
+                from diffusers import WanImageToVideoPipeline, WanTransformer3DModel
+                import numpy as np
+                from diffusers.utils import export_to_video, load_image
+                from transformers import CLIPVisionModel
+#                    import torch
+#                    from diffusers import HunyuanVideoImageToVideoPipeline, HunyuanVideoTransformer3DModel
+#                    from diffusers.utils import load_image, export_to_video
+
+                model_id = "Wan-AI/Wan2.1-I2V-14B-480P-Diffusers"
+#                    transformer = HunyuanVideoTransformer3DModel.from_pretrained(
+#                        model_id, subfolder="transformer", torch_dtype=torch.bfloat16
+#                    )
+#                    pipe = HunyuanVideoImageToVideoPipeline.from_pretrained(
+#                        model_id, transformer=transformer, torch_dtype=torch.float16
+#                    )
+                if low_vram():
+                    transformer_path = f"https://huggingface.co/city96/Wan2.1-I2V-14B-480P-gguf/blob/main/wan2.1-i2v-14b-480p-Q3_K_S.gguf"
+                else:
+                    transformer_path = f"https://huggingface.co/city96/Wan2.1-I2V-14B-480P-gguf/blob/main/hwan2.1-i2v-14b-480p-Q4_K_S.gguf"
+                    #transformer_path = f"https://huggingface.co/city96/HunyuanVideo-I2V-gguf/blob/main/hunyuan-video-i2v-720p-Q5_K_S.gguf"
+
+#                else:
+#                    print("HunyuanVideo: Load Prompt to Video Model")
+#                    model_id = "hunyuanvideo-community/HunyuanVideo"
+#                    from diffusers import HunyuanVideoPipeline
+#                    if low_vram():
+#                        transformer_path = f"https://huggingface.co/city96/Wan2.1-I2V-14B-480P-gguf/blob/main/hunyuan-video-t2v-720p-Q3_K_S.gguf"
+#                    else:
+#                        transformer_path = f"https://huggingface.co/city96/Wan2.1-I2V-14B-480P-gguf/blob/main/hunyuan-video-t2v-720p-Q4_K_S.gguf"
+
+                enabled_items = None
+                lora_files = scene.lora_files
+                enabled_names = []
+                enabled_weights = []
+                # Check if there are any enabled items before loading
+                enabled_items = [item for item in lora_files if item.enabled]
+
+                #from diffusers.models import HunyuanVideoTransformer3DModel
+                #from diffusers.utils import export_to_video
+                from diffusers import BitsAndBytesConfig
+                from transformers import LlamaModel, CLIPTextModel
+                from diffusers import GGUFQuantizationConfig
+
+                quantization_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=torch.bfloat16)
+                text_encoder = LlamaModel.from_pretrained(
+                    model_id,
+                    subfolder="text_encoder", 
+                    quantization_config=quantization_config,
+                    torch_dtype=torch.float16
+                )
+#                text_encoder_2 = CLIPTextModel.from_pretrained(
+#                    model_id,
+#                    subfolder="text_encoder_2", 
+#                    quantization_config=quantization_config,
+#                    torch_dtype=torch.float16
+#                )
+                
+                if scene.image_path and input == "input_strips":
+                    transformer = WanTransformer3DModel.from_single_file(
+                        model_id,
+                        transformer_path, 
+#                        subfolder="transformer",
+#                        quantization_config=quantization_config,
+#                        transformer_path,
+                        quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16),
+                        torch_dtype=torch.bfloat16
+                    )
+                    pipe = WanImageToVideoPipeline.from_pretrained(
+                        model_id, 
+                        text_encoder=text_encoder,
+                        #text_encoder_2=text_encoder_2,
+                        transformer=transformer, 
+                        torch_dtype=torch.float16, 
+                    )   
+#                ckpt_path = "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/blob/main/split_files/diffusion_models/wan2.1_i2v_480p_14B_fp16.safetensors"
+#                #ckpt_path = "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/blob/main/split_files/diffusion_models/wan2.1_t2v_1.3B_bf16.safetensors"
+#                transformer = WanTransformer3DModel.from_single_file(ckpt_path, torch_dtype=torch.bfloat16)
+
+#                pipe = WanImageToVideoPipeline.from_pretrained("Wan-AI/Wan2.1-I2V-14B-480P-Diffusers", transformer=transformer)
+#                
+#                if gfx_device == "mps":
+#                    pass
+#                elif low_vram():
+#                    # pipe.enable_vae_slicing()
+#                    pipe.enable_model_cpu_offload()                
+#                else:
+#                    #pipe.enable_sequential_cpu_offload()
+#                    #pipe.vae.enable_tiling()
+#                    pipe.enable_model_cpu_offload() 
 
             else:
                 from diffusers import TextToVideoSDPipeline
@@ -4297,13 +4448,81 @@ class SEQUENCER_OT_generate_movie(Operator):
                         num_frames=abs(duration),
                         generator=generator,
                         max_sequence_length=512,
-                    ).frames[0]                    
+                    ).frames[0] 
+                    
+                elif movie_model_card == "hunyuanvideo-community/HunyuanVideo":
+                         
+                    from diffusers.utils import load_image, export_to_video
+                    if scene.movie_path:
+                        print("Process: Video Image to Video (Hunyuan-I2V)")
+                        if not os.path.isfile(scene.movie_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        image = load_first_frame(bpy.path.abspath(scene.movie_path))
+                    if scene.image_path:
+                        print("Process: Image to video (Hunyuan-I2V)")
+                        if not os.path.isfile(scene.image_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        image = load_image(bpy.path.abspath(scene.image_path))
+                    #                    image = image.resize(
+                    #                        (closest_divisible_32(int(x)), closest_divisible_32(int(y)))
+                    #                    )
+                    video_frames = pipe(
+                        image=image,
+                        prompt=prompt,
+                        negative_prompt=negative_prompt,
+                        num_inference_steps=movie_num_inference_steps,
+                        guidance_scale=movie_num_guidance,
+                        height=y,
+                        width=x,
+                        num_frames=abs(duration),
+                        generator=generator,
+                        max_sequence_length=512,
+                    ).frames[0] 
+                    
+                elif movie_model_card == "Wan-AI/Wan2.1-I2V-14B-480P-Diffusers":
+                    from diffusers.utils import load_image, export_to_video
+                    import numpy as np
+                    if scene.movie_path:
+                        print("Process: Video Image to Video (Wan2.1-I2V-14B-480P-Diffusers)")
+                        if not os.path.isfile(scene.movie_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        image = load_first_frame(bpy.path.abspath(scene.movie_path))
+                    if scene.image_path:
+                        print("Process: Image to video (Wan2.1-I2V-14B-480P-Diffusers)")
+                        if not os.path.isfile(scene.image_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        image = load_image(bpy.path.abspath(scene.image_path))
+                    #                    image = image.resize(
+                    #                        (closest_divisible_32(int(x)), closest_divisible_32(int(y)))
+                    #                    )
+#                    max_area = 480 * 832
+#                    aspect_ratio = image.height / image.width
+#                    mod_value = pipe.vae_scale_factor_spatial * pipe.transformer.config.patch_size[1]
+#                    height = round(np.sqrt(max_area * aspect_ratio)) // mod_value * mod_value
+#                    width = round(np.sqrt(max_area / aspect_ratio)) // mod_value * mod_value
+#                    image = image.resize((width, height))
+                    video_frames = pipe(
+                        image=image,
+                        prompt=prompt,
+                        negative_prompt=negative_prompt,
+                        num_inference_steps=movie_num_inference_steps,
+                        guidance_scale=movie_num_guidance,
+                        height=y,
+                        width=x,
+                        num_frames=abs(duration),
+                        generator=generator,
+                        max_sequence_length=512,
+                    ).frames[0]                                              
                 elif (
                     movie_model_card != "Hailuo/MiniMax/txt2vid"
                     and movie_model_card != "Hailuo/MiniMax/img2vid"
                     and movie_model_card != "Hailuo/MiniMax/subject2vid"
                     and movie_model_card != "Wan-AI/Wan2.1-T2V-1.3B-Diffusers"
-                ):
+                ): #something is broken here?
                     if scene.movie_path:
                         print("Process: Video to video")
                         if not os.path.isfile(scene.movie_path):
@@ -5607,6 +5826,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
         if not seq_editor:
             scene.sequence_editor_create()
+            
         try:
             from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
             from diffusers.utils import pt_to_pil
@@ -5625,7 +5845,7 @@ class SEQUENCER_OT_generate_image(Operator):
         # from compel import Compel
 
         except ModuleNotFoundError:
-            print("Dependencies needs to be installed in the add-on preferences.")
+            print("Dependencies needs to be installed in the add-on preferences. "+str(ModuleNotFoundError))
             self.report(
                 {"INFO"},
                 "Dependencies needs to be installed in the add-on preferences.",
