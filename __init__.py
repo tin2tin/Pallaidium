@@ -867,7 +867,8 @@ def install_modules(self):
             ("flash_attn", "https://huggingface.co/lldacing/flash-attention-windows-wheel/blob/main/flash_attn-2.7.0.post2%2Bcu124torch2.5.1cxx11abiFALSE-cp311-cp311-win_amd64.whl"),
             #("flash_attn", "git+https://github.com/ROCm/flash-attention.git"),
             #("flash_attn", "https://github.com/oobabooga/flash-attention/releases/download/v2.6.3/flash_attn-2.6.3+cu122torch2.3.1cxx11abiFALSE-cp311-cp311-win_amd64.whl"),
-            ("triton", "https://github.com/woct0rdho/triton-windows/releases/download/v3.2.0-windows.post10/triton-3.2.0-cp311-cp311-win_amd64.whl"),
+            ("triton", "https://hf-mirror.com/LightningJay/triton-2.1.0-python3.11-win_amd64-wheel/resolve/main/triton-2.1.0-cp311-cp311-win_amd64.whl"),
+            #("triton", "https://github.com/woct0rdho/triton-windows/releases/download/v3.2.0-windows.post10/triton-3.2.0-cp311-cp311-win_amd64.whl"),
             # Use this for low cards/cuda?
             #("triton", "https://hf-mirror.com/LightningJay/triton-2.1.0-python3.11-win_amd64-wheel/resolve/main/triton-2.1.0-cp311-cp311-win_amd64.whl"),
         ]
