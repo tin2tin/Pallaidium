@@ -1,3 +1,8 @@
+> [!WARNING]
+> SCAM ALERT!
+> Scammers are misusing our free software, Pallaidium, along with our content and name, on a phishing site: pallaidium . com. We are NOT associated with this site!
+> 🚨 Please help us report this scam — otherwise, we may be forced to delete this GitHub repository.
+
 <h1 align="center">PALLAIDIUM</h1>
 
 <p align="center">A free generative AI movie studio integrated into the Blender Video Editor.</p>
