@@ -85,6 +85,7 @@ On Linux and macOS: ~/.cache/huggingface/hub
 On Windows: %userprofile%\\.cache\huggingface\hub
 
 ## Change Log
+* 2025-5-08: FramePack, Img+txt for MMAudio, Flux De-distilled
 * 2025-4-11: Improved LTX 0.95, MetaData, StripPicker, Wan t2i
 * 2025-2-25: Add: MMAudio for Video to Sync Audio 
 * 2025-2-21: Support for Skywork/SkyReels-V1-Hunyuan-T2V/I2V. Need a full update of dependencies! (Thx newgenai79 for int4 transformer)
@@ -309,6 +310,7 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 - The [Diffusers](https://github.com/huggingface/diffusers) lib makes the following weights accessible through the Pallaidium UI:
 
 ### Video:
+- [FramePack](https://github.com/lllyasviel/FramePack)
 - [SkyReels-V1-Hunyuan-I2V/T2V](https://huggingface.co/Skywork/SkyReels-V1-Hunyuan-I2V)
 - [HunyuanVideo](https://huggingface.co/tencent/HunyuanVideo)
 - [Lightricks/LTX-Video](https://huggingface.co/Lightricks/LTX-Video)
