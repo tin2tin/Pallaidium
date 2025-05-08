@@ -85,7 +85,7 @@ On Linux and macOS: ~/.cache/huggingface/hub
 On Windows: %userprofile%\\.cache\huggingface\hub
 
 ## Change Log
-* 2025-5-08: FramePack, Img+txt for MMAudio, Flux De-distilled
+* 2025-5-08: FramePack (Img/+Last Img), Img+txt for MMAudio, Flux De-distilled
 * 2025-4-11: Improved LTX 0.95, MetaData, StripPicker, Wan t2i
 * 2025-2-25: Add: MMAudio for Video to Sync Audio 
 * 2025-2-21: Support for Skywork/SkyReels-V1-Hunyuan-T2V/I2V. Need a full update of dependencies! (Thx newgenai79 for int4 transformer)
