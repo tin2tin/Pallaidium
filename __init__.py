@@ -15,8 +15,8 @@
 bl_info = {
     "name": "Pallaidium - Generative AI",
     "author": "tintwotin",
-    "version": (2, 2),
-    "blender": (4, 4, 0),
+    "version": (2, 1),
+    "blender": (3, 4, 0),
     "location": "Video Sequence Editor > Sidebar > Generative AI",
     "description": "AI Generate media in the VSE",
     "category": "Sequencer",
@@ -26,7 +26,7 @@ bl_info = {
 # Added FramePack img and fflf.
 # Image & text to audio w. MMaudio.
 # Clean-up dead models.
-# Flux De-desitlled
+#
 
 
 import bpy
@@ -7982,34 +7982,28 @@ class SEQUENCER_OT_generate_image(Operator):
                     if image_model_card == "ostris/Flex.2-preview":
                         image_model_card = "ostris/Flex.1-alpha"
                     print("Process Inpaint: " + image_model_card)
+                    inference_parameters = {
+                        "prompt": prompt,
+                        # "prompt_2": None, # Uncomment if your pipe supports/requires it
+                        "max_sequence_length": 512,
+                        "image": init_image,
+                        "mask_image": mask_image,
+                        "num_inference_steps": image_num_inference_steps, # Ensure this has a value
+                        "guidance_scale": image_num_guidance,            # Ensure this has a value
+                        "height": y,
+                        "width": x,
+                        "generator": generator,
+                        # "padding_mask_crop": 42, # Uncomment if needed
+                        # "strength": 0.5,       # Uncomment if needed
+                    }
+
                     if image_model_card == "black-forest-labs/FLUX.1-schnell":
-                        image_num_guidance = 0
-                        image_num_inference_steps = 4
-                        inference_parameters = {
-                            "prompt": prompt,
-                            "max_sequence_length": 512,
-                            "image": init_image,
-                            "mask_image": mask_image,
-                            "num_inference_steps": image_num_inference_steps,
-                            "guidance_scale": image_num_guidance,
-                            "height": y,
-                            "width": x,
-                            "generator": generator,
-                        }
+                        # Override specific parameters for FLUX
+                        inference_parameters["guidance_scale"] = 0
+                        inference_parameters["num_inference_steps"] = 4
+
                     image = pipe(
-                        **inference_parameters,
-#                        prompt=prompt,
-#                        # prompt_2=None,
-#                        max_sequence_length=512,
-#                        image=init_image,
-#                        mask_image=mask_image,
-#                        num_inference_steps=image_num_inference_steps,
-#                        guidance_scale=image_num_guidance,
-#                        height=y,
-#                        width=x,
-#                        generator=generator,
-                        # padding_mask_crop=42,
-                        # strength=0.5,
+                        **inference_parameters
                     ).images[0]
 
                 elif image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
@@ -9072,12 +9066,13 @@ class SEQUENCER_OT_ai_strip_picker(Operator):
             for strip in context.scene.sequence_editor.sequences_all:
                 # Calculate the vertical bounds of the strip in view space
                 # Assuming each channel has a nominal height of 1.0 in view space
-                strip_y_min_view = strip.channel - 0.5 * strip.transform.scale_y  # Consider the scaled height
-                strip_y_max_view = strip.channel + 0.5 * strip.transform.scale_y
+#                strip_y_min_view = strip.channel - 0.5 * strip.transform.scale_y  # Consider the scaled height
+#                strip_y_max_view = strip.channel + 0.5 * strip.transform.scale_y
 
                 if (
                     strip.frame_start <= mouse_x_view < strip.frame_final_end and
-                    strip_y_min_view <= mouse_y_view < strip_y_max_view
+                    (strip.type == "IMAGE" or strip.type =="MOVIE")#and
+                    #strip_y_min_view <= mouse_y_view < strip_y_max_view
                 ):
                     self.perform_action(context, strip)
                     context.window.cursor_modal_restore()
