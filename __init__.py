@@ -3941,10 +3941,12 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                     elif scene.image_path:
                         print("Process: Image to SVD Video")
-                        if not os.path.isfile(scene.image_path):
+                        strip = scene.sequence_editor.active_strip
+                        img_path = os.path.join(bpy.path.abspath(strip.directory), strip.elements[0].filename)
+                        if not os.path.isfile(img_path):
                             print("No file found.")
                             return {"CANCELLED"}
-                        image = load_image(bpy.path.abspath(scene.image_path))
+                        image = load_image(img_path)
 
                     image = image.resize(
                         (closest_divisible_32(int(x)), closest_divisible_32(int(y)))
@@ -4003,10 +4005,12 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                     elif scene.image_path:
                         print("Process: Image to video (CogVideoX)")
-                        if not os.path.isfile(scene.image_path):
+                        strip = scene.sequence_editor.active_strip
+                        img_path = os.path.join(bpy.path.abspath(strip.directory), strip.elements[0].filename)
+                        if not os.path.isfile(img_path):
                             print("No file found.")
                             return {"CANCELLED"}
-                        image = load_image(bpy.path.abspath(scene.image_path))
+                        image = load_image(img_path)
                         image = image.resize(
                             (closest_divisible_32(int(x)), closest_divisible_32(int(y)))
                         )
@@ -4027,18 +4031,21 @@ class SEQUENCER_OT_generate_movie(Operator):
                 # LTX
                 elif movie_model_card == "Lightricks/LTX-Video":
                     if scene.movie_path:
-                        print("Process: Video Image to Video")
-                        if not os.path.isfile(scene.movie_path):
+                        print("Process: Video to Video")
+                        if not os.path.isfile(bpy.path.abspath(scene.movie_path)):
                             print("No file found.")
                             return {"CANCELLED"}
                         image = load_video(bpy.path.abspath(scene.movie_path))
                         #image = load_first_frame(bpy.path.abspath(scene.movie_path))
-                    if scene.image_path:
+                    if scene.image_path: 
+                        strip = scene.sequence_editor.active_strip
                         print("Process: Image to video (LTX)")
-                        if not os.path.isfile(scene.image_path):
+                        img_path = os.path.join(bpy.path.abspath(strip.directory), strip.elements[0].filename)
+                        print("Path: "+img_path)
+                        if not os.path.isfile(img_path):
                             print("No file found.")
                             return {"CANCELLED"}
-                        image = load_image(bpy.path.abspath(scene.image_path))
+                        image = load_image(img_path)
                     #                    image = image.resize(
                     #                        (closest_divisible_32(int(x)), closest_divisible_32(int(y)))
                     #                    )
@@ -4069,10 +4076,13 @@ class SEQUENCER_OT_generate_movie(Operator):
                         image = load_first_frame(bpy.path.abspath(scene.movie_path))
                     if scene.image_path:
                         print("Process: Image to video (SkyReels-V1-Hunyuan-T2V)")
-                        if not os.path.isfile(scene.image_path):
+                        strip = scene.sequence_editor.active_strip
+                        img_path = os.path.join(bpy.path.abspath(strip.directory), strip.elements[0].filename)
+                        print("Path: "+img_path)
+                        if not os.path.isfile(img_path):
                             print("No file found.")
                             return {"CANCELLED"}
-                        image = load_image(bpy.path.abspath(scene.image_path))
+                        image = load_image(img_path)
                     #                    image = image.resize(
                     #                        (closest_divisible_32(int(x)), closest_divisible_32(int(y)))
                     #                    )
@@ -4100,10 +4110,12 @@ class SEQUENCER_OT_generate_movie(Operator):
                         image = load_first_frame(bpy.path.abspath(scene.movie_path))
                     if scene.image_path:
                         print("Process: Image to video (Hunyuan-I2V)")
-                        if not os.path.isfile(scene.image_path):
+                        strip = scene.sequence_editor.active_strip
+                        img_path = os.path.join(bpy.path.abspath(strip.directory), strip.elements[0].filename)
+                        if not os.path.isfile(img_path):
                             print("No file found.")
                             return {"CANCELLED"}
-                        image = load_image(bpy.path.abspath(scene.image_path))
+                        image = load_image(img_path)
                     #                    image = image.resize(
                     #                        (closest_divisible_32(int(x)), closest_divisible_32(int(y)))
                     #                    )
@@ -4134,10 +4146,12 @@ class SEQUENCER_OT_generate_movie(Operator):
                         image = load_first_frame(bpy.path.abspath(scene.movie_path))
                     if scene.image_path:
                         print("Process: Image to video (FramePack)")
-                        if not os.path.isfile(scene.image_path):
+                        strip = scene.sequence_editor.active_strip
+                        img_path = os.path.join(bpy.path.abspath(strip.directory), strip.elements[0].filename)
+                        if not os.path.isfile(img_path):
                             print("No file found.")
                             return {"CANCELLED"}
-                        image = load_image(bpy.path.abspath(scene.image_path))
+                        image = load_image(img_path)
 #                        image = image.resize(
 #                            (closest_divisible_32(int(x)), closest_divisible_32(int(y)))
 #                        )
@@ -4193,10 +4207,12 @@ class SEQUENCER_OT_generate_movie(Operator):
                         image = load_first_frame(bpy.path.abspath(scene.movie_path))
                     if scene.image_path:
                         print("Process: Image to video (Wan2.1-I2V-14B-480P-Diffusers)")
-                        if not os.path.isfile(scene.image_path):
+                        strip = scene.sequence_editor.active_strip
+                        img_path = os.path.join(bpy.path.abspath(strip.directory), strip.elements[0].filename)
+                        if not os.path.isfile(img_path):
                             print("No file found.")
                             return {"CANCELLED"}
-                        image = load_image(bpy.path.abspath(scene.image_path))
+                        image = load_image(img_path)
                     #                    image = image.resize(
                     #                        (closest_divisible_32(int(x)), closest_divisible_32(int(y)))
                     #                    )
@@ -4231,9 +4247,12 @@ class SEQUENCER_OT_generate_movie(Operator):
                             return {"CANCELLED"}
                     elif scene.image_path:
                         print("Process: Image to video")
-                        if not os.path.isfile(scene.image_path):
+                        strip = scene.sequence_editor.active_strip
+                        img_path = os.path.join(bpy.path.abspath(strip.directory), strip.elements[0].filename)
+                        if not os.path.isfile(img_path):
                             print("No file found.")
                             return {"CANCELLED"}
+                        image = load_image(img_path)
 
                     video = load_video_as_np_array(video_path)
                     video = process_image(
@@ -5202,10 +5221,13 @@ class SEQUENCER_OT_generate_audio(Operator):
 
                 elif scene.image_path:
                     print("Process: Image to audio")
-                    if not os.path.isfile(scene.image_path):
-                        print("No file found.")
-                        return {"CANCELLED"}
-                    video_path = scene.image_path
+                        strip = scene.sequence_editor.active_strip
+                        img_path = os.path.join(bpy.path.abspath(strip.directory), strip.elements[0].filename)
+                        if not os.path.isfile(img_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        image = load_image(img_path)
+                    video_path = img_path
                     image_data = load_image(scene.image_path)
                     clip_frames = image_data.clip_frames
                     sync_frames = image_data.sync_frames
