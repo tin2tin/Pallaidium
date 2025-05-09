@@ -5221,11 +5221,11 @@ class SEQUENCER_OT_generate_audio(Operator):
 
                 elif scene.image_path:
                     print("Process: Image to audio")
-                        strip = scene.sequence_editor.active_strip
-                        img_path = os.path.join(bpy.path.abspath(strip.directory), strip.elements[0].filename)
-                        if not os.path.isfile(img_path):
-                            print("No file found.")
-                            return {"CANCELLED"}
+                    strip = scene.sequence_editor.active_strip
+                    img_path = os.path.join(bpy.path.abspath(strip.directory), strip.elements[0].filename)
+                    if not os.path.isfile(img_path):
+                        print("No file found.")
+                        return {"CANCELLED"}
                         image = load_image(img_path)
                     video_path = img_path
                     image_data = load_image(scene.image_path)
