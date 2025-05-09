@@ -775,40 +775,6 @@ def ensure_unique_filename(file_name):
         return file_name
 
 
-#def import_module(self, module, install_module):
-#    show_system_console(True)
-#    set_system_console_topmost(True)
-#    module = str(module)
-#    python_exe = python_exec()
-
-#    #    try:
-#    #        #exec("import " + module)
-#    #        subprocess.call([python_exe, "import ", module])
-#    #    except:
-#    self.report({"INFO"}, "Installing: " + module + " module.")
-#    print("\nInstalling: " + module + " module")
-#    subprocess.call(
-#        [
-#            python_exe,
-#            "-m",
-#            "pip",
-#            "install",
-#            "--disable-pip-version-check",
-#            "--use-deprecated=legacy-resolver",
-#            install_module,
-#            "--no-warn-script-location",
-#            "--upgrade",
-#        ]
-#    )
-
-#    #    try:
-#    #        exec("import " + module)
-#    #    except ModuleNotFoundError:
-#    #        print("Module not found: " + module)
-#    #        return False
-#    return True
-
-
 def parse_python_version(version_info):
     major, minor = version_info[:2]
     return f"{major}.{minor}"
@@ -1049,424 +1015,6 @@ def install_modules(self):
 
     self.report({"INFO"}, "All modules installed successfully.")
 
-#def install_modules(self):
-#    os_platform = platform.system()
-#    pybin = python_exec()
-
-#    def ensure_pip():
-#        print("Ensuring: pip")
-#        try:
-#            subprocess.check_call([pybin, "-m", "ensurepip"])
-#        except ImportError:
-#            subprocess.check_call([pybin, "-m", "pip", "install", "--upgrade", "pip"])
-
-#    def install_module(name, package=None):
-#        if package is None:
-#            package = name
-#        return import_module(self, name, package)
-
-#    ensure_pip()
-
-#    # Common modules
-#    common_modules = [
-
-#        ("requests", "requests"),
-#        ("huggingface_hub", "huggingface_hub"),
-#        ("gguf", "gguf"),
-#        ("pydub", "pydub"),
-#        ("sentencepiece", "sentencepiece"),
-#        ("safetensors", "safetensors"),
-#        ("cv2", "opencv_python"),
-#        ("PIL", "pillow"),
-#        ("IPython", "IPython"),
-#        ("omegaconf", "omegaconf"),
-#        ("aura_sr", "aura-sr"),
-#        ("stable_audio_tools", "stable-audio-tools"),
-#        ("beautifulsoup4", "beautifulsoup4"),
-#        ("ftfy", "ftfy"),
-#        ("imageio", "imageio[ffmpeg]==2.4.1"),
-#        ("imageio", "imageio-ffmpeg"),
-#        ("imWatermark", "imWatermark"),
-#        ("mediapipe", "mediapipe"),
-#        ("scipy", "scipy==1.12.0"),
-#        ("protobuf", "protobuf==3.20.1"),
-#        ("scikit_learn", "scikit-learn==1.2.2"),
-#        ("bitsandbytes", "bitsandbytes"),
-#        ("numpy", "numpy==1.26.4"),
-#    ]
-
-#    for module in common_modules:
-#        install_module(*module)
-
-#    # Platform-specific modules
-#    if os_platform == "Windows":
-#        # Windows-specific modules
-#        windows_modules = [
-#            ("diffusers", "git+https://github.com/huggingface/diffusers.git"),
-#            ("deepspeed", "https://github.com/daswer123/deepspeed-windows/releases/download/13.1/deepspeed-0.13.1+cu121-cp311-cp311-win_amd64.whl"),
-#            ("resemble_enhance", "git+https://github.com/tin2tin/resemble-enhance-windows.git"),
-#            ("flash_attn", "https://github.com/oobabooga/flash-attention/releases/download/v2.6.3/flash_attn-2.6.3+cu122torch2.3.1cxx11abiFALSE-cp311-cp311-win_amd64.whl"),
-#            ("triton", "https://hf-mirror.com/LightningJay/triton-2.1.0-python3.11-win_amd64-wheel/resolve/main/triton-2.1.0-cp311-cp311-win_amd64.whl"),
-#        ]
-
-#        for module in windows_modules:
-#            install_module(*module)
-
-#        # Install via pip directly
-#        subprocess.check_call([
-#            pybin, "-m", "pip", "install", "--disable-pip-version-check",
-#            "--use-deprecated=legacy-resolver", "tensorflow", "--upgrade"
-#        ])
-
-#    else:
-#        # Linux/macOS modules
-#        install_module("diffusers", "git+https://github.com/huggingface/diffusers.git")
-#        install_module("deepspeed", "deepspeed==0.14.4")
-#        install_module("resemble_enhance", "resemble-enhance")
-#        install_module("flash_attn", "flash-attn")
-#        install_module("triton", "triton")
-
-#    # Python version-specific modules
-#    python_version_info = sys.version_info
-#    python_version_str = version.parse(".".join(map(str, python_version_info[:3])))
-#    if python_version_str >= version.parse("3.8"):
-#        install_module("image_gen_aux", "git+https://github.com/huggingface/image_gen_aux")
-
-#    # Additional modules
-#    subprocess.check_call([
-#        pybin, "-m", "pip", "install", "--disable-pip-version-check",
-#        "--use-deprecated=legacy-resolver", "controlnet-aux", "--no-warn-script-location",
-#        "--upgrade"
-#    ])
-
-#    # Torch installation
-#    if os_platform == "Windows":
-#        subprocess.check_call([
-#            pybin, "-m", "pip", "uninstall", "-y", "torch", "torchvision", "torchaudio", "xformers"
-#        ])
-#
-#        subprocess.check_call([
-#            pybin, "-m", "pip", "install", "torch==2.4.0+cu121", "xformers", "torchvision",
-#            "--index-url", "https://download.pytorch.org/whl/cu121", "--no-warn-script-location",
-#            "--upgrade"
-#        ])
-
-#        subprocess.check_call([
-#            pybin, "-m", "pip", "install", "torchaudio==2.4.0+cu121",
-#            "--index-url", "https://download.pytorch.org/whl/cu121", "--no-warn-script-location",
-#            "--upgrade"
-#        ])
-#    else:
-#        install_module("torch", "torch")
-#        install_module("torchvision", "torchvision")
-#        install_module("torchaudio", "torchaudio")
-#        install_module("xformers", "xformers")
-#        install_module("torchao", "torchao")
-
-#    # Final cleanup
-#    subprocess.check_call(
-#        [pybin, "-m", "pip", "install", "--disable-pip-version-check", "peft", "--upgrade"]
-#    )
-#    install_module("transformers", "transformers==4.46.0")
-#    import_module(self, "numpy", "numpy==1.26.4")
-#
-#    # Cleanup cache
-#    print("Cleaning up cache...")
-#    subprocess.check_call([pybin, "-m", "pip", "cache", "purge"])
-#    subprocess.check_call([pybin, "-m", "pip", "list"])
-##def install_modules(self):
-#    os_platform = platform.system()
-#    app_path = site.USER_SITE
-
-#    pybin = python_exec()
-#    print("Ensuring: pip")
-
-#    try:
-#        subprocess.call([pybin, "-m", "ensurepip"])
-#    except ImportError:
-#        subprocess.call([pybin, "-m", "pip", "install", "--upgrade", "pip"])
-#        pass
-
-#    # import_module(self, "diffusers", "diffusers")
-#    import_module(self, "requests", "requests")
-#    # import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git@refs/pull/10330/head") #ltx
-#    import_module(self, "diffusers", "git+https://github.com/huggingface/diffusers.git")
-
-#    import_module(self, "huggingface_hub", "huggingface_hub")
-#    import_module(self, "gguf", "gguf")
-#    # import_module(self, "protobuf", "protobuf==3.20.1")
-#    import_module(self, "pydub", "pydub")
-
-#    if os_platform == "Windows":
-#        # import_module(self, "deepspeed", "https://github.com/daswer123/deepspeed-windows/releases/download/13.1/deepspeed-0.13.1+cu121-cp311-cp311-win_amd64.whl")
-#        subprocess.call(
-#            [
-#                pybin,
-#                "-m",
-#                "pip",
-#                "install",
-#                "--disable-pip-version-check",
-#                "--use-deprecated=legacy-resolver",
-#                "https://github.com/daswer123/deepspeed-windows/releases/download/13.1/deepspeed-0.13.1+cu121-cp311-cp311-win_amd64.whl",
-#                "--no-warn-script-location",
-#                "--upgrade",
-#            ]
-#        )
-
-#        # resemble-enhance:
-#        subprocess.call(
-#            [
-#                pybin,
-#                "-m",
-#                "pip",
-#                "install",
-#                "--disable-pip-version-check",
-#                "--use-deprecated=legacy-resolver",
-#                "git+https://github.com/tin2tin/resemble-enhance-windows.git",
-#                "--no-warn-script-location",
-#                "--upgrade",
-#            ]  # "--no-dependencies",
-#        )
-#        # deep_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deepspeed/deepspeed-0.12.4+unknown-py3-none-any.whl")
-#    else:
-#        import_module(self, "deepspeed", "deepspeed==0.14.4")
-#        import_module(self, "resemble_enhance", "resemble-enhance")
-
-#    subprocess.check_call(
-#        [
-#            pybin,
-#            "-m",
-#            "pip",
-#            "install",
-#            "--disable-pip-version-check",
-#            "--use-deprecated=legacy-resolver",
-#            "tensorflow",
-#            "--upgrade",
-#        ]
-#    )
-
-#    import_module(self, "sentencepiece", "sentencepiece")
-#    import_module(self, "safetensors", "safetensors")
-#    import_module(self, "cv2", "opencv_python")
-#    import_module(self, "PIL", "pillow")
-#    import_module(self, "IPython", "IPython")
-#    import_module(self, "omegaconf", "omegaconf")
-#    import_module(self, "aura_sr", "aura-sr")
-#    import_module(self, "stable_audio_tools", "stable-audio-tools")
-
-#    if os_platform == "Windows":
-#        pass
-#        import_module(
-#            self,
-#            "flash_attn",
-#            "https://github.com/oobabooga/flash-attention/releases/download/v2.6.3/flash_attn-2.6.3+cu122torch2.3.1cxx11abiFALSE-cp311-cp311-win_amd64.whl",
-#        )
-#    else:
-#        import_module(self, "flash_attn", "flash-attn")
-
-#    subprocess.call(
-#        [
-#            pybin,
-#            "-m",
-#            "pip",
-#            "install",
-#            "--disable-pip-version-check",
-#            "--use-deprecated=legacy-resolver",
-#            "controlnet-aux",
-#            "--no-warn-script-location",
-#            "--upgrade",
-#        ]
-#    )
-
-#    import_module(self, "beautifulsoup4", "beautifulsoup4")
-#    import_module(self, "ftfy", "ftfy")
-
-#    python_version_info = sys.version_info
-#    python_version_str = parse_python_version(python_version_info)
-
-#    import_module(self, "imageio", "imageio[ffmpeg]==2.4.1")
-#    import_module(self, "imageio", "imageio-ffmpeg")
-#    import_module(self, "imWatermark", "imWatermark")
-#    import_module(
-#        self, "parler_tts", "git+https://github.com/huggingface/parler-tts.git"
-#    )
-#    import_module(self, "laion_clap", "laion-clap==1.1.6")
-
-#    if os_platform == "Windows":
-#        subprocess.call(
-#            [
-#                pybin,
-#                "-m",
-#                "pip",
-#                "install",
-#                "--disable-pip-version-check",
-#                "--use-deprecated=legacy-resolver",
-#                #"https://github.com/woct0rdho/triton-windows/releases/download/v3.2.0-windows.post9/triton-3.2.0-cp311-cp311-win_amd64.whl",
-#                "https://hf-mirror.com/LightningJay/triton-2.1.0-python3.11-win_amd64-wheel/resolve/main/triton-2.1.0-cp311-cp311-win_amd64.whl",
-#                "--no-warn-script-location",
-#                "--upgrade",
-#            ]
-#        )
-#    else:
-#        try:
-#            exec("import triton")
-#        except ModuleNotFoundError:
-#            import_module(self, "triton", "triton")
-
-#    import_module(self, "mediapipe", "mediapipe")
-#    import_module(
-#        self, "image_gen_aux", "git+https://github.com/huggingface/image_gen_aux"
-#    )
-
-#    subprocess.call(
-#        [
-#            pybin,
-#            "-m",
-#            "pip",
-#            "install",
-#            "--disable-pip-version-check",
-#            "--use-deprecated=legacy-resolver",
-#            "ultralytics",
-#            "--no-warn-script-location",
-#            "--upgrade",
-#        ]
-#    )
-#    subprocess.call(
-#        [
-#            pybin,
-#            "-m",
-#            "pip",
-#            "install",
-#            "--disable-pip-version-check",
-#            "--use-deprecated=legacy-resolver",
-#            "git+https://github.com/tin2tin/adetailer_sdxl.git",
-#        ]
-#    )
-#    # subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "git+https://github.com/theblackhatmagician/adetailer_sdxl.git"])
-#    subprocess.call(
-#        [
-#            pybin,
-#            "-m",
-#            "pip",
-#            "install",
-#            "--disable-pip-version-check",
-#            "--use-deprecated=legacy-resolver",
-#            "lmdb",
-#            "--no-warn-script-location",
-#            "--upgrade",
-#        ]
-#    )
-#    subprocess.call(
-#        [
-#            pybin,
-#            "-m",
-#            "pip",
-#            "install",
-#            "--disable-pip-version-check",
-#            "--use-deprecated=legacy-resolver",
-#            "git+https://github.com/huggingface/accelerate.git",
-#            "--no-warn-script-location",
-#            "--upgrade",
-#        ]
-#    )
-#    # import_module(self, "accelerate", "git+https://github.com/huggingface/accelerate.git")
-#    # import_module(self, "accelerate", "accelerate")
-
-#    import_module(self, "controlnet_aux", "controlnet-aux")
-
-#    self.report({"INFO"}, "Installing: torch module.")
-#    print("\nInstalling: torch module")
-#    if os_platform == "Windows":
-#        subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "torch"])
-#        subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "torchvision"])
-#        subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "torchaudio"])
-#        subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "xformers"])
-
-#        subprocess.check_call(
-#            [
-#                pybin,
-#                "-m",
-#                "pip",
-#                "install",
-#                "torch==2.4.0+cu121",
-#                "xformers",
-#                "torchvision",
-#                "--index-url",
-#                "https://download.pytorch.org/whl/cu121",
-#                "--no-warn-script-location",
-#                # "--user",
-#                "--upgrade",
-#            ]
-#        )
-#        subprocess.check_call(
-#            [
-#                pybin,
-#                "-m",
-#                "pip",
-#                "install",
-#                "torchaudio==2.4.0+cu121",
-#                #"torchaudio==2.3.1+cu121",
-#                "--index-url",
-#                "https://download.pytorch.org/whl/cu121",
-#                "--no-warn-script-location",
-#                # "--user",
-#                "--upgrade",
-#            ]
-#        )
-
-#    else:
-#        import_module(self, "torch", "torch")
-#        import_module(self, "torchvision", "torchvision")
-#        import_module(self, "torchaudio", "torchaudio")
-#        import_module(self, "xformers", "xformers")
-#        import_module(self, "torchao", "torchao")
-
-#    if os_platform != "Linux":
-#        subprocess.call(
-#            [
-#                pybin,
-#                "-m",
-#                "pip",
-#                "install",
-#                "--disable-pip-version-check",
-#                "--use-deprecated=legacy-resolver",
-#                "git+https://github.com/suno-ai/bark.git",
-#                "--no-warn-script-location",
-#                "--upgrade",
-#            ]
-#        )
-#        import_module(self, "whisperspeech", "WhisperSpeech==0.8")
-#        # import_module(self, "jaxlib", "jaxlib>=0.4.33")
-
-#    subprocess.check_call(
-#        [
-#            pybin,
-#            "-m",
-#            "pip",
-#            "install",
-#            "--disable-pip-version-check",
-#            "--use-deprecated=legacy-resolver",
-#            "peft",
-#            "--no-warn-script-location",
-#            "--upgrade",
-#        ]
-#    )
-#    import_module(self, "transformers", "transformers==4.46.3")
-#    import_module(self, "scipy", "scipy==1.12.0")
-#    import_module(self, "protobuf", "protobuf==3.20.1")
-#    import_module(self, "scikit_learn", "scikit-learn==1.2.2")
-#    import_module(self, "bitsandbytes", "bitsandbytes")
-#    import_module(self, "numpy", "numpy==1.26.4")
-#    print(
-#        "Dir: "
-#        + str(
-#            subprocess.check_call(
-#                [pybin, "-m", "pip", "--disable-pip-version-check", "cache", "purge"]
-#            )
-#        )
-#    )
-#    subprocess.call([pybin, "-m", "pip", "--disable-pip-version-check", "list"])
-
 
 def get_module_dependencies(module_name):
     """
@@ -1576,89 +1124,6 @@ class GENERATOR_OT_uninstall(Operator):
             "\nRemove AI Models manually: \nLinux and macOS: ~/.cache/huggingface/hub\nWindows: %userprofile%\\.cache\\huggingface\\hub",
         )
         return {"FINISHED"}
-
-#class GENERATOR_OT_uninstall(Operator):
-#    """Uninstall all dependencies"""
-
-#    bl_idname = "sequencer.uninstall_generator"
-#    bl_label = "Uninstall Dependencies"
-#    bl_options = {"REGISTER", "UNDO"}
-
-#    def execute(self, context):
-#        pybin = python_exec()
-#        preferences = context.preferences
-#        addon_prefs = preferences.addons[__name__].preferences
-#        uninstall_module_with_dependencies("torch")
-#        uninstall_module_with_dependencies("torchvision")
-#        uninstall_module_with_dependencies("torchaudio")
-#        uninstall_module_with_dependencies("diffusers")
-#        uninstall_module_with_dependencies("transformers")
-#        uninstall_module_with_dependencies("sentencepiece")
-#        uninstall_module_with_dependencies("safetensors")
-#        uninstall_module_with_dependencies("opencv_python")
-#        uninstall_module_with_dependencies("scipy")
-#        uninstall_module_with_dependencies("IPython")
-#        uninstall_module_with_dependencies("bark")
-#        uninstall_module_with_dependencies("xformers")
-#        uninstall_module_with_dependencies("imageio")
-#        uninstall_module_with_dependencies("imWatermark")
-#        uninstall_module_with_dependencies("pillow")
-#        uninstall_module_with_dependencies("libtorrent")
-#        uninstall_module_with_dependencies("accelerate")
-#        uninstall_module_with_dependencies("triton")
-#        uninstall_module_with_dependencies("cv2")
-#        uninstall_module_with_dependencies("protobuf")
-#        uninstall_module_with_dependencies("resemble-enhance")
-#        uninstall_module_with_dependencies("mediapipe")
-#        uninstall_module_with_dependencies("flash_attn")
-
-#        uninstall_module_with_dependencies("controlnet-aux")
-#        uninstall_module_with_dependencies("bitsandbytes")
-
-#        uninstall_module_with_dependencies("stable-audio-tools")
-
-#        uninstall_module_with_dependencies("beautifulsoup4")
-#        uninstall_module_with_dependencies("ftfy")
-#        uninstall_module_with_dependencies("albumentations")
-#        uninstall_module_with_dependencies("datasets")
-#        uninstall_module_with_dependencies("deepspeed")
-#        uninstall_module_with_dependencies("gradio-client")
-#        uninstall_module_with_dependencies("insightface")
-#        uninstall_module_with_dependencies("suno-bark")
-#        uninstall_module_with_dependencies("aura-sr")
-#        uninstall_module_with_dependencies("peft")
-#        uninstall_module_with_dependencies("ultralytics")
-#        uninstall_module_with_dependencies("aura-sr")
-#        uninstall_module_with_dependencies("parler-tts")
-
-#        # "resemble-enhance":
-#        uninstall_module_with_dependencies("celluloid")
-#        uninstall_module_with_dependencies("omegaconf")
-#        uninstall_module_with_dependencies("pandas")
-#        uninstall_module_with_dependencies("ptflops")
-#        uninstall_module_with_dependencies("rich")
-#        uninstall_module_with_dependencies("resampy")
-#        uninstall_module_with_dependencies("tabulate")
-#        uninstall_module_with_dependencies("gradio")
-
-#        # WhisperSpeech
-#        uninstall_module_with_dependencies("ruamel.yaml.clib")
-#        uninstall_module_with_dependencies("fastprogress")
-#        uninstall_module_with_dependencies("fastcore")
-#        uninstall_module_with_dependencies("ruamel.yaml")
-#        uninstall_module_with_dependencies("hyperpyyaml")
-#        uninstall_module_with_dependencies("speechbrain")
-#        uninstall_module_with_dependencies("vocos")
-#        uninstall_module_with_dependencies("WhisperSpeech")
-#        uninstall_module_with_dependencies("pydub")
-
-#        subprocess.check_call([pybin, "-m", "pip", "cache", "purge"])
-
-#        self.report(
-#            {"INFO"},
-#            "\nRemove AI Models manually: \nLinux and macOS: ~/.cache/huggingface/hub\nWindows: %userprofile%\\.cache\\huggingface\\hub",
-#        )
-#        return {"FINISHED"}
 
 
 def lcm_updated(self, context):
@@ -1939,7 +1404,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             ),
             (
                 "Lightricks/LTX-Video",
-                "LTX 0.9.6 (1280x720x257(frames/8+1))",
+                "LTX 0.9.7 (1280x720x257(frames/8+1))",
                 "Lightricks/LTX-Video",
             ),
             (
@@ -3706,97 +3171,27 @@ class SEQUENCER_OT_generate_movie(Operator):
                 from transformers import T5EncoderModel, T5Tokenizer
                 from diffusers import AutoencoderKLLTXVideo
 
-                # vid2vid
-                if scene.movie_path and input == "input_strips":
-                    print("LTX Video doesn't support vid2vid, doing img2vid instead!")
+                print("LTX Video: Load Model")
 
-                # img2vid
-                if input == "input_strips" and (scene.image_path or scene.movie_path):
-                    print("LTX Video: Load Image to Video Model")
-                    #from diffusers import LTXImageToVideoPipeline
-                    import torch
-                    from diffusers import LTXVideoTransformer3DModel, FlowMatchEulerDiscreteScheduler, LTXImageToVideoPipeline
-                    from diffusers.utils import export_to_video
+                import torch
+                from diffusers import LTXConditionPipeline, LTXLatentUpsamplePipeline, BitsAndBytesConfig, LTXVideoTransformer3DModel
+                from diffusers.pipelines.ltx.pipeline_ltx_condition import LTXVideoCondition
+                from diffusers.utils import export_to_video, load_video, load_image
 
-                    transformer = LTXVideoTransformer3DModel.from_pretrained(
-                        "multimodalart/ltxv-2b-0.9.6-distilled",
-                        subfolder="transformer",
-                        torch_dtype=torch.bfloat16,
-                        variant="bf16"
-                    )
+                nf4_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_quant_type="nf4",
+                    bnb_4bit_compute_dtype=torch.bfloat16,
+                )
 
-                    scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(
-                        "multimodalart/ltxv-2b-0.9.6-distilled",
-                        subfolder="scheduler"
-                    )
+                transformer = LTXVideoTransformer3DModel.from_pretrained(
+                    "a-r-r-o-w/LTX-Video-0.9.7-diffusers",
+                    quantization_config=nf4_config,
+                    torch_dtype=torch.bfloat16,
+                    subfolder="transformer",
+                )
 
-                    pipe = LTXImageToVideoPipeline.from_pretrained(
-                        "Lightricks/LTX-Video-0.9.5",
-                        transformer=transformer,
-                        scheduler=scheduler, #add or remove the scheduler to see the difference
-                        torch_dtype=torch.bfloat16,
-                    )
-#                    #from diffusers.utils import export_to_video, load_image
-
-#                    from diffusers import LTXVideoTransformer3DModel
-
-#                    #single_file_url = "https://huggingface.co/Lightricks/LTX-Video/blob/main/ltx-video-2b-v0.9.5.safetensors"
-#                    single_file_url = "https://huggingface.co/Lightricks/LTX-Video/blob/main/ltxv-2b-0.9.6-dev-04-25.safetensors"
-
-#                    transformer = LTXVideoTransformer3DModel.from_single_file(
-#                      single_file_url, torch_dtype=torch.bfloat16
-#                    )
-#                    vae = AutoencoderKLLTXVideo.from_single_file(single_file_url, torch_dtype=torch.bfloat16)
-#                    pipe = LTXImageToVideoPipeline.from_pretrained(
-#                      "Lightricks/LTX-Video", transformer=transformer, vae=vae, torch_dtype=torch.bfloat16
-#                    )
-
-                else:
-                    print("LTX Video: Load Prompt to Video Model")
-                    import torch
-                    from diffusers import BitsAndBytesConfig, LTXVideoTransformer3DModel, FlowMatchEulerDiscreteScheduler, LTXPipeline
-                    from diffusers.utils import export_to_video
-
-#                    transformer = LTXVideoTransformer3DModel.from_pretrained(
-#                        "multimodalart/ltxv-2b-0.9.6-distilled",
-#                        subfolder="transformer",
-#                        torch_dtype=torch.bfloat16,
-#                        variant="bf16"
-#                    )
-
-#                    scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(
-#                        "multimodalart/ltxv-2b-0.9.6-distilled",
-#                        subfolder="scheduler"
-#                    )
-
-#                    pipe = LTXPipeline.from_pretrained(
-#                        "Lightricks/LTX-Video-0.9.5",
-#                        transformer=transformer,
-#                        scheduler=scheduler, #add or remove the scheduler to see the difference
-#                        torch_dtype=torch.bfloat16,
-#                    )
-
-#                    from diffusers import LTXPipeline,LTXVideoTransformer3DModel
-
-#                    single_file_url = "https://huggingface.co/Lightricks/LTX-Video/blob/main/ltxv-13b-0.9.7-dev-fp8.safetensors"
-
-#                    nf4_config = BitsAndBytesConfig(
-#                        load_in_4bit=True,
-#                        bnb_4bit_quant_type="nf4",
-#                        bnb_4bit_compute_dtype=torch.bfloat16,
-#                    )
-
-                    single_file_url = "https://huggingface.co/Lightricks/LTX-Video/blob/main/ltxv-13b-0.9.7-dev.safetensors"
-
-                    transformer = LTXVideoTransformer3DModel.from_single_file(
-                      single_file_url, torch_dtype=torch.bfloat16, low_cpu_mem_usage=False, ignore_mismatched_sizes=True)#, quantization_config=nf4_config,
-                    #)
-
-                    vae = AutoencoderKLLTXVideo.from_single_file(single_file_url, torch_dtype=torch.bfloat16)
-
-                    pipe = LTXPipeline.from_pretrained(
-                      "Lightricks/LTX-Video", transformer=transformer, vae=vae, torch_dtype=torch.bfloat16
-                    )
+                pipe = LTXConditionPipeline.from_pretrained("a-r-r-o-w/LTX-Video-0.9.7-diffusers", transformer=transformer, torch_dtype=torch.bfloat16)
 
                 if gfx_device == "mps":
                     pipe.vae.enable_tiling()
@@ -4636,7 +4031,8 @@ class SEQUENCER_OT_generate_movie(Operator):
                         if not os.path.isfile(scene.movie_path):
                             print("No file found.")
                             return {"CANCELLED"}
-                        image = load_first_frame(bpy.path.abspath(scene.movie_path))
+                        image = load_video(bpy.path.abspath(scene.movie_path))
+                        #image = load_first_frame(bpy.path.abspath(scene.movie_path))
                     if scene.image_path:
                         print("Process: Image to video (LTX)")
                         if not os.path.isfile(scene.image_path):
@@ -4658,6 +4054,8 @@ class SEQUENCER_OT_generate_movie(Operator):
                         num_frames=abs(duration),
                         generator=generator,
                         max_sequence_length=512,
+                        decode_timestep=0.05,
+                        image_cond_noise_scale=0.025,
                     ).frames[0]
 
                 #Skyreel
