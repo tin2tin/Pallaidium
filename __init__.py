@@ -1003,6 +1003,7 @@ def install_modules(self):
 #        pybin, "pip", "install", "--disable-pip-version-check",
 #        "--use-deprecated=legacy-resolver", "timm", "--upgrade"
 #    ])
+    install_module("timm", "git+https://github.com/rwightman/pytorch-image-models.git")
     install_module("protobuf", "protobuf==3.20.1")
     install_module("numpy", "numpy==1.26.4")
     #install_module("transformers", "transformers")
@@ -5879,8 +5880,8 @@ class SEQUENCER_OT_generate_image(Operator):
                     if gfx_device == "mps":
                         converter.vae.enable_tiling()
                     elif low_vram():
-                        #converter.enable_sequential_cpu_offload()
-                        converter.enable_model_cpu_offload()
+                        converter.enable_sequential_cpu_offload()
+                        #converter.enable_model_cpu_offload()
                         converter.enable_vae_slicing()
                         converter.vae.enable_tiling()
                     else:
