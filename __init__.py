@@ -848,7 +848,7 @@ def install_modules(self):
     if os_platform == "Windows":
         windows_modules = [
             # How to install a patch: git+https://github.com/huggingface/diffusers@integrations/ltx-097
-            ("diffusers", "git+https://github.com/huggingface/diffusers.git"),
+            ("diffusers", "git+https://github.com/huggingface/diffusers@integrations/ltx-097"),
             ("mmaudio", "git+https://github.com/hkchengrex/MMAudio.git"),
             #("deepspeed", "https://github.com/agwosdz/DeepSpeed-Wheels-for-Windows/releases/download/DeepSpeed/deepspeed-0.16.1+unknown-cp311-cp311-win_amd64_cu124.whl"),
             ("deepspeed", "https://github.com/daswer123/deepspeed-windows/releases/download/13.1/deepspeed-0.13.1+cu121-cp311-cp311-win_amd64.whl"),
