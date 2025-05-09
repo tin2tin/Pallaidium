@@ -999,10 +999,10 @@ def install_modules(self):
         pybin, "-m", "pip", "install", "--disable-pip-version-check",
         "peft", "--upgrade"
     ])
-    subprocess.check_call([
-        pybin, "pip", "install", "--disable-pip-version-check",
-        "--use-deprecated=legacy-resolver", "timm", "--upgrade"
-    ])
+#    subprocess.check_call([
+#        pybin, "pip", "install", "--disable-pip-version-check",
+#        "--use-deprecated=legacy-resolver", "timm", "--upgrade"
+#    ])
     install_module("protobuf", "protobuf==3.20.1")
     install_module("numpy", "numpy==1.26.4")
     #install_module("transformers", "transformers")
