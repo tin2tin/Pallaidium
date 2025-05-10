@@ -133,7 +133,7 @@ Video Sequence Editor > Sidebar > Generative AI:
 
 ## Styles:
 
-![image](https://github.com/tin2tin/Generative_AI/assets/1322593/86807264-a377-4de1-875e-471aaa3011a7)
+![image](https://github.com/user-attachments/assets/44852946-67db-4788-aed0-6e383070c2ac)
 
 See SDXL handling most of the styles here: https://stable-diffusion-art.com/sdxl-styles/
 
