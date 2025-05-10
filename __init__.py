@@ -1493,6 +1493,8 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Stable Diffusion 3.5 Medium",
                 "adamo1139/stable-diffusion-3.5-medium-ungated",
             ),
+            ("Bercraft/Illustrious-XL-v2.0-FP16-Diffusers", "Illustrious XL", "Bercraft/Illustrious-XL-v2.0-FP16-Diffusers"),
+            ("John6666/cyberrealistic-xl-v53-sdxl", "Cyberrealistic XL", "John6666/cyberrealistic-xl-v53-sdxl"),
 #            (
 #                "stabilityai/stable-diffusion-3-medium-diffusers",
 #                "Stable Diffusion 3",
@@ -2570,6 +2572,8 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     or image_model_card == "black-forest-labs/FLUX.1-Canny-dev-lora"
                     or image_model_card == "black-forest-labs/FLUX.1-Depth-dev-lora"
                     or image_model_card == "black-forest-labs/FLUX.1-Redux-dev"
+                    or image_model_card == "Bercraft/Illustrious-XL-v2.0-FP16-Diffusers"
+                    or image_model_card == "John6666/cyberrealistic-xl-v53-sdxl"
                 )
                 and type == "image"
             ) or ((
@@ -7731,7 +7735,6 @@ class SEQUENCER_OT_generate_image(Operator):
                     # No LoRA.
                     else:
                         image = pipe(
-                            # prompt_embeds=prompt, # for compel - long prompts
                             prompt,
                             # negative_prompt=negative_prompt,
                             num_inference_steps=image_num_inference_steps,
@@ -7739,6 +7742,7 @@ class SEQUENCER_OT_generate_image(Operator):
                             height=y,
                             width=x,
                             generator=generator,
+                            max_sequence_length=512,
                         ).images[0]
 
                 # Not Turbo
@@ -7746,7 +7750,6 @@ class SEQUENCER_OT_generate_image(Operator):
                     # LoRA.
                     if enabled_items:
                         image = pipe(
-                            # prompt_embeds=prompt, # for compel - long prompts
                             prompt,
                             negative_prompt=negative_prompt,
                             num_inference_steps=image_num_inference_steps,
@@ -7755,11 +7758,11 @@ class SEQUENCER_OT_generate_image(Operator):
                             width=x,
                             cross_attention_kwargs={"scale": 1.0},
                             generator=generator,
+                            max_sequence_length=512,
                         ).images[0]
                     # No LoRA.
                     else:
                         image = pipe(
-                            # prompt_embeds=prompt, # for compel - long prompts
                             prompt,
                             negative_prompt=negative_prompt,
                             num_inference_steps=image_num_inference_steps,
@@ -7767,6 +7770,7 @@ class SEQUENCER_OT_generate_image(Operator):
                             height=y,
                             width=x,
                             generator=generator,
+                            max_sequence_length=512,
                         ).images[0]
 
             # Add refiner
