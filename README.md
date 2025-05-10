@@ -14,9 +14,11 @@
 
 <hr>
 
-![PallAIdium](https://github.com/tin2tin/Generative_AI/assets/1322593/1b1b232f-00d9-4b0b-86fb-5f0f24136d2c)
-AI-generate video, image, and audio from text prompts or video, image, or text strips. 
+## Pallaidium, Blender Screenwriter, and GPT4Blender
 
+https://github.com/user-attachments/assets/81d30bc1-01f6-4b52-8ce7-abf53d53e854
+
+AI-generate video, image, and audio from text prompts or video, image, or text strips. 
 
 ## Features
 
@@ -34,10 +36,6 @@ AI-generate video, image, and audio from text prompts or video, image, or text s
 | Batch conversion                                   | Batch refinement of images.                         | Prompt batching                                     |
 | Batch upscale & refinement of movies.              | Render-to-path selector.                            | Render finished notification.                       |
 | User-defined file path for generated files.        | Seed and prompt added to strip name.                | One-click install and uninstall dependencies.       |
-
-## Pallaidium, Blender Screenwriter, and GPT4Blender
-
-https://github.com/user-attachments/assets/81d30bc1-01f6-4b52-8ce7-abf53d53e854
 
 ## Requirements
 * Windows (Unsupported: Linux and MacOS).
@@ -360,6 +358,10 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 
 ### Text Captions:
 - [Florence-2-large-PromptGen](https://huggingface.co/MiaoshouAI/Florence-2-large-PromptGen-v2.0)
+
+
+
+![PallAIdium](https://github.com/tin2tin/Generative_AI/assets/1322593/1b1b232f-00d9-4b0b-86fb-5f0f24136d2c)
 
 
 
