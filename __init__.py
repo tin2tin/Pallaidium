@@ -835,6 +835,8 @@ def install_modules(self):
         ("numpy", "numpy==1.26.4"),
         ("jax", "jax")
         #("jaxlib", "jaxlib>=0.5.0")
+        ("tqdm", "tqdm")
+        ("tempfile", "tempfile")
     ]
 
     show_system_console(True)
@@ -850,8 +852,9 @@ def install_modules(self):
             # How to install a patch: git+https://github.com/huggingface/diffusers@integrations/ltx-097
             ("diffusers", "git+https://github.com/huggingface/diffusers@integrations/ltx-097"),
             ("mmaudio", "git+https://github.com/hkchengrex/MMAudio.git"),
+            ("deepspeed", "https://www.piwheels.org/simple/deepspeed/deepspeed-0.16.5-py3-none-any.whl"),
             #("deepspeed", "https://github.com/agwosdz/DeepSpeed-Wheels-for-Windows/releases/download/DeepSpeed/deepspeed-0.16.1+unknown-cp311-cp311-win_amd64_cu124.whl"),
-            ("deepspeed", "https://github.com/daswer123/deepspeed-windows/releases/download/13.1/deepspeed-0.13.1+cu121-cp311-cp311-win_amd64.whl"),
+            #("deepspeed", "https://github.com/daswer123/deepspeed-windows/releases/download/13.1/deepspeed-0.13.1+cu121-cp311-cp311-win_amd64.whl"),
             #("deepspeed", "https://github.com/agwosdz/DeepSpeed-Wheels-for-Windows/releases/download/DeepSpeed/deepspeed-0.15.1+51c6eae-cp311-cp311-win_amd64_cu124.whl"),
             ("resemble_enhance", "git+https://github.com/tin2tin/resemble-enhance-windows.git"),
             ("flash_attn", "https://huggingface.co/lldacing/flash-attention-windows-wheel/blob/main/flash_attn-2.7.0.post2%2Bcu124torch2.5.1cxx11abiFALSE-cp311-cp311-win_amd64.whl"),
@@ -870,7 +873,7 @@ def install_modules(self):
     else:
         other_modules = [
             ("diffusers", "git+https://github.com/huggingface/diffusers.git"),
-            ("deepspeed", "deepspeed==0.14.4"),
+            ("deepspeed", "deepspeed"), #==0.14.4
             ("resemble_enhance", "resemble-enhance"),
             ("flash_attn", "flash-attn"),
             ("triton", "triton"),
@@ -955,7 +958,8 @@ def install_modules(self):
             "pip",
             "install",
             "--disable-pip-version-check",
-            "git+https://github.com/suno-ai/bark.git",
+            "git+https://github.com/tin2tin/bark.git",
+            #"git+https://github.com/suno-ai/bark.git",
             "--no-warn-script-location",
             "--upgrade",
         ]
@@ -992,6 +996,7 @@ def install_modules(self):
         install_module("torchvision", "torchvision")
         install_module("torchaudio", "torchaudio")
         install_module("xformers", "xformers")
+        install_module("torcheval", "torcheval") 
         install_module("torchao", "torchao")
 
     # Final tasks
@@ -1614,19 +1619,21 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "stabilityai/stable-audio-open-1.0",
             ),
             ("MMAudio", "Audio: Video to Audio", "MMAudio"),
-            (
-                "cvssp/audioldm2-large",
-                "Audio:Audio LDM 2 Large",
-                "cvssp/audioldm2-large",
-            ),
+            # Not working!
+#            (
+#                "cvssp/audioldm2-large",
+#                "Audio:Audio LDM 2 Large",
+#                "cvssp/audioldm2-large",
+#            ),
             (
                 "facebook/musicgen-stereo-melody-large",
                 "Music: MusicGen Stereo Melody",
                 "facebook/musicgen-stereo-melody-large",
             ),
-            parler,
-            ("bark", "Speech: Bark", "Bark"),
+#            parler,
+            #("bark", "Speech: Bark", "Bark"),
             ("WhisperSpeech", "Speech: WhisperSpeech", "WhisperSpeech"),
+            ("SWivid/F5-TTS", "Speech: F5-TTS", "SWivid/F5-TTS"),
         ]
     else:
         items = [
@@ -1641,11 +1648,11 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Music: MusicGen Stereo Melody",
                 "facebook/musicgen-stereo-melody-large",
             ),
-            (
-                "cvssp/audioldm2-large",
-                "Audio LDM 2 Large",
-                "cvssp/audioldm2-large",
-            ),
+#            (
+#                "cvssp/audioldm2-large",
+#                "Audio LDM 2 Large",
+#                "cvssp/audioldm2-large",
+#            ),
             parler,
         ]
 
@@ -2319,8 +2326,8 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     )
                     or (
                         type == "audio"
-                        and audio_model_card == "facebook/musicgen-stereo-melody-large"
-                        and audio_model_card == "WhisperSpeech"
+                        and (audio_model_card == "facebook/musicgen-stereo-melody-large"
+                        or audio_model_card == "WhisperSpeech" or audio_model_card == "SWivid/F5-TTS")
                     )
                     or (type == "movie" and "Hailuo/MiniMax/" in movie_model_card)
                 ):
@@ -2380,21 +2387,28 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     type == "audio"
                     and audio_model_card != "bark"
                     and audio_model_card != "WhisperSpeech"
+                    and audio_model_card != "SWivid/F5-TTS"
                     and audio_model_card != "parler-tts/parler-tts-large-v1"
                     and audio_model_card != "parler-tts/parler-tts-mini-v1"
                 ):
                     col.prop(context.scene, "audio_length_in_f", text="Frames")
-                if type == "audio" and audio_model_card == "bark":
-                    col = layout.column(align=True)
-                    col.prop(context.scene, "speakers", text="Speaker")
-                    col.prop(context.scene, "languages", text="Language")
-                elif type == "audio" and audio_model_card == "WhisperSpeech":
+                if type == "audio" and (audio_model_card == "WhisperSpeech" or audio_model_card == "SWivid/F5-TTS"):
                     row = col.row(align=True)
                     row.prop(context.scene, "audio_path", text="Speaker")
                     row.operator(
                         "sequencer.open_audio_filebrowser", text="", icon="FILEBROWSER"
                     )
-                    col.prop(context.scene, "audio_speed", text="Speed")
+                    if audio_model_card == "WhisperSpeech":
+                        col.prop(context.scene, "audio_speed", text="Speed")
+                    else:
+                        col.prop(context.scene, "audio_speed_tts", text="Speed")
+
+                if type == "audio" and audio_model_card == "bark":
+                    col = layout.column(align=True)
+                    col.prop(context.scene, "speakers", text="Speaker")
+                    col.prop(context.scene, "languages", text="Language")
+                elif type == "audio" and (audio_model_card == "WhisperSpeech"):
+                    pass
 
                 elif type == "audio" and (
                     addon_prefs.audio_model_card
@@ -2453,6 +2467,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                             and (
                                 audio_model_card == "parler-tts/parler-tts-mini-v1"
                                 or audio_model_card == "parler-tts/parler-tts-large-v1"
+                                or audio_model_card == "SWivid/F5-TTS"
                             )
                         )
                         or (
@@ -2548,7 +2563,6 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         row.prop(context.scene, "adetailer", text="Faces")
 
                     # AuraSR
-
                     # col = col.column(heading="Upscale", align=True)
                     row.prop(context.scene, "aurasr", text="Upscale 4x")
                     # row = col.row()
@@ -2557,6 +2571,9 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 ):
                     col = layout.column(heading="Upscale", align=True)
                     col.prop(context.scene, "aurasr", text="4x")
+                if type == "audio" and audio_model_card == "SWivid/F5-TTS":
+                    col = layout.column(heading="Remove", align=True)
+                    col.prop(context.scene, "remove_silence", text="Silence")                    
 
             # LoRA.
             if (
@@ -4586,6 +4603,28 @@ class SequencerOpenAudioFile(Operator, ImportHelper):
         context.window_manager.fileselect_add(self)
         return {"RUNNING_MODAL"}
 
+##### F5-TTS
+
+# Configuration for default F5-TTS model
+DEFAULT_F5TTS_CFG = [
+    "hf://SWivid/F5-TTS/F5TTS_v1_Base/model_1250000.safetensors",
+    "hf://SWivid/F5-TTS/F5TTS_v1_Base/vocab.txt",
+    json.dumps(dict(dim=1024, depth=22, heads=16, ff_mult=2, text_dim=512, conv_layers=4)),
+]
+
+# E2-TTS model config
+E2TTS_CKPT_PATH = "hf://SWivid/E2-TTS/E2TTS_Base/model_1200000.safetensors"
+E2TTS_MODEL_CFG = dict(dim=1024, depth=24, heads=16, ff_mult=4, text_mask_padding=False, pe_attn_head=1)
+
+## Global variables to hold loaded models and vocoder for reuse
+#global vocoder
+#vocoder = None
+#F5TTS_ema_model = None
+#E2TTS_ema_model = None
+#custom_ema_model = None
+#pre_custom_path = ""
+#dependencies_loaded = False
+
 
 class SEQUENCER_OT_generate_audio(Operator):
     """Generate Audio"""
@@ -4614,6 +4653,14 @@ class SEQUENCER_OT_generate_audio(Operator):
         strip = scene.sequence_editor.active_strip
         input = scene.input_strips
         pipe = None
+        if strip:
+            duration = scene.audio_length_in_f = (
+                strip.frame_final_duration + 1
+            )
+            audio_length_in_s = duration = duration / (
+                scene.render.fps / scene.render.fps_base
+            )
+
         import torch
         import torchaudio
         import scipy
@@ -4658,6 +4705,61 @@ class SEQUENCER_OT_generate_audio(Operator):
 
                 return {"CANCELLED"}
 
+        if addon_prefs.audio_model_card == "SWivid/F5-TTS":
+            try:
+                # tqdm
+                #tempfile
+                import torcheval 
+                import numpy as np
+                import soundfile as sf
+                import torch
+                import torchaudio
+                from cached_path import cached_path
+
+                # Check if f5_tts is actually importable
+                from f5_tts.infer.utils_infer import (
+                    infer_process,
+                    load_model,
+                    load_vocoder,
+                    preprocess_ref_audio_text,
+                    remove_silence_for_generated_wav,
+                )
+                from f5_tts.model import DiT, UNetT
+
+                import tempfile
+
+            except ImportError as e:
+                print("\n--------------------------------------------------")
+                print(f"WARNING: TTS dependencies not found or failed to import: {e}")
+                print("Please install required libraries in Blender's Python environment:")
+                print("  Example: <Blender Install Dir>/4.1/python/bin/python.exe -m pip install f5-tts transformers torchaudio soundfile cached_path numpy torch torcheval") # Added torcheval to install list
+                print("--------------------------------------------------\n")
+
+                # Define dummy functions/classes to prevent errors if imports fail
+                class DummyModule:
+                    def __getattr__(self, name):
+                        # Delay the error until synthesis is attempted
+                        def dummy_func(*args, **kwargs):
+                             raise RuntimeError(f"TTS dependency missing. Cannot access '{name}'. Install f5-tts, torch, etc.")
+                        return dummy_func
+                np = DummyModule()
+                sf = DummyModule()
+                torch = DummyModule()
+                torch.cuda = DummyModule() # Ensure cuda access also raises error
+                torcheval = DummyModule() # Dummy for torcheval
+                torchaudio = DummyModule()
+                cached_path = DummyModule()
+                class DummyModel: pass
+                # Assign dummy functions/classes directly to the expected names
+                infer_process = DummyModule().infer_process
+                load_model = DummyModule().load_model
+                load_vocoder = DummyModule().load_vocoder
+                preprocess_ref_audio_text = DummyModule().preprocess_ref_audio_text
+                remove_silence_for_generated_wav = DummyModule().remove_silence_for_generated_wav
+                DiT = DummyModel
+                UNetT = DummyModel
+                dependencies_loaded = False # Ensure flag is False
+                return {"CANCELLED"}
         if (
             addon_prefs.audio_model_card == "parler-tts/parler-tts-large-v1"
             or addon_prefs.audio_model_card == "parler-tts/parler-tts-mini-v1"
@@ -4803,6 +4905,26 @@ class SEQUENCER_OT_generate_audio(Operator):
             from whisperspeech.pipeline import Pipeline
 
             pipe = Pipeline(s2a_ref="collabora/whisperspeech:s2a-q4-small-en+pl.model")
+
+        #F5-TTS
+        elif addon_prefs.audio_model_card == "SWivid/F5-TTS":
+            print("Loading vocoder...")
+            try:
+             # load_vocoder should handle device placement internally
+                vocoder = load_vocoder()
+                print("Vocoder loaded successfully.")
+            except Exception as e:
+                raise RuntimeError(f"Vocoder failed to load: {e}") from e
+
+            ckpt_path_str = str(cached_path(DEFAULT_F5TTS_CFG[0]))
+            
+            # load_model should handle device placement
+            F5TTS_model_cfg_dict = json.loads(DEFAULT_F5TTS_CFG[2])
+            pipe = load_model(DiT, F5TTS_model_cfg_dict, ckpt_path_str).to(gfx_device)
+            print("F5-TTS model loaded.")
+
+            if pipe is None:
+                 raise RuntimeError(f"Failed to load or get model F5-TTS'.")
 
         # Parler
         elif (
@@ -5031,42 +5153,14 @@ class SEQUENCER_OT_generate_audio(Operator):
                 write_wav(filename, new_sr, wav2)
 
             # WhisperSpeech
-
             elif addon_prefs.audio_model_card == "WhisperSpeech":
                 prompt = context.scene.generate_movie_prompt
                 prompt = prompt.replace("\n", " ").strip()
                 filename = solve_path(clean_filename(prompt) + ".wav")
                 if scene.audio_path:
-                    speaker = scene.audio_path
+                    speaker = bpy.path.abspath(scene.audio_path)
                 else:
                     speaker = None
-                #                sentences = split_and_recombine_text(
-                #                    prompt, desired_length=250, max_length=320
-                #                )
-                #                pieces = []
-                #                #pieces.append(silence.copy())
-                #                for sentence in sentences:
-                #                    print("Sentence: " + sentence)
-                ##                    semantic_tokens = generate_text_semantic(
-                ##                        sentence,
-                ##                        history_prompt=SPEAKER,
-                ##                        temp=GEN_TEMP,
-                ##                        # min_eos_p=0.1,  # this controls how likely the generation is to end
-                ##                    )
-                ##                    audio_array = semantic_to_waveform(
-                ##                        semantic_tokens, history_prompt=SPEAKER
-                ##                    )
-                #                    audio_array = pipe.generate(sentence, speaker=speaker, lang='en', cps=int(scene.audio_speed))
-                #                    audio_piece = (audio_array.cpu().numpy() * 32767).astype(np.int16)
-                #                    #pieces += [np.expand_dims(audio_piece, axis=0), np.expand_dims(silence.copy(), axis=0)]
-
-                #                    #pieces += [audio_array.cpu().numpy().astype(np.int16)]
-                #                    #pieces.append(audio_piece)
-                #                    pieces += [silence.copy(), audio_piece]
-                #                audio = pieces.numpy()#np.concatenate(pieces)
-                #                filename = solve_path(clean_filename(prompt) + ".wav")
-                #                # Write the combined audio to a file
-                #                write_wav(filename, rate, audio.transpose())
 
                 pipe.generate_to_file(
                     filename,
@@ -5075,6 +5169,129 @@ class SEQUENCER_OT_generate_audio(Operator):
                     lang="en",
                     cps=int(scene.audio_speed),
                 )
+
+            #F5-TTS
+            elif addon_prefs.audio_model_card == "SWivid/F5-TTS":
+                    
+                if scene.audio_path:
+                    speaker = bpy.path.abspath(scene.audio_path)
+                else:
+                    speaker = None
+                    print("No speaker file found. Cancelled...")
+                    return {"CANCELLED"}
+                print("Speaker: "+speaker)
+
+                # Preprocess reference audio and text (blocking, happens in the thread)
+                ref_audio_processed = None
+                ref_text_used = ""#ref_text.strip() # Use stripped ref text
+
+                # Ensure vocoder is loaded
+                if vocoder is None:
+                     print("Loading vocoder...")
+                     try:
+                         vocoder = load_vocoder()
+                         print("Vocoder loaded successfully.")
+                     except Exception as e:
+                         raise RuntimeError(f"Vocoder failed to load: {e}") from e
+
+                # Convert cached_path result to string path
+                ckpt_path_str = str(cached_path(DEFAULT_F5TTS_CFG[0]))
+                
+                # load_model should handle device placement
+                F5TTS_model_cfg_dict = json.loads(DEFAULT_F5TTS_CFG[2])
+                
+                pipe = load_model(DiT, F5TTS_model_cfg_dict, ckpt_path_str)
+                print("F5-TTS model loaded.")
+
+                prompt = context.scene.generate_movie_prompt
+                prompt = prompt.replace("\n", " ").strip()
+                filename = solve_path(clean_filename(prompt) + ".wav")
+                
+                ref_audio_processed, ref_text_used = preprocess_ref_audio_text(
+                    speaker, # Pass the path string
+                    ref_text_used, # Pass the stripped ref text
+                    show_info=print, # Use print instead of gr.Info
+                )
+
+                seed = context.scene.movie_num_seed
+                seed = (
+                    seed
+                    if not context.scene.movie_use_random
+                    else random.randint(0, 2147483647)
+                )
+
+                torch.manual_seed(seed)
+                print("Seed: " + str(seed))
+                context.scene.movie_num_seed = seed
+
+                final_wave = None
+                final_sample_rate = None
+
+                final_wave, final_sample_rate, _ = infer_process(
+                    ref_audio_processed, # Pass the processed tuple from preprocess
+                    ref_text_used,       # Pass the potentially auto-transcribed text from preprocess
+                    prompt,   # Pass the stripped generation text
+                    pipe,
+                    vocoder, # vocoder is loaded globally, accessed here
+                    cross_fade_duration=0.15,#cross_fade_duration,
+                    nfe_step=movie_num_inference_steps,
+                    speed=(scene.audio_speed_tts), #speed,
+                    show_info=print,
+                    #progress=None, # <--- FIX: Pass None to disable f5-tts internal tqdm progress
+                )
+                filename = solve_path(clean_filename(str(seed) + "_" + prompt) + ".wav")
+
+                # Remove silence 
+                if scene.remove_silence and final_wave is not None and len(final_wave) > 0:
+                    print("Attempting to remove silence...")
+                    tmp_wav_path = None
+                    try:
+                        # Use a more robust way to ensure the temp file exists and is closed before remove_silence_for_generated_wav opens it
+                        tmp_fd, tmp_wav_path = tempfile.mkstemp(suffix=".wav")
+                        os.close(tmp_fd) # Close the file descriptor immediately
+
+                        sf.write(tmp_wav_path, final_wave, final_sample_rate)
+
+                        remove_silence_for_generated_wav(tmp_wav_path)
+
+                        # Reload the potentially modified audio from the temporary file
+                        loaded_audio, loaded_sr = torchaudio.load(tmp_wav_path)
+                        final_wave = loaded_audio.squeeze().cpu().numpy() # Ensure 1D numpy array
+                        final_sample_rate = loaded_sr # Update sample rate if it changed (unlikely but safe)
+
+                        print("Silence removal successful.")
+                    except Exception as e:
+                        #_status_callback(f"Warning during silence removal: {e}", icon='WARNING') # Use warning icon?
+                        print(f"Error during silence removal: {e}") # Print to console
+                        #traceback.print_exc()
+                        # Continue with the original wave if silence removal fails
+                    finally:
+                         # Ensure temp file is removed even if silence removal fails
+                         if tmp_wav_path and os.path.exists(tmp_wav_path):
+                             try:
+                                 os.remove(tmp_wav_path)
+                                 # print(f"Cleaned up temporary file: {tmp_wav_path}") # Optional: verbose cleanup log
+                             except OSError as e:
+                                 print(f"Warning: Could not remove temporary file {tmp_wav_path}: {e}")
+
+                # Save the final audio (blocking, happens in the thread)
+                # Check if final_wave is valid before attempting to save
+                if final_wave is not None and len(final_wave) > 0:
+                    try:
+                        output_audio_path = filename = solve_path(clean_filename(str(seed) + "_" + prompt) + ".wav")
+                        # sf.write expects numpy array, ensure correct dtype
+                        sf.write(output_audio_path, final_wave.astype(np.float32), final_sample_rate)
+                        #print(f"Synthesized audio saved to {output_audio_path}")
+                        #result = (output_audio_path, ref_text_used, used_seed) # Set result tuple
+
+                    except Exception as e:
+                        # Catch save errors or directory creation errors
+                        exception = e # Store exception
+                        print(f"Error saving output audio to {output_audio_path}: {e}") # Print to console
+                else:
+                     # No audio data to save
+                     exception = RuntimeError("Synthesis failed, no audio data generated.")
+                     print("Synthesis failed, no audio data to save.")        
 
             # Musicgen.
             elif (
@@ -8968,6 +9185,11 @@ def register():
         description="Higher Speed, lower quality. Try Quality Steps: 1-10",
         update=lcm_updated,
     )
+    bpy.types.Scene.remove_silence = bpy.props.BoolProperty(
+        name="remove_silence",
+        default=1,
+        description="Remove Silence",
+    )
 
     # SVD decode chunck
     bpy.types.Scene.svd_decode_chunk_size = bpy.props.IntProperty(
@@ -9016,7 +9238,14 @@ def register():
         max=20,
         description="Speech speed.",
     )
-
+    # The frame audio duration.
+    bpy.types.Scene.audio_speed_tts = bpy.props.FloatProperty(
+        name="audio_speed_tts",
+        default=1.0,
+        min=0.3,
+        max=1.4,
+        description="Speech speed. 1 is normal speed.",
+    )
     bpy.types.Scene.ip_adapter_face_folder = bpy.props.StringProperty(
         name="File",
         description="Select a file or folder",
