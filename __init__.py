@@ -837,6 +837,7 @@ def install_modules(self):
         #("jaxlib", "jaxlib>=0.5.0")
         ("tqdm", "tqdm")
         ("tempfile", "tempfile")
+        ("f5_tts", "git+https://github.com/SWivid/F5-TTS.git")
     ]
 
     show_system_console(True)
