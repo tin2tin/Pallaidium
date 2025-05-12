@@ -346,12 +346,9 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 
 ### Audio:
 - [stabilityai/stable-audio-open-1.0](https://huggingface.co/stabilityai/stable-audio-open-1.0)
-- [Parler TTS](https://github.com/huggingface/parler-tts)
 - [facebook/musicgen-stereo-medium](https://huggingface.co/facebook/musicgen-stereo-medium)
-- [vtrungnhan9/audioldm2-music-zac2023](https://huggingface.co/vtrungnhan9/audioldm2-music-zac2023)
-- [Bark](https://github.com/suno-ai/bark)
+- [F5-TTS](https://github.com/SWivid/F5-TTS)
 - [WhisperSpeech](https://github.com/collabora/WhisperSpeech)
-- [parler-tts/parler-tts-large-v1](https://huggingface.co/parler-tts/parler-tts-large-v1)
 - [MMAudio](https://github.com/hkchengrex/MMAudio)
 
 ### Background Removal:
