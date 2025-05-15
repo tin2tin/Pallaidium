@@ -833,11 +833,11 @@ def install_modules(self):
         ("scikit_learn", "scikit-learn==1.2.2"),
         ("bitsandbytes", "bitsandbytes"),
         ("numpy", "numpy==1.26.4"),
-        ("jax", "jax")
+        ("jax", "jax"),
         #("jaxlib", "jaxlib>=0.5.0")
-        ("tqdm", "tqdm")
-        ("tempfile", "tempfile")
-        ("f5_tts", "git+https://github.com/SWivid/F5-TTS.git")
+        ("tqdm", "tqdm"),
+        ("tempfile", "tempfile"),
+        ("f5_tts", "git+https://github.com/SWivid/F5-TTS.git"),
     ]
 
     show_system_console(True)
