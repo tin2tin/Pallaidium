@@ -23,11 +23,6 @@ bl_info = {
 }
 
 # TO DO: Move prints.
-# Added FramePack img and fflf.
-# Image & text to audio w. MMaudio.
-# Clean-up dead models.
-#
-
 
 import bpy
 import ctypes
