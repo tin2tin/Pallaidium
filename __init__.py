@@ -2181,6 +2181,9 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     and image_model_card != "Salesforce/blipdiffusion"
                     and image_model_card != "ZhengPeng7/BiRefNet_HR"
                     and image_model_card != "Shitao/OmniGen-v1-diffusers"
+                    and image_model_card != "black-forest-labs/FLUX.1-Redux-dev"
+                    and image_model_card != "black-forest-labs/FLUX.1-Canny-dev-lora"
+                    and image_model_card != "black-forest-labs/FLUX.1-Depth-dev-lora"
                 ):
                     if input == "input_strips" and not scene.inpaint_selected_strip:
                         col = col.column(heading="Use", align=True)
@@ -2286,6 +2289,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     image_model_card == "Shitao/OmniGen-v1-diffusers"
                     and type == "image"
                 )
+                or (type == "image" and image_model_card == "black-forest-labs/FLUX.1-Redux-dev")
             ):
                 pass
             else:
@@ -6128,8 +6132,11 @@ class SEQUENCER_OT_generate_image(Operator):
                 ) or (image_model_card == "black-forest-labs/FLUX.1-Depth-dev-lora"):
                     from diffusers import FluxControlPipeline
                     from diffusers.utils import load_image
+                    if image_model_card == "black-forest-labs/FLUX.1-Canny-dev-lora":
+                        pipecard = "black-forest-labs/FLUX.1-Canny-dev"
+                    else:
+                        pipecard = "ChuckMcSneed/FLUX.1-dev"
 
-                    # https://github.com/huggingface/diffusers/issues/10588
                     from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
 
                     nf4_config = BitsAndBytesConfig(
@@ -6138,46 +6145,43 @@ class SEQUENCER_OT_generate_image(Operator):
                         bnb_4bit_compute_dtype=torch.bfloat16,
                     )
                     model_nf4 = FluxTransformer2DModel.from_pretrained(
-                        "ChuckMcSneed/FLUX.1-dev",
+                        pipecard,
                         subfolder="transformer",
                         quantization_config=nf4_config,
                         torch_dtype=torch.bfloat16,
                     )
-                    pipe = FluxControlPipeline.from_pretrained(
-                        "ChuckMcSneed/FLUX.1-dev",
+                    converter = FluxControlPipeline.from_pretrained(
+                        pipecard,
                         transformer=model_nf4,
                         torch_dtype=torch.bfloat16,
                         local_files_only=local_files_only,
                     )
-#                    pipe = FluxControlPipeline.from_pretrained(
-#                        "ChuckMcSneed/FLUX.1-dev", torch_dtype=torch.bfloat16
-#                    )
 
                     if gfx_device == "mps":
-                        pipe.vae.enable_tiling()
+                        converter.vae.enable_tiling()
                     elif low_vram():
                         #pipe.enable_sequential_cpu_offload()
-                        pipe.enable_model_cpu_offload()
-                        pipe.enable_vae_slicing()
-                        pipe.vae.enable_tiling()
+                        converter.enable_model_cpu_offload()
+                        converter.enable_vae_slicing()
+                        converter.vae.enable_tiling()
                     else:
-                        pipe.enable_model_cpu_offload()
-
-                    # pipe = FluxControlPipeline.from_pretrained("ChuckMcSneed/FLUX.1-dev", torch_dtype=torch.bfloat16).to("cuda")
-
-                    # pipe.load_lora_weights("camenduru/FLUX.1-dev/flux1-canny-dev-lora.safetensors")
-                    pipe.load_lora_weights(image_model_card)
+                        #pipe.enable_sequential_cpu_offload()
+                        converter.enable_model_cpu_offload()
+                        converter.enable_vae_slicing()
+                        converter.vae.enable_tiling()
+                        
+                    if pipecard == "ChuckMcSneed/FLUX.1-dev":
+                        converter.load_lora_weights(image_model_card)
 
                     if image_model_card == "black-forest-labs/FLUX.1-Canny-dev-lora":
                         from controlnet_aux import CannyDetector
-
                         processor = CannyDetector()
                     else:
                         from image_gen_aux import DepthPreprocessor
-
                         processor = DepthPreprocessor.from_pretrained(
                             "LiheYoung/depth-anything-large-hf"
                         )
+
                 # redux
                 elif image_model_card == "black-forest-labs/FLUX.1-Redux-dev": 
                     from transformers import SiglipImageProcessor, SiglipVisionModel                       
@@ -6192,7 +6196,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     from diffusers.utils import load_image
 
                     pipe_prior_redux = FluxPriorReduxPipeline.from_pretrained("black-forest-labs/FLUX.1-Redux-dev", torch_dtype=torch.bfloat16).to("cuda")
-                    pipe = FluxPipeline.from_pretrained(
+                    converter = FluxPipeline.from_pretrained(
                         "ChuckMcSneed/FLUX.1-dev" , 
                         feature_extractor=feature_extractor,
                         image_encoder=image_encoder,
@@ -6202,16 +6206,15 @@ class SEQUENCER_OT_generate_image(Operator):
                     )
                     
                     if gfx_device == "mps":
-                        pipe.vae.enable_tiling()
+                        converter.vae.enable_tiling()
                     elif low_vram():
-                        #pipe.enable_sequential_cpu_offload()
-                        pipe.enable_model_cpu_offload()
-                        pipe.enable_vae_slicing()
-                        pipe.vae.enable_tiling()
+                        converter.enable_model_cpu_offload()
+                        converter.enable_vae_slicing()
+                        converter.vae.enable_tiling()
                     else:
-                        pipe.enable_sequential_cpu_offload()
-                        pipe.enable_vae_slicing() 
-                        pipe.vae.enable_tiling()
+                        converter.enable_sequential_cpu_offload()
+                        converter.enable_vae_slicing() 
+                        converter.vae.enable_tiling()
                         #pipe.enable_model_cpu_offload() # too slow
                         
                 else:
@@ -7120,6 +7123,9 @@ class SEQUENCER_OT_generate_image(Operator):
             or image_model_card == "black-forest-labs/FLUX.1-schnell"
             or image_model_card == "ChuckMcSneed/FLUX.1-dev"
             or image_model_card == "ostris/Flex.2-preview"
+#            or image_model_card == "black-forest-labs/FLUX.1-Redux-dev"
+#            or image_model_card == "black-forest-labs/FLUX.1-Canny-dev-lora"
+#            or image_model_card == "black-forest-labs/FLUX.1-Depth-dev-lora"
         ):
             if image_model_card == "ostris/Flex.2-preview":
                 image_model_card = "ostris/Flex.1-alpha"
@@ -7382,12 +7388,12 @@ class SEQUENCER_OT_generate_image(Operator):
                         image_resolution=x,
                     )
                 else:
-                    from image_gen_aux import DepthPreprocessor
-                    processor = DepthPreprocessor.from_pretrained("LiheYoung/depth-anything-large-hf")
+                    #from image_gen_aux import DepthPreprocessor
+                    #processor = DepthPreprocessor.from_pretrained("LiheYoung/depth-anything-large-hf")
                     image = processor(image)[0].convert("RGB")
                     #image = get_depth_map(image)
 
-                image = pipe(
+                image = converter(
                     prompt=prompt,
                     control_image=image,
                     num_inference_steps=image_num_inference_steps,
@@ -7410,7 +7416,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     return {"CANCELLED"}
                 image = init_image
                 pipe_prior_output = pipe_prior_redux(image)
-                image = pipe(
+                image = converter(
                     num_inference_steps=image_num_inference_steps,
                     guidance_scale=image_num_guidance,
                     **pipe_prior_output,
