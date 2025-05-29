@@ -846,7 +846,7 @@ def install_modules(self):
     if os_platform == "Windows":
         windows_modules = [
             # How to install a patch: git+https://github.com/huggingface/diffusers@integrations/ltx-097
-            ("diffusers", "git+https://github.com/huggingface/diffusers@integrations/ltx-097"),
+            ("diffusers", "git+https://github.com/huggingface/diffusers.git"),
             ("mmaudio", "git+https://github.com/hkchengrex/MMAudio.git"),
             ("deepspeed", "https://www.piwheels.org/simple/deepspeed/deepspeed-0.16.5-py3-none-any.whl"),
             #("deepspeed", "https://github.com/agwosdz/DeepSpeed-Wheels-for-Windows/releases/download/DeepSpeed/deepspeed-0.16.1+unknown-cp311-cp311-win_amd64_cu124.whl"),
@@ -1470,9 +1470,10 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "black-forest-labs/FLUX.1-schnell",
             ),
             # Not ready for 4bit and depth has tensor problems
-            #            ("black-forest-labs/FLUX.1-Canny-dev-lora", "FLUX Canny", "black-forest-labs/FLUX.1-Canny-dev-lora"),
-            #            ("black-forest-labs/FLUX.1-Depth-dev-lora", "FLUX Depth", "black-forest-labs/FLUX.1-Depth-dev-lora"),
-            #            ("black-forest-labs/FLUX.1-Redux-dev", "FLUX Redux", "black-forest-labs/FLUX.1-Redux-dev"),
+            ("black-forest-labs/FLUX.1-Canny-dev-lora", "FLUX Canny", "black-forest-labs/FLUX.1-Canny-dev-lora"),
+            ("black-forest-labs/FLUX.1-Depth-dev-lora", "FLUX Depth", "black-forest-labs/FLUX.1-Depth-dev-lora"),
+            ("black-forest-labs/FLUX.1-Redux-dev", "FLUX Redux", "black-forest-labs/FLUX.1-Redux-dev"),
+            
             ("ostris/Flex.2-preview", "Flex 2 Preview", "ostris/Flex.2-preview"),
             (
                 "stabilityai/stable-diffusion-xl-base-1.0",
@@ -4669,8 +4670,8 @@ class SEQUENCER_OT_generate_audio(Operator):
                 import scipy
                 import torch
                 from diffusers import StableAudioPipeline
-            except ModuleNotFoundError:
-                print("Dependencies needs to be installed in the add-on preferences.")
+            except ModuleNotFoundError as e:
+                print("Dependencies needs to be installed in the add-on preferences: "+str(e.name))
                 self.report(
                     {"INFO"},
                     "Dependencies needs to be installed in the add-on preferences.",
@@ -5550,25 +5551,42 @@ def scale_image_within_dimensions(image, target_width=None, target_height=None):
     return scaled_image
 
 
-def get_depth_map(image):
-    from PIL import Image
+#def get_depth_map(image):
+#    from PIL import Image
+#    from transformers import SiglipImageProcessor, SiglipVisionModel
+#    feature_extractor = SiglipImageProcessor.from_pretrained(
+#        "lllyasviel/flux_redux_bfl", subfolder="feature_extractor"
+#    )
+#    image_encoder = SiglipVisionModel.from_pretrained(
+#        "lllyasviel/flux_redux_bfl", subfolder="image_encoder", torch_dtype=torch.float16
+#    )
 
-    image = feature_extractor(images=image, return_tensors="pt").pixel_values.to("cuda")
-    with torch.no_grad(), torch.autocast("cuda"):
-        depth_map = depth_estimator(image).predicted_depth
-    depth_map = torch.nn.functional.interpolate(
-        depth_map.unsqueeze(1),
-        size=(1024, 1024),
-        mode="bicubic",
-        align_corners=False,
-    )
-    depth_min = torch.amin(depth_map, dim=[1, 2, 3], keepdim=True)
-    depth_max = torch.amax(depth_map, dim=[1, 2, 3], keepdim=True)
-    depth_map = (depth_map - depth_min) / (depth_max - depth_min)
-    image = torch.cat([depth_map] * 3, dim=1)
-    image = image.permute(0, 2, 3, 1).cpu().numpy()[0]
-    image = Image.fromarray((image * 255.0).clip(0, 255).astype(np.uint8))
-    return image
+#    pipe = HunyuanVideoFramepackPipeline.from_pretrained(
+#        "hunyuanvideo-community/HunyuanVideo",
+#        transformer=transformer,
+#        feature_extractor=feature_extractor,
+#        image_encoder=image_encoder,
+#        torch_dtype=torch.float16,
+#    )
+#    feature_extractor = SiglipImageProcessor.from_pretrained(
+#        "lllyasviel/flux_redux_bfl", subfolder="feature_extractor"
+#    )
+#    image = feature_extractor(images=image, return_tensors="pt").pixel_values.to("cuda")
+#    with torch.no_grad(), torch.autocast("cuda"):
+#        depth_map = depth_estimator(image).predicted_depth
+#    depth_map = torch.nn.functional.interpolate(
+#        depth_map.unsqueeze(1),
+#        size=(1024, 1024),
+#        mode="bicubic",
+#        align_corners=False,
+#    )
+#    depth_min = torch.amin(depth_map, dim=[1, 2, 3], keepdim=True)
+#    depth_max = torch.amax(depth_map, dim=[1, 2, 3], keepdim=True)
+#    depth_map = (depth_map - depth_min) / (depth_max - depth_min)
+#    image = torch.cat([depth_map] * 3, dim=1)
+#    image = image.permute(0, 2, 3, 1).cpu().numpy()[0]
+#    image = Image.fromarray((image * 255.0).clip(0, 255).astype(np.uint8))
+#    return image
 
 
 class IPAdapterFaceProperties(bpy.types.PropertyGroup):
@@ -5829,8 +5847,8 @@ class SEQUENCER_OT_generate_image(Operator):
 
         # from compel import Compel
 
-        except ModuleNotFoundError:
-            print("Dependencies needs to be installed in the add-on preferences. "+str(ModuleNotFoundError))
+        except ModuleNotFoundError as e:
+            print("Dependencies needs to be installed in the add-on preferences: "+str(e.name))
             self.report(
                 {"INFO"},
                 "Dependencies needs to be installed in the add-on preferences.",
@@ -6112,28 +6130,28 @@ class SEQUENCER_OT_generate_image(Operator):
                     from diffusers.utils import load_image
 
                     # https://github.com/huggingface/diffusers/issues/10588
-                    #            from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
+                    from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
 
-                    #            nf4_config = BitsAndBytesConfig(
-                    #                load_in_4bit=True,
-                    #                bnb_4bit_quant_type="nf4",
-                    #                bnb_4bit_compute_dtype=torch.bfloat16,
-                    #            )
-                    #            model_nf4 = FluxTransformer2DModel.from_pretrained(
-                    #                "ChuckMcSneed/FLUX.1-dev",
-                    #                subfolder="transformer",
-                    #                quantization_config=nf4_config,
-                    #                torch_dtype=torch.bfloat16,
-                    #            )
-                    #            pipe = FluxControlPipeline.from_pretrained(
-                    #                "ChuckMcSneed/FLUX.1-dev",
-                    #                transformer=model_nf4,
-                    #                torch_dtype=torch.bfloat16,
-                    #                local_files_only=local_files_only,
-                    #            )
-                    pipe = FluxControlPipeline.from_pretrained(
-                        "ChuckMcSneed/FLUX.1-dev", torch_dtype=torch.bfloat16
+                    nf4_config = BitsAndBytesConfig(
+                        load_in_4bit=True,
+                        bnb_4bit_quant_type="nf4",
+                        bnb_4bit_compute_dtype=torch.bfloat16,
                     )
+                    model_nf4 = FluxTransformer2DModel.from_pretrained(
+                        "ChuckMcSneed/FLUX.1-dev",
+                        subfolder="transformer",
+                        quantization_config=nf4_config,
+                        torch_dtype=torch.bfloat16,
+                    )
+                    pipe = FluxControlPipeline.from_pretrained(
+                        "ChuckMcSneed/FLUX.1-dev",
+                        transformer=model_nf4,
+                        torch_dtype=torch.bfloat16,
+                        local_files_only=local_files_only,
+                    )
+#                    pipe = FluxControlPipeline.from_pretrained(
+#                        "ChuckMcSneed/FLUX.1-dev", torch_dtype=torch.bfloat16
+#                    )
 
                     if gfx_device == "mps":
                         pipe.vae.enable_tiling()
@@ -6160,6 +6178,42 @@ class SEQUENCER_OT_generate_image(Operator):
                         processor = DepthPreprocessor.from_pretrained(
                             "LiheYoung/depth-anything-large-hf"
                         )
+                # redux
+                elif image_model_card == "black-forest-labs/FLUX.1-Redux-dev": 
+                    from transformers import SiglipImageProcessor, SiglipVisionModel                       
+                    feature_extractor = SiglipImageProcessor.from_pretrained(
+                        "lllyasviel/flux_redux_bfl", subfolder="feature_extractor"
+                    )
+                    image_encoder = SiglipVisionModel.from_pretrained(
+                        "lllyasviel/flux_redux_bfl", subfolder="image_encoder", torch_dtype=torch.float16
+                    )
+              
+                    from diffusers import FluxPriorReduxPipeline, FluxPipeline
+                    from diffusers.utils import load_image
+
+                    pipe_prior_redux = FluxPriorReduxPipeline.from_pretrained("black-forest-labs/FLUX.1-Redux-dev", torch_dtype=torch.bfloat16).to("cuda")
+                    pipe = FluxPipeline.from_pretrained(
+                        "ChuckMcSneed/FLUX.1-dev" , 
+                        feature_extractor=feature_extractor,
+                        image_encoder=image_encoder,
+                        text_encoder=None,
+                        text_encoder_2=None,
+                        torch_dtype=torch.bfloat16
+                    )
+                    
+                    if gfx_device == "mps":
+                        pipe.vae.enable_tiling()
+                    elif low_vram():
+                        #pipe.enable_sequential_cpu_offload()
+                        pipe.enable_model_cpu_offload()
+                        pipe.enable_vae_slicing()
+                        pipe.vae.enable_tiling()
+                    else:
+                        pipe.enable_sequential_cpu_offload()
+                        pipe.enable_vae_slicing() 
+                        pipe.vae.enable_tiling()
+                        #pipe.enable_model_cpu_offload() # too slow
+                        
                 else:
                     try:
                         converter = AutoPipelineForImage2Image.from_pretrained(
@@ -6210,29 +6264,29 @@ class SEQUENCER_OT_generate_image(Operator):
                     else:
                         converter.to(gfx_device)
 
-        #        elif: # depth
-        #            from transformers import DPTFeatureExtractor, DPTForDepthEstimation
-        #            from diffusers import ControlNetModel, StableDiffusionXLControlNetImg2ImgPipeline, AutoencoderKL
-        #            from diffusers.utils import load_image
+#            elif: # depth
+#                from transformers import DPTFeatureExtractor, DPTForDepthEstimation
+#                from diffusers import ControlNetModel, StableDiffusionXLControlNetImg2ImgPipeline, AutoencoderKL
+#                from diffusers.utils import load_image
 
-        #            depth_estimator = DPTForDepthEstimation.from_pretrained("Intel/dpt-hybrid-midas").to("cuda")
-        #            feature_extractor = DPTFeatureExtractor.from_pretrained("Intel/dpt-hybrid-midas")
-        #            controlnet = ControlNetModel.from_pretrained(
-        #                "diffusers/controlnet-depth-sdxl-1.0-small",
-        #                variant="fp16",
-        #                use_safetensors=True,
-        #                torch_dtype=torch.float16,
-        #            ).to(gfx_device)
-        #            vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16).to("cuda")
-        #            pipe = StableDiffusionXLControlNetImg2ImgPipeline.from_pretrained(
-        #                "stabilityai/stable-diffusion-xl-base-1.0",
-        #                controlnet=controlnet,
-        #                vae=vae,
-        #                variant="fp16",
-        #                use_safetensors=True,
-        #                torch_dtype=torch.float16,
-        #            ).to(gfx_device)
-        #            pipe.enable_model_cpu_offload()
+#                depth_estimator = DPTForDepthEstimation.from_pretrained("Intel/dpt-hybrid-midas").to("cuda")
+#                feature_extractor = DPTFeatureExtractor.from_pretrained("Intel/dpt-hybrid-midas")
+#                controlnet = ControlNetModel.from_pretrained(
+#                    "diffusers/controlnet-depth-sdxl-1.0-small",
+#                    variant="fp16",
+#                    use_safetensors=True,
+#                    torch_dtype=torch.float16,
+#                ).to(gfx_device)
+#                vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16).to("cuda")
+#                pipe = StableDiffusionXLControlNetImg2ImgPipeline.from_pretrained(
+#                    "stabilityai/stable-diffusion-xl-base-1.0",
+#                    controlnet=controlnet,
+#                    vae=vae,
+#                    variant="fp16",
+#                    use_safetensors=True,
+#                    torch_dtype=torch.float16,
+#                ).to(gfx_device)
+#                pipe.enable_model_cpu_offload()
 
         # Canny & Illusion
         elif image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small":
@@ -7316,7 +7370,8 @@ class SEQUENCER_OT_generate_image(Operator):
                 if not init_image:
                     print("Loading strip failed!")
                     return {"CANCELLED"}
-                image = scale_image_within_dimensions(np.array(init_image), x, None)
+                image = init_image
+                #image = scale_image_within_dimensions(np.array(init_image), x, None)
 
                 if image_model_card == "black-forest-labs/FLUX.1-Canny-dev-lora":
                     image = processor(
@@ -7327,7 +7382,10 @@ class SEQUENCER_OT_generate_image(Operator):
                         image_resolution=x,
                     )
                 else:
-                    image = get_depth_map(image)
+                    from image_gen_aux import DepthPreprocessor
+                    processor = DepthPreprocessor.from_pretrained("LiheYoung/depth-anything-large-hf")
+                    image = processor(image)[0].convert("RGB")
+                    #image = get_depth_map(image)
 
                 image = pipe(
                     prompt=prompt,
@@ -7339,6 +7397,27 @@ class SEQUENCER_OT_generate_image(Operator):
                     width=x,
                     generator=generator,
                 ).images[0]
+                
+            elif image_model_card == "black-forest-labs/FLUX.1-Redux-dev":
+                init_image = None
+
+                if scene.image_path:
+                    init_image = load_first_frame(scene.image_path)
+                if scene.movie_path:
+                    init_image = load_first_frame(scene.movie_path)
+                if not init_image:
+                    print("Loading strip failed!")
+                    return {"CANCELLED"}
+                image = init_image
+                pipe_prior_output = pipe_prior_redux(image)
+                image = pipe(
+                    num_inference_steps=image_num_inference_steps,
+                    guidance_scale=image_num_guidance,
+                    **pipe_prior_output,
+                    height=y,
+                    width=x,
+                    generator=generator,
+                ).images[0]                
 
             # Remove Background
             elif image_model_card == "ZhengPeng7/BiRefNet_HR":
@@ -7775,6 +7854,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 inference_parameters = {
                     "prompt": prompt,
                     "prompt_2": None,
+                    "negative_prompt": negative_prompt,
                     "max_sequence_length": 512,
                     #"image": init_image,
                     #"mask_image": mask_image,
