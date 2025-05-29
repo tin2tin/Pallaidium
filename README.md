@@ -83,6 +83,7 @@ On Linux and macOS: ~/.cache/huggingface/hub
 On Windows: %userprofile%\\.cache\huggingface\hub
 
 ## Change Log
+* 2025_5_29: Add: Flux depth+canny+redux Fix: neg Flux input + py libs
 * 2025-5-12: Add: F5-TTS Voice Cloning
 * 2025-5-09: Update: LTX 0.9.7 w. img, txt & vid input
 * 2025-5-08: FramePack (Img/+Last Img), Img+txt for MMAudio, Flux De-distilled
