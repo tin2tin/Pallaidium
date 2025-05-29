@@ -1161,7 +1161,10 @@ def input_strips_updated(self, context):
             "xinsir/controlnet-openpose-sdxl-1.0",
             "xinsir/controlnet-scribble-sdxl-1.0",
             "ZhengPeng7/BiRefNet_HR",
-            "Salesforce/blipdiffusion"
+            "Salesforce/blipdiffusion",
+            "black-forest-labs/FLUX.1-Canny-dev-lora",
+            "black-forest-labs/FLUX.1-Depth-dev-lora",
+            "black-forest-labs/FLUX.1-Redux-dev",
         }:
             scene.input_strips = "input_strips"
 
@@ -1276,7 +1279,10 @@ def output_strips_updated(self, context):
             "xinsir/controlnet-openpose-sdxl-1.0",
             "xinsir/controlnet-scribble-sdxl-1.0",
             "ZhengPeng7/BiRefNet_HR",
-            "Salesforce/blipdiffusion"
+            "Salesforce/blipdiffusion",
+            "black-forest-labs/FLUX.1-Canny-dev-lora",
+            "black-forest-labs/FLUX.1-Depth-dev-lora",
+            "black-forest-labs/FLUX.1-Redux-dev",
         ]:
             strip_input = "input_strips"
         elif image_model == "dataautogpt3/OpenDalleV1.1":
