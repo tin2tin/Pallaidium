@@ -11,6 +11,35 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+# Mac compatibility patch - must be imported before other imports
+# This enables support for Apple Silicon Macs
+import os
+import sys
+import platform
+
+# Early platform detection
+os_platform = platform.system()  # 'Linux', 'Darwin', 'Java', 'Windows'
+is_apple_silicon = os_platform == "Darwin" and platform.machine() == "arm64"
+
+# Initialize Mac compatibility if needed
+if os_platform == "Darwin":
+    try:
+        # Apply the Mac compatibility patch
+        import mac_patch
+        # This will setup environment variables and apply necessary patches
+        
+        # Add the mac_utils directory to the path
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        mac_utils_dir = os.path.join(current_dir, "mac_utils")
+        if os.path.exists(mac_utils_dir) and mac_utils_dir not in sys.path:
+            sys.path.insert(0, mac_utils_dir)
+            
+        print("Pallaidium-4Mac: Mac compatibility patch applied")
+    except ImportError as e:
+        print(f"Pallaidium-4Mac: Failed to load Mac compatibility patch: {e}")
+    except Exception as e:
+        print(f"Pallaidium-4Mac: Error during Mac initialization: {e}")
+
 
 bl_info = {
     "name": "Pallaidium - Generative AI",
@@ -96,18 +125,37 @@ logging.getLogger("diffusers.models.modeling_utils").setLevel(logging.CRITICAL)
 
 try:
     exec("import torch")
-    if torch.cuda.is_available():
-        gfx_device = "cuda"
-    elif torch.backends.mps.is_available():
-        gfx_device = "mps"
+    # Enhanced device detection with better Mac support
+    if os_platform == "Darwin":
+        # On Mac, prioritize MPS if available
+        if hasattr(torch, 'backends') and hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            gfx_device = "mps"
+            print("Using MPS (Metal Performance Shaders) for GPU acceleration")
+            # Apply MPS optimizations if available
+            if 'mac_utils' in sys.modules:
+                from mac_utils import optimize_for_mps
+                optimize_for_mps()
+        else:
+            gfx_device = "cpu"
+            print("MPS not available on this Mac, falling back to CPU")
     else:
-        gfx_device = "cpu"
-except:
+        # On other platforms, check for CUDA first
+        if torch.cuda.is_available():
+            gfx_device = "cuda"
+            print(f"Using CUDA for GPU acceleration")
+        elif hasattr(torch, 'backends') and hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            gfx_device = "mps"
+            print("Using MPS for GPU acceleration")
+        else:
+            gfx_device = "cpu"
+            print("No GPU acceleration available, using CPU")
+except Exception as e:
     print(
-        "Pallaidium dependencies needs to be installed and Blender needs to be restarted."
+        f"Pallaidium dependencies need to be installed and Blender needs to be restarted: {e}"
     )
+    gfx_device = "cpu"  # Default to CPU if torch import fails
 
-os_platform = platform.system()  # 'Linux', 'Darwin', 'Java', 'Windows'
+# Platform already detected at the top of file
 if os_platform == "Windows":
     pathlib.PosixPath = pathlib.WindowsPath
 
@@ -119,36 +167,47 @@ def debug_print(*args):
         print(*args)
 
 def show_system_console(show):
-    if os_platform == "Windows":
-        # https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindow
+    if os_platform == "Darwin" and 'mac_utils' in sys.modules:
+        # Use the Mac-specific implementation from mac_utils
+        from mac_utils import show_system_console as mac_show_console
+        mac_show_console(show)
+    elif os_platform == "Windows":
+        # Fallback to the original Windows implementation
         SW_HIDE = 0
         SW_SHOW = 5
-        ctypes.windll.user32.ShowWindow(
-            ctypes.windll.kernel32.GetConsoleWindow(), SW_SHOW
-        )  # if show else SW_HIDE
-
+        try:
+            ctypes.windll.user32.ShowWindow(
+                ctypes.windll.kernel32.GetConsoleWindow(), 
+                SW_SHOW if show else SW_HIDE
+            )
+        except Exception as e:
+            print(f"Error showing/hiding console: {e}")
 
 def set_system_console_topmost(top):
-    if os_platform == "Windows":
-        # https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos
-
+    if os_platform == "Darwin" and 'mac_utils' in sys.modules:
+        # Use the Mac-specific implementation from mac_utils
+        from mac_utils import set_system_console_topmost as mac_set_topmost
+        mac_set_topmost(top)
+    elif os_platform == "Windows":
+        # Fallback to the original Windows implementation
         HWND_NOTOPMOST = -2
         HWND_TOPMOST = -1
         HWND_TOP = 0
         SWP_NOMOVE = 0x0002
         SWP_NOSIZE = 0x0001
         SWP_NOZORDER = 0x0004
-        ctypes.windll.user32.SetWindowPos(
-            ctypes.windll.kernel32.GetConsoleWindow(),
-            HWND_TOP if top else HWND_NOTOPMOST,
-            0,
-            0,
-            0,
-            0,
-            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER,
-        )
-    # normalize text, remove redundant whitespace and convert non-ascii quotes to ascii
-
+        try:
+            ctypes.windll.user32.SetWindowPos(
+                ctypes.windll.kernel32.GetConsoleWindow(),
+                HWND_TOP if top else HWND_NOTOPMOST,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER,
+            )
+        except Exception as e:
+            print(f"Error setting console topmost: {e}")
 
 def format_time(milliseconds):
     seconds, milliseconds = divmod(milliseconds, 1000)
