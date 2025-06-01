@@ -83,6 +83,7 @@ On Linux and macOS: ~/.cache/huggingface/hub
 On Windows: %userprofile%\\.cache\huggingface\hub
 
 ## Change Log
+* 2025-6-01: Add: Chatterbox with zero shot text to speech and speech to speech voice cloning.
 * 2025_5_29: Add: Flux depth+canny+redux Fix: neg Flux input + py libs
 * 2025-5-12: Add: F5-TTS Voice Cloning
 * 2025-5-09: Update: LTX 0.9.7 w. img, txt & vid input
@@ -351,6 +352,7 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-
 - [F5-TTS](https://github.com/SWivid/F5-TTS)
 - [WhisperSpeech](https://github.com/collabora/WhisperSpeech)
 - [MMAudio](https://github.com/hkchengrex/MMAudio)
+- [Chatterbox](https://github.com/resemble-ai/chatterbox)
 
 ### Background Removal:
 - [BiRefNet_HR](https://huggingface.co/ZhengPeng7/BiRefNet_HR)
