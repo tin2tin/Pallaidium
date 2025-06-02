@@ -24,8 +24,6 @@ bl_info = {
 
 # TO DO: Move prints.
 
-
-
 import bpy
 import ctypes
 import random
@@ -835,7 +833,7 @@ def install_modules(self):
         ("tqdm", "tqdm"),
         ("tempfile", "tempfile"),
         ("f5_tts", "git+https://github.com/SWivid/F5-TTS.git"),
-        ("chatterbox", "--no-deps git+https://github.com/tin2tin/chatterbox.git"),
+        ("chatterbox", "--no-deps git+https://github.com/resemble-ai/chatterbox.git"),
         ("resemble_perth", "resemble-perth==1.0.1"),
         ("s3tokenizer", "s3tokenizer"),
         ("conformer", "conformer"),
@@ -855,14 +853,11 @@ def install_modules(self):
             ("diffusers", "git+https://github.com/huggingface/diffusers.git"),
             ("mmaudio", "git+https://github.com/hkchengrex/MMAudio.git"),
             #("deepspeed", "https://www.piwheels.org/simple/deepspeed/deepspeed-0.16.5-py3-none-any.whl"),
-            #("deepspeed", "https://github.com/agwosdz/DeepSpeed-Wheels-for-Windows/releases/download/DeepSpeed/deepspeed-0.16.3+unknown-cp311-cp311-win_amd64_cu124.whl"),
             #("deepspeed", "https://github.com/agwosdz/DeepSpeed-Wheels-for-Windows/releases/download/DeepSpeed/deepspeed-0.16.1+unknown-cp311-cp311-win_amd64_cu124.whl"),
-            #("deepspeed", "https://github.com/agwosdz/DeepSpeed-Wheels-for-Windows/releases/download/DeepSpeed/deepspeed-0.15.1+51c6eae-cp311-cp311-win_amd64_cu124.whl"),
             #("deepspeed", "https://github.com/daswer123/deepspeed-windows/releases/download/13.1/deepspeed-0.13.1+cu121-cp311-cp311-win_amd64.whl"),
+            #("deepspeed", "https://github.com/agwosdz/DeepSpeed-Wheels-for-Windows/releases/download/DeepSpeed/deepspeed-0.15.1+51c6eae-cp311-cp311-win_amd64_cu124.whl"),
             ("resemble_enhance", "git+https://github.com/tin2tin/resemble-enhance-windows.git"),
-            #("flash_attn", "https://github.com/kingbri1/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1+cu124torch2.4.0cxx11abiFALSE-cp311-cp311-win_amd64.whl"),
-            #("flash_attn", "https://github.com/oobabooga/flash-attention/releases/download/v2.7.3/flash_attn-2.7.3+cu122torch2.4.1cxx11abiFALSE-cp311-cp311-win_amd64.whl"),
-            #("flash_attn", "https://huggingface.co/lldacing/flash-attention-windows-wheel/resolve/main/flash_attn-2.7.0.post2%2Bcu124torch2.4.0cxx11abiFALSE-cp311-cp311-win_amd64.whl"),
+            ("flash_attn", "https://huggingface.co/lldacing/flash-attention-windows-wheel/blob/main/flash_attn-2.7.0.post2%2Bcu124torch2.5.1cxx11abiFALSE-cp311-cp311-win_amd64.whl"),
             #("flash_attn", "git+https://github.com/ROCm/flash-attention.git"),
             #("flash_attn", "https://github.com/oobabooga/flash-attention/releases/download/v2.6.3/flash_attn-2.6.3+cu122torch2.3.1cxx11abiFALSE-cp311-cp311-win_amd64.whl"),
             #("triton", "triton-windows"),
@@ -880,7 +875,7 @@ def install_modules(self):
             ("diffusers", "git+https://github.com/huggingface/diffusers.git"),
             #("deepspeed", "deepspeed"), #==0.14.4
             ("resemble_enhance", "resemble-enhance"),
-            #("flash_attn", "flash-attn"),
+            ("flash_attn", "flash-attn"),
             ("triton", "triton"),
             ("sageattention","sageattention==1.0.6")
         ]
@@ -989,9 +984,9 @@ def install_modules(self):
 #    ])
     # Torch installations
     if os_platform == "Windows":
-#        subprocess.check_call([
-#            pybin, "-m", "pip", "uninstall", "-y", "torch", "torchvision", "torchaudio", "xformers"
-#        ])
+        subprocess.check_call([
+            pybin, "-m", "pip", "uninstall", "-y", "torch", "torchvision", "torchaudio", "xformers"
+        ])
         subprocess.check_call([
             pybin, "-m", "pip", "install",
             "torch", "xformers", "torchvision", "torchaudio",
@@ -1032,8 +1027,8 @@ def install_modules(self):
     install_module("numpy", "numpy==1.26.4")
     #install_module("transformers", "transformers")
     install_module("tokenizers", "tokenizers==0.21.1")
-    install_module("transformers", "transformers==4.51.3")
-    #install_module("transformers", "git+https://github.com/huggingface/transformers.git")
+    #install_module("transformers", "transformers==4.46.1")
+    install_module("transformers", "git+https://github.com/huggingface/transformers.git")
     print("Cleaning up cache...")
     subprocess.check_call([pybin, "-m", "pip", "cache", "purge"])
     subprocess.check_call([pybin, "-m", "pip", "list"])
@@ -1170,7 +1165,6 @@ def filter_updated(self, context):
         )
 
 def input_strips_updated(self, context):
-    print("Input updated")
     preferences = context.preferences
     addon_prefs = preferences.addons[__name__].preferences
     scene = context.scene
@@ -1192,7 +1186,7 @@ def input_strips_updated(self, context):
             "Salesforce/blipdiffusion",
             "black-forest-labs/FLUX.1-Canny-dev-lora",
             "black-forest-labs/FLUX.1-Depth-dev-lora",
-            "black-forest-labs/FLUX.1-Redux-dev",            
+            "black-forest-labs/FLUX.1-Redux-dev",
         }:
             scene.input_strips = "input_strips"
 
@@ -1214,7 +1208,7 @@ def input_strips_updated(self, context):
             scene.movie_num_guidance = 3.5
 
     # Movie Type Handling
-    elif scene_type == "movie":
+    if scene_type == "movie":
         if movie_model == "hunyuanvideo-community/HunyuanVideo":
             #scene.generate_movie_x = 960
             #scene.generate_movie_y = 544
@@ -1258,10 +1252,9 @@ def input_strips_updated(self, context):
     elif scene_type == "audio":
         if audio_model == "stabilityai/stable-audio-open-1.0":
             scene.movie_num_inference_steps = 200
-#        if addon_prefs.audio_model_card == "MMAudio":
-#            scene.input_strips = "input_strips"
+        elif addon_prefs.audio_model_card == "MMAudio":
+            scene.input_strips = "input_strips"
 
-    # Text Type Handling
     elif scene_type == "text":
         scene.input_strips = "input_strips"
         
@@ -1272,6 +1265,10 @@ def input_strips_updated(self, context):
     # LORA Handling
     if scene.lora_folder:
         bpy.ops.lora.refresh_files()
+
+    # Text Type Handling
+    if scene_type == "text":
+        scene.input_strips = "input_strips"
 
     # Clear Paths if Input is Prompt
     if scene.input_strips == "input_prompt":
@@ -1310,9 +1307,8 @@ def output_strips_updated(self, context):
             "Salesforce/blipdiffusion",
             "black-forest-labs/FLUX.1-Canny-dev-lora",
             "black-forest-labs/FLUX.1-Depth-dev-lora",
-            "black-forest-labs/FLUX.1-Redux-dev",            
+            "black-forest-labs/FLUX.1-Redux-dev",
         ]:
-            print("hep")
             strip_input = "input_strips"
         elif image_model == "dataautogpt3/OpenDalleV1.1":
             scene.use_lcm = False
@@ -1368,8 +1364,8 @@ def output_strips_updated(self, context):
     elif type == "audio":
         if audio_model == "stabilityai/stable-audio-open-1.0":
             movie_inference = 200
-#        if addon_prefs.audio_model_card == "MMAudio":
-#            scene.input_strips = "input_strips"
+        if addon_prefs.audio_model_card == "MMAudio":
+            scene.input_strips = "input_strips"
 
     # === COMMON SETTINGS === #
     if type in ["movie", "audio"] or image_model == "xinsir/controlnet-scribble-sdxl-1.0":
@@ -1504,11 +1500,11 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Flux Schnell",
                 "black-forest-labs/FLUX.1-schnell",
             ),
-
+            # Not ready for 4bit and depth has tensor problems
             ("black-forest-labs/FLUX.1-Canny-dev-lora", "FLUX Canny", "black-forest-labs/FLUX.1-Canny-dev-lora"),
             ("black-forest-labs/FLUX.1-Depth-dev-lora", "FLUX Depth", "black-forest-labs/FLUX.1-Depth-dev-lora"),
             ("black-forest-labs/FLUX.1-Redux-dev", "FLUX Redux", "black-forest-labs/FLUX.1-Redux-dev"),
-
+            
             ("ostris/Flex.2-preview", "Flex 2 Preview", "ostris/Flex.2-preview"),
             (
                 "stabilityai/stable-diffusion-xl-base-1.0",
@@ -1645,12 +1641,15 @@ class GeneratorAddonPreferences(AddonPreferences):
 
     if os_platform != "Linux":
         items = [
+            ("Chatterbox", "Speech: Chatterbox", "Zero shot TTS & voice conversion"),
+            ("SWivid/F5-TTS", "Speech: F5-TTS", "Zero shot TTS"),
+            ("WhisperSpeech", "Speech: WhisperSpeech", "Zero shot TTS"),
+            ("MMAudio", "Audio: Video to Audio", "Add sync audio to video"),
             (
                 "stabilityai/stable-audio-open-1.0",
                 "Audio: Stable Audio Open",
-                "stabilityai/stable-audio-open-1.0",
+                "Text to sfx",
             ),
-            ("MMAudio", "Audio: Video to Audio", "MMAudio"),
             # Not working!
 #            (
 #                "cvssp/audioldm2-large",
@@ -1659,27 +1658,26 @@ class GeneratorAddonPreferences(AddonPreferences):
 #            ),
             (
                 "facebook/musicgen-stereo-melody-large",
-                "Music: MusicGen Stereo Melody",
-                "facebook/musicgen-stereo-melody-large",
+                "MusicGen Stereo Melody",
+                "Generate music",
             ),
-#            parler,
+            parler,
             #("bark", "Speech: Bark", "Bark"),
-            ("WhisperSpeech", "Speech: WhisperSpeech", "WhisperSpeech"),
-            ("SWivid/F5-TTS", "Speech: F5-TTS", "SWivid/F5-TTS"),
-            ("Chatterbox", "Chatterbox", "Zero shot txt2speech & voice cloning"),
         ]
     else:
         items = [
-            ("MMAudio", "Audio: Video to Audio", "MMAudio"),
+            ("SWivid/F5-TTS", "Speech: F5-TTS", "SWivid/F5-TTS"),
+            ("Chatterbox", "Chatterbox", "Zero shot txt2speech & voice cloning"),
+            ("MMAudio", "Audio: Video to Audio", "Add sync audio to video"),
             (
                 "stabilityai/stable-audio-open-1.0",
                 "Stable Audio Open",
-                "stabilityai/stable-audio-open-1.0",
+                "Text to sfx",
             ),
             (
                 "facebook/musicgen-stereo-melody-large",
-                "Music: MusicGen Stereo Melody",
-                "facebook/musicgen-stereo-melody-large",
+                "MusicGen Stereo Melody",
+                "Generate music",
             ),
 #            (
 #                "cvssp/audioldm2-large",
@@ -1714,13 +1712,8 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Florence-2 Image Captioning",
                 "MiaoshouAI/Florence-2-large-PromptGen-v2.0",
             ),
-            (
-                "MiaoshouAI/Florence-2-large-PromptGen-v2.0",
-                "Florence-2 Image Captioning",
-                "MiaoshouAI/Florence-2-large-PromptGen-v2.0",
-            ),
         },
-        default="MiaoshouAI/Florence-2-large-PromptGen-v2.0",
+        default="Salesforce/blip-image-captioning-large",
     )
     generator_ai: StringProperty(
         name="Filepath",
@@ -2222,6 +2215,9 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     and image_model_card != "Salesforce/blipdiffusion"
                     and image_model_card != "ZhengPeng7/BiRefNet_HR"
                     and image_model_card != "Shitao/OmniGen-v1-diffusers"
+                    and image_model_card != "black-forest-labs/FLUX.1-Redux-dev"
+                    and image_model_card != "black-forest-labs/FLUX.1-Canny-dev-lora"
+                    and image_model_card != "black-forest-labs/FLUX.1-Depth-dev-lora"                    
                 ):
                     if input == "input_strips" and not scene.inpaint_selected_strip:
                         col = col.column(heading="Use", align=True)
@@ -2327,6 +2323,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     image_model_card == "Shitao/OmniGen-v1-diffusers"
                     and type == "image"
                 )
+                or (type == "image" and image_model_card == "black-forest-labs/FLUX.1-Redux-dev")
             ):
                 pass
             else:
@@ -2451,8 +2448,9 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     col = layout.column(align=True)
                     col.prop(context.scene, "speakers", text="Speaker")
                     col.prop(context.scene, "languages", text="Language")
-                elif type == "audio" and (audio_model_card == "WhisperSpeech" or audio_model_card == "Chatterbox"):
+                elif type == "audio" and (audio_model_card == "WhisperSpeech"  or audio_model_card == "Chatterbox"):
                     pass
+
                 elif type == "audio" and (
                     addon_prefs.audio_model_card
                     == "facebook/musicgen-stereo-melody-large"
@@ -2619,7 +2617,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     col = layout.column(heading="Remove", align=True)
                     col.prop(context.scene, "remove_silence", text="Silence")                    
 
-            # LoRA. 
+            # LoRA.
             if (
                 (
                     image_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
@@ -3240,7 +3238,6 @@ class SEQUENCER_OT_generate_movie(Operator):
                 from diffusers import AutoencoderKLLTXVideo
                 from diffusers import LTXPipeline, LTXVideoTransformer3DModel#, GGUFQuantizationConfig
                 from diffusers import LTXConditionPipeline, LTXLatentUpsamplePipeline, BitsAndBytesConfig, LTXVideoTransformer3DModel 
-                
                 print("LTX Video: Load Model")
 
                 import torch
@@ -3262,11 +3259,6 @@ class SEQUENCER_OT_generate_movie(Operator):
                 )
 
                 pipe = LTXConditionPipeline.from_pretrained("a-r-r-o-w/LTX-Video-0.9.7-diffusers", transformer=transformer, torch_dtype=torch.bfloat16)
-
-#                from diffusers import LTXLatentUpsamplePipeline
-#                upscale = LTXLatentUpsamplePipeline.from_pretrained("a-r-r-o-w/LTX-Video-0.9.7-Latent-Spatial-Upsampler-diffusers", torch_dtype=torch.bfloat16)
-#                upscale.to("cuda")
-#                upscale.vae.enable_tiling()
 
                 if gfx_device == "mps":
                     pipe.vae.enable_tiling()
@@ -3600,8 +3592,6 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 pipe = WanPipeline.from_pretrained("Wan-AI/Wan2.1-T2V-1.3B-Diffusers", transformer=transformer)
 
-                enabled_items = None
-
                 lora_files = scene.lora_files
                 enabled_names = []
                 enabled_weights = []
@@ -3640,15 +3630,14 @@ class SEQUENCER_OT_generate_movie(Operator):
                     return {"CANCELLED"}
 
                 print("Load: Wan2.1-I2V-14B-480P-Diffusers")
-
                 enabled_items = None
 
                 lora_files = scene.lora_files
                 enabled_names = []
                 enabled_weights = []
                 # Check if there are any enabled items before loading
-                enabled_items = [item for item in lora_files if item.enabled]                
-                
+                enabled_items = [item for item in lora_files if item.enabled]   
+
                 import torch
                 import numpy as np
                 from diffusers import AutoencoderKLWan, WanTransformer3DModel, WanImageToVideoPipeline
@@ -3702,9 +3691,9 @@ class SEQUENCER_OT_generate_movie(Operator):
                             adapter_name=((clean_filename(item.name)).replace(".", "")),
                         )
                     pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)
-                    print("Load LoRAs: " + " ".join(enabled_names))                
+                    print("Load LoRAs: " + " ".join(enabled_names))  
                 # Since we've offloaded the larger models alrady, we can move the rest of the model components to GPU
-                pipe.to("cuda")
+#                pipe.to("cuda")
 #                import torch
 #                import numpy as np
 #                from diffusers import AutoencoderKLWan, WanTransformer3DModel, WanImageToVideoPipeline
@@ -3821,15 +3810,15 @@ class SEQUENCER_OT_generate_movie(Operator):
 
 #                pipe = WanImageToVideoPipeline.from_pretrained("Wan-AI/Wan2.1-I2V-14B-480P-Diffusers", transformer=transformer)
 #
-#                if gfx_device == "mps":
-#                    pass
-#                elif low_vram():
-#                    # pipe.enable_vae_slicing()
-#                    pipe.enable_model_cpu_offload()
-#                else:
-#                    #pipe.enable_sequential_cpu_offload()
-#                    #pipe.vae.enable_tiling()
-#                    pipe.enable_model_cpu_offload()
+                if gfx_device == "mps":
+                    pass
+                elif low_vram():
+                    # pipe.enable_vae_slicing()
+                    pipe.enable_model_cpu_offload()
+                else:
+                    #pipe.enable_sequential_cpu_offload()
+                    #pipe.vae.enable_tiling()
+                    pipe.enable_model_cpu_offload()
 
             else:
                 from diffusers import TextToVideoSDPipeline
@@ -4182,8 +4171,6 @@ class SEQUENCER_OT_generate_movie(Operator):
                         decode_timestep=0.05,
                         image_cond_noise_scale=0.025,
                     ).frames[0]
-
-                    #video_frames = upscale(video=video_frames, height=672, width=1280, generator=torch.Generator().manual_seed(42)).frames[0]
 
                 #Skyreel
                 elif movie_model_card == "Skywork/SkyReels-V1-Hunyuan-T2V":
@@ -4702,7 +4689,7 @@ class SequencerOpenAudioFile(Operator, ImportHelper):
         context.window_manager.fileselect_add(self)
         return {"RUNNING_MODAL"}
 
-##### F5-TTS
+###### F5-TTS
 
 ## Configuration for default F5-TTS model
 #DEFAULT_F5TTS_CFG = [
@@ -4715,14 +4702,14 @@ class SequencerOpenAudioFile(Operator, ImportHelper):
 #E2TTS_CKPT_PATH = "hf://SWivid/E2-TTS/E2TTS_Base/model_1200000.safetensors"
 #E2TTS_MODEL_CFG = dict(dim=1024, depth=24, heads=16, ff_mult=4, text_mask_padding=False, pe_attn_head=1)
 
-## Global variables to hold loaded models and vocoder for reuse
-#global vocoder
-#vocoder = None
-#F5TTS_ema_model = None
-#E2TTS_ema_model = None
-#custom_ema_model = None
-#pre_custom_path = ""
-#dependencies_loaded = False
+### Global variables to hold loaded models and vocoder for reuse
+##global vocoder
+##vocoder = None
+##F5TTS_ema_model = None
+##E2TTS_ema_model = None
+##custom_ema_model = None
+##pre_custom_path = ""
+##dependencies_loaded = False
 
 
 class SEQUENCER_OT_generate_audio(Operator):
@@ -4773,7 +4760,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 import torch
                 from diffusers import StableAudioPipeline
             except ModuleNotFoundError as e:
-                print("Dependencies needs to be installed in the add-on preferences. "+str(e.name))
+                print("Dependencies needs to be installed in the add-on preferences: "+str(e.name))
                 self.report(
                     {"INFO"},
                     "Dependencies needs to be installed in the add-on preferences.",
@@ -4857,9 +4844,8 @@ class SEQUENCER_OT_generate_audio(Operator):
                 remove_silence_for_generated_wav = DummyModule().remove_silence_for_generated_wav
                 DiT = DummyModel
                 UNetT = DummyModel
-                dependencies_loaded = False # Ensure flag is False             
+                dependencies_loaded = False # Ensure flag is False
                 return {"CANCELLED"}
-
         if (
             addon_prefs.audio_model_card == "Chatterbox"
         ):
@@ -4881,7 +4867,6 @@ class SEQUENCER_OT_generate_audio(Operator):
                     self.report({"ERROR"}, error_message)
 
                 return {"CANCELLED"}
-
         if (
             addon_prefs.audio_model_card == "parler-tts/parler-tts-large-v1"
             or addon_prefs.audio_model_card == "parler-tts/parler-tts-mini-v1"
@@ -5048,7 +5033,6 @@ class SEQUENCER_OT_generate_audio(Operator):
             #custom_ema_model = None
             #pre_custom_path = ""
             #dependencies_loaded = False  
-
             print("Loading vocoder...")
             try:
              # load_vocoder should handle device placement internally
@@ -5067,6 +5051,7 @@ class SEQUENCER_OT_generate_audio(Operator):
             if pipe is None:
                  raise RuntimeError(f"Failed to load or get model F5-TTS'.")
 
+        # Chatterbox         
         elif addon_prefs.audio_model_card == "Chatterbox":
             if torch.cuda.is_available():
                 device = "cuda"
@@ -5742,25 +5727,42 @@ def scale_image_within_dimensions(image, target_width=None, target_height=None):
     return scaled_image
 
 
-def get_depth_map(image):
-    from PIL import Image
+#def get_depth_map(image):
+#    from PIL import Image
+#    from transformers import SiglipImageProcessor, SiglipVisionModel
+#    feature_extractor = SiglipImageProcessor.from_pretrained(
+#        "lllyasviel/flux_redux_bfl", subfolder="feature_extractor"
+#    )
+#    image_encoder = SiglipVisionModel.from_pretrained(
+#        "lllyasviel/flux_redux_bfl", subfolder="image_encoder", torch_dtype=torch.float16
+#    )
 
-    image = feature_extractor(images=image, return_tensors="pt").pixel_values.to("cuda")
-    with torch.no_grad(), torch.autocast("cuda"):
-        depth_map = depth_estimator(image).predicted_depth
-    depth_map = torch.nn.functional.interpolate(
-        depth_map.unsqueeze(1),
-        size=(1024, 1024),
-        mode="bicubic",
-        align_corners=False,
-    )
-    depth_min = torch.amin(depth_map, dim=[1, 2, 3], keepdim=True)
-    depth_max = torch.amax(depth_map, dim=[1, 2, 3], keepdim=True)
-    depth_map = (depth_map - depth_min) / (depth_max - depth_min)
-    image = torch.cat([depth_map] * 3, dim=1)
-    image = image.permute(0, 2, 3, 1).cpu().numpy()[0]
-    image = Image.fromarray((image * 255.0).clip(0, 255).astype(np.uint8))
-    return image
+#    pipe = HunyuanVideoFramepackPipeline.from_pretrained(
+#        "hunyuanvideo-community/HunyuanVideo",
+#        transformer=transformer,
+#        feature_extractor=feature_extractor,
+#        image_encoder=image_encoder,
+#        torch_dtype=torch.float16,
+#    )
+#    feature_extractor = SiglipImageProcessor.from_pretrained(
+#        "lllyasviel/flux_redux_bfl", subfolder="feature_extractor"
+#    )
+#    image = feature_extractor(images=image, return_tensors="pt").pixel_values.to("cuda")
+#    with torch.no_grad(), torch.autocast("cuda"):
+#        depth_map = depth_estimator(image).predicted_depth
+#    depth_map = torch.nn.functional.interpolate(
+#        depth_map.unsqueeze(1),
+#        size=(1024, 1024),
+#        mode="bicubic",
+#        align_corners=False,
+#    )
+#    depth_min = torch.amin(depth_map, dim=[1, 2, 3], keepdim=True)
+#    depth_max = torch.amax(depth_map, dim=[1, 2, 3], keepdim=True)
+#    depth_map = (depth_map - depth_min) / (depth_max - depth_min)
+#    image = torch.cat([depth_map] * 3, dim=1)
+#    image = image.permute(0, 2, 3, 1).cpu().numpy()[0]
+#    image = Image.fromarray((image * 255.0).clip(0, 255).astype(np.uint8))
+#    return image
 
 
 class IPAdapterFaceProperties(bpy.types.PropertyGroup):
@@ -6008,26 +6010,26 @@ class SEQUENCER_OT_generate_image(Operator):
         if not seq_editor:
             scene.sequence_editor_create()
 
-#        try:
-        from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
-        from diffusers.utils import pt_to_pil
-        import torch
-        import requests
-        from diffusers.utils import load_image
-        import numpy as np
-        import PIL
-        import cv2
-        from PIL import Image
+        try:
+            from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
+            from diffusers.utils import pt_to_pil
+            import torch
+            import requests
+            from diffusers.utils import load_image
+            import numpy as np
+            import PIL
+            import cv2
+            from PIL import Image
 
-    # from compel import Compel
+        # from compel import Compel
 
-#        except ModuleNotFoundError as e:
-#            print("Dependencies needs to be installed in the add-on preferences. "+str(e.name))
-#            self.report(
-#                {"INFO"},
-#                "Dependencies needs to be installed in the add-on preferences.",
-#            )
-#            return {"CANCELLED"}
+        except ModuleNotFoundError as e:
+            print("Dependencies needs to be installed in the add-on preferences: "+str(e.name))
+            self.report(
+                {"INFO"},
+                "Dependencies needs to be installed in the add-on preferences.",
+            )
+            return {"CANCELLED"}
         # clear the VRAM
 
         clear_cuda_cache()
@@ -6302,8 +6304,11 @@ class SEQUENCER_OT_generate_image(Operator):
                 ) or (image_model_card == "black-forest-labs/FLUX.1-Depth-dev-lora"):
                     from diffusers import FluxControlPipeline
                     from diffusers.utils import load_image
+                    if image_model_card == "black-forest-labs/FLUX.1-Canny-dev-lora":
+                        pipecard = "black-forest-labs/FLUX.1-Canny-dev"
+                    else:
+                        pipecard = "ChuckMcSneed/FLUX.1-dev"
 
-                    # https://github.com/huggingface/diffusers/issues/10588
                     from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
 
                     nf4_config = BitsAndBytesConfig(
@@ -6312,46 +6317,78 @@ class SEQUENCER_OT_generate_image(Operator):
                         bnb_4bit_compute_dtype=torch.bfloat16,
                     )
                     model_nf4 = FluxTransformer2DModel.from_pretrained(
-                        "ChuckMcSneed/FLUX.1-dev",
+                        pipecard,
                         subfolder="transformer",
                         quantization_config=nf4_config,
                         torch_dtype=torch.bfloat16,
                     )
-                    pipe = FluxControlPipeline.from_pretrained(
-                        "ChuckMcSneed/FLUX.1-dev",
+                    converter = FluxControlPipeline.from_pretrained(
+                        pipecard,
                         transformer=model_nf4,
                         torch_dtype=torch.bfloat16,
                         local_files_only=local_files_only,
                     )
-#                    pipe = FluxControlPipeline.from_pretrained(
-#                        "ChuckMcSneed/FLUX.1-dev", torch_dtype=torch.bfloat16
-#                    )
 
                     if gfx_device == "mps":
-                        pipe.vae.enable_tiling()
+                        converter.vae.enable_tiling()
                     elif low_vram():
                         #pipe.enable_sequential_cpu_offload()
-                        pipe.enable_model_cpu_offload()
-                        pipe.enable_vae_slicing()
-                        pipe.vae.enable_tiling()
+                        converter.enable_model_cpu_offload()
+                        converter.enable_vae_slicing()
+                        converter.vae.enable_tiling()
                     else:
-                        pipe.enable_model_cpu_offload()
-
-                    # pipe = FluxControlPipeline.from_pretrained("ChuckMcSneed/FLUX.1-dev", torch_dtype=torch.bfloat16).to("cuda")
-
-                    # pipe.load_lora_weights("camenduru/FLUX.1-dev/flux1-canny-dev-lora.safetensors")
-                    pipe.load_lora_weights(image_model_card)
+                        #pipe.enable_sequential_cpu_offload()
+                        converter.enable_model_cpu_offload()
+                        converter.enable_vae_slicing()
+                        converter.vae.enable_tiling()
+                        
+                    if pipecard == "ChuckMcSneed/FLUX.1-dev":
+                        converter.load_lora_weights(image_model_card)
 
                     if image_model_card == "black-forest-labs/FLUX.1-Canny-dev-lora":
                         from controlnet_aux import CannyDetector
-
                         processor = CannyDetector()
                     else:
                         from image_gen_aux import DepthPreprocessor
-
                         processor = DepthPreprocessor.from_pretrained(
                             "LiheYoung/depth-anything-large-hf"
                         )
+
+                # redux
+                elif image_model_card == "black-forest-labs/FLUX.1-Redux-dev": 
+                    from transformers import SiglipImageProcessor, SiglipVisionModel                       
+                    feature_extractor = SiglipImageProcessor.from_pretrained(
+                        "lllyasviel/flux_redux_bfl", subfolder="feature_extractor"
+                    )
+                    image_encoder = SiglipVisionModel.from_pretrained(
+                        "lllyasviel/flux_redux_bfl", subfolder="image_encoder", torch_dtype=torch.float16
+                    )
+              
+                    from diffusers import FluxPriorReduxPipeline, FluxPipeline
+                    from diffusers.utils import load_image
+
+                    pipe_prior_redux = FluxPriorReduxPipeline.from_pretrained("black-forest-labs/FLUX.1-Redux-dev", torch_dtype=torch.bfloat16).to("cuda")
+                    converter = FluxPipeline.from_pretrained(
+                        "ChuckMcSneed/FLUX.1-dev" , 
+                        feature_extractor=feature_extractor,
+                        image_encoder=image_encoder,
+                        text_encoder=None,
+                        text_encoder_2=None,
+                        torch_dtype=torch.bfloat16
+                    )
+                    
+                    if gfx_device == "mps":
+                        converter.vae.enable_tiling()
+                    elif low_vram():
+                        converter.enable_model_cpu_offload()
+                        converter.enable_vae_slicing()
+                        converter.vae.enable_tiling()
+                    else:
+                        converter.enable_sequential_cpu_offload()
+                        converter.enable_vae_slicing() 
+                        converter.vae.enable_tiling()
+                        #pipe.enable_model_cpu_offload() # too slow
+                        
                 else:
                     try:
                         converter = AutoPipelineForImage2Image.from_pretrained(
@@ -6402,29 +6439,29 @@ class SEQUENCER_OT_generate_image(Operator):
                     else:
                         converter.to(gfx_device)
 
-        #        elif: # depth
-        #            from transformers import DPTFeatureExtractor, DPTForDepthEstimation
-        #            from diffusers import ControlNetModel, StableDiffusionXLControlNetImg2ImgPipeline, AutoencoderKL
-        #            from diffusers.utils import load_image
+#            elif: # depth
+#                from transformers import DPTFeatureExtractor, DPTForDepthEstimation
+#                from diffusers import ControlNetModel, StableDiffusionXLControlNetImg2ImgPipeline, AutoencoderKL
+#                from diffusers.utils import load_image
 
-        #            depth_estimator = DPTForDepthEstimation.from_pretrained("Intel/dpt-hybrid-midas").to("cuda")
-        #            feature_extractor = DPTFeatureExtractor.from_pretrained("Intel/dpt-hybrid-midas")
-        #            controlnet = ControlNetModel.from_pretrained(
-        #                "diffusers/controlnet-depth-sdxl-1.0-small",
-        #                variant="fp16",
-        #                use_safetensors=True,
-        #                torch_dtype=torch.float16,
-        #            ).to(gfx_device)
-        #            vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16).to("cuda")
-        #            pipe = StableDiffusionXLControlNetImg2ImgPipeline.from_pretrained(
-        #                "stabilityai/stable-diffusion-xl-base-1.0",
-        #                controlnet=controlnet,
-        #                vae=vae,
-        #                variant="fp16",
-        #                use_safetensors=True,
-        #                torch_dtype=torch.float16,
-        #            ).to(gfx_device)
-        #            pipe.enable_model_cpu_offload()
+#                depth_estimator = DPTForDepthEstimation.from_pretrained("Intel/dpt-hybrid-midas").to("cuda")
+#                feature_extractor = DPTFeatureExtractor.from_pretrained("Intel/dpt-hybrid-midas")
+#                controlnet = ControlNetModel.from_pretrained(
+#                    "diffusers/controlnet-depth-sdxl-1.0-small",
+#                    variant="fp16",
+#                    use_safetensors=True,
+#                    torch_dtype=torch.float16,
+#                ).to(gfx_device)
+#                vae = AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16).to("cuda")
+#                pipe = StableDiffusionXLControlNetImg2ImgPipeline.from_pretrained(
+#                    "stabilityai/stable-diffusion-xl-base-1.0",
+#                    controlnet=controlnet,
+#                    vae=vae,
+#                    variant="fp16",
+#                    use_safetensors=True,
+#                    torch_dtype=torch.float16,
+#                ).to(gfx_device)
+#                pipe.enable_model_cpu_offload()
 
         # Canny & Illusion
         elif image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small":
@@ -6737,29 +6774,29 @@ class SEQUENCER_OT_generate_image(Operator):
             import torch
             #from diffusers import FluxPipeline
             sys.path.append(os.path.dirname(__file__))
-            from pipelines.pipeline_flux_de_distill import FluxPipeline
+            #from pipelines.pipeline_flux_de_distill import FluxPipeline
 
             if not do_inpaint and not enabled_items and not do_convert:
                 sys.path.append(os.path.dirname(__file__))
-                from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
-                print("De-destilled")
+                from diffusers import BitsAndBytesConfig, FluxTransformer2DModel, FluxPipeline
+                #print("De-destilled")
 
                 nf4_config = BitsAndBytesConfig(
                     load_in_4bit=True,
                     bnb_4bit_quant_type="nf4",
                     bnb_4bit_compute_dtype=torch.bfloat16,
                 )
-#                    model_nf4 = FluxTransformer2DModel.from_pretrained(
-#                        image_model_card,
-#                        subfolder="transformer",
-#                        quantization_config=nf4_config,
-#                        torch_dtype=torch.bfloat16,
-#                    )
                 model_nf4 = FluxTransformer2DModel.from_pretrained(
-                    "InstantX/flux-dev-de-distill-diffusers",
+                    image_model_card,
+                    subfolder="transformer",
                     quantization_config=nf4_config,
-                    torch_dtype=torch.bfloat16
+                    torch_dtype=torch.bfloat16,
                 )
+#                model_nf4 = FluxTransformer2DModel.from_pretrained(
+#                    "InstantX/flux-dev-de-distill-diffusers",
+#                    quantization_config=nf4_config,
+#                    torch_dtype=torch.bfloat16
+#                )
 
                 pipe = FluxPipeline.from_pretrained(
                     image_model_card, transformer=model_nf4, torch_dtype=torch.bfloat16
@@ -6814,32 +6851,32 @@ class SEQUENCER_OT_generate_image(Operator):
                 #image_model_card = "ostris/Flex.1-alpha"
                 image_model_card = "ostris/Flex.2-preview"
 
-                from diffusers import BitsAndBytesConfig, FluxTransformer2DModel#, FluxPipeline
+                from diffusers import BitsAndBytesConfig, FluxTransformer2DModel, FluxPipeline
                 sys.path.append(os.path.dirname(__file__))
-                from pipelines.pipeline_flux_de_distill import FluxPipeline
-                print("De-destilled")
+                #from pipelines.pipeline_flux_de_distill import FluxPipeline
+                #print("De-destilled")
 
                 nf4_config = BitsAndBytesConfig(
                     load_in_4bit=True,
                     bnb_4bit_quant_type="nf4",
                     bnb_4bit_compute_dtype=torch.bfloat16,
                 )
-#                    model_nf4 = FluxTransformer2DModel.from_pretrained(
-#                        image_model_card,
-#                        subfolder="transformer",
-#                        quantization_config=nf4_config,
-#                        torch_dtype=torch.bfloat16,
-#                    )
                 model_nf4 = FluxTransformer2DModel.from_pretrained(
-                    "InstantX/flux-dev-de-distill-diffusers",
+                    image_model_card,
+                    subfolder="transformer",
                     quantization_config=nf4_config,
-                    torch_dtype=torch.bfloat16
+                    torch_dtype=torch.bfloat16,
                 )
-                flex_pipeline_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pipelines", "flex_pipeline.py")
-                print(flex_pipeline_path)
+#                model_nf4 = FluxTransformer2DModel.from_pretrained(
+#                    "InstantX/flux-dev-de-distill-diffusers",
+#                    quantization_config=nf4_config,
+#                    torch_dtype=torch.bfloat16
+#                )
+#                flex_pipeline_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pipelines", "flex_pipeline.py")
+#                print(flex_pipeline_path)
                 pipe = FluxPipeline.from_pretrained(
                     image_model_card,
-                    custom_pipeline=flex_pipeline_path,
+                    #custom_pipeline=flex_pipeline_path,
                     trust_remote_code=True,
                     transformer=model_nf4,
                     torch_dtype=torch.bfloat16,
@@ -6896,48 +6933,35 @@ class SEQUENCER_OT_generate_image(Operator):
             )
 
         elif image_model_card == "Alpha-VLLM/Lumina-Image-2.0":
-            from diffusers import Lumina2Pipeline
+            from diffusers import Lumina2Text2ImgPipeline
 
-            pipe = Lumina2Pipeline.from_pretrained(
+            pipe = Lumina2Text2ImgPipeline.from_pretrained(
                 "Alpha-VLLM/Lumina-Image-2.0", torch_dtype=torch.bfloat16
             )
 
             if gfx_device == "mps":
                 pipe.vae.enable_tiling()
             elif low_vram():
-                #pipe.enable_model_cpu_offload()
-                pipe.enable_sequential_cpu_offload()
+                pipe.enable_model_cpu_offload()
+                #pipe.enable_sequential_cpu_offload()
                 pipe.vae.enable_tiling()
             else:
-                #pipe.enable_sequential_cpu_offload()
+                # pipe.enable_sequential_cpu_offload()
+                # pipe.vae.enable_tiling()
                 pipe.enable_model_cpu_offload()
-                pipe.vae.enable_tiling()
         elif image_model_card == "THUDM/CogView4-6B":
-            from diffusers import CogView4Pipeline, CogView4Transformer2DModel, BitsAndBytesConfig
-# missing config.json
-#            nf4_config = BitsAndBytesConfig(
-#                load_in_4bit=True,
-#                bnb_4bit_quant_type="nf4",
-#                bnb_4bit_compute_dtype=torch.bfloat16,
-#            )
-#            model_nf4 = CogView4Transformer2DModel.from_pretrained(
-#                "THUDM/CogView4-6B",
-#                quantization_config=nf4_config,
-#                torch_dtype=torch.bfloat16
-#            )
-            pipe = CogView4Pipeline.from_pretrained("THUDM/CogView4-6B", torch_dtype=torch.bfloat16) # transformer=model_nf4, 
+            from diffusers import CogView4Pipeline
+            pipe = CogView4Pipeline.from_pretrained("THUDM/CogView4-6B", torch_dtype=torch.bfloat16)
             if gfx_device == "mps":
                 pipe.vae.enable_tiling()
             elif low_vram():
-                pipe.enable_sequential_cpu_offload()
-                #pipe.enable_model_cpu_offload()
-                #pipe.enable_vae_slicing()
+                #pipe.enable_sequential_cpu_offload()
+                pipe.enable_model_cpu_offload()
                 pipe.vae.enable_tiling()
             else:
-                pipe.enable_sequential_cpu_offload()
-                #pipe.enable_vae_slicing()
-                pipe.vae.enable_tiling()
-                #pipe.enable_model_cpu_offload()
+                # pipe.enable_sequential_cpu_offload()
+                # pipe.vae.enable_tiling()
+                pipe.enable_model_cpu_offload()
 
         elif image_model_card == "Efficient-Large-Model/Sana_1600M_1024px_diffusers":
             from diffusers import (
@@ -7271,6 +7295,9 @@ class SEQUENCER_OT_generate_image(Operator):
             or image_model_card == "black-forest-labs/FLUX.1-schnell"
             or image_model_card == "ChuckMcSneed/FLUX.1-dev"
             or image_model_card == "ostris/Flex.2-preview"
+#            or image_model_card == "black-forest-labs/FLUX.1-Redux-dev"
+#            or image_model_card == "black-forest-labs/FLUX.1-Canny-dev-lora"
+#            or image_model_card == "black-forest-labs/FLUX.1-Depth-dev-lora"
         ):
             if image_model_card == "ostris/Flex.2-preview":
                 image_model_card = "ostris/Flex.1-alpha"
@@ -7364,7 +7391,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 else:
                     generator = None
 
-            # Canny & Illusion
+            # SDXL Canny & Illusion
             if image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small":
                 init_image = None
                 if scene.image_path:
@@ -7521,7 +7548,8 @@ class SEQUENCER_OT_generate_image(Operator):
                 if not init_image:
                     print("Loading strip failed!")
                     return {"CANCELLED"}
-                image = scale_image_within_dimensions(np.array(init_image), x, None)
+                image = init_image
+                #image = scale_image_within_dimensions(np.array(init_image), x, None)
 
                 if image_model_card == "black-forest-labs/FLUX.1-Canny-dev-lora":
                     image = processor(
@@ -7532,9 +7560,12 @@ class SEQUENCER_OT_generate_image(Operator):
                         image_resolution=x,
                     )
                 else:
-                    image = get_depth_map(image)
+                    #from image_gen_aux import DepthPreprocessor
+                    #processor = DepthPreprocessor.from_pretrained("LiheYoung/depth-anything-large-hf")
+                    image = processor(image)[0].convert("RGB")
+                    #image = get_depth_map(image)
 
-                image = pipe(
+                image = converter(
                     prompt=prompt,
                     control_image=image,
                     num_inference_steps=image_num_inference_steps,
@@ -7544,6 +7575,27 @@ class SEQUENCER_OT_generate_image(Operator):
                     width=x,
                     generator=generator,
                 ).images[0]
+                
+            elif image_model_card == "black-forest-labs/FLUX.1-Redux-dev":
+                init_image = None
+
+                if scene.image_path:
+                    init_image = load_first_frame(scene.image_path)
+                if scene.movie_path:
+                    init_image = load_first_frame(scene.movie_path)
+                if not init_image:
+                    print("Loading strip failed!")
+                    return {"CANCELLED"}
+                image = init_image
+                pipe_prior_output = pipe_prior_redux(image)
+                image = converter(
+                    num_inference_steps=image_num_inference_steps,
+                    guidance_scale=image_num_guidance,
+                    **pipe_prior_output,
+                    height=y,
+                    width=x,
+                    generator=generator,
+                ).images[0]                
 
             # Remove Background
             elif image_model_card == "ZhengPeng7/BiRefNet_HR":
@@ -7980,6 +8032,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 inference_parameters = {
                     "prompt": prompt,
                     "prompt_2": None,
+                    "negative_prompt": negative_prompt,
                     "max_sequence_length": 512,
                     #"image": init_image,
                     #"mask_image": mask_image,
@@ -8417,6 +8470,7 @@ class SEQUENCER_OT_generate_text(Operator):
                 from transformers import BlipProcessor, BlipForConditionalGeneration
             except ModuleNotFoundError as e:
                 print("Dependencies needs to be installed in the add-on preferences. "+str(e.name))
+
                 self.report(
                     {"INFO"},
                     "Dependencies need to be installed in the add-on preferences.",
@@ -8430,6 +8484,7 @@ class SEQUENCER_OT_generate_text(Operator):
                 from transformers import AutoModelForCausalLM, AutoProcessor, AutoConfig
             except ModuleNotFoundError as e:
                 print("Dependencies needs to be installed in the add-on preferences. "+str(e.name))
+
                 self.report(
                     {"INFO"},
                     "Dependencies need to be installed in the add-on preferences.",
@@ -8748,7 +8803,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     if use_strip_data:
                         scene.movie_use_random = use_random
                         scene.movie_num_seed = seed
-
+                        
             if strip.type == "SOUND":
                 if strip.sound:
                     print("\n" + str(count + 1) + "/" + str(len(strips)))
@@ -8764,7 +8819,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                         sequencer.generate_audio()
                     if type == "image":
                         sequencer.generate_image()
-
+                        
             if strip.type == "IMAGE":
                 strip_dirname = os.path.dirname(strip.directory)
                 image_path = bpy.path.abspath(
@@ -9524,7 +9579,6 @@ def register():
         min=0,
         max=100,
     )
-    # The frame audio duration.
     bpy.types.Scene.chat_exaggeration = bpy.props.FloatProperty(
         name="Exaggeration",
         default=0.5,
@@ -9546,6 +9600,7 @@ def register():
         max=1,
         description="Chatterbox Pace",
     )
+
 
 def unregister():
     for cls in classes:
