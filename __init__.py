@@ -833,7 +833,7 @@ def install_modules(self):
         ("tqdm", "tqdm"),
         ("tempfile", "tempfile"),
         ("f5_tts", "git+https://github.com/SWivid/F5-TTS.git"),
-        ("chatterbox", "--no-deps git+https://github.com/resemble-ai/chatterbox.git"),
+        ("chatterbox", "--no-deps git+https://github.com/tin2tin/chatterbox.git"),
         ("resemble_perth", "resemble-perth==1.0.1"),
         ("s3tokenizer", "s3tokenizer"),
         ("conformer", "conformer"),
