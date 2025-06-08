@@ -82,6 +82,26 @@ On Linux and macOS: ~/.cache/huggingface/hub
 
 On Windows: %userprofile%\\.cache\huggingface\hub
 
+
+## Usage
+
+The addon panel is located in the **Video Sequence Editor > Sidebar (N-Panel) > Generative AI** tab.
+
+### Basic Workflow
+
+1.  **Choose Output:** In the "Output" section of the panel, select whether you want to generate an `Image`, `Video`, `Audio`, or `Text`.
+2.  **Select Model:** Based on your output choice, select a specific AI model from the dropdown list.
+3.  **Set Input:**
+    -   **For Prompts:** Leave the `Input` dropdown on `Prompts`.
+    -   **For Strips:** Select one or more strips in the VSE timeline and set the `Input` dropdown to `Strips`.
+4.  **Configure:** Enter your text prompts and adjust parameters like resolution, quality steps, and guidance scale.
+5.  **Generate:**
+    -   If using `Prompts`, click the **`Generate`** button.
+    -   If using `Strips`, click the **`Generate from Strips`** button.
+
+The generated media will be saved to the directory specified in the addon preferences and automatically added to your VSE timeline on a new channel.
+
+
 ## Change Log
 * 2025-6-01: Add: Chatterbox with zero shot text to speech and speech to speech voice cloning.
 * 2025_5_29: Add: Flux depth+canny+redux Fix: neg Flux input + py libs
@@ -150,7 +170,7 @@ See SDXL handling most of the styles here: https://stable-diffusion-art.com/sdxl
 
 ## Batch Processing
 
-Select multiple strips and hit Generate. When doing this, the file name, and if found the seed value, are automatically inserted into the prompt and seed value. However, in the add-on preferences, this behavior can be switched off.
+Select multiple strips and hit Generate. When doing this, the file name, and if found, also the seed value, are automatically inserted into the prompt and seed value. However, in the add-on preferences, this behavior can be switched off.
 
 https://github.com/tin2tin/Pallaidium/assets/1322593/28098eb6-3a93-4bcb-bd6f-53b71faabd8d
 
@@ -190,7 +210,7 @@ https://github.com/tin2tin/GPT4BLENDER
 
 ### Text to Strip
 
-Convert text from the Text Editor to strips which can be used as prompts for batch generation.
+Convert text from the Text Editor to strips, which can be used as prompts for batch generation.
 
 https://github.com/tin2tin/text_to_strip
 
@@ -232,15 +252,9 @@ https://github.com/Nerogar/OneTrainer
 
 ## Video Examples
 
-### VID2VID & TXT2VID
-[![Watch the video](https://img.youtube.com/vi/S2b7QGv-l-o/0.jpg)](https://www.youtube.com/watch?v=S2b7QGv-l-o)
 
 ### Image to Text
 https://github.com/tin2tin/Pallaidium/assets/1322593/91eb17e4-72d6-4c69-8e5c-a3d38af5a770
-
-
-### Illusion Diffusion
-https://github.com/tin2tin/Pallaidium/assets/1322593/42eadfd8-3ebf-4747-b8e0-7b79fe8626b6
 
 
 ### Scribble
@@ -259,40 +273,16 @@ https://github.com/tin2tin/Pallaidium/assets/1322593/a1e94e09-0147-40ae-b4c2-4ce
 https://github.com/tin2tin/Pallaidium/assets/1322593/ac9f278e-9fc9-46fc-a4e7-562ff041964f
 
 
-### Screenplay to Film
-[![Watch the video](https://img.youtube.com/vi/J64ZitsSN6k/0.jpg)](https://youtu.be/J64ZitsSN6k) 
-
-
-### Img to Txt to Audio
-[![Watch the video](https://img.youtube.com/vi/0EnUq1RhJ6M/0.jpg)](https://youtu.be/0EnUq1RhJ6M) 
-
-
-### Zeroscope
-[![Watch the video](https://img.youtube.com/vi/LejSJGmtEvE/0.jpg)](https://youtu.be/LejSJGmtEvE) 
-
-
-### Würstchen
-[![Watch the video](https://img.youtube.com/vi/CDPmGs_JtSM/0.jpg)](https://youtu.be/CDPmGs_JtSM) 
-
-
-### Bark
-[![Watch the video](https://img.youtube.com/vi/AAdQfQjENJU/0.jpg)](https://youtu.be/AAdQfQjENJU) 
-
-
-### Batch from Text Strips
-[![Watch the video](https://img.youtube.com/vi/gSFWGkgaNsE/0.jpg)](https://youtu.be/gSFWGkgaNsE)
-
-
 ### Video to video:
 https://github.com/tin2tin/Generative_AI/assets/1322593/c044a0b0-95c2-4b54-af0b-45bc0c670c89
 
+
 https://github.com/tin2tin/Generative_AI/assets/1322593/0105cd35-b3b2-49cf-91c1-0633dd484177
 
-### Img2img:
+
+### Frame by Frame:
 https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-ffce872b79c3
 
-### Painting
-https://github.com/tin2tin/Generative_AI/assets/1322593/7cd69cd0-5842-40f0-b41f-455c77443535
 
 ## Restrictions on using Pallaidium:
 - The team behind Pallaidium does not endorse or take responsibility for third-party use.
