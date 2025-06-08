@@ -1,8 +1,3 @@
-> [!WARNING]
-> SCAM ALERT!
-> Scammers are misusing our free software, Pallaidium, along with our content and name, on a phishing site: pallaidium . com. We are NOT associated with this site!
-> 🚨 Please help us report this scam — otherwise, we may be forced to delete this GitHub repository.
-
 <h1 align="center">PALLAIDIUM</h1>
 
 <p align="center">A free generative AI movie studio integrated into the Blender Video Editor.</p>
@@ -14,7 +9,7 @@
 
 <hr>
 
-## Pallaidium, Blender Screenwriter, and GPT4Blender
+## Workflow examples with Pallaidium, Blender Screenwriter, and GPT4Blender
 
 https://github.com/user-attachments/assets/81d30bc1-01f6-4b52-8ce7-abf53d53e854
 
@@ -350,7 +345,10 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 ### Text Captions:
 - [Florence-2-large-PromptGen](https://huggingface.co/MiaoshouAI/Florence-2-large-PromptGen-v2.0)
 
-
+> [!WARNING]
+> SCAM ALERT!
+> Scammers are misusing our free software, Pallaidium, along with our content and name, on a phishing site: pallaidium . com. We are NOT associated with this site!
+> 🚨 Please help us report this scam — otherwise, we may be forced to delete this GitHub repository.
 
 ![PallAIdium](https://github.com/tin2tin/Generative_AI/assets/1322593/1b1b232f-00d9-4b0b-86fb-5f0f24136d2c)
 
