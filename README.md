@@ -98,6 +98,7 @@ The generated media will be saved to the directory specified in the addon prefer
 
 
 ## Change Log
+* 2025-6-12: Add: ZuluVision/MoviiGen1.1_Prompt_Rewriter
 * 2025-6-01: Add: Chatterbox with zero shot text to speech and speech to speech voice cloning.
 * 2025_5_29: Add: Flux depth+canny+redux Fix: neg Flux input + py libs
 * 2025-5-12: Add: F5-TTS Voice Cloning
@@ -342,8 +343,9 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 ### Background Removal:
 - [BiRefNet_HR](https://huggingface.co/ZhengPeng7/BiRefNet_HR)
 
-### Text Captions:
+### Generate Text Captions/Enhancing:
 - [Florence-2-large-PromptGen](https://huggingface.co/MiaoshouAI/Florence-2-large-PromptGen-v2.0)
+- [MoviiGen1.1_Prompt_Rewriter](https://huggingface.co/ZuluVision/MoviiGen1.1_Prompt_Rewriter)
 
 > [!WARNING]
 > SCAM ALERT!
