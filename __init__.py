@@ -833,7 +833,7 @@ def install_modules(self):
         ("tqdm", "tqdm"),
         ("tempfile", "tempfile"),
         ("f5_tts", "git+https://github.com/SWivid/F5-TTS.git"),
-        ("chatterbox", "--no-deps git+https://github.com/tin2tin/chatterbox.git"),
+        ("chatterbox", "--no-deps git+https://github.com/resemble-ai/chatterbox.git"),
         ("resemble_perth", "resemble-perth==1.0.1"),
         ("s3tokenizer", "s3tokenizer"),
         ("conformer", "conformer"),
@@ -876,6 +876,7 @@ def install_modules(self):
             #("deepspeed", "deepspeed"), #==0.14.4
             ("resemble_enhance", "resemble-enhance"),
             ("flash_attn", "flash-attn"),
+            ("triton", "triton"),
             ("triton", "triton"),
             ("sageattention","sageattention==1.0.6")
         ]
@@ -1010,8 +1011,9 @@ def install_modules(self):
         install_module("torchvision", "torchvision")
         install_module("torchaudio", "torchaudio")
         install_module("xformers", "xformers")
-        install_module("torcheval", "torcheval") 
-        install_module("torchao", "torchao")
+        
+    install_module("torcheval", "torcheval") 
+    install_module("torchao", "torchao")
 
     # Final tasks
     subprocess.check_call([
@@ -1174,6 +1176,10 @@ def input_strips_updated(self, context):
     movie_model = addon_prefs.movie_model_card
     audio_model = addon_prefs.audio_model_card
 
+    # Text Type Handling
+    if scene_type == "text" and scene.input_strips != "input_strips":
+        if addon_prefs.text_model_card != "ZuluVision/MoviiGen1.1_Prompt_Rewriter":
+            scene.input_strips = "input_strips"
     # Image Type Handling
     if scene_type == "image":
         if image_model == "Shitao/OmniGen-v1-diffusers":
@@ -1208,7 +1214,7 @@ def input_strips_updated(self, context):
             scene.movie_num_guidance = 3.5
 
     # Movie Type Handling
-    if scene_type == "movie":
+    elif scene_type == "movie":
         if movie_model == "hunyuanvideo-community/HunyuanVideo":
             #scene.generate_movie_x = 960
             #scene.generate_movie_y = 544
@@ -1244,19 +1250,16 @@ def input_strips_updated(self, context):
                 "stabilityai/stable-video-diffusion-img2vid-xt",
                 "Hailuo/MiniMax/img2vid",
                 "Hailuo/MiniMax/subject2vid"
-            }
-        ):
+            } 
+        ) and scene.input_strips != "input_strips":
             scene.input_strips = "input_strips"
 
     # Audio Type Handling
     elif scene_type == "audio":
         if audio_model == "stabilityai/stable-audio-open-1.0":
             scene.movie_num_inference_steps = 200
-        elif addon_prefs.audio_model_card == "MMAudio":
+        elif addon_prefs.audio_model_card == "MMAudio" and scene.input_strips != "input_strips":
             scene.input_strips = "input_strips"
-
-    elif scene_type == "text":
-        scene.input_strips = "input_strips"
         
     # Common Handling for Selected Strip
     if scene_type in {"movie", "audio"} or image_model == "xinsir/controlnet-scribble-sdxl-1.0":
@@ -1265,10 +1268,6 @@ def input_strips_updated(self, context):
     # LORA Handling
     if scene.lora_folder:
         bpy.ops.lora.refresh_files()
-
-    # Text Type Handling
-    if scene_type == "text":
-        scene.input_strips = "input_strips"
 
     # Clear Paths if Input is Prompt
     if scene.input_strips == "input_prompt":
@@ -1286,7 +1285,7 @@ def output_strips_updated(self, context):
     audio_model = addon_prefs.audio_model_card
 
     type = scene.generatorai_typeselect
-    strip_input = scene.input_strips
+    #strip_input = scene.input_strips
 
     # Default values for movie generation settings
     movie_res_x = scene.generate_movie_x
@@ -1295,10 +1294,15 @@ def output_strips_updated(self, context):
     movie_inference = scene.movie_num_inference_steps
     movie_guidance = scene.movie_num_guidance
 
+    # Text Type Handling
+    if type == "text" and scene.input_strips != "input_strips":
+        if addon_prefs.text_model_card != "ZuluVision/MoviiGen1.1_Prompt_Rewriter":
+            scene.input_strips = "input_strips"
+
     # === IMAGE TYPE === #
     if type == "image":
         if image_model == "Shitao/OmniGen-v1-diffusers":
-            strip_input = "input_prompt"
+            scene.input_strips = "input_prompt"
         elif image_model in [
             "diffusers/controlnet-canny-sdxl-1.0",
             "xinsir/controlnet-openpose-sdxl-1.0",
@@ -1309,7 +1313,7 @@ def output_strips_updated(self, context):
             "black-forest-labs/FLUX.1-Depth-dev-lora",
             "black-forest-labs/FLUX.1-Redux-dev",
         ]:
-            strip_input = "input_strips"
+            scene.input_strips = "input_strips"
         elif image_model == "dataautogpt3/OpenDalleV1.1":
             scene.use_lcm = False
         elif image_model == "Kwai-Kolors/Kolors-diffusers":
@@ -1358,7 +1362,7 @@ def output_strips_updated(self, context):
             "Hailuo/MiniMax/img2vid",
             "Hailuo/MiniMax/subject2vid"
         ]:
-            strip_input = "input_strips"
+            scene.input_strips = "input_strips"
 
     # === AUDIO TYPE === #
     elif type == "audio":
@@ -1373,8 +1377,6 @@ def output_strips_updated(self, context):
         if scene.lora_folder:
             bpy.ops.lora.refresh_files()
 
-    # Update scene properties
-    scene.input_strips = strip_input
     if type == "movie":
         scene.generate_movie_x = movie_res_x
         scene.generate_movie_y = movie_res_y
@@ -1691,7 +1693,7 @@ class GeneratorAddonPreferences(AddonPreferences):
         name="Audio Model",
         items=items,
         default="stabilityai/stable-audio-open-1.0",
-        update=input_strips_updated,
+        update=output_strips_updated,
     )
     # For DeepFloyd
     hugginface_token: bpy.props.StringProperty(
@@ -1701,19 +1703,25 @@ class GeneratorAddonPreferences(AddonPreferences):
     )
     text_model_card: EnumProperty(
         name="Text Model",
-        items={
+        items=[
             (
                 "Salesforce/blip-image-captioning-large",
-                "Blip Image Captioning",
-                "Salesforce/blip-image-captioning-large",
+                "Image Captioning: Blip",
+                "Image Captioning",
             ),
             (
                 "MiaoshouAI/Florence-2-large-PromptGen-v2.0",
-                "Florence-2 Image Captioning",
-                "MiaoshouAI/Florence-2-large-PromptGen-v2.0",
+                "Image Captioning: Florence-2",
+                "Image Captioning",
             ),
-        },
-        default="Salesforce/blip-image-captioning-large",
+            (
+                "ZuluVision/MoviiGen1.1_Prompt_Rewriter",
+                "Prompt Enhancer: MoviiGen",
+                "MoviiGen Prompt Rewriter",
+            ),
+        ],
+        default="MiaoshouAI/Florence-2-large-PromptGen-v2.0",
+        update=output_strips_updated,
     )
     generator_ai: StringProperty(
         name="Filepath",
@@ -2111,6 +2119,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         audio_model_card = addon_prefs.audio_model_card
         movie_model_card = addon_prefs.movie_model_card
         image_model_card = addon_prefs.image_model_card
+        text_model_card = addon_prefs.text_model_card
         scene = context.scene
         type = scene.generatorai_typeselect
         input = scene.input_strips
@@ -2670,6 +2679,14 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         rows=2,
                     )
 
+        elif text_model_card == "ZuluVision/MoviiGen1.1_Prompt_Rewriter":
+                col = layout.column(align=True)
+                col = col.box()
+                col = col.column(align=True)
+                col.use_property_split = False
+                col.use_property_decorate = False
+                col.prop(context.scene, "generate_movie_prompt", text="", icon="ADD")
+                
         # Output.
         layout = self.layout
         layout.use_property_split = True
@@ -2730,6 +2747,8 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 row.operator("sequencer.generate_image", text="Generate")
             if type == "audio":
                 row.operator("sequencer.generate_audio", text="Generate")
+            if type == "text":
+                row.operator("sequencer.generate_text", text="Generate")
 
 
 class NoWatermark:
@@ -3586,11 +3605,27 @@ class SEQUENCER_OT_generate_movie(Operator):
                 import numpy as np
                 from diffusers.utils import export_to_video, load_image
                 from transformers import CLIPVisionModel
-                ckpt_path = "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/blob/main/split_files/diffusion_models/wan2.1_t2v_1.3B_bf16.safetensors"
                 #ckpt_path = "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/blob/main/split_files/diffusion_models/wan2.1_t2v_1.3B_bf16.safetensors"
-                transformer = WanTransformer3DModel.from_single_file(ckpt_path, torch_dtype=torch.bfloat16)
+                ckpt_path = "https://huggingface.co/vrgamedevgirl84/Wan14BT2V_MasterModel/blob/main/WanT2V_MasterModel.safetensors"
+                #ckpt_path = "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/blob/main/split_files/diffusion_models/wan2.1_t2v_1.3B_bf16.safetensors"
+                #transformer = WanTransformer3DModel.from_single_file(ckpt_path, torch_dtype=torch.bfloat16)
 
-                pipe = WanPipeline.from_pretrained("Wan-AI/Wan2.1-T2V-1.3B-Diffusers", transformer=transformer)
+                # from diffusers import FluxPipeline
+                from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
+
+                nf4_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_quant_type="nf4",
+                    bnb_4bit_compute_dtype=torch.bfloat16,
+                )
+                transformer = WanTransformer3DModel.from_single_file(
+                    ckpt_path,
+                    quantization_config=nf4_config,
+                    torch_dtype=torch.bfloat16,
+                )
+
+                pipe = WanPipeline.from_pretrained("Wan-AI/Wan2.1-T2V-14B-Diffusers", transformer=transformer)
+                #pipe = WanPipeline.from_pretrained("Wan-AI/Wan2.1-T2V-1.3B-Diffusers", transformer=transformer)
 
                 lora_files = scene.lora_files
                 enabled_names = []
@@ -8443,6 +8478,7 @@ class SEQUENCER_OT_generate_text(Operator):
 
     def execute(self, context):
         scene = context.scene
+        input = scene.input_strips
         seq_editor = scene.sequence_editor
         preferences = context.preferences
         addon_prefs = preferences.addons[__name__].preferences
@@ -8478,6 +8514,20 @@ class SEQUENCER_OT_generate_text(Operator):
                 return {"CANCELLED"}
 
         elif (
+            addon_prefs.text_model_card == "ZuluVision/MoviiGen1.1_Prompt_Rewriter"
+        ):
+            try:
+                import torch
+                from transformers import TorchAoConfig, AutoModelForCausalLM, AutoTokenizer
+            except ModuleNotFoundError as e:
+                print("Dependencies needs to be installed in the add-on preferences. "+str(e.name))
+
+                self.report(
+                    {"INFO"},
+                    "Dependencies need to be installed in the add-on preferences.",
+                )
+                return {"CANCELLED"}
+        elif (
             addon_prefs.text_model_card == "MiaoshouAI/Florence-2-large-PromptGen-v2.0"
         ):
             try:
@@ -8490,17 +8540,19 @@ class SEQUENCER_OT_generate_text(Operator):
                     "Dependencies need to be installed in the add-on preferences.",
                 )
                 return {"CANCELLED"}
-
+            
         # clear the VRAM
         clear_cuda_cache()
 
-        init_image = (
-            load_first_frame(scene.movie_path)
-            if scene.movie_path
-            else load_first_frame(scene.image_path)
-        )
 
-        init_image = init_image.resize((x, y))
+        if not addon_prefs.text_model_card == "ZuluVision/MoviiGen1.1_Prompt_Rewriter":
+            init_image = (
+                load_first_frame(scene.movie_path)
+                if scene.movie_path
+                else load_first_frame(scene.image_path)
+            )
+
+            init_image = init_image.resize((x, y))
 
         if addon_prefs.text_model_card == "Salesforce/blip-image-captioning-large":
             processor = BlipProcessor.from_pretrained(
@@ -8567,10 +8619,58 @@ class SEQUENCER_OT_generate_text(Operator):
             text = parsed_answer[prompt]
             print("Generated text: " + str(text))
 
-        start_frame = int(active_strip.frame_start)
-        end_frame = (
-            start_frame + active_strip.frame_final_duration
-        )
+        elif addon_prefs.text_model_card == "ZuluVision/MoviiGen1.1_Prompt_Rewriter":
+            if input == "input_strips" and active_strip and active_strip.type != "TEXT":
+                print("Unsupported strip type: "+active_strip.name)
+                return {"CANCELLED"}
+            print("Enhancing prompt.")
+            quantization_config = TorchAoConfig("int4_weight_only", group_size=128)
+
+            model_name = "ZuluVision/MoviiGen1.1_Prompt_Rewriter"
+
+            model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                torch_dtype=torch.bfloat16,
+                #torch_dtype="auto",
+                device_map="auto",
+                quantization_config=quantization_config,
+            )
+            tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+            prompt = prompt
+            messages = [
+                #{"role": "system", "content": "You are an advanced AI model tasked with You must respond in the language used by the user."},
+                {"role": "system", "content": "You are an advanced AI model tasked with generating and extending structured and detailed video captions. Enhance the input prompt by describing who, what, where in detail ex. mood, style, and framing; specifying subjects, actions, settings, lighting, color, atmosphere, motion, and camera movement; using precise cinematic language. You have 400 characters to reply"},
+                {"role": "user", "content": prompt}
+            ]
+            text = tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+            model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
+
+            generated_ids = model.generate(
+                **model_inputs,
+                max_new_tokens=256
+            )
+            generated_ids = [
+                output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
+            ]
+
+            text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+            print("Generated text: " + str(text))
+
+        if input == "input_strips" and active_strip:
+            start_frame = int(active_strip.frame_start)
+            end_frame = (
+                start_frame + active_strip.frame_final_duration
+            )
+        else:
+            start_frame = int(scene.frame_current)
+            end_frame = (
+                start_frame + 100
+            )
 
         empty_channel = find_first_empty_channel(
             start_frame,
@@ -8690,12 +8790,12 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         if type == "text":
             for strip in strips:
                 if strip.type in {"MOVIE", "IMAGE", "TEXT", "SCENE", "META"}:
-                    print("Process: Image Captioning")
+                    print("Process: Processing to Text")
                     break
             else:
                 self.report(
                     {"INFO"},
-                    "None of the selected strips are possible to caption.",
+                    "None of the selected strips are possible to process to text.",
                 )
                 return {"CANCELLED"}
 
@@ -8791,6 +8891,8 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                         sequencer.generate_audio()
                     if type == "image":
                         sequencer.generate_image()
+                    if type == "text":
+                        sequencer.generate_text()
                     # context.scene.generate_movie_prompt = prompt
                     # scene.generate_movie_negative_prompt = negative_prompt
 
@@ -9306,7 +9408,7 @@ def register():
             ("text", "Text", "Generate Text"),
         ],
         default="image",
-        update=output_strips_updated,
+        update=input_strips_updated,
     )
     bpy.types.Scene.speakers = bpy.props.EnumProperty(
         name="Speakers",
