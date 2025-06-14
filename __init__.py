@@ -6925,53 +6925,98 @@ class SEQUENCER_OT_generate_image(Operator):
                     pipe.vae.enable_tiling()
                 else:
                     pipe.enable_model_cpu_offload()
+                    
+#        # Chroma
+#        elif image_model_card == "lodestones/Chroma":
+#            print("Load: Chroma Model")
+#            clear_cuda_cache()
 
+#            if not do_inpaint and not enabled_items and not do_convert:
+#                import torch
+#                from transformers import BitsAndBytesConfig as BitsAndBytesConfig
+#                from transformers import T5EncoderModel
+
+#                #from diffusers import BitsAndBytesConfig as DiffusersBitsAndBytesConfig
+#                from diffusers import ChromaPipeline, ChromaTransformer2DModel
+
+
+#                dtype = torch.bfloat16
+
+#                repo_id = "imnotednamode/Chroma-v36-dc-diffusers"
+
+#                quant_config = BitsAndBytesConfig(load_in_4bit=True)
+#                text_encoder_4bit = T5EncoderModel.from_pretrained(
+#                    repo_id, subfolder="text_encoder", quantization_config=quant_config, torch_dtype=dtype
+#                )
+
+#                #quant_config = DiffusersBitsAndBytesConfig(load_in_4bit=True)
+#                transformer_4bit = ChromaTransformer2DModel.from_pretrained(
+#                    repo_id, subfolder="transformer",  torch_dtype=dtype, 
+#                ) #quantization_config=quant_config,
+
+#                pipe = ChromaPipeline.from_pretrained(
+#                    "imnotednamode/Chroma-v36-dc-diffusers",
+#                    text_encoder=text_encoder_4bit,
+#                    transformer=transformer_4bit,
+#                    torch_dtype=dtype,
+#                )
+#                if gfx_device == "mps":
+#                    pipe.vae.enable_tiling()
+#                elif low_vram():
+#                    #pipe.enable_sequential_cpu_offload()
+#                    pipe.enable_model_cpu_offload()
+#                    pipe.enable_vae_slicing()
+#                    pipe.vae.enable_tiling()
+#                else:
+#                    #pipe.enable_sequential_cpu_offload()
+#                    #pipe.to("cuda")
+#                    pipe.enable_model_cpu_offload()
+#                    pipe.enable_vae_slicing()
+#                    pipe.vae.enable_tiling()
 
         # Chroma
         elif image_model_card == "lodestones/Chroma":
-            print("Load: Chroma Model")
-            clear_cuda_cache()
-
             if not do_inpaint and not enabled_items and not do_convert:
+                print("Load: Chroma Model")
+                clear_cuda_cache()
                 import torch
-                from diffusers import ChromaTransformer2DModel, ChromaPipeline,BitsAndBytesConfig
+                from diffusers import ChromaTransformer2DModel, ChromaPipeline, BitsAndBytesConfig
                 from transformers import T5EncoderModel, T5Tokenizer
 
-                #bfl_repo = "imnotednamode/Chroma-v36-dc-diffusers"#"ChuckMcSneed/FLUX.1-dev"
+                bfl_repo = "black-forest-labs/FLUX.1-dev"
                 dtype = torch.bfloat16
 
-                nf4_config = BitsAndBytesConfig(
-                    load_in_4bit=True,
-                    bnb_4bit_quant_type="nf4",
-                    bnb_4bit_compute_dtype=torch.bfloat16,
+                nf8_config = BitsAndBytesConfig(
+                    load_in_8bit=True,
+                    bnb_8bit_quant_type="nf8",
+                    bnb_8bit_compute_dtype=torch.bfloat16,
                 )
-#                transformer = ChromaTransformer2DModel.from_pretrained(
-#                    "imnotednamode/Chroma-v36-dc-diffusers",
-#                    subfolder="transformer",
-#                    quantization_config=nf4_config,
-#                    torch_dtype=torch.bfloat16,
-#                )
-                transformer = ChromaTransformer2DModel.from_single_file("https://huggingface.co/lodestones/Chroma/blob/main/chroma-unlocked-v35.safetensors", torch_dtype=dtype)#, quantization_config=nf4_config) 
-                #transformer = ChromaTransformer2DModel.from_single_file("https://huggingface.co/lodestones/Chroma/blob/main/chroma-unlocked-v35.safetensors", torch_dtype=dtype)#, quantization_config=nf4_config) 
+                transformer = ChromaTransformer2DModel.from_pretrained(
+                    "imnotednamode/Chroma-v36-dc-diffusers",
+                    subfolder="transformer",
+                    quantization_config=nf8_config,
+                    torch_dtype=torch.bfloat16,
+                )
 
-                text_encoder = T5EncoderModel.from_pretrained("ChuckMcSneed/FLUX.1-dev", subfolder="text_encoder_2", torch_dtype=dtype)
-                tokenizer = T5Tokenizer.from_pretrained("ChuckMcSneed/FLUX.1-dev", subfolder="tokenizer_2", torch_dtype=dtype)
+                text_encoder = T5EncoderModel.from_pretrained(bfl_repo, subfolder="text_encoder_2", torch_dtype=dtype)
+                tokenizer = T5Tokenizer.from_pretrained(bfl_repo, subfolder="tokenizer_2", torch_dtype=dtype)
 
-                pipe = ChromaPipeline.from_pretrained("ChuckMcSneed/FLUX.1-dev", transformer=transformer, text_encoder=text_encoder, tokenizer=tokenizer, torch_dtype=dtype)
+                pipe = ChromaPipeline.from_pretrained(bfl_repo, transformer=transformer, text_encoder=text_encoder, tokenizer=tokenizer, torch_dtype=dtype)
 
                 if gfx_device == "mps":
                     pipe.vae.enable_tiling()
                 elif low_vram():
-                    pipe.enable_sequential_cpu_offload()
-                    pipe.enable_vae_slicing()
-                    pipe.vae.enable_tiling()
+                    pipe.to("cuda")
+                    #pipe.enable_sequential_cpu_offload()
+#                    pipe.enable_model_cpu_offload()
+#                    pipe.enable_vae_slicing()
+#                    pipe.vae.enable_tiling()
                 else:
-                    pipe.enable_model_cpu_offload()
-                    pipe.enable_vae_slicing()
-                    pipe.vae.enable_tiling()
-
-            else:
-                print("Inpaint, LoRA and img2img are not supported for Chroma!")
+                    #pipe.enable_sequential_cpu_offload()
+                    pipe.to("cuda")
+                    #pipe.enable_model_cpu_offload()
+                    #pipe.enable_vae_slicing()
+                    #pipe.vae.enable_tiling()
 
         # Fluently-XL
         elif image_model_card == "fluently/Fluently-XL-Final":
