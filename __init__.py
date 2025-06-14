@@ -1508,6 +1508,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             ("black-forest-labs/FLUX.1-Redux-dev", "FLUX Redux", "black-forest-labs/FLUX.1-Redux-dev"),
             
             ("ostris/Flex.2-preview", "Flex 2 Preview", "ostris/Flex.2-preview"),
+            ("lodestones/Chroma", "Chroma", "Chroma is a 8.9B parameter model based on FLUX.1-schnell"),
             (
                 "stabilityai/stable-diffusion-xl-base-1.0",
                 "Stable Diffusion XL 1.0 (1024x1024)",
@@ -2234,7 +2235,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         if type == "movie" and (
                             movie_model_card == "black-forest-labs/FLUX.1-schnell"
                             or movie_model_card == "ChuckMcSneed/FLUX.1-dev"
-                            or movie_model_card == "ostris/Flex.2-preview"
+                            #or movie_model_card == "ostris/Flex.2-preview"
                         ):
                             pass
                         else:
@@ -2387,7 +2388,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     col.prop(
                         context.scene,
                         "parler_direction_prompt",
-                        text="Direction",
+                        text="Instruction",
                     )
                 else:
                     col.prop(
@@ -2636,6 +2637,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
                     or image_model_card == "black-forest-labs/FLUX.1-schnell"
                     or image_model_card == "ostris/Flex.2-preview"
+                    or image_model_card == "lodestones/Chroma"
                     or image_model_card == "ChuckMcSneed/FLUX.1-dev"
                     or image_model_card == "black-forest-labs/FLUX.1-Canny-dev-lora"
                     or image_model_card == "black-forest-labs/FLUX.1-Depth-dev-lora"
@@ -6878,7 +6880,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
         # FLEX
         elif image_model_card == "ostris/Flex.2-preview":
-            print("Load: Flux Model")
+            print("Load: Flex Model")
             clear_cuda_cache()
 
             if not do_inpaint and not enabled_items and not do_convert:
@@ -6888,31 +6890,29 @@ class SEQUENCER_OT_generate_image(Operator):
 
                 from diffusers import BitsAndBytesConfig, FluxTransformer2DModel, FluxPipeline
                 sys.path.append(os.path.dirname(__file__))
-                #from pipelines.pipeline_flux_de_distill import FluxPipeline
-                #print("De-destilled")
 
                 nf4_config = BitsAndBytesConfig(
                     load_in_4bit=True,
                     bnb_4bit_quant_type="nf4",
                     bnb_4bit_compute_dtype=torch.bfloat16,
                 )
+#                    model_nf4 = FluxTransformer2DModel.from_pretrained(
+#                        image_model_card,
+#                        subfolder="transformer",
+#                        quantization_config=nf4_config,
+#                        torch_dtype=torch.bfloat16,
+#                    )
                 model_nf4 = FluxTransformer2DModel.from_pretrained(
-                    image_model_card,
-                    subfolder="transformer",
+                    "ChuckMcSneed/FLUX.1-dev",
                     quantization_config=nf4_config,
-                    torch_dtype=torch.bfloat16,
+                    torch_dtype=torch.bfloat16
                 )
-#                model_nf4 = FluxTransformer2DModel.from_pretrained(
-#                    "InstantX/flux-dev-de-distill-diffusers",
-#                    quantization_config=nf4_config,
-#                    torch_dtype=torch.bfloat16
-#                )
-#                flex_pipeline_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pipelines", "flex_pipeline.py")
-#                print(flex_pipeline_path)
+                #flex_pipeline_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pipelines", "flex_pipeline.py")
+                #print(flex_pipeline_path)
                 pipe = FluxPipeline.from_pretrained(
                     image_model_card,
                     #custom_pipeline=flex_pipeline_path,
-                    trust_remote_code=True,
+                    #trust_remote_code=True,
                     transformer=model_nf4,
                     torch_dtype=torch.bfloat16,
                 )
@@ -6925,6 +6925,53 @@ class SEQUENCER_OT_generate_image(Operator):
                     pipe.vae.enable_tiling()
                 else:
                     pipe.enable_model_cpu_offload()
+
+
+        # Chroma
+        elif image_model_card == "lodestones/Chroma":
+            print("Load: Chroma Model")
+            clear_cuda_cache()
+
+            if not do_inpaint and not enabled_items and not do_convert:
+                import torch
+                from diffusers import ChromaTransformer2DModel, ChromaPipeline,BitsAndBytesConfig
+                from transformers import T5EncoderModel, T5Tokenizer
+
+                #bfl_repo = "imnotednamode/Chroma-v36-dc-diffusers"#"ChuckMcSneed/FLUX.1-dev"
+                dtype = torch.bfloat16
+
+                nf4_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_quant_type="nf4",
+                    bnb_4bit_compute_dtype=torch.bfloat16,
+                )
+#                transformer = ChromaTransformer2DModel.from_pretrained(
+#                    "imnotednamode/Chroma-v36-dc-diffusers",
+#                    subfolder="transformer",
+#                    quantization_config=nf4_config,
+#                    torch_dtype=torch.bfloat16,
+#                )
+                transformer = ChromaTransformer2DModel.from_single_file("https://huggingface.co/lodestones/Chroma/blob/main/chroma-unlocked-v35.safetensors", torch_dtype=dtype)#, quantization_config=nf4_config) 
+                #transformer = ChromaTransformer2DModel.from_single_file("https://huggingface.co/lodestones/Chroma/blob/main/chroma-unlocked-v35.safetensors", torch_dtype=dtype)#, quantization_config=nf4_config) 
+
+                text_encoder = T5EncoderModel.from_pretrained("ChuckMcSneed/FLUX.1-dev", subfolder="text_encoder_2", torch_dtype=dtype)
+                tokenizer = T5Tokenizer.from_pretrained("ChuckMcSneed/FLUX.1-dev", subfolder="tokenizer_2", torch_dtype=dtype)
+
+                pipe = ChromaPipeline.from_pretrained("ChuckMcSneed/FLUX.1-dev", transformer=transformer, text_encoder=text_encoder, tokenizer=tokenizer, torch_dtype=dtype)
+
+                if gfx_device == "mps":
+                    pipe.vae.enable_tiling()
+                elif low_vram():
+                    pipe.enable_sequential_cpu_offload()
+                    pipe.enable_vae_slicing()
+                    pipe.vae.enable_tiling()
+                else:
+                    pipe.enable_model_cpu_offload()
+                    pipe.enable_vae_slicing()
+                    pipe.vae.enable_tiling()
+
+            else:
+                print("Inpaint, LoRA and img2img are not supported for Chroma!")
 
         # Fluently-XL
         elif image_model_card == "fluently/Fluently-XL-Final":
@@ -8081,7 +8128,26 @@ class SEQUENCER_OT_generate_image(Operator):
                 image = pipe(
                     **inference_parameters,
                 ).images[0]
+                
+            # Chroma
+            elif (image_model_card == "lodestones/Chroma"):
+                inference_parameters = {
+                    "prompt": prompt,
+                    "negative_prompt": negative_prompt,
+                    "max_sequence_length": 512,
+                    #"image": init_image,
+                    #"mask_image": mask_image,
+                    "num_inference_steps": image_num_inference_steps,
+                    "guidance_scale": image_num_guidance,
+                    "height": y,
+                    "width": x,
+                    "generator": generator,
+                }
 
+                image = pipe(
+                    **inference_parameters,
+                ).images[0]
+                
             # Generate Stable Diffusion etc.
             elif (
                 image_model_card == "stabilityai/stable-diffusion-3-medium-diffusers"
@@ -8468,6 +8534,47 @@ def clean_string(input_string):
     return input_string
 
 
+def remove_duplicate_phrases(input_string: str) -> str:
+    """
+    Removes duplicate comma-separated phrases from a string.
+
+    This function is designed for strings that are lists of phrases,
+    like "phrase one, phrase two, phrase one". It preserves the
+    first occurrence of each unique phrase.
+
+    Args:
+        input_string: The string containing comma-separated phrases.
+
+    Returns:
+        A new string with duplicate phrases removed, properly formatted.
+    """
+    # 1. Split the string into a list of phrases using the comma as a delimiter.
+    #    We then use a list comprehension to strip leading/trailing whitespace
+    #    from each resulting phrase.
+    phrases = [phrase.strip() for phrase in input_string.split(',')]
+
+    # Use a set for fast lookups to track phrases we've already seen.
+    seen_phrases = set()
+    
+    # This list will hold the unique phrases in their original order.
+    unique_phrases_in_order = []
+
+    for phrase in phrases:
+        # Ignore any empty phrases that might result from trailing commas, etc.
+        if not phrase:
+            continue
+            
+        # If we haven't seen this phrase before...
+        if phrase not in seen_phrases:
+            # ...add it to our list of unique phrases...
+            unique_phrases_in_order.append(phrase)
+            # ...and record that we have now seen it.
+            seen_phrases.add(phrase)
+
+    # 3. Join the unique phrases back together with a comma and a space.
+    return ", ".join(unique_phrases_in_order)
+
+
 class SEQUENCER_OT_generate_text(Operator):
     """Generate Text"""
 
@@ -8639,8 +8746,10 @@ class SEQUENCER_OT_generate_text(Operator):
 
             prompt = prompt
             messages = [
+                #{"role": "system", "content": "Be creative and expand the input into a single line of comma-separated cinematic keywords, strictly ordered as: camera, camera motion, subject, distinct subject details, distinct situation, distinct location details, setting, lighting, atmosphere, style."},
                 #{"role": "system", "content": "You are an advanced AI model tasked with You must respond in the language used by the user."},
-                {"role": "system", "content": "You are an advanced AI model tasked with generating and extending structured and detailed video captions. Enhance the input prompt by describing who, what, where in detail ex. mood, style, and framing; specifying subjects, actions, settings, lighting, color, atmosphere, motion, and camera movement; using precise cinematic language. You have 400 characters to reply"},
+                #{"role": "system", "content": "You enhance the input prompt to a 400 characters image prompt, in precise cinematic language, in comma separated nouns and adjectives. First camera angle and framing, then be creative and expand on all the input elements, don't change the order, by specifying subjects, their situation, one by one, then the settings, lighting, color, atmosphere, mood, style, motion, and camera movement. Do not repeat words or elements. Example: a cinematic wide-shot of a young woman, red hair, army clothes, dark forest, dramatic lightning. "},
+                {"role": "system", "content": "As a cinematic prompt engineer, be creative, rewrite the following into a comma-separated list of visual details, starting with camera angle, camera motion and progressing through subject, setting, lighting, atmosphere, style."},
                 {"role": "user", "content": prompt}
             ]
             text = tokenizer.apply_chat_template(
@@ -8652,13 +8761,15 @@ class SEQUENCER_OT_generate_text(Operator):
 
             generated_ids = model.generate(
                 **model_inputs,
-                max_new_tokens=256
+                max_new_tokens=512
             )
             generated_ids = [
                 output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
             ]
 
             text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+            print("Generated text: " + str(text))
+            text = remove_duplicate_phrases(text)
             print("Generated text: " + str(text))
 
         if input == "input_strips" and active_strip:
