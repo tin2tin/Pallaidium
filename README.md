@@ -98,6 +98,7 @@ The generated media will be saved to the directory specified in the addon prefer
 
 
 ## Change Log
+* 2025-6-14: Add: Chroma txt2vid
 * 2025-6-12: Add: ZuluVision/MoviiGen1.1_Prompt_Rewriter
 * 2025-6-01: Add: Chatterbox with zero shot text to speech and speech to speech voice cloning.
 * 2025_5_29: Add: Flux depth+canny+redux Fix: neg Flux input + py libs
@@ -331,6 +332,7 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 - [Lumina 2](https://huggingface.co/Alpha-VLLM/Lumina-Image-2.0)
 - [Sana](https://huggingface.co/Efficient-Large-Model/Sana_1600M_1024px_diffusers)
 - [OmniGen](https://github.com/VectorSpaceLab/OmniGen)
+- [Chroma](https://huggingface.co/lodestones/Chroma)
 
 ### Audio:
 - [stabilityai/stable-audio-open-1.0](https://huggingface.co/stabilityai/stable-audio-open-1.0)
