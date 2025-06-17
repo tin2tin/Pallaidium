@@ -60,7 +60,9 @@ For Mac and Linux, we'll have to rely on contributor support. So, post your issu
 
 * Open the add-on UI in the Sequencer > Sidebar > Generative AI.
 
-* 5-10 GB must be downloaded first the first time any model is executed. 
+* 5-10 GB must be downloaded first the first time any model is executed.
+
+* When you have Pallaidium installed, reach out on Discord: https://discord.gg/HMYpnPzbTm or leave a note on how it is working for you. It means the world to me to know someone is using it! 
 
 If any Python modules are missing, use this add-on to install them manually:     |
 :------------- |
