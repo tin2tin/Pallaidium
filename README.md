@@ -33,7 +33,8 @@ AI-generate video, image, and audio from text prompts or video, image, or text s
 | User-defined file path for generated files.        | Seed and prompt added to strip name.                | One-click install and uninstall dependencies.       |
 
 ## Requirements
-* Windows (Unsupported: Linux and MacOS, however try the experimental MacOS fork here: https://github.com/Parsabz/Pallaidium-4Mac)
+* Windows (Unsupported: Linux and MacOS, however, try the experimental MacOS fork here: https://github.com/Parsabz/Pallaidium-4Mac)
+* Blender 4.5+
 * A CUDA-supported Nvidia card with at least 6 GB VRAM.
 * CUDA: 12.4
 * 20+ GB HDD. (Each model is 6+ GB).
