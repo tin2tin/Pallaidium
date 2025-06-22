@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 3 of the License, or
@@ -827,16 +829,17 @@ def install_modules(self):
         ("protobuf", "protobuf==3.20.1"),
         ("scikit_learn", "scikit-learn==1.2.2"),
         ("bitsandbytes", "bitsandbytes"),
+        ("chatterbox", "--no-deps git+https://https://github.com/tin2tin/chatterbox.git"),
         ("numpy", "numpy==1.26.4"),
         ("jax", "jax"),
         #("jaxlib", "jaxlib>=0.5.0")
         ("tqdm", "tqdm"),
         ("tempfile", "tempfile"),
         ("f5_tts", "git+https://github.com/SWivid/F5-TTS.git"),
-        ("chatterbox", "--no-deps git+https://github.com/resemble-ai/chatterbox.git"),
         ("resemble_perth", "resemble-perth==1.0.1"),
         ("s3tokenizer", "s3tokenizer"),
         ("conformer", "conformer"),
+        ("spacy", "spacy"),
     ]
 
     show_system_console(True)
@@ -891,6 +894,9 @@ def install_modules(self):
         install_module("image_gen_aux", "git+https://github.com/huggingface/image_gen_aux")
 
     # Additional installations
+    subprocess.check_call([
+        pybin, "-m", "spacy", "download", "en_core_web_md",
+    ])
 #    subprocess.check_call([
 #        pybin, "-m", "pip", "install", "--disable-pip-version-check",
 #        "--use-deprecated=legacy-resolver", "tensorflow<2.11", "--upgrade"
@@ -1258,8 +1264,8 @@ def input_strips_updated(self, context):
     elif scene_type == "audio":
         if audio_model == "stabilityai/stable-audio-open-1.0":
             scene.movie_num_inference_steps = 200
-        elif addon_prefs.audio_model_card == "MMAudio" and scene.input_strips != "input_strips":
-            scene.input_strips = "input_strips"
+#        elif addon_prefs.audio_model_card == "MMAudio" and scene.input_strips != "input_strips":
+#            scene.input_strips = "input_strips"
 
     # Common Handling for Selected Strip
     if scene_type in {"movie", "audio"} or image_model == "xinsir/controlnet-scribble-sdxl-1.0":
@@ -1368,8 +1374,8 @@ def output_strips_updated(self, context):
     elif type == "audio":
         if audio_model == "stabilityai/stable-audio-open-1.0":
             movie_inference = 200
-        if addon_prefs.audio_model_card == "MMAudio":
-            scene.input_strips = "input_strips"
+#        if addon_prefs.audio_model_card == "MMAudio":
+#            scene.input_strips = "input_strips"
 
     # === COMMON SETTINGS === #
     if type in ["movie", "audio"] or image_model == "xinsir/controlnet-scribble-sdxl-1.0":
@@ -1646,7 +1652,7 @@ class GeneratorAddonPreferences(AddonPreferences):
         items = [
             ("Chatterbox", "Speech: Chatterbox", "Zero shot TTS & voice conversion"),
             ("SWivid/F5-TTS", "Speech: F5-TTS", "Zero shot TTS"),
-            ("WhisperSpeech", "Speech: WhisperSpeech", "Zero shot TTS"),
+#            ("WhisperSpeech", "Speech: WhisperSpeech", "Zero shot TTS"),
             ("MMAudio", "Audio: Video to Audio", "Add sync audio to video"),
             (
                 "stabilityai/stable-audio-open-1.0",
@@ -1659,11 +1665,12 @@ class GeneratorAddonPreferences(AddonPreferences):
 #                "Audio:Audio LDM 2 Large",
 #                "cvssp/audioldm2-large",
 #            ),
-            (
-                "facebook/musicgen-stereo-melody-large",
-                "MusicGen Stereo Melody",
-                "Generate music",
-            ),
+# Broken:
+#            (
+#                "facebook/musicgen-stereo-melody-large",
+#                "MusicGen Stereo Melody",
+#                "Generate music",
+#            ),
             parler,
             #("bark", "Speech: Bark", "Bark"),
         ]
@@ -4749,6 +4756,216 @@ class SequencerOpenAudioFile(Operator, ImportHelper):
 ##dependencies_loaded = False
 
 
+def split_text_for_tts(full_text: str) -> list[str]:
+    """
+    Splits text into manageable and natural-sounding chunks for TTS.
+    Uses spaCy if available, otherwise falls back to a simple splitter.
+    """
+    MAX_CHUNK_LENGTH = 285
+    print("Full text: "+full_text)
+    try:
+        import spacy
+        # Define an alias for the type hint to use later
+        from spacy.tokens.span import Span as SpacySpan
+        SPACY_AVAILABLE = True
+        print("spaCy library found. Advanced text splitting is enabled.")
+    except ImportError:
+        # If spacy is not installed, create placeholder variables
+        spacy = None
+        SpacySpan = None # This is needed so type hints don't break
+        SPACY_AVAILABLE = False
+        print("Warning: spaCy library not found. Using simple text splitting. For more natural TTS, please install it.")
+        
+    if not SPACY_AVAILABLE:
+        # Assuming simple_fallback_splitter and SPACY_AVAILABLE flag from previous answer
+        return simple_fallback_splitter(full_text, MAX_CHUNK_LENGTH)
+
+    # --- spaCy-powered logic (only runs if the import succeeded) ---
+    # NOTE: The spaCy model should be loaded only once if possible for performance.
+    # If this function is called many times, consider loading `nlp` outside.
+    nlp = spacy.load("en_core_web_md")
+    doc = nlp(full_text.replace("\n", " ")) # Replace newlines with spaces for better sentence detection
+    chunks = []
+    current_chunk = ""
+
+    # Iterate through all sentences provided by spaCy
+    for sent in doc.sents:
+        sentence_text = sent.text.strip()
+        if not sentence_text:
+            continue
+
+        # If the sentence itself is too long, it must be split into sub-parts
+        if len(sentence_text) > MAX_CHUNK_LENGTH:
+            # First, if there's anything in current_chunk, finalize it and add to the list.
+            if current_chunk:
+                chunks.append(current_chunk)
+                current_chunk = ""
+
+            # Split the oversized sentence into smaller, manageable parts
+            sub_parts = split_long_sentence(sent, MAX_CHUNK_LENGTH)
+
+            # Add all the new sub-parts directly to the chunks list
+            chunks.extend(sub_parts)
+            
+            # Continue to the next sentence, as this one has been fully processed
+            continue
+
+        # --- Logic for sentences that are NOT too long ---
+
+        # If adding the new sentence would make the current chunk too long...
+        # (add 1 for the space that will join them)
+        if len(current_chunk) + len(sentence_text) + 1 > MAX_CHUNK_LENGTH:
+            # ...finalize the current chunk...
+            if current_chunk:
+                chunks.append(current_chunk)
+            # ...and start a new chunk with the new sentence.
+            current_chunk = sentence_text
+        else:
+            # Otherwise, append the new sentence to the current chunk.
+            if current_chunk:
+                current_chunk += " " + sentence_text
+            else:
+                current_chunk = sentence_text
+
+    # After the loop, add any remaining text in current_chunk to the list.
+    if current_chunk:
+        chunks.append(current_chunk)
+
+    return [c for c in chunks if c.strip()]
+
+
+def split_long_sentence(spacy_sentence_span: spacy.tokens.span.Span, max_len: int) -> list[str]:
+    """
+    Splits a single spaCy sentence Span that is longer than max_len
+    into smaller pieces, aiming for natural breaks.
+    Returns a list of strings.
+    """
+    import spacy
+    parts = []
+    tokens = list(spacy_sentence_span) # Get all tokens from the sentence span
+    current_pos = 0 # Index in the tokens list
+
+    while current_pos < len(tokens):
+        # Determine the text of the remaining part of the sentence
+        remaining_doc = tokens[current_pos].doc
+        span_start_index = tokens[current_pos].i
+        span_end_index = tokens[-1].i + 1 # up to the end of the last token
+        text_to_split = remaining_doc[span_start_index:span_end_index].text
+
+        if len(text_to_split) <= max_len:
+            parts.append(text_to_split)
+            break # All remaining tokens fit
+
+        # Find the best break point *within* the first max_len characters of text_to_split
+        # This requires careful token-level iteration and checking linguistic features
+        
+        # Iterate tokens from current_pos up to where cumulative length approaches max_len
+        potential_break_token_idx_in_sentence = -1 # Absolute index in the original sentence doc
+        current_length_chars = 0
+        
+        # Iterate tokens starting from current_pos to find a segment <= max_len
+        last_safe_break_token_offset = -1 # Relative to current_pos
+
+        for i_offset, token in enumerate(tokens[current_pos:]):
+            # Consider space before token, unless it's the first in this potential part
+            token_text_to_add = token.text_with_ws if (current_length_chars > 0 or i_offset > 0) else token.text
+            
+            if current_length_chars + len(token_text_to_add.lstrip()) > max_len: # lstrip to avoid counting leading space if it's the start
+                break # This token makes it too long
+
+            current_length_chars += len(token_text_to_add.lstrip())
+            last_safe_break_token_offset = i_offset # This token still fits
+
+            # Check for good break points (punctuation, conjunctions)
+            # Prefer breaks *after* punctuation if it's part of the current segment.
+            # Prefer breaks *before* conjunctions.
+            # This is a place for sophisticated logic. For simplicity:
+            if token.is_punct and token.text in [',', ';', ':', '—']:
+                # This could be a good place to note, will be handled by scan_back
+                pass
+            if token.dep_ == 'cc': # Coordinating conjunction
+                # This could be a good place to note
+                pass
+        
+        # If nothing fit (e.g., first token itself > max_len, highly unlikely with sane text)
+        if last_safe_break_token_offset == -1:
+             # Fallback: Take up to MAX_LEN characters and find last space (crude)
+            slice_text = text_to_split[:max_len]
+            last_space = slice_text.rfind(' ')
+            if last_space != -1:
+                parts.append(slice_text[:last_space].strip())
+                # This requires updating current_pos based on character count, which is fiddly.
+                # A token-based approach is cleaner.
+                # For now, let's assume the token iteration handles this better.
+                # This fallback needs to be robust or avoided by good token logic.
+                # For this example, we'll rely on token iteration to find a split point.
+                # If the first token itself is too long, this function has a problem.
+                # It's better to ensure 'potential_break_token_idx_in_sentence' gets set properly.
+                
+                # Simplified: If the loop above found at least one token that fits.
+                if last_safe_break_token_offset >=0:
+                    actual_break_idx_relative_to_current_pos = last_safe_break_token_offset
+                else: # First token already too long - should not happen if max_len is reasonable
+                    parts.append(tokens[current_pos].text) # Take first token only
+                    current_pos +=1
+                    continue
+
+            else: # No space, hard cut (worst case)
+                parts.append(slice_text.strip())
+                # Update current_pos...
+                current_pos +=1 # very simplified, needs to advance by tokens in slice_text
+                continue
+
+        # Now, scan backward from tokens[current_pos + last_safe_break_token_offset]
+        # to find the *best* break point (e.g., punctuation, conjunction).
+        
+        best_split_offset = last_safe_break_token_offset # Default to the furthest fitting token
+
+        for i in range(last_safe_break_token_offset, 0, -1): # Scan back, but not before the first token of this sub-segment
+            token_at_i = tokens[current_pos + i]
+            prev_token_at_i = tokens[current_pos + i -1]
+
+            # Ideal: split AFTER these punctuations
+            if prev_token_at_i.text in [';', ':', '—']:
+                best_split_offset = i -1 # The punctuation (prev_token) will be the last in the segment
+                break
+            # Good: split AFTER a comma
+            if prev_token_at_i.text == ',':
+                best_split_offset = i -1
+                break
+            # Good: split BEFORE a conjunction (token_at_i is the conjunction)
+            if token_at_i.dep_ == 'cc' and token_at_i.pos_ == 'CCONJ':
+                best_split_offset = i -1 # Break before the conjunction (segment ends with prev_token_at_i)
+                break
+        
+        # Extract the part based on best_split_offset
+        part_tokens = tokens[current_pos : current_pos + best_split_offset + 1]
+        if part_tokens:
+            part_doc = part_tokens[0].doc
+            span_start = part_tokens[0].i
+            span_end = part_tokens[-1].i + 1
+            parts.append(part_doc[span_start:span_end].text.strip())
+        
+        current_pos += best_split_offset + 1
+
+
+    return [p for p in parts if p] # Filter out any empty strings
+
+
+def simple_fallback_splitter(full_text: str, max_len: int) -> list[str]:
+    # ... (implementation of the simple splitter) ...
+    print("Using simple fallback text splitter.")
+    chunks = []
+    while len(full_text) > max_len:
+        break_point = full_text.rfind(' ', 0, max_len)
+        if break_point == -1: break_point = max_len
+        chunks.append(full_text[:break_point].strip())
+        full_text = full_text[break_point:].strip()
+    if full_text: chunks.append(full_text)
+    return chunks
+
+
+
 class SEQUENCER_OT_generate_audio(Operator):
     """Generate Audio"""
 
@@ -4776,13 +4993,19 @@ class SEQUENCER_OT_generate_audio(Operator):
         strip = scene.sequence_editor.active_strip
         input = scene.input_strips
         pipe = None
-        if strip:
+        strips = context.selected_sequences
+        if strip in strips:
             duration = scene.audio_length_in_f = (
                 strip.frame_final_duration + 1
             )
             audio_length_in_s = duration = duration / (
                 scene.render.fps / scene.render.fps_base
             )
+        else:
+            duration = scene.audio_length_in_f
+            audio_length_in_s = duration = duration / (
+                scene.render.fps / scene.render.fps_base
+            )            
 
         import torch
         import torchaudio
@@ -4892,6 +5115,9 @@ class SEQUENCER_OT_generate_audio(Operator):
                 import torchaudio as ta
                 from chatterbox.tts import ChatterboxTTS
                 from chatterbox.vc import ChatterboxVC
+                
+                import spacy
+
             except ModuleNotFoundError as e:
                 missing_module_name = e.name
                 error_message = (
@@ -5162,7 +5388,8 @@ class SEQUENCER_OT_generate_audio(Operator):
                 )
 #
             else:
-                audio_length_in_s = duration = duration / (
+                duration = scene.audio_length_in_f
+                audio_length_in_s = duration / (
                     scene.render.fps / scene.render.fps_base
                 )
 #                print("No input strip found!")
@@ -5491,17 +5718,65 @@ class SEQUENCER_OT_generate_audio(Operator):
                 pace = scene.chat_pace
                 exaggeration = scene.chat_exaggeration
                 temperature = scene.chat_temperature
-                print(input)
+
                 if input and input == "input_strips" and strip.type == "SOUND": # Voice clone
                     AUDIO_PROMPT_PATH = os.path.join(bpy.path.abspath(strip.sound.filepath))#, strip.elements[0].filename)
                     print("Voice cloning: "+strip.sound.name)
                     model = ChatterboxVC.from_pretrained(device)
                     wav = model.generate(audio=AUDIO_PROMPT_PATH,target_voice_path=speaker)
                     ta.save(output_audio_path, wav, model.sr)
-                else:
-                    model = ChatterboxTTS.from_pretrained(device=device)
-                    wav = model.generate(prompt, audio_prompt_path=speaker,exaggeration=exaggeration,cfg_weight=pace,temperature=temperature)
-                    ta.save(output_audio_path, wav, model.sr)
+                else: # Text-to-Speech
+                    try:
+                        print(f"Starting Text-to-Speech for prompt: '{prompt}'")
+                        
+                        # TTS-specific parameters
+                        pace = scene.chat_pace
+                        exaggeration = scene.chat_exaggeration
+                        temperature = scene.chat_temperature
+
+                        # Load the model once
+                        model = ChatterboxTTS.from_pretrained(device=device)
+                        
+                        # Split the full prompt into smaller, manageable chunks
+                        chunks = split_text_for_tts(prompt)
+                        
+                        # List to hold the 1D audio waveform of each chunk
+                        all_wav_chunks = [] 
+                        
+                        for i, chunk_text in enumerate(chunks):
+                            if not chunk_text.strip():
+                                continue
+                                
+                            print(f"Synthesizing chunk {i+1}/{len(chunks)}: '{chunk_text}...'")
+                            try:
+                                # Generate audio for the current chunk
+                                wav_chunk_tensor = model.generate(
+                                    chunk_text, 
+                                    audio_prompt_path=speaker, # Use the path as the API requires
+                                    exaggeration=exaggeration,
+                                    cfg_weight=pace,
+                                    temperature=temperature
+                                )
+                                all_wav_chunks.append(wav_chunk_tensor.flatten())
+
+                            except Exception as e:
+                                print(f"Error synthesizing chunk {i+1}: {e}")
+
+                        # Concatenate and Save
+                        if all_wav_chunks:
+                            # Concatenate the list of 1D tensors along their only dimension (dim=0)
+                            final_wav = torch.cat(all_wav_chunks, dim=0)
+                            
+                            # torchaudio.save needs a 2D tensor: (channels, length)
+                            # Add the "channel" dimension back in with .unsqueeze(0)
+                            ta.save(output_audio_path, final_wav.unsqueeze(0), model.sr)
+                            
+                            print(f"Successfully saved combined audio to {output_audio_path}")
+                        else:
+                            print("No audio was generated. The prompt might have been empty or resulted in errors.")
+
+                    except Exception as e:
+                        print(f"An unexpected error occurred in the TTS process: {e}")
 
             # Musicgen.
             elif (
@@ -5627,7 +5902,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                         generator.manual_seed(seed)
                     else:
                         generator = None
-
+                generated_audio = None
                 if scene.movie_path:
                     print("Process: Video to audio")
                     if not os.path.isfile(scene.movie_path):
@@ -5696,12 +5971,28 @@ class SEQUENCER_OT_generate_audio(Operator):
                     if scene.audio_length_in_f == -1:
                         scene.audio_length_in_f = 25
                     clip_frames = sync_frames = None
+                    scheduler_config.duration = audio_length_in_s
+                    model.update_seq_lengths(scheduler_config.latent_seq_len, scheduler_config.clip_seq_len, scheduler_config.sync_seq_len)
+                    with torch.no_grad():
+                        generation = generate(clip_frames,
+                                          sync_frames, [prompt],
+                                          negative_text=[negative_prompt],
+                                          feature_utils=feature_extractor,
+                                          net=model, fm=scheduler, rng=generator,
+                                          cfg_strength=movie_num_guidance,
+                                          image_input=True)
+                                          
+                    audio_output = generation.float().cpu()[0]
+                    target_sr = int((context.preferences.system.audio_sample_rate).split('_')[1])
+                    filename = solve_path(str(seed) + "_" + prompt + ".wav")
+                    torchaudio.save(filename, audio_output, target_sr)
 
-                audio_output = generated_audio.float().cpu()[0]
-                target_sr = int((context.preferences.system.audio_sample_rate).split('_')[1])
-                filename = video_output_path = solve_path(str(seed) + "_" + prompt + ".mp4")
-                make_video(video_data, video_output_path, audio_output, sampling_rate=target_sr)
-                print(f'Saved video to {video_output_path}')
+                if generated_audio != None:
+                    audio_output = generated_audio.float().cpu()[0]
+                    target_sr = int((context.preferences.system.audio_sample_rate).split('_')[1])
+                    filename = video_output_path = solve_path(str(seed) + "_" + prompt + ".mp4")
+                    make_video(video_data, video_output_path, audio_output, sampling_rate=target_sr)
+                    print(f'Saved video to {video_output_path}')
 
             # Add Audio Strip
             filepath = filename
@@ -6098,15 +6389,14 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
             and not image_model_card == "Salesforce/blipdiffusion"
             # and not image_model_card == "Corcelio/mobius"
-            and not image_model_card
-            == "stabilityai/stable-diffusion-3-medium-diffusers"
+            and not image_model_card == "stabilityai/stable-diffusion-3-medium-diffusers"
             and not image_model_card == "stabilityai/stable-diffusion-3.5-large"
             and not image_model_card == "adamo1139/stable-diffusion-3.5-medium-ungated"
             and not image_model_card == "Vargol/ProteusV0.4"
             and not image_model_card == "ZhengPeng7/BiRefNet_HR"
             and not image_model_card == "Shitao/OmniGen-v1-diffusers"
-            and not scene.ip_adapter_face_folder
-            and not scene.ip_adapter_style_folder
+#            and (not scene.ip_adapter_face_folder and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0")
+#            and (not scene.ip_adapter_style_folder and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0")
         )
         do_convert = (
             (scene.image_path or scene.movie_path)
@@ -6118,8 +6408,8 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "Vargol/ProteusV0.4"
             and not image_model_card == "ZhengPeng7/BiRefNet_HR"
             and not image_model_card == "Shitao/OmniGen-v1-diffusers"
-            and not scene.ip_adapter_face_folder
-            and not scene.ip_adapter_style_folder
+#            and (not scene.ip_adapter_face_folder and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0")
+#            and (not scene.ip_adapter_style_folder and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0")
             and not do_inpaint
         )
         do_refine = scene.refine_sd and not do_convert
@@ -6146,6 +6436,11 @@ class SEQUENCER_OT_generate_image(Operator):
                     "None of the selected strips are movie, image, text or scene types.",
                 )
                 return {"CANCELLED"}
+
+        print("do_inpaint: "+str(do_inpaint))
+        print("do_convert: "+str(do_convert))
+        print("do_refine: "+str(do_refine))
+
 
         # LOADING MODELS
         # models for inpaint
@@ -6394,25 +6689,46 @@ class SEQUENCER_OT_generate_image(Operator):
                 # redux
                 elif image_model_card == "black-forest-labs/FLUX.1-Redux-dev":
                     from transformers import SiglipImageProcessor, SiglipVisionModel
-                    feature_extractor = SiglipImageProcessor.from_pretrained(
-                        "lllyasviel/flux_redux_bfl", subfolder="feature_extractor"
-                    )
-                    image_encoder = SiglipVisionModel.from_pretrained(
-                        "lllyasviel/flux_redux_bfl", subfolder="image_encoder", torch_dtype=torch.float16
-                    )
+#                    feature_extractor = SiglipImageProcessor.from_pretrained(
+#                        "lllyasviel/flux_redux_bfl", subfolder="feature_extractor"
+#                    )
+#                    image_encoder = SiglipVisionModel.from_pretrained(
+#                        "lllyasviel/flux_redux_bfl", subfolder="image_encoder", torch_dtype=torch.float16
+#                    )
 
                     from diffusers import FluxPriorReduxPipeline, FluxPipeline
                     from diffusers.utils import load_image
+#                    from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
 
-                    pipe_prior_redux = FluxPriorReduxPipeline.from_pretrained("black-forest-labs/FLUX.1-Redux-dev", torch_dtype=torch.bfloat16).to("cuda")
+#                    nf4_config = BitsAndBytesConfig(
+#                        load_in_4bit=True,
+#                        bnb_4bit_quant_type="nf4",
+#                        bnb_4bit_compute_dtype=torch.bfloat16,
+#                    )
+#                    model_nf4 = FluxTransformer2DModel.from_pretrained(
+#                        "ChuckMcSneed/FLUX.1-dev",
+#                        subfolder="transformer",
+#                        quantization_config=nf4_config,
+#                        torch_dtype=torch.bfloat16,
+#                    )
                     converter = FluxPipeline.from_pretrained(
-                        "ChuckMcSneed/FLUX.1-dev" ,
-                        feature_extractor=feature_extractor,
-                        image_encoder=image_encoder,
+                        "ChuckMcSneed/FLUX.1-dev" , 
                         text_encoder=None,
                         text_encoder_2=None,
-                        torch_dtype=torch.bfloat16
+                        torch_dtype=torch.bfloat16,
+                        #transformer=model_nf4, 
                     )
+                    pipe_prior_redux = FluxPriorReduxPipeline.from_pretrained("black-forest-labs/FLUX.1-Redux-dev", torch_dtype=torch.bfloat16).to("cuda")
+
+#                    converter = FluxPipeline.from_pretrained(
+#                        "ChuckMcSneed/FLUX.1-dev" ,
+#                        feature_extractor=feature_extractor,
+#                        image_encoder=image_encoder,
+#                        text_encoder=None,
+#                        text_encoder_2=None,
+#                        torch_dtype=torch.bfloat16,
+#                        transformer=model_nf4,
+#                    )
 
                     if gfx_device == "mps":
                         converter.vae.enable_tiling()
@@ -6422,9 +6738,9 @@ class SEQUENCER_OT_generate_image(Operator):
                         converter.vae.enable_tiling()
                     else:
                         converter.enable_sequential_cpu_offload()
+                        #converter.enable_model_cpu_offload() # too slow
                         converter.enable_vae_slicing()
                         converter.vae.enable_tiling()
-                        #pipe.enable_model_cpu_offload() # too slow
 
                 else:
                     try:
@@ -6849,7 +7165,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 else:
                     pipe.enable_model_cpu_offload()
             else:  # LoRA + img2img
-                from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
+                from diffusers import BitsAndBytesConfig, FluxTransformer2DModel, FluxPipeline
 
                 nf4_config = BitsAndBytesConfig(
                     load_in_4bit=True,
