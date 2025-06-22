@@ -100,6 +100,7 @@ The generated media will be saved to the directory specified in the addon prefer
 
 
 ## Change Log
+* 2025-6-22: Add: Long string parsing for Chatterbox (for Audiobooks). Use Blender 5.0 Alpha.
 * 2025-6-14: Add: Chroma txt2vid
 * 2025-6-12: Add: ZuluVision/MoviiGen1.1_Prompt_Rewriter
 * 2025-6-01: Add: Chatterbox with zero shot text to speech and speech to speech voice cloning.
