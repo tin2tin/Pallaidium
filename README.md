@@ -103,6 +103,7 @@ The generated media will be saved to the directory specified in the addon prefer
 
 
 ## Change Log
+* 2025-6-26: Add: FLUX.1 Dev Kontext. Update Diffusers by installing this: "git+https://github.com/huggingface/diffusers.git" with the Python Module Manager add-on (link below), and restart Blender. 
 * 2025-6-22: Add: Long string parsing for Chatterbox (for Audiobooks). Use Blender 5.0 Alpha.
 * 2025-6-14: Add: Chroma txt2vid
 * 2025-6-12: Add: ZuluVision/MoviiGen1.1_Prompt_Rewriter
@@ -320,6 +321,7 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 - [stabilityai/stable-diffusion-3-medium-diffusers](https://huggingface.co/stabilityai/stable-diffusion-3-medium-diffusers)
 - [black-forest-labs/FLUX.1-schnell](https://huggingface.co/black-forest-labs/FLUX.1-schnell)
 - [black-forest-labs/FLUX.1-dev](https://huggingface.co/ChuckMcSneed/FLUX.1-dev)
+- [black-forest-labs/FLUX.1-Kontext-dev](https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev)
 - [fluently/Fluently-XL-Final](https://huggingface.co/fluently/Fluently-XL-Final)
 - [shuttleai/shuttle-jaguar](https://huggingface.co/shuttleai/shuttle-jaguar)
 - [Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers](https://huggingface.co/Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers)
