@@ -1508,6 +1508,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Flux Schnell",
                 "black-forest-labs/FLUX.1-schnell",
             ),
+            ("black-forest-labs/FLUX.1-Kontext-dev", "Flux.1 Kontext Dev", "black-forest-labs/FLUX.1-Kontext-dev"),
             # Not ready for 4bit and depth has tensor problems
             ("black-forest-labs/FLUX.1-Canny-dev-lora", "FLUX Canny", "black-forest-labs/FLUX.1-Canny-dev-lora"),
             ("black-forest-labs/FLUX.1-Depth-dev-lora", "FLUX Depth", "black-forest-labs/FLUX.1-Depth-dev-lora"),
@@ -2179,6 +2180,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             )
             row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = "omni_select3"
 
+
         elif image_model_card == "Salesforce/blipdiffusion" and type == "image":
             col.prop(context.scene, "input_strips", text="Source Image")
             col.prop(context.scene, "blip_cond_subject", text="Source Subject")
@@ -2197,6 +2199,19 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 col.prop(context.scene, "input_strips", text="Input")
             except:
                 pass
+
+        if image_model_card == "black-forest-labs/FLUX.1-Kontext-dev" and type == "image":
+            row = col.row(align=True)
+            row.prop_search(
+                scene,
+                "kontext_strip_1",
+                scene.sequence_editor,
+                "sequences",
+                text="Reference Image",
+                icon="FILE_IMAGE",
+            )
+            row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = "kontext_select1"
+
         if type != "text":
             if type != "audio":
                 if type == "movie" and "Hailuo/MiniMax/" in movie_model_card:
@@ -2242,6 +2257,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         if type == "movie" and (
                             movie_model_card == "black-forest-labs/FLUX.1-schnell"
                             or movie_model_card == "ChuckMcSneed/FLUX.1-dev"
+                            or movie_model_card == "black-forest-labs/FLUX.1-Kontext-dev"
                             #or movie_model_card == "ostris/Flex.2-preview"
                         ):
                             pass
@@ -2360,6 +2376,10 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     or (
                         type == "image"
                         and image_model_card == "ChuckMcSneed/FLUX.1-dev"
+                    )
+                    or (
+                        type == "image"
+                        and image_model_card == "black-forest-labs/FLUX.1-Kontext-dev"
                     )
                     or (type == "image" and image_model_card == "ostris/Flex.2-preview")
                     or (
@@ -2643,6 +2663,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     or image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
                     or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
                     or image_model_card == "black-forest-labs/FLUX.1-schnell"
+                    or image_model_card == "black-forest-labs/FLUX.1-Kontext-dev"
                     or image_model_card == "ostris/Flex.2-preview"
                     or image_model_card == "lodestones/Chroma"
                     or image_model_card == "ChuckMcSneed/FLUX.1-dev"
@@ -6589,12 +6610,12 @@ class SEQUENCER_OT_generate_image(Operator):
                 if (
                     image_model_card == "black-forest-labs/FLUX.1-schnell"
                     or image_model_card == "ChuckMcSneed/FLUX.1-dev"
+                    or image_model_card == "black-forest-labs/FLUX.1-Kontext-dev"
                     or image_model_card == "ostris/Flex.2-preview"
                 ):
-                    # from diffusers import FluxPipeline
                     from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
-
-#                    from pipelines.pipeline_flux_de_distill import FluxPipeline
+                    if image_model_card == "black-forest-labs/FLUX.1-Kontext-dev":
+                        from diffusers import FluxKontextPipeline
 
                     nf4_config = BitsAndBytesConfig(
                         load_in_4bit=True,
@@ -6607,17 +6628,21 @@ class SEQUENCER_OT_generate_image(Operator):
                         quantization_config=nf4_config,
                         torch_dtype=torch.bfloat16,
                     )
-#                    model_nf4 = FluxTransformer2DModel.from_pretrained(
-#                        "InstantX/flux-dev-de-distill-diffusers",
-#                        quantization_config=nf4_config,
-#                        torch_dtype=torch.bfloat16
-#                    )
-                    converter = AutoPipelineForImage2Image.from_pretrained(
-                        image_model_card,
-                        transformer=model_nf4,
-                        torch_dtype=torch.bfloat16,
-                        local_files_only=local_files_only,
-                    )
+
+                    if image_model_card == "black-forest-labs/FLUX.1-Kontext-dev":
+                        converter = FluxKontextPipeline.from_pretrained(
+                            image_model_card,
+                            transformer=model_nf4,
+                            torch_dtype=torch.bfloat16,
+                            local_files_only=local_files_only,
+                        )                       
+                    else:
+                        converter = AutoPipelineForImage2Image.from_pretrained(
+                            image_model_card,
+                            transformer=model_nf4,
+                            torch_dtype=torch.bfloat16,
+                            local_files_only=local_files_only,
+                        )
                     # pipe = FluxPipeline.from_pretrained(image_model_card, transformer=model_nf4, torch_dtype=torch.bfloat16)
 
                     if gfx_device == "mps":
@@ -7193,6 +7218,48 @@ class SEQUENCER_OT_generate_image(Operator):
                     pipe.vae.enable_tiling()
                 else:
                     pipe.enable_model_cpu_offload()
+
+        # FLUX Kontext
+        elif image_model_card == "black-forest-labs/FLUX.1-Kontext-dev":
+            from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
+            from diffusers import FluxKontextPipeline
+
+            nf4_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_compute_dtype=torch.bfloat16,
+            )
+            model_nf4 = FluxTransformer2DModel.from_pretrained(
+                image_model_card,
+                subfolder="transformer",
+                quantization_config=nf4_config,
+                torch_dtype=torch.bfloat16,
+            )
+
+            if image_model_card == "black-forest-labs/FLUX.1-Kontext-dev":
+                converter = FluxKontextPipeline.from_pretrained(
+                    image_model_card,
+                    transformer=model_nf4,
+                    torch_dtype=torch.bfloat16,
+                    local_files_only=local_files_only,
+                )                       
+            else:
+                converter = AutoPipelineForImage2Image.from_pretrained(
+                    image_model_card,
+                    transformer=model_nf4,
+                    torch_dtype=torch.bfloat16,
+                    local_files_only=local_files_only,
+                )
+
+            if gfx_device == "mps":
+                converter.vae.enable_tiling()
+            elif low_vram():
+                converter.enable_sequential_cpu_offload()
+                #converter.enable_model_cpu_offload()
+                converter.enable_vae_slicing()
+                converter.vae.enable_tiling()
+            else:
+                converter.enable_model_cpu_offload()
 
         # FLEX
         elif image_model_card == "ostris/Flex.2-preview":
@@ -8414,7 +8481,68 @@ class SEQUENCER_OT_generate_image(Operator):
                         width=x,
                         generator=generator,
                     ).images[0]
+                elif (
+                    image_model_card == "black-forest-labs/FLUX.1-Kontext-dev"
+                ):
+                        
+                    kontext_images = []
+                    if scene.kontext_strip_1:
+                        if find_strip_by_name(scene, scene.kontext_strip_1):
+                            input_image = load_first_frame(
+                                get_strip_path(
+                                    find_strip_by_name(scene, scene.kontext_strip_1)
+                                )
+                            )
+                        #kontext_images.append(input_image)
+                        init_image = input_image
+#                    if init_image:
+#                        kontext_images.append(init_image)
 
+#                    prompt = prompt + scene.omnigen_prompt_2
+#                    if find_strip_by_name(scene, scene.omnigen_strip_2):
+#                        omnigen_images.append(
+#                            load_first_frame(
+#                                get_strip_path(
+#                                    find_strip_by_name(scene, scene.omnigen_strip_2)
+#                                )
+#                            )
+#                        )
+#                        prompt = prompt + " <img><|image_2|></img> "
+
+#                    prompt = prompt + scene.omnigen_prompt_3
+#                    if find_strip_by_name(scene, scene.omnigen_strip_3):
+#                        omnigen_images.append(
+#                            load_first_frame(
+#                                get_strip_path(
+#                                    find_strip_by_name(scene, scene.omnigen_strip_3)
+#                                )
+#                            )
+#                        )
+#                        prompt = prompt + " <img><|image_3|></img> "
+#                    print(prompt)
+
+                    if not kontext_images:
+                        kontext_images = None
+                        img_size = False
+                    else:
+                        img_size = True
+                     
+                    image = converter(
+                        prompt=prompt,
+                        #prompt_2=None,
+                        max_sequence_length=512,
+                        #input_images=kontext_images, 
+                        #image=kontext_images,
+                        image=init_image,
+                        #strength=1.00 - scene.image_power,
+                        # negative_prompt=negative_prompt,
+                        num_inference_steps=image_num_inference_steps,
+                        guidance_scale=image_num_guidance,
+                        height=y,
+                        width=x,
+                        generator=generator,
+                    ).images[0]
+                    
                 # Not Turbo
                 else:
                     image = converter(
@@ -8468,7 +8596,33 @@ class SEQUENCER_OT_generate_image(Operator):
                 image = pipe(
                     **inference_parameters,
                 ).images[0]
-
+            elif (
+                image_model_card == "black-forest-labs/FLUX.1-Kontext-dev"
+            ):
+                
+                kontext_images = []
+                init_image = None
+                if scene.kontext_strip_1:
+                    if find_strip_by_name(scene, scene.kontext_strip_1):
+                        input_image = load_first_frame(
+                            get_strip_path(
+                                find_strip_by_name(scene, scene.kontext_strip_1)
+                            )
+                        )
+                    init_image = input_image              
+                image = converter(
+                    prompt=prompt,
+                    #prompt_2=None,
+                    max_sequence_length=512,
+                    image=init_image,
+                    #strength=1.00 - scene.image_power,
+                    # negative_prompt=negative_prompt,
+                    num_inference_steps=image_num_inference_steps,
+                    guidance_scale=image_num_guidance,
+                    height=y,
+                    width=x,
+                    generator=generator,
+                ).images[0]
             # Chroma
             elif (image_model_card == "lodestones/Chroma"):
                 inference_parameters = {
@@ -9586,6 +9740,10 @@ class SEQUENCER_OT_ai_strip_picker(Operator):
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):
                 context.scene.out_frame = strip.name
+        if self.action == "kontext_select1":
+            self.report({"INFO"}, f"Picked: {strip.name}")
+            if find_strip_by_name(scene, strip.name):
+                scene.kontext_strip_1 = strip.name
         else:
             self.report({"WARNING"}, f"Unknown action: {self.action}")
 
@@ -10153,7 +10311,9 @@ def register():
         max=1,
         description="Chatterbox Pace",
     )
-
+    bpy.types.Scene.kontext_strip_1 = bpy.props.StringProperty(
+        name="kontext_strip_1", options={"TEXTEDIT_UPDATE"}, default=""
+    )
 
 def unregister():
     for cls in classes:
