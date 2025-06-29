@@ -6654,13 +6654,13 @@ class SEQUENCER_OT_generate_image(Operator):
                 # MacOS
                 if image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin":
                     from mflux import Flux1, Config
-                    flux = Flux1.from_name(
+                    pipe = Flux1.from_name(
                        model_name="dev",  # "schnell" or "dev"
                        quantize=4,            # 4 or 8
                     )
                 elif image_model_card == "ChuckMcSneed/FLUX.1-schnell" and os_platform == "Darwin":
                     from mflux import Flux1, Config
-                    flux = Flux1.from_name(
+                    pipe = Flux1.from_name(
                        model_name="schnell",  # "schnell" or "dev"
                        quantize=4,            # 4 or 8
                     )                
@@ -7225,7 +7225,7 @@ class SEQUENCER_OT_generate_image(Operator):
             )
             print(str(result))
             from mflux import Flux1, Config
-            flux = Flux1.from_name(
+            pipe = Flux1.from_name(
                model_name="dev",  # "schnell" or "dev"
                quantize=4,            # 4 or 8
             )
@@ -7237,7 +7237,7 @@ class SEQUENCER_OT_generate_image(Operator):
             )
             print(str(result))
             from mflux import Flux1, Config
-            flux = Flux1.from_name(
+            pipe = Flux1.from_name(
                model_name="schnell",  # "schnell" or "dev"
                quantize=4,            # 4 or 8
             )  
@@ -8581,7 +8581,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     if not img_path:
                         print("Please, input an image!")
                         return {"CANCELLED"}
-                    image = image = flux.generate_image(
+                    image = pipe.generate_image(
                        seed=generator,
                        prompt=prompt,
                        image_path=os.path.abspath(img_path),
@@ -8686,8 +8686,8 @@ class SEQUENCER_OT_generate_image(Operator):
                     ).images[0]
 
             # MacOS
-            elif image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin":
-                image = image = flux.generate_image(
+            elif (image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin") or (image_model_card == "ChuckMcSneed/FLUX.1-schnell" and os_platform == "Darwin"):
+                image = pipe.generate_image(
                    seed=generator,
                    prompt=prompt,
                    config=Config(
