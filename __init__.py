@@ -61,7 +61,6 @@ import asyncio
 import inspect
 from fractions import Fraction
 
-os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 print("Python: " + sys.version)
 
@@ -84,17 +83,22 @@ os.makedirs(dir_path, exist_ok=True)
 
 
 import warnings
-
 warnings.filterwarnings("ignore", category=FutureWarning, module="xformers.*")
 warnings.filterwarnings(
     "ignore", category=UserWarning, message="1Torch was not compiled"
 )
 warnings.filterwarnings("ignore", category=FutureWarning, module="torch.*")
 warnings.filterwarnings("ignore", category=UserWarning, message="FutureWarning: ")
-import logging
 
+# Disable certain warnings that are common with PyTorch on Apple Silicon
+warnings.filterwarnings("ignore", category=UserWarning, message="TypedStorage is deprecated")
+warnings.filterwarnings("ignore", category=UserWarning, message="The operator.*is not current")
+warnings.filterwarnings("ignore", category=UserWarning, message="Converting a tensor to a Python boolean")
+
+import logging
 logging.getLogger("xformers").setLevel(logging.ERROR)  # shutup triton
 logging.getLogger("diffusers.models.modeling_utils").setLevel(logging.CRITICAL)
+
 
 try:
     exec("import torch")
@@ -104,10 +108,22 @@ try:
         gfx_device = "mps"
     else:
         gfx_device = "cpu"
+    # Set environment variables for better MPS performance
+    if os_platform == "Darwin":
+        os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+        # Disable oneDNN optimizations that can cause issues on Apple Silicon
+        os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+    if device == 'mps' and not torch.backends.mps.is_available():
+          raise Exception("Device set to MPS, but MPS is not available")
+    elif device == 'cuda' and not torch.cuda.is_available():
+          raise Exception("Device set to CUDA, but CUDA is not available") 
 except:
     print(
         "Pallaidium dependencies needs to be installed and Blender needs to be restarted."
     )
+
+# Disable oneDNN optimizations
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 os_platform = platform.system()  # 'Linux', 'Darwin', 'Java', 'Windows'
 if os_platform == "Windows":
