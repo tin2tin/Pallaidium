@@ -113,9 +113,9 @@ try:
         os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
         # Disable oneDNN optimizations that can cause issues on Apple Silicon
         os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-    if device == 'mps' and not torch.backends.mps.is_available():
+    if gfx_device == 'mps' and not torch.backends.mps.is_available():
           raise Exception("Device set to MPS, but MPS is not available")
-    elif device == 'cuda' and not torch.cuda.is_available():
+    elif gfx_device == 'cuda' and not torch.cuda.is_available():
           raise Exception("Device set to CUDA, but CUDA is not available") 
 except:
     print(
@@ -902,7 +902,10 @@ def install_modules(self):
 
         for module_name, package_name in other_modules:
             install_module(module_name, package_name)
-
+            
+    if os_platform == "Darwin":
+        install_module("mflux","mflux")
+    
     # Python version-specific installations
     from packaging import version
     python_version = sys.version_info
@@ -931,7 +934,7 @@ def install_modules(self):
             "--no-warn-script-location",
         ]
     )
-    install_module("controlnet-aux")
+    install_module("controlnet_aux", "controlnet-aux")
     install_module(self, "whisperspeech", "WhisperSpeech==0.8")
     install_module(
         self, "parler_tts", "git+https://github.com/huggingface/parler-tts.git"
@@ -1777,6 +1780,8 @@ class GeneratorAddonPreferences(AddonPreferences):
         if (
             self.image_model_card == "stabilityai/stable-diffusion-3-medium-diffusers"
             or self.image_model_card == "stabilityai/stable-diffusion-3.5-large"
+            or (self.image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin")
+            or (self.image_model_card == "ChuckMcSneed/FLUX.1-schnell" and os_platform == "Darwin")
         ):
             row = box.row(align=True)
             row.prop(self, "hugginface_token")
@@ -6637,14 +6642,30 @@ class SEQUENCER_OT_generate_image(Operator):
                 if (
                     image_model_card
                     == "stabilityai/stable-diffusion-3-medium-diffusers"
+                    or os_platform == "Darwin"
                 ):  # or image_model_card == "stabilityai/stable-diffusion-3.5-large":
                     from huggingface_hub.commands.user import login
 
                     result = login(
                         token=addon_prefs.hugginface_token, add_to_git_credential=True
                     )
+                    print(str(result))
 
-                if (
+                # MacOS
+                if image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin":
+                    from mflux import Flux1, Config
+                    flux = Flux1.from_name(
+                       model_name="dev",  # "schnell" or "dev"
+                       quantize=4,            # 4 or 8
+                    )
+                elif image_model_card == "ChuckMcSneed/FLUX.1-schnell" and os_platform == "Darwin":
+                    from mflux import Flux1, Config
+                    flux = Flux1.from_name(
+                       model_name="schnell",  # "schnell" or "dev"
+                       quantize=4,            # 4 or 8
+                    )                
+                # Win                  
+                elif (
                     image_model_card == "black-forest-labs/FLUX.1-schnell"
                     or image_model_card == "ChuckMcSneed/FLUX.1-dev"
                     or image_model_card == "black-forest-labs/FLUX.1-Kontext-dev"
@@ -7195,6 +7216,31 @@ class SEQUENCER_OT_generate_image(Operator):
             else:
                 pipe.enable_model_cpu_offload()
 
+        # FLUX MACOS
+        elif image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin":
+            from huggingface_hub.commands.user import login
+
+            result = login(
+                token=addon_prefs.hugginface_token, add_to_git_credential=True
+            )
+            print(str(result))
+            from mflux import Flux1, Config
+            flux = Flux1.from_name(
+               model_name="dev",  # "schnell" or "dev"
+               quantize=4,            # 4 or 8
+            )
+        elif image_model_card == "ChuckMcSneed/FLUX.1-schnell" and os_platform == "Darwin":
+            from huggingface_hub.commands.user import login
+
+            result = login(
+                token=addon_prefs.hugginface_token, add_to_git_credential=True
+            )
+            print(str(result))
+            from mflux import Flux1, Config
+            flux = Flux1.from_name(
+               model_name="schnell",  # "schnell" or "dev"
+               quantize=4,            # 4 or 8
+            )  
 
         # Flux
         elif (
@@ -7306,6 +7352,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 converter.vae.enable_tiling()
             else:
                 converter.enable_model_cpu_offload()
+
 
         # FLEX
         elif image_model_card == "ostris/Flex.2-preview":
@@ -8498,6 +8545,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         {"INFO"},
                         "LoRAs are ignored for image to image processing.",
                     )
+                img_path = None
                 if scene.movie_path:
                     print("Process: Image to Image")
                     init_image = load_first_frame(scene.movie_path)
@@ -8506,6 +8554,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     print("Process: Image to Image")
                     init_image = load_first_frame(scene.image_path)
                     init_image = init_image.resize((x, y))
+                    img_path=scene.image_path 
                 # init_image = load_image(scene.image_path).convert("RGB")
                 print("X: " + str(x), "Y: " + str(y))
 
@@ -8526,6 +8575,23 @@ class SEQUENCER_OT_generate_image(Operator):
                         width=x,
                         generator=generator,
                     ).images[0]
+                    
+                # MacOS
+                elif (image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin") or (image_model_card == "ChuckMcSneed/FLUX.1-schnell" and os_platform == "Darwin"):
+                    if not img_path:
+                        print("Please, input an image!")
+                        return {"CANCELLED"}
+                    image = image = flux.generate_image(
+                       seed=generator,
+                       prompt=prompt,
+                       image_path=os.path.abspath(img_path),
+                       config=Config(
+                          num_inference_steps=image_num_inference_steps,  # "schnell" works well with 2-4 steps, "dev" works well with 20-25 steps
+                          height=y,
+                          width=x,
+                       )
+                    )
+                    
                 elif (
                     image_model_card == "ChuckMcSneed/FLUX.1-dev"
                     or image_model_card == "ostris/Flex.2-preview"
@@ -8619,6 +8685,18 @@ class SEQUENCER_OT_generate_image(Operator):
                         generator=generator,
                     ).images[0]
 
+            # MacOS
+            elif image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin":
+                image = image = flux.generate_image(
+                   seed=generator,
+                   prompt=prompt,
+                   config=Config(
+                      num_inference_steps=image_num_inference_steps,  # "schnell" works well with 2-4 steps, "dev" works well with 20-25 steps
+                      height=y,
+                      width=x,
+                   )
+                )
+
             # Flux Schnell
             elif (
                 image_model_card == "black-forest-labs/FLUX.1-schnell"
@@ -8636,6 +8714,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 image = pipe(
                     **inference_parameters,
                 ).images[0]
+
             # Flux Dev
             elif (
                 image_model_card == "ChuckMcSneed/FLUX.1-dev"
@@ -9737,6 +9816,7 @@ class SEQUENCER_OT_ai_strip_picker(Operator):
 
     def modal(self, context, event):
         if event.type == "LEFTMOUSE" and event.value == "PRESS":
+            print("Picking...")
             area = context.area
             region = context.region
             mouse_region_coord = (event.mouse_region_x, event.mouse_region_y)
@@ -9751,17 +9831,31 @@ class SEQUENCER_OT_ai_strip_picker(Operator):
             for strip in context.scene.sequence_editor.sequences_all:
                 # Calculate the vertical bounds of the strip in view space
                 # Assuming each channel has a nominal height of 1.0 in view space
-#                strip_y_min_view = strip.channel - 0.5 * strip.transform.scale_y  # Consider the scaled height
-#                strip_y_max_view = strip.channel + 0.5 * strip.transform.scale_y
+                strip_y_min_view = strip.channel - 0.5 * strip.transform.scale_y  # Consider the scaled height
+                strip_y_max_view = strip.channel + 0.5 * strip.transform.scale_y
 
                 if (
                     strip.frame_start <= mouse_x_view < strip.frame_final_end and
-                    (strip.type == "IMAGE" or strip.type =="MOVIE")#and
-                    #strip_y_min_view <= mouse_y_view < strip_y_max_view
+                    strip_y_min_view <= mouse_y_view < strip_y_max_view
                 ):
                     self.perform_action(context, strip)
                     context.window.cursor_modal_restore()
                     return {"FINISHED"}
+
+
+#                # Calculate the vertical bounds of the strip in view space
+#                # Assuming each channel has a nominal height of 1.0 in view space
+#                strip_y_min_view = strip.channel - 0.5 * strip.transform.scale_y  # Consider the scaled height
+#                strip_y_max_view = strip.channel + 0.5 * strip.transform.scale_y
+
+#                if (
+#                    strip.frame_start <= mouse_x_view < strip.frame_final_end and
+#                    (strip.type == "IMAGE" or strip.type =="MOVIE")#and
+#                    #strip_y_min_view <= mouse_y_view < strip_y_max_view
+#                ):
+#                    self.perform_action(context, strip)
+#                    context.window.cursor_modal_restore()
+#                    return {"FINISHED"}
 
             # If no strip picked, don't exit — allow continuous clicking
             return {"RUNNING_MODAL"}
