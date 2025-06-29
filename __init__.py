@@ -935,11 +935,11 @@ def install_modules(self):
         ]
     )
     install_module("controlnet_aux", "controlnet-aux")
-    install_module(self, "whisperspeech", "WhisperSpeech==0.8")
+    install_module("whisperspeech", "WhisperSpeech==0.8")
     install_module(
-        self, "parler_tts", "git+https://github.com/huggingface/parler-tts.git"
+        "parler_tts", "git+https://github.com/huggingface/parler-tts.git"
     )
-    install_module(self, "laion_clap", "laion-clap==1.1.6")
+    install_module("laion_clap", "laion-clap==1.1.6")
     subprocess.call(
         [
             pybin,
@@ -8582,7 +8582,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         print("Please, input an image!")
                         return {"CANCELLED"}
                     image = pipe.generate_image(
-                       seed=generator,
+                       seed=seed,
                        prompt=prompt,
                        image_path=os.path.abspath(img_path),
                        config=Config(
@@ -8688,7 +8688,7 @@ class SEQUENCER_OT_generate_image(Operator):
             # MacOS
             elif (image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin") or (image_model_card == "ChuckMcSneed/FLUX.1-schnell" and os_platform == "Darwin"):
                 image = pipe.generate_image(
-                   seed=generator,
+                   seed=seed,
                    prompt=prompt,
                    config=Config(
                       num_inference_steps=image_num_inference_steps,  # "schnell" works well with 2-4 steps, "dev" works well with 20-25 steps
