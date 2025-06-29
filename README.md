@@ -357,6 +357,9 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 - [Florence-2-large-PromptGen](https://huggingface.co/MiaoshouAI/Florence-2-large-PromptGen-v2.0)
 - [MoviiGen1.1_Prompt_Rewriter](https://huggingface.co/ZuluVision/MoviiGen1.1_Prompt_Rewriter)
 
+### MacOS:
+- [MFLUX](https://github.com/filipstrand/mflux)
+
 > [!WARNING]
 > SCAM ALERT!
 > Scammers are misusing our free software, Pallaidium, along with our content and name, on a phishing site: pallaidium . com. We are NOT associated with this site!
