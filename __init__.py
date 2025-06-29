@@ -6669,7 +6669,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     if image_model_card == "black-forest-labs/FLUX.1-Kontext-dev":
                         converter = FluxKontextPipeline.from_pretrained(
                             image_model_card,
-                            #transformer=model_nf4,
+                            transformer=model_nf4,
                             torch_dtype=torch.bfloat16,
                             local_files_only=local_files_only,
                         )                       
@@ -6680,7 +6680,6 @@ class SEQUENCER_OT_generate_image(Operator):
                             torch_dtype=torch.bfloat16,
                             local_files_only=local_files_only,
                         )
-                    # pipe = FluxPipeline.from_pretrained(image_model_card, transformer=model_nf4, torch_dtype=torch.bfloat16)
 
                     if gfx_device == "mps":
                         converter.to("mps")
