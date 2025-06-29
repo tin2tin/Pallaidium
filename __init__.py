@@ -6396,11 +6396,12 @@ class SEQUENCER_OT_generate_image(Operator):
             scene.sequence_editor_create()
 
         try:
-            from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
+            if os_platform != "Darwin":
+                from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
             from diffusers.utils import pt_to_pil
             import torch
-            import requests
             from diffusers.utils import load_image
+            import requests
             import numpy as np
             import PIL
             import cv2
