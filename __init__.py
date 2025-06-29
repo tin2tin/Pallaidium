@@ -3126,7 +3126,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     print("Load LoRAs: " + " ".join(enabled_names))
 
                 if gfx_device == "mps":
-                    pipe.vae.enable_tiling()
+                    pipe.to("mps")
                 elif low_vram():
                     pipe.enable_sequential_cpu_offload()
                     # pipe.enable_vae_slicing()
@@ -3159,7 +3159,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     )
 
                 if gfx_device == "mps":
-                    prefiner.vae.enable_tiling()
+                    refiner.to("mps")
                 elif low_vram():
                     refiner.enable_model_cpu_offload()
                     refiner.unet.enable_forward_chunking()
@@ -3190,7 +3190,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     upscale.scheduler.config
                 )
                 if gfx_device == "mps":
-                    upscale.vae.enable_tiling()
+                    upscale.to("mps")
                 elif low_vram():
                     upscale.enable_model_cpu_offload()
                 else:
@@ -3228,7 +3228,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 pipe.set_adapters(["lcm-lora"], [0.8])
 
                 if gfx_device == "mps":
-                    pipe.vae.enable_tiling()
+                    pipe.to("mps")
                 elif low_vram():
                     pipe.enable_vae_slicing()
                     pipe.enable_model_cpu_offload()
@@ -3277,7 +3277,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     )
 
                 if gfx_device == "mps":
-                    pipe.vae.enable_tiling()
+                    pipe.to("mps")
                 elif low_vram():
                     pipe.enable_sequential_cpu_offload()
                     # pipe.enable_vae_slicing()
@@ -3317,7 +3317,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 pipe = LTXConditionPipeline.from_pretrained("a-r-r-o-w/LTX-Video-0.9.7-diffusers", transformer=transformer, torch_dtype=torch.bfloat16)
 
                 if gfx_device == "mps":
-                    pipe.vae.enable_tiling()
+                    pipe.to("mps")
                 elif low_vram():
                     pipe.vae.enable_tiling()
                     pipe.enable_model_cpu_offload()
@@ -3438,7 +3438,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     print("Load LoRAs: " + " ".join(enabled_names))
 
                 if gfx_device == "mps":
-                    pipe.vae.enable_tiling()
+                    pipe.to("mps")
                 elif low_vram():
                     pipe.vae.enable_tiling()
                     pipe.enable_model_cpu_offload()
@@ -3526,7 +3526,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 #                    )
 
                 if gfx_device == "mps":
-                    pipe.vae.enable_tiling()
+                    pipe.to("mps")
                 else:
                     pipe.vae.enable_tiling()
                     pipe.enable_model_cpu_offload()
@@ -3593,7 +3593,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     pipe = HunyuanVideoPipeline.from_pretrained(model_id, transformer=transformer, torch_dtype=torch.float16)
 
                 if gfx_device == "mps":
-                    pipe.vae.enable_tiling()
+                    pipe.to("mps")
                 elif low_vram():
                     # pipe.enable_vae_slicing()
                     pipe.vae.enable_tiling()
@@ -3614,7 +3614,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 pipe.to("cuda")
 
                 if gfx_device == "mps":
-                    pipe.vae.enable_tiling()
+                    pipe.to("mps")
                 else:
                     pipe.enable_sequential_cpu_offload()
                     pipe.enable_vae_slicing()
@@ -3687,7 +3687,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 #                pipe = WanPipeline.from_pretrained(movie_model_card, vae=vae, torch_dtype=torch.bfloat16)
 
                 if gfx_device == "mps":
-                    pass
+                    pipe.to("mps")
                 elif low_vram():
                     # pipe.enable_vae_slicing()
                     pipe.enable_model_cpu_offload()
@@ -3883,7 +3883,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 #                pipe = WanImageToVideoPipeline.from_pretrained("Wan-AI/Wan2.1-I2V-14B-480P-Diffusers", transformer=transformer)
 #
                 if gfx_device == "mps":
-                    pass
+                    pipe.to("mps")
                 elif low_vram():
                     # pipe.enable_vae_slicing()
                     pipe.enable_model_cpu_offload()
@@ -3908,7 +3908,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     pipe.scheduler.config
                 )
                 if gfx_device == "mps":
-                    pipe.vae.enable_tiling()
+                    pipe.to("mps")
                 elif low_vram():
                     pipe.enable_model_cpu_offload()
                     # pipe.enable_vae_slicing()
@@ -3931,7 +3931,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     upscale.scheduler.config
                 )
                 if gfx_device == "mps":
-                    upscale.vae.enable_tiling()
+                    upscale.to("mps")
                 elif low_vram():
                     upscale.enable_model_cpu_offload()
                 else:
@@ -5263,7 +5263,7 @@ class SEQUENCER_OT_generate_audio(Operator):
             )
             #device = "cuda" if torch.cuda.is_available() else "cpu"
             if gfx_device == "mps":
-                pipe.vae.enable_tiling()
+                pipe.to("mps")
             elif low_vram():
                 pipe.enable_model_cpu_offload()
             else:
@@ -5276,7 +5276,7 @@ class SEQUENCER_OT_generate_audio(Operator):
             pipe = AudioLDM2Pipeline.from_pretrained(repo_id, torch_dtype=torch.float16)
 
             if gfx_device == "mps":
-                pipe.vae.enable_tiling()
+                pipe.to("mps")
             elif low_vram():
                 pipe.enable_model_cpu_offload()
             else:
@@ -6521,7 +6521,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
                 pipe.watermark = NoWatermark()
                 if gfx_device == "mps":
-                    pipe.vae.enable_tiling()
+                    pipe.to("mps")
                 elif low_vram():
                     # torch.cuda.set_per_process_memory_fraction(0.99)
                     pipe.enable_model_cpu_offload()
@@ -6563,7 +6563,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 )
 
                 if gfx_device == "mps":
-                    pipe.vae.enable_tiling()
+                    pipe.to("mps")
                 elif low_vram():
                     pipe.enable_sequential_cpu_offload()
                     pipe.vae.enable_tiling()
@@ -6591,7 +6591,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     local_files_only=local_files_only,
                 )
                 if gfx_device == "mps":
-                    converter.vae.enable_tiling()
+                    converter.to("mps")
                 elif low_vram():
                     converter.enable_model_cpu_offload()
                 else:
@@ -6611,7 +6611,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     converter.scheduler.config, use_karras_sigmas=True
                 )
                 if gfx_device == "mps":
-                    converter.vae.enable_tiling()
+                    converter.to("mps")
                 elif low_vram():
                     converter.enable_model_cpu_offload()
                 else:
@@ -6653,7 +6653,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     if image_model_card == "black-forest-labs/FLUX.1-Kontext-dev":
                         converter = FluxKontextPipeline.from_pretrained(
                             image_model_card,
-                            transformer=model_nf4,
+                            #transformer=model_nf4,
                             torch_dtype=torch.bfloat16,
                             local_files_only=local_files_only,
                         )                       
@@ -6667,7 +6667,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     # pipe = FluxPipeline.from_pretrained(image_model_card, transformer=model_nf4, torch_dtype=torch.bfloat16)
 
                     if gfx_device == "mps":
-                        converter.vae.enable_tiling()
+                        converter.to("mps")
                     elif low_vram():
                         converter.enable_sequential_cpu_offload()
                         #converter.enable_model_cpu_offload()
@@ -6708,7 +6708,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     )
 
                     if gfx_device == "mps":
-                        converter.vae.enable_tiling()
+                        converter.to("mps")
                     elif low_vram():
                         #pipe.enable_sequential_cpu_offload()
                         converter.enable_model_cpu_offload()
@@ -6777,7 +6777,7 @@ class SEQUENCER_OT_generate_image(Operator):
 #                    )
 
                     if gfx_device == "mps":
-                        converter.vae.enable_tiling()
+                        converter.to("mps")
                     elif low_vram():
                         converter.enable_model_cpu_offload()
                         converter.enable_vae_slicing()
@@ -6811,7 +6811,7 @@ class SEQUENCER_OT_generate_image(Operator):
                             )
                             return {"CANCELLED"}
                     if gfx_device == "mps":
-                        converter.vae.enable_tiling()
+                        converter.to("mps")
                     elif low_vram():
                         converter.enable_model_cpu_offload()
                     else:
@@ -6836,7 +6836,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     converter.watermark = NoWatermark()
 
                     if gfx_device == "mps":
-                        converter.vae.enable_tiling()
+                        converter.to("mps")
                     elif low_vram():
                         converter.enable_model_cpu_offload()
                     else:
@@ -6913,7 +6913,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     pipe.load_lora_weights("latent-consistency/lcm-lora-sdxl")
 
             if gfx_device == "mps":
-                pipe.vae.enable_tiling()
+                pipe.to("mps")
             elif low_vram():
                 pipe.enable_model_cpu_offload()
             else:
@@ -6993,7 +6993,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 scene.movie_num_guidance = 0
 
             if gfx_device == "mps":
-                pipe.vae.enable_tiling()
+                pipe.to("mps")
             elif low_vram():
                 pipe.enable_model_cpu_offload()
             else:
@@ -7044,7 +7044,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 )
 
             if gfx_device == "mps":
-                pipe.vae.enable_tiling()
+                pipe.to("mps")
             elif low_vram():
                 pipe.enable_model_cpu_offload()
             else:
@@ -7064,7 +7064,7 @@ class SEQUENCER_OT_generate_image(Operator):
             )
             
             if gfx_device == "mps":
-                pipe.vae.enable_tiling()
+                pipe.to("mps")
             elif low_vram():
                 pipe.enable_model_cpu_offload()
             else:
@@ -7102,7 +7102,7 @@ class SEQUENCER_OT_generate_image(Operator):
             )
 
             if gfx_device == "mps":
-                pipe.vae.enable_tiling()
+                pipe.to("mps")
             elif low_vram():
                 pipe.enable_model_cpu_offload()
             else:
@@ -7176,7 +7176,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     torch_dtype=torch.float16,
                 )
             if gfx_device == "mps":
-                pipe.vae.enable_tiling()
+                pipe.to("mps")
             else:
                 pipe.enable_model_cpu_offload()
 
@@ -7220,7 +7220,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 )
 
                 if gfx_device == "mps":
-                    pipe.vae.enable_tiling()
+                    pipe.to("mps")
                 elif low_vram():
                     #pipe.enable_sequential_cpu_offload()
                     pipe.enable_model_cpu_offload()
@@ -7250,7 +7250,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 # pipe = FluxPipeline.from_pretrained(image_model_card, torch_dtype=torch.bfloat16)
 
                 if gfx_device == "mps":
-                    pipe.vae.enable_tiling()
+                    pipe.to("mps")
                 elif low_vram():
                     pipe.enable_model_cpu_offload()
                     pipe.enable_vae_slicing()
@@ -7275,23 +7275,15 @@ class SEQUENCER_OT_generate_image(Operator):
                 torch_dtype=torch.bfloat16,
             )
 
-            if image_model_card == "black-forest-labs/FLUX.1-Kontext-dev":
-                converter = FluxKontextPipeline.from_pretrained(
-                    image_model_card,
-                    transformer=model_nf4,
-                    torch_dtype=torch.bfloat16,
-                    local_files_only=local_files_only,
-                )                       
-            else:
-                converter = AutoPipelineForImage2Image.from_pretrained(
-                    image_model_card,
-                    transformer=model_nf4,
-                    torch_dtype=torch.bfloat16,
-                    local_files_only=local_files_only,
-                )
+            converter = FluxKontextPipeline.from_pretrained(
+                image_model_card,
+                transformer=model_nf4,
+                torch_dtype=torch.bfloat16,
+                local_files_only=local_files_only,
+            )                       
 
             if gfx_device == "mps":
-                converter.vae.enable_tiling()
+                converter.to("mps")
             elif low_vram():
                 converter.enable_sequential_cpu_offload()
                 #converter.enable_model_cpu_offload()
@@ -7340,7 +7332,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 )
 
                 if gfx_device == "mps":
-                    pipe.vae.enable_tiling()
+                    pipe.to("mps")
                 elif low_vram():
                     pipe.enable_model_cpu_offload()
                     pipe.enable_vae_slicing()
@@ -7398,7 +7390,7 @@ class SEQUENCER_OT_generate_image(Operator):
 #                    pipe = ChromaPipeline.from_pretrained(bfl_repo, transformer=transformer, text_encoder=text_encoder, tokenizer=tokenizer, torch_dtype=dtype)
 
                     if gfx_device == "mps":
-                        pipe.vae.enable_tiling()
+                        pipe.to("mps")
                     elif low_vram():
                         pipe.enable_model_cpu_offload()
                         pipe.enable_vae_slicing()
@@ -7436,7 +7428,7 @@ class SEQUENCER_OT_generate_image(Operator):
             )
 
             if gfx_device == "mps":
-                pipe.vae.enable_tiling()
+                pipe.to("mps")
             elif low_vram():
                 pipe.enable_model_cpu_offload()
             else:
@@ -7470,7 +7462,7 @@ class SEQUENCER_OT_generate_image(Operator):
             )
 
             if gfx_device == "mps":
-                pipe.vae.enable_tiling()
+                pipe.to("mps")
             elif low_vram():
                 pipe.enable_model_cpu_offload()
                 #pipe.enable_sequential_cpu_offload()
@@ -7483,7 +7475,7 @@ class SEQUENCER_OT_generate_image(Operator):
             from diffusers import CogView4Pipeline
             pipe = CogView4Pipeline.from_pretrained("THUDM/CogView4-6B", torch_dtype=torch.bfloat16)
             if gfx_device == "mps":
-                pipe.vae.enable_tiling()
+                pipe.to("mps")
             elif low_vram():
                 #pipe.enable_sequential_cpu_offload()
                 pipe.enable_model_cpu_offload()
@@ -7535,7 +7527,7 @@ class SEQUENCER_OT_generate_image(Operator):
             )
 
             if gfx_device == "mps":
-                pipe.vae.enable_tiling()
+                pipe.to("mps")
             elif low_vram():
                 pipe.enable_sequential_cpu_offload()
                 pipe.vae.enable_tiling()
@@ -7664,7 +7656,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     )
 
                 if gfx_device == "mps":
-                    pipe.vae.enable_tiling()
+                    pipe.to("mps")
                 elif low_vram():
                     pipe.enable_model_cpu_offload()
                     pipe.vae.enable_tiling()
@@ -7681,7 +7673,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     local_files_only=local_files_only,
                 )
                 if gfx_device == "mps":
-                    pipe.vae.enable_tiling()
+                    pipe.to("mps")
                 elif low_vram():
                     pipe.enable_model_cpu_offload()
                 else:
@@ -7736,7 +7728,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     pipe.scheduler.config
                 )
                 if gfx_device == "mps":
-                    pipe.vae.enable_tiling()
+                    pipe.to("mps")
                 elif low_vram():
                     pipe.enable_model_cpu_offload()
                 else:
@@ -7756,7 +7748,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     pipe.scheduler.config, use_karras_sigmas=True
                 )
                 if gfx_device == "mps":
-                    pipe.vae.enable_tiling()
+                    pipe.to("mps")
                 elif low_vram():
                     pipe.enable_model_cpu_offload()
                 else:
@@ -7815,7 +7807,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 pipe.watermark = NoWatermark()
 
                 if gfx_device == "mps":
-                    pipe.vae.enable_tiling()
+                    pipe.to("mps")
                 elif low_vram():
                     # torch.cuda.set_per_process_memory_fraction(0.95)  # 6 GB VRAM
 
@@ -7879,7 +7871,7 @@ class SEQUENCER_OT_generate_image(Operator):
             )
             refiner.watermark = NoWatermark()
             if gfx_device == "mps":
-                pipe.vae.enable_tiling()
+                pipe.to("mps")
             elif low_vram():
                 refiner.enable_model_cpu_offload()
                 # refiner.enable_vae_tiling()
@@ -8925,7 +8917,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     torch_dtype=torch.float16,
                 )
                 if gfx_device == "mps":
-                    pipe.vae.enable_tiling()
+                    pipe.to("mps")
                 elif low_vram():
                     pipe.enable_model_cpu_offload()
                 else:
