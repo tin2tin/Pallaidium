@@ -841,7 +841,7 @@ def install_modules(self):
         ("imageio", "imageio-ffmpeg"),
         ("imWatermark", "imWatermark"),
         ("mediapipe", "mediapipe"),
-        ("scipy", "scipy==1.12.0"),
+        ("scipy", "scipy"), #scipy==1.12.0
         ("protobuf", "protobuf==3.20.1"),
         ("scikit_learn", "scikit-learn==1.2.2"),
         ("bitsandbytes", "bitsandbytes"),
@@ -6403,8 +6403,8 @@ class SEQUENCER_OT_generate_image(Operator):
             scene.sequence_editor_create()
 
         try:
-            if os_platform != "Darwin":
-                from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
+#            if os_platform != "Darwin":
+            from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
             from diffusers.utils import pt_to_pil
             import torch
             from diffusers.utils import load_image
