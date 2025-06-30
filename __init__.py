@@ -905,6 +905,12 @@ def install_modules(self):
             
     if os_platform == "Darwin":
         install_module("mflux","--no-deps mflux")
+        install_module("matplotlib","--no-deps matplotlib")
+        install_module("mlx","--no-deps mlx")
+        install_module("opencv_python","--no-deps opencv-python")
+        install_module("piexif","--no-deps piexif")
+        install_module("platformdirs","--no-deps platformdirs")
+        install_module("toml","--no-deps toml")
     
     # Python version-specific installations
     from packaging import version
