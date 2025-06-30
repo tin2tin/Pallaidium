@@ -692,6 +692,8 @@ def clear_cuda_cache():
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
         torch.cuda.reset_max_memory_allocated()
+    if torch.backends.mps.is_available():
+        torch.mps.empty_cache()
 #
 #def flush():
 #    import torch
@@ -1787,7 +1789,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             self.image_model_card == "stabilityai/stable-diffusion-3-medium-diffusers"
             or self.image_model_card == "stabilityai/stable-diffusion-3.5-large"
             or (self.image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin")
-            or (self.image_model_card == "ChuckMcSneed/FLUX.1-schnell" and os_platform == "Darwin")
+            or (self.image_model_card == "black-forest-labs/FLUX.1-schnell" and os_platform == "Darwin")
         ):
             row = box.row(align=True)
             row.prop(self, "hugginface_token")
@@ -6666,7 +6668,7 @@ class SEQUENCER_OT_generate_image(Operator):
                        model_name="dev",  # "schnell" or "dev"
                        quantize=4,            # 4 or 8
                     )
-                elif image_model_card == "ChuckMcSneed/FLUX.1-schnell" and os_platform == "Darwin":
+                elif image_model_card == "black-forest-labs/FLUX.1-schnell" and os_platform == "Darwin":
                     from mflux import Flux1, Config
                     pipe = Flux1.from_name(
                        model_name="schnell",  # "schnell" or "dev"
@@ -7237,7 +7239,7 @@ class SEQUENCER_OT_generate_image(Operator):
                model_name="dev",  # "schnell" or "dev"
                quantize=4,            # 4 or 8
             )
-        elif image_model_card == "ChuckMcSneed/FLUX.1-schnell" and os_platform == "Darwin":
+        elif image_model_card == "black-forest-labs/FLUX.1-schnell" and os_platform == "Darwin":
             from huggingface_hub.commands.user import login
 
             result = login(
@@ -8585,7 +8587,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     ).images[0]
                     
                 # MacOS
-                elif (image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin") or (image_model_card == "ChuckMcSneed/FLUX.1-schnell" and os_platform == "Darwin"):
+                elif (image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin") or (image_model_card == "black-forest-labs/FLUX.1-schnell" and os_platform == "Darwin"):
                     if not img_path:
                         print("Please, input an image!")
                         return {"CANCELLED"}
@@ -8694,7 +8696,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     ).images[0]
 
             # MacOS
-            elif (image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin") or (image_model_card == "ChuckMcSneed/FLUX.1-schnell" and os_platform == "Darwin"):
+            elif (image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin") or (image_model_card == "black-forest-labs/FLUX.1-schnell" and os_platform == "Darwin"):
                 image = pipe.generate_image(
                    seed=seed,
                    prompt=prompt,
