@@ -904,7 +904,7 @@ def install_modules(self):
             install_module(module_name, package_name)
             
     if os_platform == "Darwin":
-        install_module("mflux","mflux")
+        install_module("mflux","--no-deps mflux")
     
     # Python version-specific installations
     from packaging import version
@@ -2595,14 +2595,15 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 if not (
                     type == "image" and image_model_card == "ZhengPeng7/BiRefNet_HR"
                 ):
-                    col = col.column()
+                    col = col.column(align=True)
                     row = col.row(align=True)
                     sub_row = row.row(align=True)
-                    sub_row.prop(context.scene, "movie_num_seed", text="Seed")
                     row.prop(
                         context.scene, "movie_use_random", text="", icon="QUESTION"
                     )
-                    sub_row.active = not context.scene.movie_use_random
+                    sub_row.prop(context.scene, "movie_num_seed", text="Seed")
+                    sub_row.active = not context.scene.movie_use_random   
+                    
                 if type == "movie" and (
                     movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256"
                     or movie_model_card == "cerspense/zeroscope_v2_576w"
