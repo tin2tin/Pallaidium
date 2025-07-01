@@ -8574,7 +8574,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         print("Please, input an image!")
                         return {"CANCELLED"}
                     image = converter.generate_image(
-                       seed=seed,
+                       seed=int(seed),
                        prompt=prompt,
                        image_path=os.path.abspath(img_path),
                        config=Config(
@@ -8699,7 +8699,7 @@ class SEQUENCER_OT_generate_image(Operator):
             # MacOS
             elif (image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin") or (image_model_card == "black-forest-labs/FLUX.1-schnell" and os_platform == "Darwin"):
                 image = pipe.generate_image(
-                   seed=seed,
+                   seed=int(seed),
                    prompt=prompt,
                    config=Config(
                       num_inference_steps=image_num_inference_steps,  # "schnell" works well with 2-4 steps, "dev" works well with 20-25 steps
