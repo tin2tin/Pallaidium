@@ -6664,13 +6664,13 @@ class SEQUENCER_OT_generate_image(Operator):
                 # MacOS
                 if image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin":
                     from mflux import Flux1, Config
-                    pipe = Flux1.from_name(
+                    converter = Flux1.from_name(
                        model_name="dev",  # "schnell" or "dev"
                        quantize=4,            # 4 or 8
                     )
                 elif image_model_card == "black-forest-labs/FLUX.1-schnell" and os_platform == "Darwin":
                     from mflux import Flux1, Config
-                    pipe = Flux1.from_name(
+                    converter = Flux1.from_name(
                        model_name="schnell",  # "schnell" or "dev"
                        quantize=4,            # 4 or 8
                     )                
@@ -8568,7 +8568,23 @@ class SEQUENCER_OT_generate_image(Operator):
                 # init_image = load_image(scene.image_path).convert("RGB")
                 print("X: " + str(x), "Y: " + str(y))
 
-                if (
+                # MacOS
+                if (image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin") or (image_model_card == "black-forest-labs/FLUX.1-schnell" and os_platform == "Darwin"):
+                    if not img_path:
+                        print("Please, input an image!")
+                        return {"CANCELLED"}
+                    image = converter.generate_image(
+                       seed=seed,
+                       prompt=prompt,
+                       image_path=os.path.abspath(img_path),
+                       config=Config(
+                          num_inference_steps=image_num_inference_steps,  # "schnell" works well with 2-4 steps, "dev" works well with 20-25 steps
+                          height=y,
+                          width=x,
+                       )
+                    )
+                    
+                elif (
                     image_model_card == "stabilityai/sdxl-turbo"
                     or image_model_card == "black-forest-labs/FLUX.1-schnell"
                 ):
@@ -8586,21 +8602,6 @@ class SEQUENCER_OT_generate_image(Operator):
                         generator=generator,
                     ).images[0]
                     
-                # MacOS
-                elif (image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin") or (image_model_card == "black-forest-labs/FLUX.1-schnell" and os_platform == "Darwin"):
-                    if not img_path:
-                        print("Please, input an image!")
-                        return {"CANCELLED"}
-                    image = pipe.generate_image(
-                       seed=seed,
-                       prompt=prompt,
-                       image_path=os.path.abspath(img_path),
-                       config=Config(
-                          num_inference_steps=image_num_inference_steps,  # "schnell" works well with 2-4 steps, "dev" works well with 20-25 steps
-                          height=y,
-                          width=x,
-                       )
-                    )
                     
                 elif (
                     image_model_card == "ChuckMcSneed/FLUX.1-dev"
