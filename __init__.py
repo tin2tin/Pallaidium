@@ -2284,7 +2284,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     if input == "input_strips" and not scene.inpaint_selected_strip:
                         col = col.column(heading="Use", align=True)
                         col.prop(addon_prefs, "use_strip_data", text=" Name & Seed")
-                        if type == "movie" and (
+                        if type == "movie" and os_platform != "Darwin" and (
                             movie_model_card == "black-forest-labs/FLUX.1-schnell"
                             or movie_model_card == "ChuckMcSneed/FLUX.1-dev"
                             or movie_model_card == "black-forest-labs/FLUX.1-Kontext-dev"
@@ -8576,11 +8576,12 @@ class SEQUENCER_OT_generate_image(Operator):
                     image = converter.generate_image(
                        seed=int(seed),
                        prompt=prompt,
-                       image_path=os.path.abspath(img_path),
                        config=Config(
                           num_inference_steps=image_num_inference_steps,  # "schnell" works well with 2-4 steps, "dev" works well with 20-25 steps
                           height=y,
                           width=x,
+                          image_path=os.path.abspath(img_path),
+                          image_strength=1.00-scene.image_power,
                        )
                     )
                     
