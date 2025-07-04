@@ -68,7 +68,7 @@ print("Python: " + sys.version)
 python_exe_dir = os.path.dirname(os.__file__)
 
 # Construct the path to the site-packages directory
-site_packages_dir = os.path.join(python_exe_dir, "lib", "site-packages")
+site_packages_dir = os.path.join(python_exe_dir, "site-packages")
 
 # Add the site-packages directory to the top of sys.path
 sys.path.insert(0, site_packages_dir)
@@ -81,6 +81,28 @@ os.makedirs(dir_path, exist_ok=True)
 #    temp = pathlib.PosixPath
 #    pathlib.PosixPath = pathlib.WindowsPath
 
+site_paths_to_move = set(site.getsitepackages() + [site.getusersitepackages()])
+
+seen = set()
+unique_ordered_paths = []
+for path in sys.path:
+    if path not in seen:
+        unique_ordered_paths.append(path)
+        seen.add(path)
+
+non_site_paths = []
+final_site_paths = []
+for path in unique_ordered_paths:
+    if path in site_paths_to_move or 'site-packages' in path:
+        final_site_paths.append(path)
+    else:
+        non_site_paths.append(path)
+
+sys.path[:] = non_site_paths + final_site_paths
+
+#print("\n--- Modified Python Path (site-packages moved to the end) ---")
+#for i, path in enumerate(sys.path):
+#    print(f"{i}: {path}")
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning, module="xformers.*")
@@ -948,6 +970,7 @@ def install_modules(self):
         "parler_tts", "git+https://github.com/huggingface/parler-tts.git"
     )
     install_module("laion_clap", "laion-clap==1.1.6")
+    install_module("numpy", "numpy==1.26.4")
     subprocess.call(
         [
             pybin,
@@ -6614,7 +6637,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     local_files_only=local_files_only,
                 )
                 converter = StableDiffusionXLImg2ImgPipeline.from_pretrained(
-                    "stabilityai/stable-diffusion-xl-refiner-1.0",
+                    "thingthatis/stable-diffusion-xl-refiner-1.0",
                     # text_encoder_2=pipe.text_encoder_2,
                     vae=vae,
                     torch_dtype=torch.float16,
@@ -7925,7 +7948,7 @@ class SEQUENCER_OT_generate_image(Operator):
         # Refiner model - load if chosen.
         if do_refine:
             print(
-                "Load Refine Model:  " + "stabilityai/stable-diffusion-xl-refiner-1.0"
+                "Load Refine Model:  " + "thingthatis/stable-diffusion-xl-refiner-1.0"
             )
             from diffusers import StableDiffusionXLImg2ImgPipeline, AutoencoderKL
 
@@ -7935,7 +7958,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 local_files_only=local_files_only,
             )
             refiner = StableDiffusionXLImg2ImgPipeline.from_pretrained(
-                "stabilityai/stable-diffusion-xl-refiner-1.0",
+                "thingthatis/stable-diffusion-xl-refiner-1.0",
                 vae=vae,
                 torch_dtype=torch.float16,
                 variant="fp16",
