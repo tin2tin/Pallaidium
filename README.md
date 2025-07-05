@@ -15,6 +15,15 @@ https://github.com/user-attachments/assets/81d30bc1-01f6-4b52-8ce7-abf53d53e854
 
 AI-generate video, image, and audio from text prompts or video, image, or text strips. 
 
+## Generation Matrix
+This matrix provides a quick overview of the core generative capabilities, mapping input types to possible outputs.
+
+| Input | Image | Video | Text | Audio | Music | Speech |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Text** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Image**| ✅ | ✅ | ✅ | | | |
+| **Video**| ✅ | ✅ | ✅ | | | |
+
 ## Features
 
 |                                                    |                                                     |                                                     |
