@@ -42,7 +42,7 @@ This matrix provides a quick overview of the core generative capabilities, mappi
 | User-defined file path for generated files.        | Seed and prompt added to strip name.                | One-click install and uninstall dependencies.       |
 
 ## Requirements
-* Windows. Limited support for Linux and [MacOS](https://github.com/tin2tin/Pallaidium/wiki/macOS-Compatibility-Status)
+* [Windows](https://github.com/tin2tin/Pallaidium/wiki/Windows-Model-Status). Limited support for Linux and [MacOS](https://github.com/tin2tin/Pallaidium/wiki/macOS-Compatibility-Status)
 * Blender 4.5+ https://builder.blender.org/download/daily/
 * A CUDA-supported Nvidia card with at least 6 GB VRAM or MPS.
 * CUDA: 12.4
