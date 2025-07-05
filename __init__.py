@@ -1273,7 +1273,7 @@ def input_strips_updated(self, context):
             "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers"
         }:
             scene.use_lcm = False
-        if image_model == "black-forest-labs/FLUX.1-schnell":
+        if image_model == "lzyvegetable/FLUX.1-schnell":
             scene.movie_num_inference_steps = 4
             scene.movie_num_guidance = 0
         elif image_model == "ChuckMcSneed/FLUX.1-dev":
@@ -1390,7 +1390,7 @@ def output_strips_updated(self, context):
             scene.use_lcm = False
         elif image_model == "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers":
             scene.use_lcm = False
-        elif image_model == "black-forest-labs/FLUX.1-schnell":
+        elif image_model == "lzyvegetable/FLUX.1-schnell":
             movie_inference = 4
             movie_guidance = 0
         elif image_model == "ChuckMcSneed/FLUX.1-dev":
@@ -1568,9 +1568,9 @@ class GeneratorAddonPreferences(AddonPreferences):
         items=[
             ("ChuckMcSneed/FLUX.1-dev", "Flux 1 Dev", "ChuckMcSneed/FLUX.1-dev"),
             (
-                "black-forest-labs/FLUX.1-schnell",
+                "lzyvegetable/FLUX.1-schnell",
                 "Flux Schnell",
-                "black-forest-labs/FLUX.1-schnell",
+                "lzyvegetable/FLUX.1-schnell",
             ),
             ("black-forest-labs/FLUX.1-Kontext-dev", "Flux.1 Kontext Dev", "black-forest-labs/FLUX.1-Kontext-dev"),
             # Not ready for 4bit and depth has tensor problems
@@ -1591,9 +1591,9 @@ class GeneratorAddonPreferences(AddonPreferences):
 #                "ByteDance/SDXL-Lightning",
 #            ),
             (
-                "stabilityai/stable-diffusion-3.5-large",
+                "adamo1139/stable-diffusion-3.5-large-ungated",
                 "Stable Diffusion 3.5 Large",
-                "stabilityai/stable-diffusion-3.5-large",
+                "adamo1139/stable-diffusion-3.5-large-ungated",
             ),
             (
                 "adamo1139/stable-diffusion-3.5-medium-ungated",
@@ -1824,9 +1824,9 @@ class GeneratorAddonPreferences(AddonPreferences):
             pass
         if (
             self.image_model_card == "stabilityai/stable-diffusion-3-medium-diffusers"
-            or self.image_model_card == "stabilityai/stable-diffusion-3.5-large"
+            or self.image_model_card == "adamo1139/stable-diffusion-3.5-large-ungated"
             or (self.image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin")
-            or (self.image_model_card == "black-forest-labs/FLUX.1-schnell" and os_platform == "Darwin")
+            or (self.image_model_card == "lzyvegetable/FLUX.1-schnell" and os_platform == "Darwin")
         ):
             row = box.row(align=True)
             row.prop(self, "hugginface_token")
@@ -2322,7 +2322,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         col = col.column(heading="Use", align=True)
                         col.prop(addon_prefs, "use_strip_data", text=" Name & Seed")
                         if type == "movie" and os_platform != "Darwin" and (
-                            movie_model_card == "black-forest-labs/FLUX.1-schnell"
+                            movie_model_card == "lzyvegetable/FLUX.1-schnell"
                             or movie_model_card == "ChuckMcSneed/FLUX.1-dev"
                             or movie_model_card == "black-forest-labs/FLUX.1-Kontext-dev"
                             #or movie_model_card == "ostris/Flex.2-preview"
@@ -2438,7 +2438,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     )
                     or (
                         type == "image"
-                        and image_model_card == "black-forest-labs/FLUX.1-schnell"
+                        and image_model_card == "lzyvegetable/FLUX.1-schnell"
                     )
                     or (
                         type == "image"
@@ -2601,7 +2601,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         )
                         or (
                             type == "image"
-                            and image_model_card == "black-forest-labs/FLUX.1-schnell"
+                            and image_model_card == "lzyvegetable/FLUX.1-schnell"
                         )
                         or (
                             type == "image"
@@ -2730,7 +2730,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     or image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
                     or image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
                     or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
-                    or image_model_card == "black-forest-labs/FLUX.1-schnell"
+                    or image_model_card == "lzyvegetable/FLUX.1-schnell"
                     or image_model_card == "black-forest-labs/FLUX.1-Kontext-dev"
                     or image_model_card == "ostris/Flex.2-preview"
                     or image_model_card == "lodestones/Chroma"
@@ -2802,7 +2802,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 addon_prefs.image_model_card
                 == "stabilityai/stable-diffusion-3-medium-diffusers"
                 or addon_prefs.image_model_card
-                == "stabilityai/stable-diffusion-3.5-large"
+                == "adamo1139/stable-diffusion-3.5-large-ungated"
             ):
                 row = col.row(align=True)
                 row.prop(addon_prefs, "hugginface_token")
@@ -5433,10 +5433,38 @@ class SEQUENCER_OT_generate_audio(Operator):
             addon_prefs.audio_model_card == "parler-tts/parler-tts-large-v1"
             or addon_prefs.audio_model_card == "parler-tts/parler-tts-mini-v1"
         ):
-            pipe = ParlerTTSForConditionalGeneration.from_pretrained(
-                "parler-tts/parler-tts-large-v1", revision="refs/pr/9"
-            ).to(gfx_device)
-            tokenizer = AutoTokenizer.from_pretrained(addon_prefs.audio_model_card)
+#            pipe = ParlerTTSForConditionalGeneration.from_pretrained(
+#                "parler-tts/parler-tts-large-v1", #revision="refs/pr/9"
+#            ).to(gfx_device)
+#            tokenizer = AutoTokenizer.from_pretrained(addon_prefs.audio_model_card)
+
+#            # --- Start of Final Corrected Code ---
+#            from parler_tts import ParlerTTSForConditionalGeneration
+#            from transformers import AutoTokenizer
+
+#            # Your existing setup
+#            addon_prefs.audio_model_card = "parler-tts/parler-tts-large-v1"
+#            #gfx_device = "cuda"  # Or your detected device
+
+#            # Load the model using trust_remote_code=True
+#            # This is the definitive fix that uses the author's own code to build the model,
+#            # guaranteeing the architecture matches the saved weights.
+#            pipe = ParlerTTSForConditionalGeneration.from_pretrained(
+#                addon_prefs.audio_model_card,
+#                trust_remote_code=True,  # This is the key
+#            ).to(gfx_device)
+
+#            # The tokenizer can be loaded as before
+#            tokenizer = AutoTokenizer.from_pretrained(addon_prefs.audio_model_card)
+
+#            # --- End of Final Corrected Code ---
+
+            from parler_tts import ParlerTTSForConditionalGeneration
+            from transformers import AutoTokenizer
+
+            pipe = ParlerTTSForConditionalGeneration.from_pretrained("parler-tts/parler-tts-mini-v1").to(gfx_device)
+            tokenizer = AutoTokenizer.from_pretrained("parler-tts/parler-tts-mini-v1")
+
 
         #MMAudio
         elif addon_prefs.audio_model_card == "MMAudio":
@@ -6494,7 +6522,7 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "Salesforce/blipdiffusion"
             # and not image_model_card == "Corcelio/mobius"
             and not image_model_card == "stabilityai/stable-diffusion-3-medium-diffusers"
-            and not image_model_card == "stabilityai/stable-diffusion-3.5-large"
+            and not image_model_card == "adamo1139/stable-diffusion-3.5-large-ungated"
             and not image_model_card == "adamo1139/stable-diffusion-3.5-medium-ungated"
             and not image_model_card == "Vargol/ProteusV0.4"
             and not image_model_card == "ZhengPeng7/BiRefNet_HR"
@@ -6597,7 +6625,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     pipe.to(gfx_device)
 
             elif (
-                image_model_card == "black-forest-labs/FLUX.1-schnell"
+                image_model_card == "lzyvegetable/FLUX.1-schnell"
                 or image_model_card == "ChuckMcSneed/FLUX.1-dev"
                 or image_model_card == "ostris/Flex.2-preview"
             ):
@@ -6690,7 +6718,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     image_model_card
                     == "stabilityai/stable-diffusion-3-medium-diffusers"
                     or os_platform == "Darwin"
-                ):  # or image_model_card == "stabilityai/stable-diffusion-3.5-large":
+                ):  # or image_model_card == "adamo1139/stable-diffusion-3.5-large-ungated":
                     from huggingface_hub.commands.user import login
 
                     result = login(
@@ -6705,7 +6733,7 @@ class SEQUENCER_OT_generate_image(Operator):
                        model_name="dev",  # "schnell" or "dev"
                        quantize=4,            # 4 or 8
                     )
-                elif image_model_card == "black-forest-labs/FLUX.1-schnell" and os_platform == "Darwin":
+                elif image_model_card == "lzyvegetable/FLUX.1-schnell" and os_platform == "Darwin":
                     from mflux import Flux1, Config
                     converter = Flux1.from_name(
                        model_name="schnell",  # "schnell" or "dev"
@@ -6713,7 +6741,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     )                
                 # Win                  
                 elif (
-                    image_model_card == "black-forest-labs/FLUX.1-schnell"
+                    image_model_card == "lzyvegetable/FLUX.1-schnell"
                     or image_model_card == "ChuckMcSneed/FLUX.1-dev"
                     or image_model_card == "black-forest-labs/FLUX.1-Kontext-dev"
                     or image_model_card == "ostris/Flex.2-preview"
@@ -7218,7 +7246,7 @@ class SEQUENCER_OT_generate_image(Operator):
             pipe.enable_model_cpu_offload()
 
         # SD3.5 Stable Diffusion 3.5
-        elif image_model_card == "stabilityai/stable-diffusion-3.5-large":
+        elif image_model_card == "adamo1139/stable-diffusion-3.5-large-ungated":
             print("Load: Stable Diffusion 3.5 large Model")
             from huggingface_hub.commands.user import login
 
@@ -7276,7 +7304,7 @@ class SEQUENCER_OT_generate_image(Operator):
                model_name="dev",  # "schnell" or "dev"
                quantize=4,            # 4 or 8
             )
-        elif image_model_card == "black-forest-labs/FLUX.1-schnell" and os_platform == "Darwin":
+        elif image_model_card == "lzyvegetable/FLUX.1-schnell" and os_platform == "Darwin":
             from huggingface_hub.commands.user import login
 
             result = login(
@@ -7291,7 +7319,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
         # Flux
         elif (
-            image_model_card == "black-forest-labs/FLUX.1-schnell"
+            image_model_card == "lzyvegetable/FLUX.1-schnell"
             or image_model_card == "ChuckMcSneed/FLUX.1-dev"
         ):
             print("Load: Flux Model")
@@ -7935,7 +7963,7 @@ class SEQUENCER_OT_generate_image(Operator):
             or image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
             or image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
             or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
-            or image_model_card == "black-forest-labs/FLUX.1-schnell"
+            or image_model_card == "lzyvegetable/FLUX.1-schnell"
             or image_model_card == "ChuckMcSneed/FLUX.1-dev"
             or image_model_card == "ostris/Flex.2-preview"
 #            or image_model_card == "black-forest-labs/FLUX.1-Redux-dev"
@@ -8515,7 +8543,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 init_image = init_image.resize((x, y))
 
                 if (
-                    image_model_card == "black-forest-labs/FLUX.1-schnell"
+                    image_model_card == "lzyvegetable/FLUX.1-schnell"
                     or image_model_card == "ChuckMcSneed/FLUX.1-dev"
                     or image_model_card == "ostris/Flex.2-preview"
                 ):
@@ -8537,7 +8565,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         # "strength": 0.5,       # Uncomment if needed
                     }
 
-                    if image_model_card == "black-forest-labs/FLUX.1-schnell":
+                    if image_model_card == "lzyvegetable/FLUX.1-schnell":
                         # Override specific parameters for FLUX
                         inference_parameters["guidance_scale"] = 0
                         inference_parameters["num_inference_steps"] = 4
@@ -8606,7 +8634,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 print("X: " + str(x), "Y: " + str(y))
 
                 # MacOS
-                if (image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin") or (image_model_card == "black-forest-labs/FLUX.1-schnell" and os_platform == "Darwin"):
+                if (image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin") or (image_model_card == "lzyvegetable/FLUX.1-schnell" and os_platform == "Darwin"):
                     if not img_path:
                         print("Please, input an image!")
                         return {"CANCELLED"}
@@ -8624,7 +8652,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     
                 elif (
                     image_model_card == "stabilityai/sdxl-turbo"
-                    or image_model_card == "black-forest-labs/FLUX.1-schnell"
+                    or image_model_card == "lzyvegetable/FLUX.1-schnell"
                 ):
                     image = converter(
                         prompt=prompt,
@@ -8735,7 +8763,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     ).images[0]
 
             # MacOS
-            elif (image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin") or (image_model_card == "black-forest-labs/FLUX.1-schnell" and os_platform == "Darwin"):
+            elif (image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin") or (image_model_card == "lzyvegetable/FLUX.1-schnell" and os_platform == "Darwin"):
                 image = pipe.generate_image(
                    seed=abs(int(seed)),
                    prompt=prompt,
@@ -8748,7 +8776,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             # Flux Schnell
             elif (
-                image_model_card == "black-forest-labs/FLUX.1-schnell"
+                image_model_card == "lzyvegetable/FLUX.1-schnell"
             ):  # and not scene.aurasr:
                 inference_parameters = {
                     "prompt": prompt,
@@ -8835,7 +8863,7 @@ class SEQUENCER_OT_generate_image(Operator):
             # Generate Stable Diffusion etc.
             elif (
                 image_model_card == "stabilityai/stable-diffusion-3-medium-diffusers"
-                or image_model_card == "stabilityai/stable-diffusion-3.5-large"
+                or image_model_card == "adamo1139/stable-diffusion-3.5-large-ungated"
                 or image_model_card == "adamo1139/stable-diffusion-3.5-medium-ungated"
             ):
                 print("Generate: Stable Diffusion Image ")
@@ -9879,10 +9907,16 @@ class SEQUENCER_OT_ai_strip_picker(Operator):
             mouse_x_view, mouse_y_view = v2d.region_to_view(*mouse_region_coord)
 
             for strip in context.scene.sequence_editor.sequences_all:
+                # Check if the strip has a transform property before accessing it
+                if hasattr(strip, 'transform'):
+                    scale_y = strip.transform.scale_y
+                else:
+                    # If not, assume a default scale of 1.0 (occupies one channel)
+                    scale_y = 1.0
+
                 # Calculate the vertical bounds of the strip in view space
-                # Assuming each channel has a nominal height of 1.0 in view space
-                strip_y_min_view = strip.channel - 0.5 * strip.transform.scale_y  # Consider the scaled height
-                strip_y_max_view = strip.channel + 0.5 * strip.transform.scale_y
+                strip_y_min_view = strip.channel - 0.5 * scale_y
+                strip_y_max_view = strip.channel + 0.5 * scale_y
 
                 if (
                     strip.frame_start <= mouse_x_view < strip.frame_final_end and
