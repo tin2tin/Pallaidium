@@ -350,6 +350,7 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 - [Sana](https://huggingface.co/Efficient-Large-Model/Sana_1600M_1024px_diffusers)
 - [OmniGen](https://github.com/VectorSpaceLab/OmniGen)
 - [Chroma](https://huggingface.co/lodestones/Chroma)
+- [Relight](https://huggingface.co/kontext-community/relighting-kontext-dev-lora-v3)
 
 ### Audio:
 - [stabilityai/stable-audio-open-1.0](https://huggingface.co/stabilityai/stable-audio-open-1.0)
