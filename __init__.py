@@ -7564,9 +7564,9 @@ class SEQUENCER_OT_generate_image(Operator):
             )
 
         elif image_model_card == "Alpha-VLLM/Lumina-Image-2.0":
-            from diffusers import Lumina2Text2ImgPipeline
+            from diffusers import Lumina2Pipeline
 
-            pipe = Lumina2Text2ImgPipeline.from_pretrained(
+            pipe = Lumina2Pipeline.from_pretrained(
                 "Alpha-VLLM/Lumina-Image-2.0", torch_dtype=torch.bfloat16
             )
 
