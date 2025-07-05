@@ -1260,9 +1260,9 @@ def input_strips_updated(self, context):
             "xinsir/controlnet-scribble-sdxl-1.0",
             "ZhengPeng7/BiRefNet_HR",
             "Salesforce/blipdiffusion",
-            "black-forest-labs/FLUX.1-Canny-dev-lora",
-            "black-forest-labs/FLUX.1-Depth-dev-lora",
-            "black-forest-labs/FLUX.1-Redux-dev",
+            "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora",
+            "romanfratric234/FLUX.1-Depth-dev-lora",
+            "Runware/FLUX.1-Redux-dev",
         }:
             scene.input_strips = "input_strips"
 
@@ -1379,9 +1379,9 @@ def output_strips_updated(self, context):
             "xinsir/controlnet-scribble-sdxl-1.0",
             "ZhengPeng7/BiRefNet_HR",
             "Salesforce/blipdiffusion",
-            "black-forest-labs/FLUX.1-Canny-dev-lora",
-            "black-forest-labs/FLUX.1-Depth-dev-lora",
-            "black-forest-labs/FLUX.1-Redux-dev",
+            "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora",
+            "romanfratric234/FLUX.1-Depth-dev-lora",
+            "Runware/FLUX.1-Redux-dev",
         ]:
             scene.input_strips = "input_strips"
         elif image_model == "dataautogpt3/OpenDalleV1.1":
@@ -1574,11 +1574,11 @@ class GeneratorAddonPreferences(AddonPreferences):
             ),
             ("black-forest-labs/FLUX.1-Kontext-dev", "Flux.1 Kontext Dev", "black-forest-labs/FLUX.1-Kontext-dev"),
             # Not ready for 4bit and depth has tensor problems
-            ("black-forest-labs/FLUX.1-Canny-dev-lora", "FLUX Canny", "black-forest-labs/FLUX.1-Canny-dev-lora"),
-            ("black-forest-labs/FLUX.1-Depth-dev-lora", "FLUX Depth", "black-forest-labs/FLUX.1-Depth-dev-lora"),
-            ("black-forest-labs/FLUX.1-Redux-dev", "FLUX Redux", "black-forest-labs/FLUX.1-Redux-dev"),
+            ("fuliucansheng/FLUX.1-Canny-dev-diffusers-lora", "FLUX Canny", "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"),
+            ("romanfratric234/FLUX.1-Depth-dev-lora", "FLUX Depth", "romanfratric234/FLUX.1-Depth-dev-lora"),
+            ("Runware/FLUX.1-Redux-dev", "FLUX Redux", "Runware/FLUX.1-Redux-dev"),
 
-            ("ostris/Flex.2-preview", "Flex 2 Preview", "ostris/Flex.2-preview"),
+#            ("ostris/Flex.2-preview", "Flex 2 Preview", "ostris/Flex.2-preview"),
             ("lodestones/Chroma", "Chroma", "Chroma is a 8.9B parameter model based on FLUX.1-schnell"),
             (
                 "stabilityai/stable-diffusion-xl-base-1.0",
@@ -2313,9 +2313,9 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     and image_model_card != "Salesforce/blipdiffusion"
                     and image_model_card != "ZhengPeng7/BiRefNet_HR"
                     and image_model_card != "Shitao/OmniGen-v1-diffusers"
-                    and image_model_card != "black-forest-labs/FLUX.1-Redux-dev"
-                    and image_model_card != "black-forest-labs/FLUX.1-Canny-dev-lora"
-                    and image_model_card != "black-forest-labs/FLUX.1-Depth-dev-lora"
+                    and image_model_card != "Runware/FLUX.1-Redux-dev"
+                    and image_model_card != "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"
+                    and image_model_card != "romanfratric234/FLUX.1-Depth-dev-lora"
                     and image_model_card != "black-forest-labs/FLUX.1-Kontext-dev"
                 ):
                     if input == "input_strips" and not scene.inpaint_selected_strip:
@@ -2423,7 +2423,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     image_model_card == "Shitao/OmniGen-v1-diffusers"
                     and type == "image"
                 )
-                or (type == "image" and image_model_card == "black-forest-labs/FLUX.1-Redux-dev")
+                or (type == "image" and image_model_card == "Runware/FLUX.1-Redux-dev")
             ):
                 pass
             else:
@@ -2452,16 +2452,16 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     or (
                         type == "image"
                         and image_model_card
-                        == "black-forest-labs/FLUX.1-Canny-dev-lora"
+                        == "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"
                     )
                     or (
                         type == "image"
                         and image_model_card
-                        == "black-forest-labs/FLUX.1-Depth-dev-lora"
+                        == "romanfratric234/FLUX.1-Depth-dev-lora"
                     )
                     or (
                         type == "image"
-                        and image_model_card == "black-forest-labs/FLUX.1-Redux-dev"
+                        and image_model_card == "Runware/FLUX.1-Redux-dev"
                     )
                     or (
                         type == "audio"
@@ -2735,9 +2735,9 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     or image_model_card == "ostris/Flex.2-preview"
                     or image_model_card == "lodestones/Chroma"
                     or image_model_card == "ChuckMcSneed/FLUX.1-dev"
-                    or image_model_card == "black-forest-labs/FLUX.1-Canny-dev-lora"
-                    or image_model_card == "black-forest-labs/FLUX.1-Depth-dev-lora"
-                    or image_model_card == "black-forest-labs/FLUX.1-Redux-dev"
+                    or image_model_card == "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"
+                    or image_model_card == "romanfratric234/FLUX.1-Depth-dev-lora"
+                    or image_model_card == "Runware/FLUX.1-Redux-dev"
                     or image_model_card == "Bercraft/Illustrious-XL-v2.0-FP16-Diffusers"
                     or image_model_card == "John6666/cyberrealistic-xl-v53-sdxl"
                 )
@@ -6789,12 +6789,12 @@ class SEQUENCER_OT_generate_image(Operator):
 
                 # FLUX ControlNets
                 elif (
-                    image_model_card == "black-forest-labs/FLUX.1-Canny-dev-lora"
-                ) or (image_model_card == "black-forest-labs/FLUX.1-Depth-dev-lora"):
+                    image_model_card == "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"
+                ) or (image_model_card == "romanfratric234/FLUX.1-Depth-dev-lora"):
                     from diffusers import FluxControlPipeline
                     from diffusers.utils import load_image
-                    if image_model_card == "black-forest-labs/FLUX.1-Canny-dev-lora":
-                        pipecard = "black-forest-labs/FLUX.1-Canny-dev"
+                    if image_model_card == "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora":
+                        pipecard = "fuliucansheng/FLUX.1-Canny-dev-diffusers"
                     else:
                         pipecard = "ChuckMcSneed/FLUX.1-dev"
 
@@ -6834,7 +6834,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     if pipecard == "ChuckMcSneed/FLUX.1-dev":
                         converter.load_lora_weights(image_model_card)
 
-                    if image_model_card == "black-forest-labs/FLUX.1-Canny-dev-lora":
+                    if image_model_card == "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora":
                         from controlnet_aux import CannyDetector
                         processor = CannyDetector()
                     else:
@@ -6844,7 +6844,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         )
 
                 # redux
-                elif image_model_card == "black-forest-labs/FLUX.1-Redux-dev":
+                elif image_model_card == "Runware/FLUX.1-Redux-dev":
                     from transformers import SiglipImageProcessor, SiglipVisionModel
 #                    feature_extractor = SiglipImageProcessor.from_pretrained(
 #                        "lllyasviel/flux_redux_bfl", subfolder="feature_extractor"
@@ -6875,7 +6875,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         torch_dtype=torch.bfloat16,
                         #transformer=model_nf4, 
                     )
-                    pipe_prior_redux = FluxPriorReduxPipeline.from_pretrained("black-forest-labs/FLUX.1-Redux-dev", torch_dtype=torch.bfloat16).to("cuda")
+                    pipe_prior_redux = FluxPriorReduxPipeline.from_pretrained("Runware/FLUX.1-Redux-dev", torch_dtype=torch.bfloat16).to("cuda")
 
 #                    converter = FluxPipeline.from_pretrained(
 #                        "ChuckMcSneed/FLUX.1-dev" ,
@@ -7966,9 +7966,9 @@ class SEQUENCER_OT_generate_image(Operator):
             or image_model_card == "lzyvegetable/FLUX.1-schnell"
             or image_model_card == "ChuckMcSneed/FLUX.1-dev"
             or image_model_card == "ostris/Flex.2-preview"
-#            or image_model_card == "black-forest-labs/FLUX.1-Redux-dev"
-#            or image_model_card == "black-forest-labs/FLUX.1-Canny-dev-lora"
-#            or image_model_card == "black-forest-labs/FLUX.1-Depth-dev-lora"
+#            or image_model_card == "Runware/FLUX.1-Redux-dev"
+#            or image_model_card == "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"
+#            or image_model_card == "romanfratric234/FLUX.1-Depth-dev-lora"
         ):
             if image_model_card == "ostris/Flex.2-preview":
                 image_model_card = "ostris/Flex.1-alpha"
@@ -8208,8 +8208,8 @@ class SEQUENCER_OT_generate_image(Operator):
                 ).images[0]
 
             # FLUX ControlNets
-            elif (image_model_card == "black-forest-labs/FLUX.1-Canny-dev-lora") or (
-                image_model_card == "black-forest-labs/FLUX.1-Depth-dev-lora"
+            elif (image_model_card == "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora") or (
+                image_model_card == "romanfratric234/FLUX.1-Depth-dev-lora"
             ):
                 print("Process: Flux ControlNets")
                 init_image = None
@@ -8224,7 +8224,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 image = init_image
                 #image = scale_image_within_dimensions(np.array(init_image), x, None)
 
-                if image_model_card == "black-forest-labs/FLUX.1-Canny-dev-lora":
+                if image_model_card == "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora":
                     image = processor(
                         image,
                         low_threshold=50,
@@ -8249,7 +8249,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     generator=generator,
                 ).images[0]
 
-            elif image_model_card == "black-forest-labs/FLUX.1-Redux-dev":
+            elif image_model_card == "Runware/FLUX.1-Redux-dev":
                 init_image = None
 
                 if scene.image_path:
@@ -9367,14 +9367,16 @@ class SEQUENCER_OT_generate_text(Operator):
 
 
         if not addon_prefs.text_model_card == "ZuluVision/MoviiGen1.1_Prompt_Rewriter":
-            init_image = (
-                load_first_frame(scene.movie_path)
-                if scene.movie_path
-                else load_first_frame(scene.image_path)
-            )
-
-            init_image = init_image.resize((x, y))
-
+            if scene.movie_path:
+                init_image = load_first_frame(bpy.path.abspath(scene.movie_path))
+            else:
+                init_image = load_first_frame(bpy.path.abspath(scene.image_path))
+            if init_image:
+                init_image = init_image.resize((x, y))
+            else:
+                print("No input image loaded succesfully. Cancelling.")
+                return {"CANCELLED"}
+            
         if addon_prefs.text_model_card == "Salesforce/blip-image-captioning-large":
             processor = BlipProcessor.from_pretrained(
                 "Salesforce/blip-image-captioning-large",
@@ -9483,7 +9485,7 @@ class SEQUENCER_OT_generate_text(Operator):
             ]
 
             text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-            print("Generated text: " + str(text))
+            #print("Generated text: " + str(text))
             text = remove_duplicate_phrases(text)
             print("Generated text: " + str(text))
 
