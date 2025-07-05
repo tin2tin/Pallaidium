@@ -1263,6 +1263,7 @@ def input_strips_updated(self, context):
             "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora",
             "romanfratric234/FLUX.1-Depth-dev-lora",
             "Runware/FLUX.1-Redux-dev",
+            "kontext-community/relighting-kontext-dev-lora-v3",
         }:
             scene.input_strips = "input_strips"
 
@@ -1382,6 +1383,7 @@ def output_strips_updated(self, context):
             "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora",
             "romanfratric234/FLUX.1-Depth-dev-lora",
             "Runware/FLUX.1-Redux-dev",
+            "kontext-community/relighting-kontext-dev-lora-v3",
         ]:
             scene.input_strips = "input_strips"
         elif image_model == "dataautogpt3/OpenDalleV1.1":
@@ -1453,6 +1455,113 @@ def output_strips_updated(self, context):
         scene.generate_movie_frames = movie_frames
         scene.movie_num_inference_steps = movie_inference
         scene.movie_num_guidance = movie_guidance
+
+
+# Relight:
+
+# Illumination options mapping
+ILLUMINATION_OPTIONS = {
+    # Natural Daylight
+    "natural lighting": "Neutral white color temperature with balanced exposure and soft shadows",
+    "sunshine from window": "Bright directional sunlight with hard shadows and visible light rays",
+    "golden time": "Warm golden hour lighting with enhanced warm colors and soft shadows",
+    "sunrise in the mountains": "Warm backlighting with atmospheric haze and lens flare",
+    "afternoon light filtering through trees": "Dappled sunlight patterns with green color cast from foliage",
+    "early morning rays, forest clearing": "God rays through trees with warm color temperature",
+    "golden sunlight streaming through trees": "Golden god rays with atmospheric particles in light beams",
+    
+    # Sunset & Evening
+    "sunset over sea": "Warm sunset light with soft diffused lighting and gentle gradients",
+    "golden hour in a meadow": "Golden backlighting with lens flare and rim lighting",
+    "golden hour on a city skyline": "Golden lighting on buildings with silhouette effects",
+    "evening glow in the desert": "Warm directional lighting with long shadows",
+    "dusky evening on a beach": "Cool backlighting with horizon silhouettes",
+    "mellow evening glow on a lake": "Warm lighting with water reflections",
+    "warm sunset in a rural village": "Golden hour lighting with peaceful warm tones",
+    
+    # Night & Moonlight
+    "moonlight through curtains": "Cool blue lighting with curtain shadow patterns",
+    "moonlight in a dark alley": "Cool blue lighting with deep urban shadows",
+    "midnight in the forest": "Very low brightness with minimal ambient lighting",
+    "midnight sky with bright starlight": "Cool blue lighting with star point sources",
+    "fireflies lighting up a summer night": "Small glowing points with warm ambient lighting",
+    
+    # Indoor & Cozy
+    "warm atmosphere, at home, bedroom": "Very warm lighting with soft diffused glow",
+    "home atmosphere, cozy bedroom illumination": "Warm table lamp lighting with pools of light",
+    "cozy candlelight": "Warm orange flickering light with dramatic shadows",
+    "candle-lit room, rustic vibe": "Multiple warm candlelight sources with atmospheric shadows",
+    "night, cozy warm light from fireplace": "Warm orange-red firelight with flickering effects",
+    "campfire light": "Warm orange flickering light from below with dancing shadows",
+    
+    # Urban & Neon
+    "neon night, city": "Vibrant blue, magenta, and green neon lights with reflections",
+    "blue neon light, urban street": "Blue neon lighting with urban glow effects",
+    "neon, Wong Kar-wai, warm": "Warm amber and red neon with moody selective lighting",
+    "red and blue police lights in rain": "Alternating red and blue strobing with wet reflections",
+    "red glow, emergency lights": "Red emergency lighting with harsh shadows and high contrast",
+    
+    # Sci-Fi & Fantasy
+    "sci-fi RGB glowing, cyberpunk": "Electric blue, pink, and green RGB lighting with glowing effects",
+    "rainbow reflections, neon": "Chromatic rainbow patterns with prismatic reflections",
+    "magic lit": "Colored rim lighting in purple and blue with soft ethereal glow",
+    "mystical glow, enchanted forest": "Supernatural green and blue glowing with floating particles",
+    "ethereal glow, magical forest": "Supernatural lighting with blue-green rim lighting",
+    "underwater glow, deep sea": "Blue-green lighting with caustic patterns and particles",
+    "underwater luminescence": "Blue-green bioluminescent glow with caustic light patterns",
+    "aurora borealis glow, arctic landscape": "Green and purple dancing sky lighting",
+    "crystal reflections in a cave": "Sparkle effects with prismatic light dispersion",
+    
+    # Weather & Atmosphere
+    "foggy forest at dawn": "Volumetric fog with cool god rays through trees",
+    "foggy morning, muted light": "Soft fog effects with reduced contrast throughout",
+    "soft, diffused foggy glow": "Heavy fog with soft lighting and no harsh shadows",
+    "stormy sky lighting": "Dramatic lighting with high contrast and rim lighting",
+    "lightning flash in storm": "Brief intense white light with stark shadows",
+    "rain-soaked reflections in city lights": "Wet surface reflections with streaking light effects",
+    "gentle snowfall at dusk": "Cool blue lighting with snowflake particle effects",
+    "hazy light of a winter morning": "Neutral lighting with atmospheric haze",
+    "mysterious twilight, heavy mist": "Heavy fog with cool lighting and atmospheric depth",
+    
+    # Seasonal & Nature
+    "vibrant autumn lighting in a forest": "Enhanced warm autumn colors with dappled sunlight",
+    "purple and pink hues at twilight": "Warm lighting with soft purple and pink color grading",
+    "desert sunset with mirage-like glow": "Warm orange lighting with heat distortion effects",
+    "sunrise through foggy mountains": "Warm lighting through mist with atmospheric perspective",
+    
+    # Professional & Studio
+    "soft studio lighting": "Multiple diffused sources with even illumination and minimal shadows",
+    "harsh, industrial lighting": "Bright fluorescent lighting with hard shadows",
+    "fluorescent office lighting": "Cool white overhead lighting with slight green tint",
+    "harsh spotlight in a dark room": "Single intense directional light with dramatic shadows",
+    
+    # Special Effects & Drama
+    "light and shadow": "Maximum contrast with sharp shadow boundaries",
+    "shadow from window": "Window frame shadow patterns with geometric shapes",
+    "apocalyptic, smoky atmosphere": "Orange-red fire tint with smoke effects",
+    "evil, gothic, in a cave": "Low brightness with cool lighting and deep shadows",
+    "flickering light in a haunted house": "Unstable flickering with cool and warm mixed lighting",
+    "golden beams piercing through storm clouds": "Dramatic god rays with high contrast",
+    "dim candlelight in a gothic castle": "Warm orange candlelight with stone texture enhancement",
+    
+    # Festival & Celebration
+    "colorful lantern light at festival": "Multiple colored lantern sources with bokeh effects",
+    "golden glow at a fairground": "Warm carnival lighting with colorful bulb effects",
+    "soft glow through stained glass": "Colored light filtering with rainbow surface patterns",
+    "glowing embers from a forge": "Orange-red glowing particles with intense heat effects"
+}
+
+DIRECTION_OPTIONS = {
+    "auto": "",  
+    "left side": "Position the light source from the left side of the frame, creating shadows falling to the right.",
+    "right side": "Position the light source from the right side of the frame, creating shadows falling to the left.",
+    "top": "Position the light source from directly above, creating downward shadows.",
+    "top left": "Position the light source from the top left corner, creating diagonal shadows falling down and to the right.",
+    "top right": "Position the light source from the top right corner, creating diagonal shadows falling down and to the left.",
+    "bottom": "Position the light source from below, creating upward shadows and dramatic under-lighting.",
+    "front": "Position the light source from the front, minimizing shadows and creating even illumination.",
+    "back": "Position the light source from behind the subject, creating silhouette effects and rim lighting."
+}
 
 
 class GeneratorAddonPreferences(AddonPreferences):
@@ -1573,6 +1682,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "lzyvegetable/FLUX.1-schnell",
             ),
             ("black-forest-labs/FLUX.1-Kontext-dev", "Flux.1 Kontext Dev", "black-forest-labs/FLUX.1-Kontext-dev"),
+            ("kontext-community/relighting-kontext-dev-lora-v3", "Relight Flux.1 Kontext", "kontext-community/relighting-kontext-dev-lora-v3"),
             # Not ready for 4bit and depth has tensor problems
             ("fuliucansheng/FLUX.1-Canny-dev-diffusers-lora", "FLUX Canny", "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"),
             ("romanfratric234/FLUX.1-Depth-dev-lora", "FLUX Depth", "romanfratric234/FLUX.1-Depth-dev-lora"),
@@ -2278,6 +2388,15 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             )
             row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = "kontext_select1"
 
+        if image_model_card == "kontext-community/relighting-kontext-dev-lora-v3" and type == "image":
+            box = layout.box()
+            box = box.column(align=True)
+            box.use_property_split = True
+            box.use_property_decorate = False
+            box.prop(context.scene, "illumination_style", text="Relight Style")
+            box.prop(context.scene, "light_direction", text="Direction")
+
+
         if type != "text":
             if type != "audio":
                 if type == "movie" and "Hailuo/MiniMax/" in movie_model_card:
@@ -2317,6 +2436,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     and image_model_card != "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"
                     and image_model_card != "romanfratric234/FLUX.1-Depth-dev-lora"
                     and image_model_card != "black-forest-labs/FLUX.1-Kontext-dev"
+                    and image_model_card != "kontext-community/relighting-kontext-dev-lora-v3"
                 ):
                     if input == "input_strips" and not scene.inpaint_selected_strip:
                         col = col.column(heading="Use", align=True)
@@ -2448,6 +2568,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         type == "image"
                         and image_model_card == "black-forest-labs/FLUX.1-Kontext-dev"
                     )
+                    or (type == "image" and image_model_card == "kontext-community/relighting-kontext-dev-lora-v3")
                     or (type == "image" and image_model_card == "ostris/Flex.2-preview")
                     or (
                         type == "image"
@@ -6744,11 +6865,16 @@ class SEQUENCER_OT_generate_image(Operator):
                     image_model_card == "lzyvegetable/FLUX.1-schnell"
                     or image_model_card == "ChuckMcSneed/FLUX.1-dev"
                     or image_model_card == "black-forest-labs/FLUX.1-Kontext-dev"
+                    or image_model_card == "kontext-community/relighting-kontext-dev-lora-v3"
                     or image_model_card == "ostris/Flex.2-preview"
                 ):
+                    relight = False
                     from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
-                    if image_model_card == "black-forest-labs/FLUX.1-Kontext-dev":
+                    if image_model_card == "black-forest-labs/FLUX.1-Kontext-dev" or image_model_card == "kontext-community/relighting-kontext-dev-lora-v3":
                         from diffusers import FluxKontextPipeline
+                    if image_model_card == "kontext-community/relighting-kontext-dev-lora-v3":
+                        image_model_card = "black-forest-labs/FLUX.1-Kontext-dev"
+                        relight = True
 
                     nf4_config = BitsAndBytesConfig(
                         load_in_4bit=True,
@@ -6777,6 +6903,16 @@ class SEQUENCER_OT_generate_image(Operator):
                             local_files_only=local_files_only,
                         )
 
+                    if relight == True:
+                        print("AI Relight: Loading and applying Relighting LoRA...")
+                        converter.load_lora_weights(
+                            "kontext-community/relighting-kontext-dev-lora-v3", 
+                            weight_name="relighting-kontext-dev-lora-v3.safetensors", 
+                            adapter_name="lora"
+                        )
+                        converter.set_adapters(["lora"], adapter_weights=[0.75])
+                        image_model_card = "kontext-community/relighting-kontext-dev-lora-v3"
+                                          
                     if gfx_device == "mps":
                         converter.to("mps")
                     elif low_vram():
@@ -6786,6 +6922,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         converter.vae.enable_tiling()
                     else:
                         converter.enable_model_cpu_offload()
+                    
 
                 # FLUX ControlNets
                 elif (
@@ -8698,33 +8835,7 @@ class SEQUENCER_OT_generate_image(Operator):
                                     find_strip_by_name(scene, scene.kontext_strip_1)
                                 )
                             )
-                        #kontext_images.append(input_image)
                         init_image = input_image
-#                    if init_image:
-#                        kontext_images.append(init_image)
-
-#                    prompt = prompt + scene.omnigen_prompt_2
-#                    if find_strip_by_name(scene, scene.omnigen_strip_2):
-#                        omnigen_images.append(
-#                            load_first_frame(
-#                                get_strip_path(
-#                                    find_strip_by_name(scene, scene.omnigen_strip_2)
-#                                )
-#                            )
-#                        )
-#                        prompt = prompt + " <img><|image_2|></img> "
-
-#                    prompt = prompt + scene.omnigen_prompt_3
-#                    if find_strip_by_name(scene, scene.omnigen_strip_3):
-#                        omnigen_images.append(
-#                            load_first_frame(
-#                                get_strip_path(
-#                                    find_strip_by_name(scene, scene.omnigen_strip_3)
-#                                )
-#                            )
-#                        )
-#                        prompt = prompt + " <img><|image_3|></img> "
-#                    print(prompt)
 
                     if not kontext_images:
                         kontext_images = None
@@ -8746,6 +8857,36 @@ class SEQUENCER_OT_generate_image(Operator):
                         height=y,
                         width=x,
                         generator=generator,
+                    ).images[0]
+
+                elif (
+                    image_model_card == "kontext-community/relighting-kontext-dev-lora-v3"
+                ):
+
+                    prompt_description = ""
+                    style_and_direction_parts = []
+
+                    if prompt:
+                        prompt_description = prompt
+                        style_and_direction_parts.append("with custom lighting")
+                    else:
+                        prompt_description = ILLUMINATION_OPTIONS.get(context.scene.illumination_style, "")
+                        style_and_direction_parts.append(f"with {context.scene.illumination_style} lighting")
+
+                    if context.scene.light_direction != "auto":
+                        style_and_direction_parts.append(f"coming from the {context.scene.light_direction}")
+
+                    style_description = " ".join(style_and_direction_parts)
+                    final_prompt = (
+                        f"Relight the image {style_description}. "
+                        f"{prompt_description} "
+                        "Maintain the identity of the foreground subjects."
+                    )
+                    
+                    print(f"AI Relight: Running inference with prompt: {final_prompt}")
+                    image = converter(
+                        image=init_image, prompt=final_prompt, num_inference_steps=image_num_inference_steps, guidance_scale=image_num_guidance,
+                        width=x, height=y, generator=generator
                     ).images[0]
                     
                 # Not Turbo
@@ -10156,6 +10297,11 @@ classes = (
 )
 
 
+def get_enum_items(options_dict):
+    """Converts a dictionary to the format required by bpy.props.EnumProperty."""
+    return [(key, key.replace("_", " ").title(), desc) for key, desc in options_dict.items()]
+
+
 def register():
     bpy.types.Scene.generate_movie_prompt = bpy.props.StringProperty(
         name="generate_movie_prompt",
@@ -10558,6 +10704,10 @@ def register():
     bpy.types.Scene.kontext_strip_1 = bpy.props.StringProperty(
         name="kontext_strip_1", options={"TEXTEDIT_UPDATE"}, default=""
     )
+
+    bpy.types.Scene.illumination_style = bpy.props.EnumProperty(name="Lighting Style", items=get_enum_items(ILLUMINATION_OPTIONS), default="sunshine from window")
+    bpy.types.Scene.light_direction = bpy.props.EnumProperty(name="Light Direction", items=get_enum_items(DIRECTION_OPTIONS), default="auto")
+ 
 
 def unregister():
     for cls in classes:
