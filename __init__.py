@@ -25,6 +25,8 @@ bl_info = {
 }
 
 # TO DO: Move prints.
+# Pop-up for audio
+# Use a-z for batches
 
 import bpy
 import ctypes
@@ -943,9 +945,21 @@ def install_modules(self):
         install_module("image_gen_aux", "git+https://github.com/huggingface/image_gen_aux")
 
     # Additional installations
-    subprocess.check_call([
-        pybin, "-m", "spacy", "download", "en_core_web_md",
-    ])
+#    subprocess.check_call([
+#        pybin, "-m", "spacy", "download", "en_core_web_md",
+#    ])
+    subprocess.call(
+        [
+            pybin,
+            "-m",
+            "pip",
+            "install",
+            "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl",
+            "--no-deps",
+            "--disable-pip-version-check",
+            "--no-warn-script-location",
+        ]
+    )
 #    subprocess.check_call([
 #        pybin, "-m", "pip", "install", "--disable-pip-version-check",
 #        "--use-deprecated=legacy-resolver", "tensorflow<2.11", "--upgrade"
@@ -1238,9 +1252,9 @@ def input_strips_updated(self, context):
             scene.input_strips = "input_strips"
     # Image Type Handling
     if scene_type == "image":
-        if image_model == "Shitao/OmniGen-v1-diffusers":
-            scene.input_strips = "input_prompt"
-        elif scene.input_strips != "input_strips" and image_model in {
+#        if image_model == "Shitao/OmniGen-v1-diffusers": #crash
+#            scene.input_strips = "input_prompt"
+        if scene.input_strips != "input_strips" and image_model in {
             "diffusers/controlnet-canny-sdxl-1.0-small",
             "xinsir/controlnet-openpose-sdxl-1.0",
             "xinsir/controlnet-scribble-sdxl-1.0",
