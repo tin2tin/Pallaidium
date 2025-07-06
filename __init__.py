@@ -1893,7 +1893,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Image Captioning",
             ),
             (
-                "MiaoshouAI/Florence-2-large-PromptGen-v2.0",
+                "yownas/Florence-2-large",
                 "Image Captioning: Florence-2",
                 "Image Captioning",
             ),
@@ -1903,7 +1903,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "MoviiGen Prompt Rewriter",
             ),
         ],
-        default="MiaoshouAI/Florence-2-large-PromptGen-v2.0",
+        default="yownas/Florence-2-large",
         update=output_strips_updated,
     )
     generator_ai: StringProperty(
@@ -9490,7 +9490,7 @@ class SEQUENCER_OT_generate_text(Operator):
                 )
                 return {"CANCELLED"}
         elif (
-            addon_prefs.text_model_card == "MiaoshouAI/Florence-2-large-PromptGen-v2.0"
+            addon_prefs.text_model_card == "yownas/Florence-2-large"
         ):
             try:
                 from transformers import AutoModelForCausalLM, AutoProcessor, AutoConfig
@@ -9541,18 +9541,18 @@ class SEQUENCER_OT_generate_text(Operator):
             print("Generated text: " + text)
 
         elif (
-            addon_prefs.text_model_card == "MiaoshouAI/Florence-2-large-PromptGen-v2.0"
+            addon_prefs.text_model_card == "yownas/Florence-2-large"
         ):
 
             model = (
                 AutoModelForCausalLM.from_pretrained(
-                    "MiaoshouAI/Florence-2-large-PromptGen-v2.0", trust_remote_code=True
+                    "yownas/Florence-2-large", trust_remote_code=True
                 )
                 .to(gfx_device)
                 .eval()
             )
             processor = AutoProcessor.from_pretrained(
-                "MiaoshouAI/Florence-2-large-PromptGen-v2.0", trust_remote_code=True
+                "yownas/Florence-2-large", trust_remote_code=True
             )
 
             # Ensure the image is in RGB mode
