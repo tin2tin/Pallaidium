@@ -102,9 +102,9 @@ for path in unique_ordered_paths:
 
 sys.path[:] = non_site_paths + final_site_paths
 
-#print("\n--- Modified Python Path (site-packages moved to the end) ---")
-#for i, path in enumerate(sys.path):
-#    print(f"{i}: {path}")
+print("\n--- Modified Python Path (site-packages moved to the end) ---")
+for i, path in enumerate(sys.path):
+    print(f"{i}: {path}")
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning, module="xformers.*")
@@ -849,7 +849,8 @@ def install_modules(self):
     # Common modules
     common_modules = [
         ("requests", "requests"),
-        ("huggingface_hub", "huggingface_hub"),
+        #("huggingface_hub", "huggingface_hub"),
+        ("huggingface_hub", "huggingface_hub[hf_xet]"),
         ("gguf", "gguf"),
         ("pydub", "pydub"),
         ("sentencepiece", "sentencepiece"),
@@ -1311,8 +1312,8 @@ def input_strips_updated(self, context):
             #scene.generate_movie_frames = 49
             scene.movie_num_inference_steps = 40
             scene.movie_num_guidance = 1
-        elif movie_model == "cerspense/zeroscope_v2_XL":
-            scene.upscale = False
+#        elif movie_model == "cerspense/zeroscope_v2_XL":
+#            scene.upscale = False
 
         # Handle specific input strips for movie types
         if (
@@ -1416,8 +1417,8 @@ def output_strips_updated(self, context):
             movie_frames = 49
             movie_inference = 40
             movie_guidance = 1
-        elif movie_model == "cerspense/zeroscope_v2_XL":
-            scene.upscale = False
+#        elif movie_model == "cerspense/zeroscope_v2_XL":
+#            scene.upscale = False
         elif movie_model in ["THUDM/CogVideoX-5b", "THUDM/CogVideoX-2b"]:
             movie_res_x = 720
             movie_res_y = 480
@@ -1648,11 +1649,18 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Wan2.1-I2V-14B-480P (832x480x81)",
                 "Wan-AI/Wan2.1-I2V-14B-480P-Diffusers",
             ),
-            (
-                "cerspense/zeroscope_v2_XL",
-                "Zeroscope XL (1024x576x24)",
-                "Zeroscope XL (1024x576x24)",
-            ),
+            
+#            (
+#                "Wan-AI/Wan2.1-VACE-1.3B-diffusers",
+#                "Wan2.1-VACE 1.3B",
+#                "Wan-AI/Wan2.1-VACE-1.3B-diffusers",
+#            ),
+
+#            (
+#                "cerspense/zeroscope_v2_XL",
+#                "Zeroscope XL (1024x576x24)",
+#                "Zeroscope XL (1024x576x24)",
+#            ),
             (
                 "stabilityai/stable-diffusion-xl-base-1.0",
                 "Frame by Frame SDXL Turbo (1024x1024)",
@@ -2376,18 +2384,6 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             except:
                 pass
 
-        if image_model_card == "black-forest-labs/FLUX.1-Kontext-dev" and type == "image":
-            row = col.row(align=True)
-            row.prop_search(
-                scene,
-                "kontext_strip_1",
-                scene.sequence_editor,
-                "sequences",
-                text="Reference Image",
-                icon="FILE_IMAGE",
-            )
-            row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = "kontext_select1"
-
         if image_model_card == "kontext-community/relighting-kontext-dev-lora-v3" and type == "image":
             box = layout.box()
             box = box.column(align=True)
@@ -2435,16 +2431,16 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     and image_model_card != "Runware/FLUX.1-Redux-dev"
                     and image_model_card != "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"
                     and image_model_card != "romanfratric234/FLUX.1-Depth-dev-lora"
-                    and image_model_card != "black-forest-labs/FLUX.1-Kontext-dev"
+                    #and image_model_card != "black-forest-labs/FLUX.1-Kontext-dev"
                     and image_model_card != "kontext-community/relighting-kontext-dev-lora-v3"
                 ):
-                    if input == "input_strips" and not scene.inpaint_selected_strip:
+                    if input == "input_strips" and (not scene.inpaint_selected_strip or image_model_card == "black-forest-labs/FLUX.1-Kontext-dev"):
                         col = col.column(heading="Use", align=True)
                         col.prop(addon_prefs, "use_strip_data", text=" Name & Seed")
                         if type == "movie" and os_platform != "Darwin" and (
                             movie_model_card == "lzyvegetable/FLUX.1-schnell"
                             or movie_model_card == "ChuckMcSneed/FLUX.1-dev"
-                            or movie_model_card == "black-forest-labs/FLUX.1-Kontext-dev"
+                            #or movie_model_card == "black-forest-labs/FLUX.1-Kontext-dev"
                             #or movie_model_card == "ostris/Flex.2-preview"
                         ):
                             pass
@@ -2474,19 +2470,29 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         != "diffusers/controlnet-canny-sdxl-1.0-small"
                         and image_model_card != "ByteDance/SDXL-Lightning"
                     ):
-                        if len(bpy.context.scene.sequence_editor.sequences) > 0:
-                            if input == "input_strips" and type == "image":
-                                row = col.row(align=True)
-                                row.prop_search(
-                                    scene,
-                                    "inpaint_selected_strip",
-                                    scene.sequence_editor,
-                                    "sequences",
-                                    text="Inpaint Mask",
-                                    icon="SEQ_STRIP_DUPLICATE",
-                                )
-                                row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = "inpaint_select"
+                        if input == "input_strips" and type == "image":
+                            row = col.row(align=True)
+                            row.prop_search(
+                                scene,
+                                "inpaint_selected_strip",
+                                scene.sequence_editor,
+                                "sequences",
+                                text="Inpaint Mask",
+                                icon="SEQ_STRIP_DUPLICATE",
+                            )
+                            row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = "inpaint_select"
 
+            if image_model_card == "black-forest-labs/FLUX.1-Kontext-dev" and type == "image":
+                row = col.row(align=True)
+                row.prop_search(
+                    scene,
+                    "kontext_strip_1",
+                    scene.sequence_editor,
+                    "sequences",
+                    text="Reference Image",
+                    icon="FILE_IMAGE",
+                )
+                row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = "kontext_select1"
 
             if (
                 image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
@@ -2770,13 +2776,13 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     sub_row.prop(context.scene, "movie_num_seed", text="Seed")
                     sub_row.active = not context.scene.movie_use_random   
                     
-                if type == "movie" and (
-                    movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256"
-                    or movie_model_card == "cerspense/zeroscope_v2_576w"
-                    or movie_model_card == "cerspense/zeroscope_v2_XL"
-                ):
-                    col = col.column(heading="Upscale", align=True)
-                    col.prop(context.scene, "video_to_video", text="2x")
+#                if type == "movie" and (
+#                    movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256"
+#                    or movie_model_card == "cerspense/zeroscope_v2_576w"
+#                    or movie_model_card == "cerspense/zeroscope_v2_XL"
+#                ):
+#                    col = col.column(heading="Upscale", align=True)
+#                    col.prop(context.scene, "video_to_video", text="2x")
                 if type == "image" and not (
                     type == "image" and image_model_card == "ZhengPeng7/BiRefNet_HR"
                 ):
@@ -2869,6 +2875,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 or (movie_model_card == "hunyuanvideo-community/HunyuanVideo")
                 or (movie_model_card == "Wan-AI/Wan2.1-I2V-14B-480P-Diffusers")
                 or (movie_model_card == "Wan-AI/Wan2.1-T2V-1.3B-Diffusers")
+                or (movie_model_card == "Wan-AI/Wan2.1-VACE-1.3B-diffusers")
             )):
                 layout = self.layout
                 layout.use_property_split = True
@@ -3269,6 +3276,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             and movie_model_card != "Hailuo/MiniMax/subject2vid"
             and movie_model_card != "Skywork/SkyReels-V1-Hunyuan-T2V"
             and movie_model_card != "Wan-AI/Wan2.1-I2V-14B-480P-Diffusers"
+            and movie_model_card != "Wan-AI/Wan2.1-VACE-1.3B-diffusers"
         ) or movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
             # Frame by Frame
             if (
@@ -3354,35 +3362,35 @@ class SEQUENCER_OT_generate_movie(Operator):
                 else:
                     refiner.to(gfx_device)
 
-            else:  # vid2vid / img2vid
-                if (
-                    movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256"
-                    or movie_model_card == "cerspense/zeroscope_v2_576w"
-                    or scene.image_path
-                ):
-                    card = "cerspense/zeroscope_v2_XL"
-                else:
-                    card = movie_model_card
+#            else:  # vid2vid / img2vid
+##                if (
+###                    movie_model_card == "cerspense/zeroscope_v2_dark_30x448x256"
+###                    or movie_model_card == "cerspense/zeroscope_v2_576w"
+##                    scene.image_path
+##                ):
+##                    card = "cerspense/zeroscope_v2_XL"
+##                else:
+#                card = movie_model_card
 
-                from diffusers import VideoToVideoSDPipeline
+#                from diffusers import VideoToVideoSDPipeline
 
-                upscale = VideoToVideoSDPipeline.from_pretrained(
-                    card,
-                    torch_dtype=torch.float16,
-                    local_files_only=local_files_only,
-                )
+#                upscale = VideoToVideoSDPipeline.from_pretrained(
+#                    card,
+#                    torch_dtype=torch.float16,
+#                    local_files_only=local_files_only,
+#                )
 
-                from diffusers import DPMSolverMultistepScheduler
+#                from diffusers import DPMSolverMultistepScheduler
 
-                upscale.scheduler = DPMSolverMultistepScheduler.from_config(
-                    upscale.scheduler.config
-                )
-                if gfx_device == "mps":
-                    upscale.to("mps")
-                elif low_vram():
-                    upscale.enable_model_cpu_offload()
-                else:
-                    upscale.to(gfx_device)
+#                upscale.scheduler = DPMSolverMultistepScheduler.from_config(
+#                    upscale.scheduler.config
+#                )
+#                if gfx_device == "mps":
+#                    upscale.to("mps")
+#                elif low_vram():
+#                    upscale.enable_model_cpu_offload()
+#                else:
+#                    upscale.to(gfx_device)
 
         # Models for movie generation
         elif (
@@ -3824,33 +3832,29 @@ class SEQUENCER_OT_generate_movie(Operator):
                     print("Wan2.1-T2V doesn't support img/vid2vid!")
                     return {"CANCELLED"}
 
-                #from diffusers import AutoencoderKLWan, WanPipeline
+                # Import all necessary classes
+                from diffusers import WanPipeline
+                from diffusers.quantizers import PipelineQuantizationConfig
                 from diffusers.utils import export_to_video
-                from diffusers import WanPipeline, WanTransformer3DModel
-                import numpy as np
-                from diffusers.utils import export_to_video, load_image
-                from transformers import CLIPVisionModel
-                #ckpt_path = "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/blob/main/split_files/diffusion_models/wan2.1_t2v_1.3B_bf16.safetensors"
-                ckpt_path = "https://huggingface.co/vrgamedevgirl84/Wan14BT2V_MasterModel/blob/main/WanT2V_MasterModel.safetensors"
-                #ckpt_path = "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/blob/main/split_files/diffusion_models/wan2.1_t2v_1.3B_bf16.safetensors"
-                #transformer = WanTransformer3DModel.from_single_file(ckpt_path, torch_dtype=torch.bfloat16)
-
-                # from diffusers import FluxPipeline
-                from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
-
-                nf4_config = BitsAndBytesConfig(
-                    load_in_4bit=True,
-                    bnb_4bit_quant_type="nf4",
-                    bnb_4bit_compute_dtype=torch.bfloat16,
-                )
-                transformer = WanTransformer3DModel.from_single_file(
-                    ckpt_path,
-                    quantization_config=nf4_config,
-                    torch_dtype=torch.bfloat16,
+                
+                pipeline_quant_config = PipelineQuantizationConfig(
+                    quant_backend="bitsandbytes_4bit",
+                    quant_kwargs={
+                        "load_in_4bit": True,
+                        "bnb_4bit_quant_type": "nf4",
+                        "bnb_4bit_compute_dtype": torch.bfloat16
+                    },
+                    # Specify which part of the pipeline to quantize. For Wan-AI, it's the transformer.
+                    components_to_quantize=["transformer"],
                 )
 
-                pipe = WanPipeline.from_pretrained("Wan-AI/Wan2.1-T2V-14B-Diffusers", transformer=transformer)
-                #pipe = WanPipeline.from_pretrained("Wan-AI/Wan2.1-T2V-1.3B-Diffusers", transformer=transformer)
+                print("Loading Wan-AI/Wan2.1-T2V-1.3B-Diffusers with 4-bit quantization API...")
+                
+                # Pass the new config object to from_pretrained
+                pipe = WanPipeline.from_pretrained(
+                    "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
+                    quantization_config=pipeline_quant_config,
+                )
 
                 lora_files = scene.lora_files
                 enabled_names = []
@@ -3871,74 +3875,93 @@ class SEQUENCER_OT_generate_movie(Operator):
                         )
                     pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)
                     print("Load LoRAs: " + " ".join(enabled_names))
-#                vae = AutoencoderKLWan.from_pretrained(movie_model_card, subfolder="vae", torch_dtype=torch.float32)
-#                pipe = WanPipeline.from_pretrained(movie_model_card, vae=vae, torch_dtype=torch.bfloat16)
 
                 if gfx_device == "mps":
+                    # Note: bitsandbytes quantization typically requires a CUDA-enabled GPU.
+                    # This line will likely fail on MPS. You may need to add logic
+                    # to skip quantization if gfx_device is "mps".
                     pipe.to("mps")
                 elif low_vram():
-                    # pipe.enable_vae_slicing()
                     pipe.enable_model_cpu_offload()
                 else:
-                    #pipe.enable_sequential_cpu_offload()
-                    #pipe.vae.enable_tiling()
+                    pipe.enable_model_cpu_offload()
+
+
+                lora_files = scene.lora_files
+                enabled_names = []
+                enabled_weights = []
+                # Check if there are any enabled items before loading
+                enabled_items = [item for item in lora_files if item.enabled]
+
+                if enabled_items:
+                    for item in enabled_items:
+                        enabled_names.append(
+                            (clean_filename(item.name)).replace(".", "")
+                        )
+                        enabled_weights.append(item.weight_value)
+                        pipe.load_lora_weights(
+                            bpy.path.abspath(scene.lora_folder),
+                            weight_name=item.name + ".safetensors",
+                            adapter_name=((clean_filename(item.name)).replace(".", "")),
+                        )
+                    pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)
+                    print("Load LoRAs: " + " ".join(enabled_names))
+
+                if gfx_device == "mps":
+                    # Note: bitsandbytes quantization typically requires a CUDA-enabled GPU.
+                    # This line will likely fail on MPS. You may need to add logic
+                    # to skip quantization if gfx_device is "mps".
+                    pipe.to("mps")
+                elif low_vram():
+                    pipe.enable_model_cpu_offload()
+                else:
                     pipe.enable_model_cpu_offload()
 
             elif movie_model_card == "Wan-AI/Wan2.1-I2V-14B-480P-Diffusers":
                 if (not scene.movie_path and not scene.image_path) and not input == "input_strips":
                     print("Wan2.1-I2V doesn't support txt2vid!")
+                    self.report({'ERROR'}, "Wan2.1-I2V requires an input image or video.")
                     return {"CANCELLED"}
 
-                print("Load: Wan2.1-I2V-14B-480P-Diffusers")
-                enabled_items = None
+                print(f"Load: {movie_model_card} with maximum memory optimization.")
+        
+                import torch
+                from diffusers import WanImageToVideoPipeline
+                from diffusers.utils import export_to_video, load_image
+                from diffusers.quantizers import PipelineQuantizationConfig
+
+                model_id = movie_model_card
+
+                pipeline_quant_config = PipelineQuantizationConfig(
+                    quant_backend="bitsandbytes_4bit",
+                    quant_kwargs={
+                        "load_in_4bit": True,
+                        "bnb_4bit_quant_type": "nf4",
+                        "bnb_4bit_compute_dtype": torch.bfloat16
+                    },
+                    components_to_quantize=["transformer", "text_encoder"],
+                )
+
+                print("Loading pipeline with 4-bit quantization to minimize RAM/VRAM usage...")
+
+                try:
+                    pipe = WanImageToVideoPipeline.from_pretrained(
+                        model_id,
+                        quantization_config=pipeline_quant_config,
+                    )
+                    
+                    print("Pipeline loaded successfully in quantized state.")
+
+                except Exception as e:
+                    print(f"An error occurred during quantized model loading: {e}")
+                    self.report({'ERROR'}, f"Failed to load model. Check console: {e}")
+                    return {'CANCELLED'}
 
                 lora_files = scene.lora_files
                 enabled_names = []
                 enabled_weights = []
-                # Check if there are any enabled items before loading
                 enabled_items = [item for item in lora_files if item.enabled]
 
-                import torch
-                import numpy as np
-                from diffusers import AutoencoderKLWan, WanTransformer3DModel, WanImageToVideoPipeline
-                from diffusers.hooks.group_offloading import apply_group_offloading
-                from diffusers.utils import export_to_video, load_image
-                from transformers import UMT5EncoderModel, CLIPVisionModel
-
-                # Available models: Wan-AI/Wan2.1-I2V-14B-480P-Diffusers, Wan-AI/Wan2.1-I2V-14B-720P-Diffusers
-                model_id = movie_model_card#"Wan-AI/Wan2.1-I2V-14B-720P-Diffusers"
-                image_encoder = CLIPVisionModel.from_pretrained(
-                    model_id, subfolder="image_encoder", torch_dtype=torch.float32
-                )
-
-                text_encoder = UMT5EncoderModel.from_pretrained(model_id, subfolder="text_encoder", torch_dtype=torch.bfloat16)
-                vae = AutoencoderKLWan.from_pretrained(model_id, subfolder="vae", torch_dtype=torch.float32)
-                transformer = WanTransformer3DModel.from_pretrained(model_id, subfolder="transformer", torch_dtype=torch.bfloat16)
-
-                onload_device = torch.device("cuda")
-                offload_device = torch.device("cpu")
-
-                apply_group_offloading(text_encoder,
-                    onload_device=onload_device,
-                    offload_device=offload_device,
-                    offload_type="block_level",
-                    num_blocks_per_group=4
-                )
-
-                transformer.enable_group_offload(
-                    onload_device=onload_device,
-                    offload_device=offload_device,
-                    offload_type="block_level",
-                    num_blocks_per_group=4,
-                )
-                pipe = WanImageToVideoPipeline.from_pretrained(
-                    model_id,
-                    vae=vae,
-                    transformer=transformer,
-                    text_encoder=text_encoder,
-                    image_encoder=image_encoder,
-                    torch_dtype=torch.bfloat16
-                )
                 if enabled_items:
                     for item in enabled_items:
                         enabled_names.append(
@@ -3952,133 +3975,110 @@ class SEQUENCER_OT_generate_movie(Operator):
                         )
                     pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)
                     print("Load LoRAs: " + " ".join(enabled_names))
-                # Since we've offloaded the larger models alrady, we can move the rest of the model components to GPU
-#                pipe.to("cuda")
-#                import torch
-#                import numpy as np
-#                from diffusers import AutoencoderKLWan, WanTransformer3DModel, WanImageToVideoPipeline
-#                from diffusers.hooks.group_offloading import apply_group_offloading
-#                from diffusers.utils import export_to_video, load_image
-#                from transformers import UMT5EncoderModel, CLIPVisionModel
 
-#                model_id = movie_model_card#"Wan-AI/Wan2.1-I2V-14B-720P-Diffusers"
-#                image_encoder = CLIPVisionModel.from_pretrained(
-#                    model_id, subfolder="image_encoder", torch_dtype=torch.float32
-#                )
-#                text_encoder = UMT5EncoderModel.from_pretrained(model_id, subfolder="text_encoder", torch_dtype=torch.bfloat16)
-#                vae = AutoencoderKLWan.from_pretrained(model_id, subfolder="vae", torch_dtype=torch.float32)
-
-#                transformer = WanTransformer3DModel.from_pretrained(model_id, subfolder="transformer", torch_dtype=torch.bfloat16)
-#                transformer.enable_layerwise_casting(storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16)
-
-#                pipe = WanImageToVideoPipeline.from_pretrained(
-#                    model_id,
-#                    vae=vae,
-#                    transformer=transformer,
-#                    text_encoder=text_encoder,
-#                    image_encoder=image_encoder,
-#                    torch_dtype=torch.bfloat16
-#                )
-#                pipe.enable_model_cpu_offload()
-##                from diffusers import AutoencoderKLWan, WanImageToVideoPipeline
-##                from diffusers.utils import export_to_video, load_image
-##                from transformers import CLIPVisionModel
-
-##                # Available models: Wan-AI/Wan2.1-I2V-14B-480P-Diffusers, Wan-AI/Wan2.1-I2V-14B-720P-Diffusers
-##                model_id = "Wan-AI/Wan2.1-I2V-14B-480P-Diffusers"
-##                image_encoder = CLIPVisionModel.from_pretrained(model_id, subfolder="image_encoder", torch_dtype=torch.float32)
-##                vae = AutoencoderKLWan.from_pretrained(model_id, subfolder="vae", torch_dtype=torch.float32)
-##                pipe = WanImageToVideoPipeline.from_pretrained(model_id, vae=vae, image_encoder=image_encoder, torch_dtype=torch.bfloat16)
-#                from diffusers.utils import export_to_video
-#                from diffusers import WanImageToVideoPipeline, WanTransformer3DModel
-#                import numpy as np
-#                from diffusers.utils import export_to_video, load_image
-#                from transformers import CLIPVisionModel
-##                    import torch
-##                    from diffusers import HunyuanVideoImageToVideoPipeline, HunyuanVideoTransformer3DModel
-##                    from diffusers.utils import load_image, export_to_video
-
-#                model_id = "Wan-AI/Wan2.1-I2V-14B-480P-Diffusers"
-##                    transformer = HunyuanVideoTransformer3DModel.from_pretrained(
-##                        model_id, subfolder="transformer", torch_dtype=torch.bfloat16
-##                    )
-##                    pipe = HunyuanVideoImageToVideoPipeline.from_pretrained(
-##                        model_id, transformer=transformer, torch_dtype=torch.float16
-##                    )
-#                if low_vram():
-#                    transformer_path = f"https://huggingface.co/city96/Wan2.1-I2V-14B-480P-gguf/blob/main/wan2.1-i2v-14b-480p-Q3_K_S.gguf"
-#                else:
-#                    transformer_path = f"https://huggingface.co/city96/Wan2.1-I2V-14B-480P-gguf/blob/main/hwan2.1-i2v-14b-480p-Q4_K_S.gguf"
-#                    #transformer_path = f"https://huggingface.co/city96/HunyuanVideo-I2V-gguf/blob/main/hunyuan-video-i2v-720p-Q5_K_S.gguf"
-
-##                else:
-##                    print("HunyuanVideo: Load Prompt to Video Model")
-##                    model_id = "hunyuanvideo-community/HunyuanVideo"
-##                    from diffusers import HunyuanVideoPipeline
-##                    if low_vram():
-##                        transformer_path = f"https://huggingface.co/city96/Wan2.1-I2V-14B-480P-gguf/blob/main/hunyuan-video-t2v-720p-Q3_K_S.gguf"
-##                    else:
-##                        transformer_path = f"https://huggingface.co/city96/Wan2.1-I2V-14B-480P-gguf/blob/main/hunyuan-video-t2v-720p-Q4_K_S.gguf"
-
-#                enabled_items = None
-#                lora_files = scene.lora_files
-#                enabled_names = []
-#                enabled_weights = []
-#                # Check if there are any enabled items before loading
-#                enabled_items = [item for item in lora_files if item.enabled]
-
-#                #from diffusers.models import HunyuanVideoTransformer3DModel
-#                #from diffusers.utils import export_to_video
-#                from diffusers import BitsAndBytesConfig
-#                from transformers import LlamaModel, CLIPTextModel
-#                from diffusers import GGUFQuantizationConfig
-
-#                quantization_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=torch.bfloat16)
-#                text_encoder = LlamaModel.from_pretrained(
-#                    model_id,
-#                    subfolder="text_encoder",
-#                    quantization_config=quantization_config,
-#                    torch_dtype=torch.float16
-#                )
-#                text_encoder_2 = CLIPTextModel.from_pretrained(
-#                    model_id,
-#                    subfolder="text_encoder_2",
-#                    quantization_config=quantization_config,
-#                    torch_dtype=torch.float16
-#                )
-#
-#                if input == "input_strips":
-#                    transformer = WanTransformer3DModel.from_single_file(
-#                        model_id,
-#                        transformer_path,
-##                        subfolder="transformer",
-##                        quantization_config=quantization_config,
-##                        transformer_path,
-#                        quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16),
-#                        torch_dtype=torch.bfloat16
-#                    )
-#                    pipe = WanImageToVideoPipeline.from_pretrained(
-#                        model_id,
-#                        text_encoder=text_encoder,
-#                        #text_encoder_2=text_encoder_2,
-#                        transformer=transformer,
-#                        torch_dtype=torch.float16,
-#                    )
-#                ckpt_path = "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/blob/main/split_files/diffusion_models/wan2.1_i2v_480p_14B_fp16.safetensors"
-#                #ckpt_path = "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/blob/main/split_files/diffusion_models/wan2.1_t2v_1.3B_bf16.safetensors"
-#                transformer = WanTransformer3DModel.from_single_file(ckpt_path, torch_dtype=torch.bfloat16)
-
-#                pipe = WanImageToVideoPipeline.from_pretrained("Wan-AI/Wan2.1-I2V-14B-480P-Diffusers", transformer=transformer)
-#
                 if gfx_device == "mps":
                     pipe.to("mps")
+                else:
+                    torch.cuda.empty_cache() 
+                    pipe.enable_model_cpu_offload()
+
+            # Wan Vace - Refactored and Optimized
+            elif movie_model_card == "Wan-AI/Wan2.1-VACE-1.3B-diffusers":
+                print("Model: " + movie_model_card)
+
+                # The loading logic is the same for both t2v and i2v, so we remove the redundant if/else.
+                # We just print the mode for user feedback.
+                if not ((scene.movie_path or scene.image_path) and input == "input_strips"):
+                    print("Mode: Text-to-Video")
+                else:
+                    print("Mode: Image-to-Video")
+
+                import torch
+                from diffusers import AutoencoderKLWan, WanVACEPipeline
+                from diffusers.quantizers import PipelineQuantizationConfig
+                from diffusers.schedulers import UniPCMultistepScheduler
+                from diffusers.utils import export_to_video, load_image
+
+                # 1. Define the quantization configuration for the main transformer model.
+                pipeline_quant_config = PipelineQuantizationConfig(
+                    quant_backend="bitsandbytes_4bit",
+                    quant_kwargs={
+                        "load_in_4bit": True,
+                        "bnb_4bit_quant_type": "nf4",
+                        "bnb_4bit_compute_dtype": torch.bfloat16
+                    },
+                    components_to_quantize=["transformer"],
+                )
+                
+                # 2. Load the VAE separately in full float32 precision to ensure maximum quality.
+                # This is an important step for VACE models.
+                print("Loading VAE in float32 for maximum quality...")
+                vae = AutoencoderKLWan.from_pretrained(movie_model_card, subfolder="vae", torch_dtype=torch.float32)
+
+                # 3. Load the main pipeline, passing both the quantization config and the pre-loaded VAE.
+                # This applies 4-bit quantization to the transformer while using our high-quality VAE.
+                print("Loading main pipeline with 4-bit quantization...")
+                pipe = WanVACEPipeline.from_pretrained(
+                    movie_model_card,
+                    vae=vae, # Use the high-precision VAE we just loaded
+                    quantization_config=pipeline_quant_config
+                )
+                print("Pipeline loaded successfully.")
+
+                # 4. Set up the scheduler as before. This is done after the pipeline is loaded.
+                flow_shift = 5.0  # 5.0 for 720P, 3.0 for 480P
+                pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config, flow_shift=flow_shift)
+                print(f"Scheduler set to UniPCMultistep with flow_shift={flow_shift}")
+
+                # 5. Apply memory management for inference. This is still a good safety measure.
+                if gfx_device == "mps":
+                    # Quantization is not supported on MPS, so this path assumes a non-quantized model.
+                    print("Moving model to MPS.")
+                    pipe.to("mps")
+                # For CUDA devices, offloading is the final step for memory-safe inference.
                 elif low_vram():
-                    # pipe.enable_vae_slicing()
+                    print("Low VRAM mode: Enabling model CPU offload.")
                     pipe.enable_model_cpu_offload()
                 else:
+                    print("Defaulting to model CPU offload for stability.")
                     #pipe.enable_sequential_cpu_offload()
-                    #pipe.vae.enable_tiling()
                     pipe.enable_model_cpu_offload()
+
+#            # Wan Vace
+#            elif movie_model_card == "Wan-AI/Wan2.1-VACE-1.3B-diffusers":
+#                print("Model: "+movie_model_card)
+#                # t2i
+#                if not ((scene.movie_path or scene.image_path) and input == "input_strips"):
+#                    from diffusers import AutoencoderKLWan, WanVACEPipeline
+#                    from diffusers.schedulers.scheduling_unipc_multistep import UniPCMultistepScheduler
+#                    from diffusers.utils import export_to_video
+
+#                    vae = AutoencoderKLWan.from_pretrained(movie_model_card, subfolder="vae", torch_dtype=torch.float32)
+#                    pipe = WanVACEPipeline.from_pretrained(movie_model_card, vae=vae, torch_dtype=torch.bfloat16)
+#                    flow_shift = 5.0  # 5.0 for 720P, 3.0 for 480P
+#                    pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config, flow_shift=flow_shift)
+#                    
+#                #i2v
+#                else:
+#                    import PIL.Image
+#                    from diffusers import AutoencoderKLWan, WanVACEPipeline
+#                    from diffusers.schedulers.scheduling_unipc_multistep import UniPCMultistepScheduler
+#                    from diffusers.utils import export_to_video, load_image
+
+#                    vae = AutoencoderKLWan.from_pretrained(movie_model_card, subfolder="vae", torch_dtype=torch.float32)
+#                    pipe = WanVACEPipeline.from_pretrained(movie_model_card, vae=vae, torch_dtype=torch.bfloat16)
+#                    flow_shift = 5.0  # 5.0 for 720P, 3.0 for 480P
+#                    pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config, flow_shift=flow_shift)                 
+
+#                if gfx_device == "mps":
+#                    pipe.to("mps")
+#                elif low_vram():
+#                    # pipe.enable_vae_slicing()
+#                    pipe.enable_model_cpu_offload()
+#                else:
+#                    #pipe.enable_sequential_cpu_offload()
+#                    #pipe.vae.enable_tiling()
+#                    pipe.enable_model_cpu_offload()
 
             else:
                 from diffusers import TextToVideoSDPipeline
@@ -4103,27 +4103,27 @@ class SEQUENCER_OT_generate_movie(Operator):
                 else:
                     pipe.to(gfx_device)
 
-            # Model for upscale generated movie
-            if scene.video_to_video:
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-                from diffusers import DiffusionPipeline
+#            # Model for upscale generated movie
+#            if scene.video_to_video:
+#                if torch.cuda.is_available():
+#                    torch.cuda.empty_cache()
+#                from diffusers import DiffusionPipeline
 
-                upscale = DiffusionPipeline.from_pretrained(
-                    "cerspense/zeroscope_v2_XL",
-                    torch_dtype=torch.float16,
-                    use_safetensors=False,
-                    local_files_only=local_files_only,
-                )
-                upscale.scheduler = DPMSolverMultistepScheduler.from_config(
-                    upscale.scheduler.config
-                )
-                if gfx_device == "mps":
-                    upscale.to("mps")
-                elif low_vram():
-                    upscale.enable_model_cpu_offload()
-                else:
-                    upscale.to(gfx_device)
+#                upscale = DiffusionPipeline.from_pretrained(
+#                    "cerspense/zeroscope_v2_XL",
+#                    torch_dtype=torch.float16,
+#                    use_safetensors=False,
+#                    local_files_only=local_files_only,
+#                )
+#                upscale.scheduler = DPMSolverMultistepScheduler.from_config(
+#                    upscale.scheduler.config
+#                )
+#                if gfx_device == "mps":
+#                    upscale.to("mps")
+#                elif low_vram():
+#                    upscale.enable_model_cpu_offload()
+#                else:
+#                    upscale.to(gfx_device)
 
         # GENERATING - Main Loop Video
         for i in range(scene.movie_num_batch):
@@ -4603,6 +4603,48 @@ class SEQUENCER_OT_generate_movie(Operator):
                         height=y,
                         width=x,
                         num_frames=abs(duration),
+                        generator=generator,
+                        max_sequence_length=512,
+                    ).frames[0]
+                elif movie_model_card == "Wan-AI/Wan2.1-VACE-1.3B-diffusers" and input == "input_strips":
+                    from diffusers.utils import load_image, export_to_video
+                    import numpy as np
+                    import PIL
+                    if scene.movie_path:
+                        print("Process: Video Image to Video (Wan2.1-I2V-14B-480P-Diffusers)")
+                        if not os.path.isfile(scene.movie_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        image = load_first_frame(bpy.path.abspath(scene.movie_path))
+                    if scene.image_path:
+                        print("Process: Image to video (Wan2.1-I2V-14B-480P-Diffusers)")
+                        strip = scene.sequence_editor.active_strip
+                        img_path = os.path.join(bpy.path.abspath(strip.directory), strip.elements[0].filename)
+                        if not os.path.isfile(img_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        image = load_image(img_path)
+
+                        img = image.resize((x, y))
+                        frames = [img]
+                        # Ideally, this should be 127.5 to match original code, but they perform computation on numpy arrays
+                        # whereas we are passing PIL images. If you choose to pass numpy arrays, you can set it to 127.5 to
+                        # match the original code.
+                        frames.extend([PIL.Image.new("RGB", (x, y), (128, 128, 128))] * (abs(duration) - 1))
+                        mask_black = PIL.Image.new("L", (x, y), 0)
+                        mask_white = PIL.Image.new("L", (x, y), 255)
+                        mask = [mask_black, *[mask_white] * (abs(duration) - 1)]
+
+                    video_frames = pipe(
+                        video=frames,
+                        mask=mask,
+                        prompt=prompt,
+                        negative_prompt=negative_prompt,
+                        num_inference_steps=movie_num_inference_steps,
+                        guidance_scale=movie_num_guidance,
+                        height=y,
+                        width=x,
+                        #num_frames=abs(duration),
                         generator=generator,
                         max_sequence_length=512,
                     ).frames[0]
@@ -6703,8 +6745,43 @@ class SEQUENCER_OT_generate_image(Operator):
 
             # clear the VRAM
             clear_cuda_cache()
+            
+            if image_model_card == "black-forest-labs/FLUX.1-Kontext-dev":
+                print("Load Inpaint: " + image_model_card)
+                import torch 
+                from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
+                from diffusers import FluxKontextInpaintPipeline
+                from diffusers.utils import load_image
 
-            if image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
+                nf4_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_quant_type="nf4",
+                    bnb_4bit_compute_dtype=torch.bfloat16,
+                )
+                model_nf4 = FluxTransformer2DModel.from_pretrained(
+                    image_model_card,
+                    subfolder="transformer",
+                    quantization_config=nf4_config,
+                    torch_dtype=torch.bfloat16,
+                )
+
+                pipe = FluxKontextInpaintPipeline.from_pretrained(
+                    image_model_card,
+                    transformer=model_nf4,
+                    torch_dtype=torch.bfloat16,
+                    local_files_only=local_files_only,
+                )  
+
+                if gfx_device == "mps":
+                    pipe.to("mps")
+                elif low_vram():
+                    # torch.cuda.set_per_process_memory_fraction(0.99)
+                    pipe.enable_model_cpu_offload()
+                else:
+                    pipe.to(gfx_device)              
+                
+                
+            elif image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
                 print("Load Inpaint: " + image_model_card)
                 pipe = AutoPipelineForInpainting.from_pretrained(
                     "diffusers/stable-diffusion-xl-1.0-inpainting-0.1",
@@ -6847,7 +6924,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     )
                     print(str(result))
 
-                # MacOS
+                # FLUX MacOS
                 if image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin":
                     from mflux import Flux1, Config
                     converter = Flux1.from_name(
@@ -6870,8 +6947,10 @@ class SEQUENCER_OT_generate_image(Operator):
                 ):
                     relight = False
                     from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
+                    
                     if image_model_card == "black-forest-labs/FLUX.1-Kontext-dev" or image_model_card == "kontext-community/relighting-kontext-dev-lora-v3":
                         from diffusers import FluxKontextPipeline
+                        
                     if image_model_card == "kontext-community/relighting-kontext-dev-lora-v3":
                         image_model_card = "black-forest-labs/FLUX.1-Kontext-dev"
                         relight = True
@@ -7564,7 +7643,6 @@ class SEQUENCER_OT_generate_image(Operator):
                 converter.vae.enable_tiling()
             else:
                 converter.enable_model_cpu_offload()
-
 
         # FLEX
         elif image_model_card == "ostris/Flex.2-preview":
@@ -8647,7 +8725,9 @@ class SEQUENCER_OT_generate_image(Operator):
 
             # Inpaint
             elif do_inpaint:
+                mask_image = None
                 init_image = None
+                image_reference = None
                 mask_strip = find_strip_by_name(scene, scene.inpaint_selected_strip)
 
                 if not mask_strip:
@@ -8674,10 +8754,23 @@ class SEQUENCER_OT_generate_image(Operator):
                 if scene.movie_path:
                     init_image = load_first_frame(scene.movie_path)
                 if not init_image:
-                    print("Loading strip failed!")
+                    print("Loading init image failed!")
                     return {"CANCELLED"}
+                else:
+                    init_image = init_image.resize((x, y))
 
-                init_image = init_image.resize((x, y))
+                if scene.kontext_strip_1:
+                    if find_strip_by_name(scene, scene.kontext_strip_1):
+                        input_image = load_first_frame(
+                            get_strip_path(
+                                find_strip_by_name(scene, scene.kontext_strip_1)
+                            )
+                        )
+                    image_reference = input_image
+
+                print(f"Init image loaded:      {init_image is not None}")
+                print(f"Mask image loaded:      {mask_image is not None}")
+                print(f"Reference image loaded: {image_reference is not None}")
 
                 if (
                     image_model_card == "lzyvegetable/FLUX.1-schnell"
@@ -8710,6 +8803,38 @@ class SEQUENCER_OT_generate_image(Operator):
                     image = pipe(
                         **inference_parameters
                     ).images[0]
+                    
+                # Kontext Inpaint            
+                elif (
+                    image_model_card == "black-forest-labs/FLUX.1-Kontext-dev"
+                ):
+
+                    print("Process Inpaint: " + image_model_card)
+                    inference_parameters = {
+                        "prompt": prompt,
+                        # "prompt_2": None, # Uncomment if your pipe supports/requires it
+                        "max_sequence_length": 512,
+                        "image": init_image,
+                        "mask_image": mask_image,
+                        "image_reference": image_reference, 
+                        "num_inference_steps": image_num_inference_steps, # Ensure this has a value
+                        "guidance_scale": image_num_guidance,            # Ensure this has a value
+                        "height": y,
+                        "width": x,
+                        "generator": generator,
+                        "strength": 1.00 - scene.image_power,
+                        # "padding_mask_crop": 42, # Uncomment if needed
+                        # "strength": 0.5,       # Uncomment if needed
+                    }
+
+                    if image_model_card == "lzyvegetable/FLUX.1-schnell":
+                        # Override specific parameters for FLUX
+                        inference_parameters["guidance_scale"] = 0
+                        inference_parameters["num_inference_steps"] = 4
+
+                    image = pipe(
+                        **inference_parameters
+                    ).images[0]                    
 
                 elif image_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
                     print("Process Inpaint: " + image_model_card)
@@ -10510,8 +10635,8 @@ def register():
     bpy.types.Scene.image_power = bpy.props.FloatProperty(
         name="image_power",
         default=0.50,
-        min=0.05,
-        max=0.92,
+        min=0.00,
+        max=1.00,
         description="Preserve the input image in vid/img to img/vid processes",
     )
     styles_array = load_styles(
