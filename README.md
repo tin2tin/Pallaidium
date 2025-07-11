@@ -255,6 +255,22 @@ https://github.com/tin2tin/Add_Rendered_Strips
 
 ![image](https://github.com/tin2tin/Generative_AI/assets/1322593/d8c0a184-d812-440d-a5a8-501a1282d78d)
 
+### Pallaidium Module Checker
+
+Add-on to check if the gen AI models are running error-free in Pallaidium. 
+
+https://github.com/tin2tin/pallaidium_module_checker
+
+<img width="385" height="446" alt="462758956-7dec5ead-c6d0-4846-a1ef-03c3ee47ecd0" src="https://github.com/user-attachments/assets/069dc2ad-9a25-47a1-995a-82e047d872cc" />
+
+### Blender Screenwriter
+
+Write screenplays, add image prompts, and convert everything to times text strips, ready for batch convering to ex. imgage, video or speech.
+
+https://github.com/tin2tin/Blender_Screenwriter
+
+https://github.com/tin2tin/Blender_Screenwriter/blob/master/bsw_tut.gif?raw=true
+
 ### Low on VRAM?
 Disable System memory fallback: https://nvidia.custhelp.com/app/answers/detail/a_id/5490/~/system-memory-fallback-for-stable-diffusion
 
