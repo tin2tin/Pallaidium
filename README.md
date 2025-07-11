@@ -269,7 +269,7 @@ Write screenplays, add image prompts, and convert everything to times text strip
 
 https://github.com/tin2tin/Blender_Screenwriter
 
-https://github.com/tin2tin/Blender_Screenwriter/blob/master/bsw_tut.gif?raw=true
+![image](https://github.com/tin2tin/Blender_Screenwriter/blob/master/bsw_tut.gif)
 
 ### Low on VRAM?
 Disable System memory fallback: https://nvidia.custhelp.com/app/answers/detail/a_id/5490/~/system-memory-fallback-for-stable-diffusion
