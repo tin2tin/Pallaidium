@@ -21,8 +21,8 @@ This matrix provides a quick overview of the core generative capabilities, mappi
 | Input | Image | Video | Text | Audio | Music | Speech |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Text** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Image**| ✅ | ✅ | ✅ | | | |
-| **Video**| ✅ | ✅ | ✅ | | | |
+| **Image**| ✅ | ✅ | ✅ | ✅ | | |
+| **Video**| ✅ | ✅ | ✅ | ✅ | | |
 
 ## Features
 
