@@ -850,7 +850,7 @@ def install_modules(self):
     common_modules = [
         ("requests", "requests"),
         #("huggingface_hub", "huggingface_hub"),
-        ("huggingface_hub", "huggingface_hub[hf_xet]"),
+        ("huggingface_hub", "huggingface_hub[hf_xet]"), 
         ("gguf", "gguf"),
         ("pydub", "pydub"),
         ("sentencepiece", "sentencepiece"),
@@ -872,7 +872,8 @@ def install_modules(self):
         ("protobuf", "protobuf==3.20.1"),
         ("scikit_learn", "scikit-learn==1.2.2"),
         ("bitsandbytes", "bitsandbytes"),
-        ("chatterbox", "--no-deps git+https://https://github.com/tin2tin/chatterbox.git"),
+        #("chatterbox", "--no-deps git+https://https://github.com/tin2tin/chatterbox.git"),
+        ("chatterbox", "--no-deps chatterbox-tts"),
         ("numpy", "numpy==1.26.4"),
         ("jax", "jax"),
         #("jaxlib", "jaxlib>=0.5.0")
@@ -1098,10 +1099,11 @@ def install_modules(self):
     install_module("timm", "git+https://github.com/rwightman/pytorch-image-models.git")
     install_module("protobuf", "protobuf==3.20.1")
     install_module("numpy", "numpy==1.26.4")
-    #install_module("transformers", "transformers")
-    install_module("tokenizers", "tokenizers==0.21.1")
+    #install_module("tokenizers", "tokenizers==0.21.1")
+    install_module("tokenizers", "tokenizers==0.20.4")
     #install_module("transformers", "transformers==4.46.1")
-    install_module("transformers", "git+https://github.com/huggingface/transformers.git")
+    #install_module("transformers", "git+https://github.com/huggingface/transformers.git")
+    install_module("transformers", "transformers==4.49.0")
     print("Cleaning up cache...")
     subprocess.check_call([pybin, "-m", "pip", "cache", "purge"])
     subprocess.check_call([pybin, "-m", "pip", "list"])
@@ -1203,7 +1205,7 @@ class GENERATOR_OT_uninstall(Operator):
                 "hyperpyyaml", "speechbrain", "vocos", "WhisperSpeech", "pydub"
             ],
             "Speech Components": [
-                "chatterbox", "f5-tts", "resemble-perth", "s3tokenizer",
+                "chatterbox-tts", "f5-tts", "resemble-perth", "s3tokenizer",
                 "conformer"
             ],
         }
