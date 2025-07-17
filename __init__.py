@@ -1691,7 +1691,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Flux Schnell",
                 "lzyvegetable/FLUX.1-schnell",
             ),
-            ("black-forest-labs/FLUX.1-Kontext-dev", "Flux.1 Kontext Dev", "black-forest-labs/FLUX.1-Kontext-dev"),
+            ("yuvraj108c/FLUX.1-Kontext-dev", "Flux.1 Kontext Dev", "yuvraj108c/FLUX.1-Kontext-dev"),
             ("kontext-community/relighting-kontext-dev-lora-v3", "Relight Flux.1 Kontext", "kontext-community/relighting-kontext-dev-lora-v3"),
             # Not ready for 4bit and depth has tensor problems
             ("fuliucansheng/FLUX.1-Canny-dev-diffusers-lora", "FLUX Canny", "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"),
@@ -2433,16 +2433,16 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     and image_model_card != "Runware/FLUX.1-Redux-dev"
                     and image_model_card != "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"
                     and image_model_card != "romanfratric234/FLUX.1-Depth-dev-lora"
-                    #and image_model_card != "black-forest-labs/FLUX.1-Kontext-dev"
+                    #and image_model_card != "yuvraj108c/FLUX.1-Kontext-dev"
                     and image_model_card != "kontext-community/relighting-kontext-dev-lora-v3"
                 ):
-                    if input == "input_strips" and (not scene.inpaint_selected_strip or image_model_card == "black-forest-labs/FLUX.1-Kontext-dev"):
+                    if input == "input_strips" and (not scene.inpaint_selected_strip or image_model_card == "yuvraj108c/FLUX.1-Kontext-dev"):
                         col = col.column(heading="Use", align=True)
                         col.prop(addon_prefs, "use_strip_data", text=" Name & Seed")
                         if type == "movie" and os_platform != "Darwin" and (
                             movie_model_card == "lzyvegetable/FLUX.1-schnell"
                             or movie_model_card == "ChuckMcSneed/FLUX.1-dev"
-                            #or movie_model_card == "black-forest-labs/FLUX.1-Kontext-dev"
+                            #or movie_model_card == "yuvraj108c/FLUX.1-Kontext-dev"
                             #or movie_model_card == "ostris/Flex.2-preview"
                         ):
                             pass
@@ -2484,7 +2484,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                             )
                             row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = "inpaint_select"
 
-            if image_model_card == "black-forest-labs/FLUX.1-Kontext-dev" and type == "image":
+            if image_model_card == "yuvraj108c/FLUX.1-Kontext-dev" and type == "image":
                 row = col.row(align=True)
                 row.prop_search(
                     scene,
@@ -2574,7 +2574,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     )
                     or (
                         type == "image"
-                        and image_model_card == "black-forest-labs/FLUX.1-Kontext-dev"
+                        and image_model_card == "yuvraj108c/FLUX.1-Kontext-dev"
                     )
                     or (type == "image" and image_model_card == "kontext-community/relighting-kontext-dev-lora-v3")
                     or (type == "image" and image_model_card == "ostris/Flex.2-preview")
@@ -2860,7 +2860,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     or image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
                     or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
                     or image_model_card == "lzyvegetable/FLUX.1-schnell"
-                    or image_model_card == "black-forest-labs/FLUX.1-Kontext-dev"
+                    or image_model_card == "yuvraj108c/FLUX.1-Kontext-dev"
                     or image_model_card == "ostris/Flex.2-preview"
                     or image_model_card == "lodestones/Chroma"
                     or image_model_card == "ChuckMcSneed/FLUX.1-dev"
@@ -6748,7 +6748,7 @@ class SEQUENCER_OT_generate_image(Operator):
             # clear the VRAM
             clear_cuda_cache()
             
-            if image_model_card == "black-forest-labs/FLUX.1-Kontext-dev":
+            if image_model_card == "yuvraj108c/FLUX.1-Kontext-dev":
                 print("Load Inpaint: " + image_model_card)
                 import torch 
                 from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
@@ -6943,18 +6943,18 @@ class SEQUENCER_OT_generate_image(Operator):
                 elif (
                     image_model_card == "lzyvegetable/FLUX.1-schnell"
                     or image_model_card == "ChuckMcSneed/FLUX.1-dev"
-                    or image_model_card == "black-forest-labs/FLUX.1-Kontext-dev"
+                    or image_model_card == "yuvraj108c/FLUX.1-Kontext-dev"
                     or image_model_card == "kontext-community/relighting-kontext-dev-lora-v3"
                     or image_model_card == "ostris/Flex.2-preview"
                 ):
                     relight = False
                     from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
                     
-                    if image_model_card == "black-forest-labs/FLUX.1-Kontext-dev" or image_model_card == "kontext-community/relighting-kontext-dev-lora-v3":
+                    if image_model_card == "yuvraj108c/FLUX.1-Kontext-dev" or image_model_card == "kontext-community/relighting-kontext-dev-lora-v3":
                         from diffusers import FluxKontextPipeline
                         
                     if image_model_card == "kontext-community/relighting-kontext-dev-lora-v3":
-                        image_model_card = "black-forest-labs/FLUX.1-Kontext-dev"
+                        image_model_card = "yuvraj108c/FLUX.1-Kontext-dev"
                         relight = True
 
                     nf4_config = BitsAndBytesConfig(
@@ -6969,7 +6969,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         torch_dtype=torch.bfloat16,
                     )
 
-                    if image_model_card == "black-forest-labs/FLUX.1-Kontext-dev":
+                    if image_model_card == "yuvraj108c/FLUX.1-Kontext-dev":
                         converter = FluxKontextPipeline.from_pretrained(
                             image_model_card,
                             transformer=model_nf4,
@@ -7613,7 +7613,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     pipe.enable_model_cpu_offload()
 
         # FLUX Kontext
-        elif image_model_card == "black-forest-labs/FLUX.1-Kontext-dev":
+        elif image_model_card == "yuvraj108c/FLUX.1-Kontext-dev":
             from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
             from diffusers import FluxKontextPipeline
 
@@ -8808,7 +8808,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     
                 # Kontext Inpaint            
                 elif (
-                    image_model_card == "black-forest-labs/FLUX.1-Kontext-dev"
+                    image_model_card == "yuvraj108c/FLUX.1-Kontext-dev"
                 ):
 
                     print("Process Inpaint: " + image_model_card)
@@ -8951,7 +8951,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         generator=generator,
                     ).images[0]
                 elif (
-                    image_model_card == "black-forest-labs/FLUX.1-Kontext-dev"
+                    image_model_card == "yuvraj108c/FLUX.1-Kontext-dev"
                 ):
                         
                     kontext_images = []
@@ -9083,7 +9083,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     **inference_parameters,
                 ).images[0]
             elif (
-                image_model_card == "black-forest-labs/FLUX.1-Kontext-dev"
+                image_model_card == "yuvraj108c/FLUX.1-Kontext-dev"
             ):
                 
                 kontext_images = []
