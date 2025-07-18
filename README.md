@@ -81,6 +81,8 @@ If any Python modules are missing, use this add-on to install them manually:    
 https://github.com/tin2tin/blender_pip      |
 If "WARNING: Failed to find MSVC", install "Tools for Visual Studio":
 https://aka.ms/vs/17/release/vs_BuildTools.exe
+If error: "Missing DLL", install Microsoft Visual C++ Redistributable:
+https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170
 
 
 ## Uninstall
