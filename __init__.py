@@ -904,15 +904,17 @@ def install_modules(self):
             #("deepspeed", "https://github.com/daswer123/deepspeed-windows/releases/download/13.1/deepspeed-0.13.1+cu121-cp311-cp311-win_amd64.whl"),
             #("deepspeed", "https://github.com/agwosdz/DeepSpeed-Wheels-for-Windows/releases/download/DeepSpeed/deepspeed-0.15.1+51c6eae-cp311-cp311-win_amd64_cu124.whl"),
             ("resemble_enhance", "git+https://github.com/tin2tin/resemble-enhance-windows.git"),
-            ("flash_attn", "https://huggingface.co/lldacing/flash-attention-windows-wheel/blob/main/flash_attn-2.7.0.post2%2Bcu124torch2.5.1cxx11abiFALSE-cp311-cp311-win_amd64.whl"),
+            ####("flash_attn", "https://huggingface.co/lldacing/flash-attention-windows-wheel/blob/main/flash_attn-2.7.0.post2%2Bcu124torch2.5.1cxx11abiFALSE-cp311-cp311-win_amd64.whl"),
+            ("flash_attn", "https://github.com/PLISGOOD/flash-attention-windows-wheels/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1-cp311-cp311-win_amd64.whl --force-reinstall --no-deps"),
             #("flash_attn", "git+https://github.com/ROCm/flash-attention.git"),
             #("flash_attn", "https://github.com/oobabooga/flash-attention/releases/download/v2.6.3/flash_attn-2.6.3+cu122torch2.3.1cxx11abiFALSE-cp311-cp311-win_amd64.whl"),
             #("triton", "triton-windows"),
-            ("sageattention", "https://github.com/woct0rdho/SageAttention/releases/download/v2.1.1-windows/sageattention-2.1.1+cu124torch2.5.1-cp311-cp311-win_amd64.whl"),
+            ("sageattention", "https://github.com/woct0rdho/SageAttention/releases/download/v2.2.0-windows/sageattention-2.2.0+cu128torch2.7.1-cp311-cp311-win_amd64.whl"),
+            ###("sageattention", "https://github.com/woct0rdho/SageAttention/releases/download/v2.1.1-windows/sageattention-2.1.1+cu124torch2.5.1-cp311-cp311-win_amd64.whl"),
             #("triton", "https://github.com/woct0rdho/triton-windows/releases/download/v3.2.0-windows.post10/triton-3.2.0-cp311-cp311-win_amd64.whl"),
             #("triton", "https://github.com/woct0rdho/triton-windows/releases/download/v3.2.0-windows.post10/triton-3.2.0-cp311-cp311-win_amd64.whl"),
             # Use this for low cards/cuda?
-            #("triton", "https://hf-mirror.com/LightningJay/triton-2.1.0-python3.11-win_amd64-wheel/resolve/main/triton-2.1.0-cp311-cp311-win_amd64.whl"),
+            ("triton", "https://github.com/woct0rdho/triton-windows/releases/download/v3.2.0-windows.post10/triton-3.2.0-cp311-cp311-win_amd64.whl"),
         ]
 
         for module_name, package_name in windows_modules:
@@ -923,7 +925,6 @@ def install_modules(self):
             #("deepspeed", "deepspeed"), #==0.14.4
             ("resemble_enhance", "resemble-enhance"),
             ("flash_attn", "flash-attn"),
-            ("triton", "triton"),
             ("triton", "triton"),
             ("sageattention","sageattention==1.0.6")
         ]
@@ -1063,7 +1064,8 @@ def install_modules(self):
         subprocess.check_call([
             pybin, "-m", "pip", "install",
             "torch", "xformers", "torchvision", "torchaudio",
-            "--index-url", "https://download.pytorch.org/whl/cu124",
+            "--index-url", "https://download.pytorch.org/whl/cu128",
+            #"--index-url", "https://download.pytorch.org/whl/cu124",
             "--no-warn-script-location", "--upgrade"
         ])
 #        subprocess.check_call([
