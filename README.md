@@ -7,7 +7,7 @@
     <a href="https://twitter.com/tintwotin"><img src="https://img.shields.io/twitter/follow/tintwotin" alt="Follow us on X" title="Follow us on X"></a>
 <p>
 
-<hr>
+<hr> 
 
 ## Workflow examples with Pallaidium, Blender Screenwriter, and GPT4Blender
 
