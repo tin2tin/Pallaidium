@@ -884,6 +884,7 @@ def install_modules(self):
         ("s3tokenizer", "s3tokenizer"),
         ("conformer", "conformer"),
         ("spacy", "spacy"),
+        ("hf_xet", "hf-xet"),
     ]
 
     show_system_console(True)
@@ -897,7 +898,8 @@ def install_modules(self):
     if os_platform == "Windows":
         windows_modules = [
             # How to install a patch: git+https://github.com/huggingface/diffusers@integrations/ltx-097
-            ("diffusers", "git+https://github.com/huggingface/diffusers.git"),
+            ("diffusers", "diffusers==0.34.0"),
+            #("diffusers", "git+https://github.com/huggingface/diffusers.git"),
             ("mmaudio", "git+https://github.com/hkchengrex/MMAudio.git"),
             #("deepspeed", "https://www.piwheels.org/simple/deepspeed/deepspeed-0.16.5-py3-none-any.whl"),
             #("deepspeed", "https://github.com/agwosdz/DeepSpeed-Wheels-for-Windows/releases/download/DeepSpeed/deepspeed-0.16.1+unknown-cp311-cp311-win_amd64_cu124.whl"),
@@ -908,7 +910,7 @@ def install_modules(self):
             #("flash_attn", "git+https://github.com/ROCm/flash-attention.git"),
             #("flash_attn", "https://github.com/oobabooga/flash-attention/releases/download/v2.6.3/flash_attn-2.6.3+cu122torch2.3.1cxx11abiFALSE-cp311-cp311-win_amd64.whl"),
             #("triton", "triton-windows"),
-            ("sageattention", "https://github.com/woct0rdho/SageAttention/releases/download/v2.1.1-windows/sageattention-2.1.1+cu124torch2.5.1-cp311-cp311-win_amd64.whl"),
+            #("sageattention", "https://github.com/woct0rdho/SageAttention/releases/download/v2.1.1-windows/sageattention-2.1.1+cu124torch2.5.1-cp311-cp311-win_amd64.whl"),
             #("triton", "https://github.com/woct0rdho/triton-windows/releases/download/v3.2.0-windows.post10/triton-3.2.0-cp311-cp311-win_amd64.whl"),
             #("triton", "https://github.com/woct0rdho/triton-windows/releases/download/v3.2.0-windows.post10/triton-3.2.0-cp311-cp311-win_amd64.whl"),
             # Use this for low cards/cuda?
@@ -923,7 +925,6 @@ def install_modules(self):
             #("deepspeed", "deepspeed"), #==0.14.4
             ("resemble_enhance", "resemble-enhance"),
             ("flash_attn", "flash-attn"),
-            ("triton", "triton"),
             ("triton", "triton"),
             ("sageattention","sageattention==1.0.6")
         ]
@@ -966,20 +967,20 @@ def install_modules(self):
 #        pybin, "-m", "pip", "install", "--disable-pip-version-check",
 #        "--use-deprecated=legacy-resolver", "tensorflow<2.11", "--upgrade"
 #    ])
-    deepspeed_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deepspeed", "deepspeed-0.16.5-py3-none-any.whl")
-    print(deepspeed_path)
-    subprocess.call(
-        [
-            pybin,
-            "-m",
-            "pip",
-            "install",
-            "--disable-pip-version-check",
-            "--use-deprecated=legacy-resolver",
-            deepspeed_path,
-            "--no-warn-script-location",
-        ]
-    )
+#    deepspeed_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deepspeed", "deepspeed-0.16.5-py3-none-any.whl")
+#    print(deepspeed_path)
+#    subprocess.call(
+#        [
+#            pybin,
+#            "-m",
+#            "pip",
+#            "install",
+#            "--disable-pip-version-check",
+#            "--use-deprecated=legacy-resolver",
+#            deepspeed_path,
+#            "--no-warn-script-location",
+#        ]
+#    )
     install_module("controlnet_aux", "controlnet-aux")
     install_module("whisperspeech", "WhisperSpeech==0.8")
     install_module(
@@ -1096,6 +1097,8 @@ def install_modules(self):
 #        pybin, "pip", "install", "--disable-pip-version-check",
 #        "--use-deprecated=legacy-resolver", "timm", "--upgrade"
 #    ])
+
+    install_module("sageattention","sageattention==1.0.6")
     install_module("timm", "git+https://github.com/rwightman/pytorch-image-models.git")
     install_module("protobuf", "protobuf==3.20.1")
     install_module("numpy", "numpy==1.26.4")
@@ -1104,8 +1107,8 @@ def install_modules(self):
     #install_module("transformers", "transformers==4.46.1")
     #install_module("transformers", "git+https://github.com/huggingface/transformers.git")
     install_module("transformers", "transformers==4.49.0")
-    print("Cleaning up cache...")
-    subprocess.check_call([pybin, "-m", "pip", "cache", "purge"])
+    #print("Cleaning up cache...")
+    #subprocess.check_call([pybin, "-m", "pip", "cache", "purge"])
     subprocess.check_call([pybin, "-m", "pip", "list"])
 
     self.report({"INFO"}, "All modules installed successfully.")
@@ -1888,7 +1891,6 @@ class GeneratorAddonPreferences(AddonPreferences):
         default="stabilityai/stable-audio-open-1.0",
         update=output_strips_updated,
     )
-    # For DeepFloyd
     hugginface_token: bpy.props.StringProperty(
         name="Hugginface Token",
         default="hugginface_token",
