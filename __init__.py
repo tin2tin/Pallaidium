@@ -1103,10 +1103,10 @@ def install_modules(self):
     install_module("protobuf", "protobuf==3.20.1")
     install_module("numpy", "numpy==1.26.4")
     #install_module("tokenizers", "tokenizers==0.21.1")
-    install_module("tokenizers", "tokenizers==0.20.4")
+    install_module("tokenizers", "tokenizers==0.22.0")
     #install_module("transformers", "transformers==4.46.1")
     #install_module("transformers", "git+https://github.com/huggingface/transformers.git")
-    install_module("transformers", "transformers==4.49.0")
+    install_module("transformers", "transformers==4.56.2")
     #print("Cleaning up cache...")
     #subprocess.check_call([pybin, "-m", "pip", "cache", "purge"])
     subprocess.check_call([pybin, "-m", "pip", "list"])
@@ -1702,6 +1702,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             ("Runware/FLUX.1-Redux-dev", "FLUX Redux", "Runware/FLUX.1-Redux-dev"),
 
 #            ("ostris/Flex.2-preview", "Flex 2 Preview", "ostris/Flex.2-preview"),
+            #("diffusers/qwen-image-nf4", "Qwen-Image", "diffusers/qwen-image-nf4"), too heavy
             ("lodestones/Chroma", "Chroma", "Chroma is a 8.9B parameter model based on FLUX.1-schnell"),
             (
                 "stabilityai/stable-diffusion-xl-base-1.0",
@@ -2865,6 +2866,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     or image_model_card == "yuvraj108c/FLUX.1-Kontext-dev"
                     or image_model_card == "ostris/Flex.2-preview"
                     or image_model_card == "lodestones/Chroma"
+                    or image_model_card == "diffusers/qwen-image-nf4"
                     or image_model_card == "ChuckMcSneed/FLUX.1-dev"
                     or image_model_card == "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"
                     or image_model_card == "romanfratric234/FLUX.1-Depth-dev-lora"
@@ -7696,6 +7698,83 @@ class SEQUENCER_OT_generate_image(Operator):
                 else:
                     pipe.enable_model_cpu_offload()
 
+
+        # Qwen-Image
+# Qwen-Image
+        elif image_model_card == "diffusers/qwen-image-nf4":
+
+            import torch
+            import gc # Import garbage collector
+            import os # Import os to set environment variables
+            from diffusers import QwenImageImg2ImgPipeline, DiffusionPipeline, FlowMatchEulerDiscreteScheduler, BitsAndBytesConfig
+            from diffusers.utils import load_image
+            import math
+
+            # Suggestion from the error: helps with memory fragmentation
+            os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
+            # NF4 Configuration for 4-bit loading
+            nf4_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_compute_dtype=torch.bfloat16,
+            )
+            
+            # Explicitly clear cache before loading a new model
+            torch.cuda.empty_cache()
+            gc.collect()
+
+            if do_convert:
+                print("Setting up Qwen-Image for img2img with NF4 and memory optimizations...")
+                dtype = torch.bfloat16
+                
+                # Load the pipeline with the quantization config directly
+                # For img2img, the full pipeline is often needed
+                pipe = QwenImageImg2ImgPipeline.from_pretrained(
+                    "diffusers/qwen-image-nf4", 
+                    torch_dtype=dtype,
+                    quantization_config=nf4_config, # Apply quantization here
+                    device_map="auto" # Let accelerate handle device placement
+                )
+
+            elif not do_inpaint and not enabled_items:
+                print("Setting up Qwen-Image for text-to-image with NF4 and memory optimizations...")
+                dtype = torch.bfloat16
+                ckpt_id = "diffusers/qwen-image-nf4"
+
+                # No need for a separate scheduler config, from_pretrained will handle it
+                
+                # Load the pipeline with quantization config and let accelerate handle placement
+                pipe = DiffusionPipeline.from_pretrained(
+                    ckpt_id, 
+                    torch_dtype=dtype,
+                    quantization_config=nf4_config,
+                    device_map="auto" # This is key for BitsAndBytes + offloading
+                )
+
+            else:
+                print("Inpaint and LoRA are not supported for Qwen-Image in this configuration!")
+                # Fallback or error for unsupported modes
+                pipe = None
+
+
+            # Apply aggressive memory saving techniques AFTER loading the pipe
+            if pipe is not None:
+                if low_vram():
+                    print("Enabling VAE slicing and tiling for low VRAM.")
+                    pipe.enable_vae_slicing()
+                    # Tiling is on the VAE component itself
+                    if hasattr(pipe, 'vae'):
+                        pipe.vae.enable_tiling()
+                else:
+                    # Even on 24GB, sequential offload is safer for large models
+                    print("Enabling sequential CPU offload.")
+                    pipe.enable_sequential_cpu_offload()
+                    print("Enabling VAE slicing and tiling.")
+                    pipe.enable_vae_slicing()
+                    if hasattr(pipe, 'vae'):
+                        pipe.vae.enable_tiling()
+        
         # Chroma
         elif image_model_card == "lodestones/Chroma":
 
@@ -7790,7 +7869,7 @@ class SEQUENCER_OT_generate_image(Operator):
             else:
                 pipe.to(gfx_device)
 
-        # Shuttle-Jaguar # mneeds a quantinized version
+        # Shuttle-Jaguar # needs a quantinized version
         elif image_model_card == "shuttleai/shuttle-jaguar":
             from diffusers import DiffusionPipeline
 
