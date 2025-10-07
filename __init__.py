@@ -1702,7 +1702,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             ("Runware/FLUX.1-Redux-dev", "FLUX Redux", "Runware/FLUX.1-Redux-dev"),
 
 #            ("ostris/Flex.2-preview", "Flex 2 Preview", "ostris/Flex.2-preview"),
-            #("diffusers/qwen-image-nf4", "Qwen-Image", "diffusers/qwen-image-nf4"), too heavy
+            ("Qwen/Qwen-Image", "Qwen-Image", "Qwen/Qwen-Image"),
             ("lodestones/Chroma", "Chroma", "Chroma is a 8.9B parameter model based on FLUX.1-schnell"),
             (
                 "stabilityai/stable-diffusion-xl-base-1.0",
@@ -2866,7 +2866,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     or image_model_card == "yuvraj108c/FLUX.1-Kontext-dev"
                     or image_model_card == "ostris/Flex.2-preview"
                     or image_model_card == "lodestones/Chroma"
-                    or image_model_card == "diffusers/qwen-image-nf4"
+                    or image_model_card == "Qwen/Qwen-Image"
                     or image_model_card == "ChuckMcSneed/FLUX.1-dev"
                     or image_model_card == "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"
                     or image_model_card == "romanfratric234/FLUX.1-Depth-dev-lora"
@@ -7120,7 +7120,65 @@ class SEQUENCER_OT_generate_image(Operator):
                         #converter.enable_model_cpu_offload() # too slow
                         converter.enable_vae_slicing()
                         converter.vae.enable_tiling()
+                        
+                elif image_model_card == "Qwen/Qwen-Image":
+                    print("Load: Qwen-Image - img2img")
 
+                    from diffusers.utils import load_image
+                    from transformers import BitsAndBytesConfig as TransformersBitsAndBytesConfig
+                    from transformers import Qwen2_5_VLForConditionalGeneration
+                    from diffusers import BitsAndBytesConfig as DiffusersBitsAndBytesConfig
+                    from diffusers import QwenImageImg2ImgPipeline, QwenImageTransformer2DModel
+
+                    model_id = "Qwen/Qwen-Image"
+                    torch_dtype = torch.bfloat16
+                    device = gfx_device
+
+                    quantization_config_transformer = DiffusersBitsAndBytesConfig(
+                        load_in_4bit=True,
+                        bnb_4bit_quant_type="nf4",
+                        bnb_4bit_compute_dtype=torch.bfloat16,
+                        llm_int8_skip_modules=["transformer_blocks.0.img_mod"],
+                    )
+
+                    quantization_config_text_encoder = TransformersBitsAndBytesConfig(
+                        load_in_4bit=True,
+                        bnb_4bit_quant_type="nf4",
+                        bnb_4bit_compute_dtype=torch.bfloat16,
+                    )
+
+                    transformer = QwenImageTransformer2DModel.from_pretrained(
+                        model_id,
+                        subfolder="transformer",
+                        quantization_config=quantization_config_transformer,
+                        torch_dtype=torch_dtype,
+                    )
+                    transformer = transformer.to("cpu")
+
+                    text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                        model_id,
+                        subfolder="text_encoder",
+                        quantization_config=quantization_config_text_encoder,
+                        torch_dtype=torch_dtype,
+                    )
+                    text_encoder = text_encoder.to("cpu")
+
+                    converter = QwenImageImg2ImgPipeline.from_pretrained(
+                        model_id,
+                        transformer=transformer,
+                        text_encoder=text_encoder,
+                        torch_dtype=torch_dtype
+                    )
+
+                    if gfx_device == "mps":
+                        converter.to("mps")
+                    elif low_vram():
+                        converter.enable_model_cpu_offload()
+                        converter.enable_vae_slicing()
+                        converter.vae.enable_tiling()
+                    else:
+                        converter.enable_model_cpu_offload()   
+                    
                 else:
                     try:
                         converter = AutoPipelineForImage2Image.from_pretrained(
@@ -7700,80 +7758,114 @@ class SEQUENCER_OT_generate_image(Operator):
 
 
         # Qwen-Image
-# Qwen-Image
-        elif image_model_card == "diffusers/qwen-image-nf4":
-
-            import torch
-            import gc # Import garbage collector
-            import os # Import os to set environment variables
-            from diffusers import QwenImageImg2ImgPipeline, DiffusionPipeline, FlowMatchEulerDiscreteScheduler, BitsAndBytesConfig
-            from diffusers.utils import load_image
-            import math
-
-            # Suggestion from the error: helps with memory fragmentation
-            os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-
-            # NF4 Configuration for 4-bit loading
-            nf4_config = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_quant_type="nf4",
-                bnb_4bit_compute_dtype=torch.bfloat16,
-            )
-            
-            # Explicitly clear cache before loading a new model
-            torch.cuda.empty_cache()
-            gc.collect()
-
-            if do_convert:
-                print("Setting up Qwen-Image for img2img with NF4 and memory optimizations...")
-                dtype = torch.bfloat16
+        elif image_model_card == "Qwen/Qwen-Image":
+                clear_cuda_cache()
                 
-                # Load the pipeline with the quantization config directly
-                # For img2img, the full pipeline is often needed
-                pipe = QwenImageImg2ImgPipeline.from_pretrained(
-                    "diffusers/qwen-image-nf4", 
-                    torch_dtype=dtype,
-                    quantization_config=nf4_config, # Apply quantization here
-                    device_map="auto" # Let accelerate handle device placement
-                )
+                if not do_inpaint and not do_convert:
+                    print("Load: Qwen-Image")
 
-            elif not do_inpaint and not enabled_items:
-                print("Setting up Qwen-Image for text-to-image with NF4 and memory optimizations...")
-                dtype = torch.bfloat16
-                ckpt_id = "diffusers/qwen-image-nf4"
+                    from transformers import BitsAndBytesConfig as TransformersBitsAndBytesConfig
+                    from transformers import Qwen2_5_VLForConditionalGeneration
 
-                # No need for a separate scheduler config, from_pretrained will handle it
-                
-                # Load the pipeline with quantization config and let accelerate handle placement
-                pipe = DiffusionPipeline.from_pretrained(
-                    ckpt_id, 
-                    torch_dtype=dtype,
-                    quantization_config=nf4_config,
-                    device_map="auto" # This is key for BitsAndBytes + offloading
-                )
-
-            else:
-                print("Inpaint and LoRA are not supported for Qwen-Image in this configuration!")
-                # Fallback or error for unsupported modes
-                pipe = None
+                    from diffusers import BitsAndBytesConfig as DiffusersBitsAndBytesConfig
+                    from diffusers import QwenImagePipeline, QwenImageTransformer2DModel
 
 
-            # Apply aggressive memory saving techniques AFTER loading the pipe
-            if pipe is not None:
-                if low_vram():
-                    print("Enabling VAE slicing and tiling for low VRAM.")
-                    pipe.enable_vae_slicing()
-                    # Tiling is on the VAE component itself
-                    if hasattr(pipe, 'vae'):
-                        pipe.vae.enable_tiling()
+                    model_id = "Qwen/Qwen-Image"
+                    torch_dtype = torch.bfloat16
+                    device = gfx_device
+
+                    quantization_config = DiffusersBitsAndBytesConfig(
+                        load_in_4bit=True,
+                        bnb_4bit_quant_type="nf4",
+                        bnb_4bit_compute_dtype=torch.bfloat16,
+                        llm_int8_skip_modules=["transformer_blocks.0.img_mod"],
+                    )
+
+                    transformer = QwenImageTransformer2DModel.from_pretrained(
+                        model_id,
+                        subfolder="transformer",
+                        quantization_config=quantization_config,
+                        torch_dtype=torch_dtype,
+                    )
+                    transformer = transformer.to("cpu")
+
+                    quantization_config = TransformersBitsAndBytesConfig(
+                        load_in_4bit=True,
+                        bnb_4bit_quant_type="nf4",
+                        bnb_4bit_compute_dtype=torch.bfloat16,
+                    )
+
+                    text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                        model_id,
+                        subfolder="text_encoder",
+                        quantization_config=quantization_config,
+                        torch_dtype=torch_dtype,
+                    )
+                    text_encoder = text_encoder.to("cpu")
+
+                    pipe = QwenImagePipeline.from_pretrained(
+                        model_id, transformer=transformer, text_encoder=text_encoder, torch_dtype=torch_dtype
+                    )
+                    
                 else:
-                    # Even on 24GB, sequential offload is safer for large models
-                    print("Enabling sequential CPU offload.")
-                    pipe.enable_sequential_cpu_offload()
-                    print("Enabling VAE slicing and tiling.")
+                    print("Load: Qwen-Image - img2img")
+
+                    from diffusers.utils import load_image
+                    from transformers import BitsAndBytesConfig as TransformersBitsAndBytesConfig
+                    from transformers import Qwen2_5_VLForConditionalGeneration
+                    from diffusers import BitsAndBytesConfig as DiffusersBitsAndBytesConfig
+                    from diffusers import QwenImageImg2ImgPipeline, QwenImageTransformer2DModel
+
+                    model_id = "Qwen/Qwen-Image"
+                    torch_dtype = torch.bfloat16
+                    device = gfx_device
+
+                    quantization_config_transformer = DiffusersBitsAndBytesConfig(
+                        load_in_4bit=True,
+                        bnb_4bit_quant_type="nf4",
+                        bnb_4bit_compute_dtype=torch.bfloat16,
+                        llm_int8_skip_modules=["transformer_blocks.0.img_mod"],
+                    )
+
+                    quantization_config_text_encoder = TransformersBitsAndBytesConfig(
+                        load_in_4bit=True,
+                        bnb_4bit_quant_type="nf4",
+                        bnb_4bit_compute_dtype=torch.bfloat16,
+                    )
+
+                    transformer = QwenImageTransformer2DModel.from_pretrained(
+                        model_id,
+                        subfolder="transformer",
+                        quantization_config=quantization_config_transformer,
+                        torch_dtype=torch_dtype,
+                    )
+                    transformer = transformer.to("cpu")
+
+                    text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                        model_id,
+                        subfolder="text_encoder",
+                        quantization_config=quantization_config_text_encoder,
+                        torch_dtype=torch_dtype,
+                    )
+                    text_encoder = text_encoder.to("cpu")
+
+                    pipe = QwenImageImg2ImgPipeline.from_pretrained(
+                        model_id,
+                        transformer=transformer,
+                        text_encoder=text_encoder,
+                        torch_dtype=torch_dtype
+                    )
+
+                if gfx_device == "mps":
+                    pipe.to("mps")
+                elif low_vram():
+                    pipe.enable_model_cpu_offload()
                     pipe.enable_vae_slicing()
-                    if hasattr(pipe, 'vae'):
-                        pipe.vae.enable_tiling()
+                    pipe.vae.enable_tiling()
+                else:
+                    pipe.enable_model_cpu_offload()                   
+                    #pipe.to(device)                 
         
         # Chroma
         elif image_model_card == "lodestones/Chroma":
@@ -9032,6 +9124,23 @@ class SEQUENCER_OT_generate_image(Operator):
                         generator=generator,
                     ).images[0]
                 elif (
+                    image_model_card == "Qwen/Qwen-Image"
+                ):
+                    image = converter(
+                        prompt=prompt,
+                        #prompt_2=None,
+                        negative_prompt=negative_prompt,
+                        max_sequence_length=512,
+                        image=init_image,
+                        strength=1.00 - scene.image_power,
+                        # negative_prompt=negative_prompt,
+                        num_inference_steps=image_num_inference_steps,
+                        guidance_scale=image_num_guidance,
+                        height=y,
+                        width=x,
+                        generator=generator,
+                    ).images[0]
+                elif (
                     image_model_card == "yuvraj108c/FLUX.1-Kontext-dev"
                 ):
                         
@@ -9372,6 +9481,35 @@ class SEQUENCER_OT_generate_image(Operator):
                             # negative_prompt=negative_prompt,
                             num_inference_steps=image_num_inference_steps,
                             guidance_scale=0.0,
+                            height=y,
+                            width=x,
+                            generator=generator,
+                            max_sequence_length=512,
+                        ).images[0]
+                        
+                # Qwen
+                elif image_model_card == "Qwen/Qwen-Image":
+                    # LoRA.
+                    if enabled_items:
+                        image = pipe(
+                            # prompt_embeds=prompt, # for compel - long prompts
+                            prompt,
+                            negative_prompt=negative_prompt,
+                            num_inference_steps=image_num_inference_steps,
+                            #guidance_scale=0.0,
+                            height=y,
+                            width=x,
+                            true_cfg_scale=4.0,
+                            generator=generator,
+                        ).images[0]
+
+                    # No LoRA.
+                    else:
+                        image = pipe(
+                            prompt,
+                            negative_prompt=negative_prompt,
+                            num_inference_steps=image_num_inference_steps,
+                            true_cfg_scale=4.0,
                             height=y,
                             width=x,
                             generator=generator,
