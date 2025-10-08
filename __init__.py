@@ -102,9 +102,9 @@ for path in unique_ordered_paths:
 
 sys.path[:] = non_site_paths + final_site_paths
 
-print("\n--- Modified Python Path (site-packages moved to the end) ---")
-for i, path in enumerate(sys.path):
-    print(f"{i}: {path}")
+#print("\n--- Modified Python Path (site-packages moved to the end) ---")
+#for i, path in enumerate(sys.path):
+#    print(f"{i}: {path}")
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning, module="xformers.*")
@@ -1703,6 +1703,11 @@ class GeneratorAddonPreferences(AddonPreferences):
 
 #            ("ostris/Flex.2-preview", "Flex 2 Preview", "ostris/Flex.2-preview"),
             ("Qwen/Qwen-Image", "Qwen-Image", "Qwen/Qwen-Image"),
+            (
+                "Qwen/Qwen-Image-Edit-2509",
+                "Qwen Multi-image Edit",
+                "Text and multiple images as input.",
+            ),            
             ("lodestones/Chroma", "Chroma", "Chroma is a 8.9B parameter model based on FLUX.1-schnell"),
             (
                 "stabilityai/stable-diffusion-xl-base-1.0",
@@ -2330,8 +2335,8 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
 
         if scene.sequence_editor is None:
             scene.sequence_editor_create()
-
-        # Input
+            
+        # OmniGen
         if image_model_card == "Shitao/OmniGen-v1-diffusers" and type == "image":
             col.prop(context.scene, "omnigen_prompt_1", text="", icon="ADD")
             row = col.row(align=True)
@@ -2369,7 +2374,6 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             )
             row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = "omni_select3"
 
-
         elif image_model_card == "Salesforce/blipdiffusion" and type == "image":
             col.prop(context.scene, "input_strips", text="Source Image")
             col.prop(context.scene, "blip_cond_subject", text="Source Subject")
@@ -2388,6 +2392,41 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 col.prop(context.scene, "input_strips", text="Input")
             except:
                 pass
+
+        # Qwen multi-image
+        if image_model_card == "Qwen/Qwen-Image-Edit-2509" and type == "image":
+            row = col.row(align=True)
+            row.prop_search(
+                scene,
+                "qwen_strip_1",
+                scene.sequence_editor,
+                "sequences",
+                text="",
+                icon="FILE_IMAGE",
+            )
+            row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = "qwen_select1"
+
+            row = col.row(align=True)
+            row.prop_search(
+                scene,
+                "qwen_strip_2",
+                scene.sequence_editor,
+                "sequences",
+                text="",
+                icon="FILE_IMAGE",
+            )
+            row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = "qwen_select2"
+
+            row = col.row(align=True)
+            row.prop_search(
+                scene,
+                "qwen_strip_3",
+                scene.sequence_editor,
+                "sequences",
+                text="",
+                icon="FILE_IMAGE",
+            )
+            row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = "qwen_select3"
 
         if image_model_card == "kontext-community/relighting-kontext-dev-lora-v3" and type == "image":
             box = layout.box()
@@ -2433,6 +2472,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     and image_model_card != "Salesforce/blipdiffusion"
                     and image_model_card != "ZhengPeng7/BiRefNet_HR"
                     and image_model_card != "Shitao/OmniGen-v1-diffusers"
+                    and image_model_card != "Qwen/Qwen-Image-Edit-2509"
                     and image_model_card != "Runware/FLUX.1-Redux-dev"
                     and image_model_card != "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"
                     and image_model_card != "romanfratric234/FLUX.1-Depth-dev-lora"
@@ -2762,6 +2802,9 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     else:
                         if (
                             image_model_card == "Shitao/OmniGen-v1-diffusers"
+                            and type == "image"
+                        ) or (
+                            image_model_card == "Qwen/Qwen-Image-Edit-2509"
                             and type == "image"
                         ):
                             col.prop(
@@ -6696,6 +6739,7 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "Vargol/ProteusV0.4"
             and not image_model_card == "ZhengPeng7/BiRefNet_HR"
             and not image_model_card == "Shitao/OmniGen-v1-diffusers"
+            and not image_model_card == "Qwen/Qwen-Image-Edit-2509"
 #            and (not scene.ip_adapter_face_folder and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0")
 #            and (not scene.ip_adapter_style_folder and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0")
         )
@@ -6709,6 +6753,7 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "Vargol/ProteusV0.4"
             and not image_model_card == "ZhengPeng7/BiRefNet_HR"
             and not image_model_card == "Shitao/OmniGen-v1-diffusers"
+            and not image_model_card == "Qwen/Qwen-Image-Edit-2509"
 #            and (not scene.ip_adapter_face_folder and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0")
 #            and (not scene.ip_adapter_style_folder and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0")
             and not do_inpaint
@@ -6724,6 +6769,7 @@ class SEQUENCER_OT_generate_image(Operator):
             and not scene.ip_adapter_face_folder
             and not scene.ip_adapter_style_folder
             and not image_model_card == "Shitao/OmniGen-v1-diffusers"
+            and not image_model_card == "Qwen/Qwen-Image-Edit-2509"
         ):
             if not strips:
                 self.report({"INFO"}, "Select strip(s) for processing.")
@@ -8062,6 +8108,79 @@ class SEQUENCER_OT_generate_image(Operator):
                 # pipe.enable_sequential_cpu_offload()
                 # pipe.vae.enable_tiling()
                 pipe.enable_model_cpu_offload()
+                
+        # Qwen Multi-image
+        elif image_model_card == "Qwen/Qwen-Image-Edit-2509":
+            clear_cuda_cache() 
+
+            print("Load: Qwen-Image-Edit-2509")
+
+            # Import necessary classes for quantization and model components
+            from transformers import BitsAndBytesConfig as TransformersBitsAndBytesConfig
+            from transformers import Qwen2_5_VLForConditionalGeneration
+            from diffusers import BitsAndBytesConfig as DiffusersBitsAndBytesConfig
+            from diffusers import QwenImageEditPlusPipeline, QwenImageTransformer2DModel
+
+            # Define model ID, data type, and device
+            model_id = "Qwen/Qwen-Image-Edit-2509"
+            torch_dtype = torch.bfloat16
+            device = gfx_device
+
+            # Configure 4-bit quantization for the transformer model
+            quantization_config_diffusers = DiffusersBitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_compute_dtype=torch.bfloat16,
+                llm_int8_skip_modules=["transformer_blocks.0.img_mod"],
+            )
+
+            # Load the transformer model with quantization and move to CPU initially
+            transformer = QwenImageTransformer2DModel.from_pretrained(
+                model_id,
+                subfolder="transformer",
+                quantization_config=quantization_config_diffusers,
+                torch_dtype=torch_dtype,
+            )
+            transformer = transformer.to("cpu")
+
+            # Configure 4-bit quantization for the text encoder
+            quantization_config_transformers = TransformersBitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_compute_dtype=torch.bfloat16,
+            )
+
+            # Load the text encoder with quantization and move to CPU initially
+            text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                model_id,
+                subfolder="text_encoder",
+                quantization_config=quantization_config_transformers,
+                torch_dtype=torch_dtype,
+            )
+            text_encoder = text_encoder.to("cpu")
+
+            # Assemble the pipeline from the pre-loaded, quantized components
+            pipe = QwenImageEditPlusPipeline.from_pretrained(
+                model_id,
+                transformer=transformer,
+                text_encoder=text_encoder,
+                torch_dtype=torch_dtype
+            )
+
+            print("Pipeline loaded")
+
+            # Move the complete pipeline to the GPU for inference
+            # pipeline.to(device)
+
+            if gfx_device == "mps":
+                pipe.to("mps")
+            elif low_vram():
+                pipe.enable_sequential_cpu_offload()
+                pipe.vae.enable_tiling()
+            else:
+                #pipe.enable_sequential_cpu_offload()
+                # pipe.vae.enable_tiling()
+                pipe.to(gfx_device)
 
         # Stable diffusion etc.
         else:
@@ -8406,7 +8525,7 @@ class SEQUENCER_OT_generate_image(Operator):
             else:
                 refiner.to(gfx_device)
 
-        # Main Generate Loop Image:
+        # --------------------- Main Generate Loop Image -------------------------
         from PIL import Image
         import random
 
@@ -8841,6 +8960,8 @@ class SEQUENCER_OT_generate_image(Operator):
                 image = pipe(
                     **inference_parameters,
                 ).images[0]
+                
+            # OmniGen    
             elif image_model_card == "Shitao/OmniGen-v1-diffusers":
                 omnigen_images = []
 
@@ -8897,6 +9018,74 @@ class SEQUENCER_OT_generate_image(Operator):
                 image = pipe(
                     **inference_parameters,
                 ).images[0]
+
+            #Qwen Multi-image
+            elif image_model_card == "Qwen/Qwen-Image-Edit-2509":
+                
+                qwen_images = []
+                init_image = None
+                
+                if scene.input_strips == "input_strips":
+                    if scene.image_path:
+                        init_image = load_first_frame(scene.image_path)
+                    if scene.movie_path:
+                        init_image = load_first_frame(scene.movie_path)
+                    if init_image:
+                        qwen_images.append(init_image)
+
+                if find_strip_by_name(scene, scene.qwen_strip_1):
+                    qwen_images.append(
+                        load_first_frame(
+                            get_strip_path(
+                                find_strip_by_name(scene, scene.qwen_strip_1)
+                            )
+                        )
+                    )
+
+                if find_strip_by_name(scene, scene.qwen_strip_2):
+                    qwen_images.append(
+                        load_first_frame(
+                            get_strip_path(
+                                find_strip_by_name(scene, scene.qwen_strip_2)
+                            )
+                        )
+                    )
+
+                if init_image != None and find_strip_by_name(scene, scene.qwen_strip_3):
+                    qwen_images.append(
+                        load_first_frame(
+                            get_strip_path(
+                                find_strip_by_name(scene, scene.qwen_strip_3)
+                            )
+                        )
+                    )
+
+                if not qwen_images:
+                    qwen_images = None
+                    img_size = False
+                else:
+                    img_size = True
+                inference_parameters = {
+                    "image": qwen_images,
+                    "prompt": prompt,
+                    "generator": generator,
+                    "true_cfg_scale": 4.0,
+                    "negative_prompt": negative_prompt+" ",
+                    "num_inference_steps": image_num_inference_steps,
+                    "guidance_scale": 1.0,
+                    "num_images_per_prompt": 1,
+#                    "height": y,
+#                    "width": x,
+                }
+
+                with torch.inference_mode():
+                    image = pipe(
+                        **inference_parameters,
+                    ).images[0]
+#                    output = pipeline(**inputs)
+#                    output_image = output.images[0]
+#                    output_image.save("output_image_edit_plus.png")
+#                    print("Image saved at", os.path.abspath("output_image_edit_plus.png"))
 
             # Inpaint
             elif do_inpaint:
@@ -10456,27 +10645,46 @@ class SEQUENCER_OT_ai_strip_picker(Operator):
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):
                 context.scene.omnigen_strip_3 = strip.name
+                
+        if self.action == "qwen_select1":
+            self.report({"INFO"}, f"Picked: {strip.name}")
+            if find_strip_by_name(scene, strip.name):
+                scene.qwen_strip_1 = strip.name
+        elif self.action == "qwen_select2":
+            print(f"Picked Strip Name: {strip.name}")
+            self.report({"INFO"}, f"Picked '{strip.name}'")
+            if find_strip_by_name(scene, strip.name):
+                context.scene.qwen_strip_2 = strip.name
+        elif self.action == "qwen_select3":
+            print(f"Picked Strip Name: {strip.name}")
+            self.report({"INFO"}, f"Picked '{strip.name}'")
+            if find_strip_by_name(scene, strip.name):
+                context.scene.qwen_strip_3 = strip.name
+                
         elif self.action == "minimax_select":
             print(f"Picked Strip Name: {strip.name}")
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):
                 context.scene.minimax_subject = strip.name
+                
         elif self.action == "inpaint_select":
             print(f"Picked Strip Name: {strip.name}")
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):
                 context.scene.inpaint_selected_strip = strip.name
+                
         elif self.action == "out_frame_select":
             print(f"Picked Strip Name: {strip.name}")
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):
                 context.scene.out_frame = strip.name
+                
         if self.action == "kontext_select1":
             self.report({"INFO"}, f"Picked: {strip.name}")
             if find_strip_by_name(scene, strip.name):
                 scene.kontext_strip_1 = strip.name
-        else:
-            self.report({"WARNING"}, f"Unknown action: {self.action}")
+#        else:
+#            self.report({"WARNING"}, f"Unknown action: {self.action}")
 
     def invoke(self, context, event):
         if context.area.type == 'SEQUENCE_EDITOR':
@@ -11019,6 +11227,17 @@ def register():
     bpy.types.Scene.omnigen_strip_3 = bpy.props.StringProperty(
         name="omnigen_strip_3", options={"TEXTEDIT_UPDATE"}, default=""
     )
+
+    bpy.types.Scene.qwen_strip_1 = bpy.props.StringProperty(
+        name="qwen_strip_1", options={"TEXTEDIT_UPDATE"}, default=""
+    )
+    bpy.types.Scene.qwen_strip_2 = bpy.props.StringProperty(
+        name="qwen_strip_2", options={"TEXTEDIT_UPDATE"}, default=""
+    )
+    bpy.types.Scene.qwen_strip_3 = bpy.props.StringProperty(
+        name="qwen_strip_3", options={"TEXTEDIT_UPDATE"}, default=""
+    )
+
     # The guidance number.
     bpy.types.Scene.img_guidance_scale = bpy.props.FloatProperty(
         name="img_guidance_scale",
