@@ -2910,6 +2910,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     or image_model_card == "ostris/Flex.2-preview"
                     or image_model_card == "lodestones/Chroma"
                     or image_model_card == "Qwen/Qwen-Image"
+                    or image_model_card == "Qwen/Qwen-Image-Edit-2509"
                     or image_model_card == "ChuckMcSneed/FLUX.1-dev"
                     or image_model_card == "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"
                     or image_model_card == "romanfratric234/FLUX.1-Depth-dev-lora"
@@ -8475,6 +8476,8 @@ class SEQUENCER_OT_generate_image(Operator):
             or image_model_card == "lzyvegetable/FLUX.1-schnell"
             or image_model_card == "ChuckMcSneed/FLUX.1-dev"
             or image_model_card == "ostris/Flex.2-preview"
+            or image_model_card == "Qwen/Qwen-Image-Edit-2509"
+            or image_model_card == "Qwen/Qwen-Image"
 #            or image_model_card == "Runware/FLUX.1-Redux-dev"
 #            or image_model_card == "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"
 #            or image_model_card == "romanfratric234/FLUX.1-Depth-dev-lora"
@@ -8641,6 +8644,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     image = load_first_frame(scene.movie_path)
                 if not image:
                     print("Loading strip failed!")
+                    clear_cuda_cache() 
                     return {"CANCELLED"}
                 image = image.resize((x, y))
                 # image = scale_image_within_dimensions(np.array(init_image),x,None)
@@ -8683,6 +8687,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     init_image = load_first_frame(scene.movie_path)
                 if not init_image:
                     print("Loading strip failed!")
+                    clear_cuda_cache() 
                     return {"CANCELLED"}
                 image = scale_image_within_dimensions(np.array(init_image), x, None)
 
@@ -8729,6 +8734,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     init_image = load_first_frame(scene.movie_path)
                 if not init_image:
                     print("Loading strip failed!")
+                    clear_cuda_cache() 
                     return {"CANCELLED"}
                 image = init_image
                 #image = scale_image_within_dimensions(np.array(init_image), x, None)
@@ -8767,6 +8773,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     init_image = load_first_frame(scene.movie_path)
                 if not init_image:
                     print("Loading strip failed!")
+                    clear_cuda_cache() 
                     return {"CANCELLED"}
                 image = init_image
                 pipe_prior_output = pipe_prior_redux(image)
@@ -8789,6 +8796,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     init_image = load_first_frame(scene.movie_path)
                 if not init_image:
                     print("Loading strip failed!")
+                    clear_cuda_cache() 
                     return {"CANCELLED"}
                 image = scale_image_within_dimensions(np.array(init_image), x, None)
 
@@ -8839,6 +8847,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     init_image = load_first_frame(scene.movie_path)
                 if not init_image:
                     print("Loading strip failed!")
+                    clear_cuda_cache() 
                     return {"CANCELLED"}
                 init_image = init_image.resize((x, y))
                 style_image = init_image
@@ -9062,9 +9071,10 @@ class SEQUENCER_OT_generate_image(Operator):
 
                 if not qwen_images:
                     qwen_images = None
-                    img_size = False
-                else:
-                    img_size = True
+                    print("No input images found. Cancelled!")
+                    clear_cuda_cache() 
+                    return {"CANCELLED"}
+
                 inference_parameters = {
                     "image": qwen_images,
                     "prompt": prompt,
@@ -9072,7 +9082,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     "true_cfg_scale": 4.0,
                     "negative_prompt": negative_prompt+" ",
                     "num_inference_steps": image_num_inference_steps,
-                    "guidance_scale": 1.0,
+                    #"guidance_scale": 1.0,
                     "num_images_per_prompt": 1,
 #                    "height": y,
 #                    "width": x,
@@ -9096,6 +9106,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
                 if not mask_strip:
                     print("Selected mask not found!")
+                    clear_cuda_cache() 
                     return {"CANCELLED"}
                 if (
                     mask_strip.type == "MASK"
@@ -9119,6 +9130,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     init_image = load_first_frame(scene.movie_path)
                 if not init_image:
                     print("Loading init image failed!")
+                    clear_cuda_cache() 
                     return {"CANCELLED"}
                 else:
                     init_image = init_image.resize((x, y))
@@ -9263,6 +9275,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 if (image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin") or (image_model_card == "lzyvegetable/FLUX.1-schnell" and os_platform == "Darwin"):
                     if not img_path:
                         print("Please, input an image!")
+                        clear_cuda_cache() 
                         return {"CANCELLED"}
                     image = converter.generate_image(
                        seed=abs(int(seed)),
@@ -9568,6 +9581,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
                         if not mask_strip:
                             print("Selected mask not found!")
+                            clear_cuda_cache() 
                             return {"CANCELLED"}
                         if (
                             mask_strip.type == "MASK"
@@ -9593,6 +9607,7 @@ class SEQUENCER_OT_generate_image(Operator):
                             init_image = load_first_frame(scene.movie_path)
                         if not init_image:
                             print("Loading strip failed!")
+                            clear_cuda_cache() 
                             return {"CANCELLED"}
                         image = pipe(
                             prompt,
@@ -9620,6 +9635,7 @@ class SEQUENCER_OT_generate_image(Operator):
                             init_image = load_first_frame(scene.movie_path)
                         if not init_image:
                             print("Loading strip failed!")
+                            clear_cuda_cache() 
                             return {"CANCELLED"}
                         image = pipe(
                             prompt,
