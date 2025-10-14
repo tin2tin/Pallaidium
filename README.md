@@ -114,6 +114,7 @@ The generated media will be saved to the directory specified in the addon prefer
 
 
 ## Change Log
+* 2025-10-1: Fix: Deps. Add: Qwen Multi-image Edit.
 * 2025-7-05: Add: FLUX Kontext Relight.
 * 2025-6-26: Add: FLUX.1 Dev Kontext. Update Diffusers by installing this: "git+https://github.com/huggingface/diffusers.git" with the Python Module Manager add-on (link below), and restart Blender. 
 * 2025-6-22: Add: Long string parsing for Chatterbox (for Audiobooks). Use Blender 5.0 Alpha.
