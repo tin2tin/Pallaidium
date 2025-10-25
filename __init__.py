@@ -1097,7 +1097,6 @@ def install_modules(self):
 #        pybin, "pip", "install", "--disable-pip-version-check",
 #        "--use-deprecated=legacy-resolver", "timm", "--upgrade"
 #    ])
-
     install_module("sageattention","sageattention==1.0.6")
     install_module("timm", "git+https://github.com/rwightman/pytorch-image-models.git")
     install_module("protobuf", "protobuf==3.20.1")
@@ -1107,6 +1106,8 @@ def install_modules(self):
     #install_module("transformers", "transformers==4.46.1")
     #install_module("transformers", "git+https://github.com/huggingface/transformers.git")
     install_module("transformers", "transformers==4.56.2")
+    install_module("onnx", "onnx==1.18.0"),
+    install_module("onnxruntime", "onnxruntime==1.21.0"),
     #print("Cleaning up cache...")
     #subprocess.check_call([pybin, "-m", "pip", "cache", "purge"])
     subprocess.check_call([pybin, "-m", "pip", "list"])
@@ -1197,7 +1198,7 @@ class GENERATOR_OT_uninstall(Operator):
                 "resemble-enhance", "mediapipe", "flash_attn", "stable-audio-tools",
                 "beautifulsoup4", "ftfy", "deepspeed",
                 "gradio-client" , "suno-bark", "peft", "ultralytics",
-                "parler-tts"
+                "parler-tts", "onnx", "onnxruntime"
             ], # "albumentations", "datasets", "insightface"
             "Utils": [
                 "celluloid", "omegaconf", "pandas", "ptflops", "rich", "resampy",
@@ -1645,14 +1646,14 @@ class GeneratorAddonPreferences(AddonPreferences):
 #            ),
             #            ("genmo/mochi-1-preview", "Mochi-1", "genmo/mochi-1-preview"), #noot good enough yet!
             (
-                "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
+                "FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers",
                 "Wan2.1-T2V (832x480x81)",
-                "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
+                "FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers",
             ),
             (
-                "Wan-AI/Wan2.1-I2V-14B-480P-Diffusers",
-                "Wan2.1-I2V-14B-480P (832x480x81)",
-                "Wan-AI/Wan2.1-I2V-14B-480P-Diffusers",
+                "FastDM/Wan2.2-I2V-A14B-Merge-Lightning-V1.0-Diffusers",
+                "Wan2.2-I2V-14B-480P (832x480x81)",
+                "FastDM/Wan2.2-I2V-A14B-Merge-Lightning-V1.0-Diffusers",
             ),
             
 #            (
@@ -2923,8 +2924,8 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 type == "movie")
                 and (movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
                 or (movie_model_card == "hunyuanvideo-community/HunyuanVideo")
-                or (movie_model_card == "Wan-AI/Wan2.1-I2V-14B-480P-Diffusers")
-                or (movie_model_card == "Wan-AI/Wan2.1-T2V-1.3B-Diffusers")
+                or (movie_model_card == "FastDM/Wan2.2-I2V-A14B-Merge-Lightning-V1.0-Diffusers")
+                or (movie_model_card == "FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers")
                 or (movie_model_card == "Wan-AI/Wan2.1-VACE-1.3B-diffusers")
             )):
                 layout = self.layout
@@ -3325,7 +3326,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             and movie_model_card != "Hailuo/MiniMax/img2vid"
             and movie_model_card != "Hailuo/MiniMax/subject2vid"
             and movie_model_card != "Skywork/SkyReels-V1-Hunyuan-T2V"
-            and movie_model_card != "Wan-AI/Wan2.1-I2V-14B-480P-Diffusers"
+            and movie_model_card != "FastDM/Wan2.2-I2V-A14B-Merge-Lightning-V1.0-Diffusers"
             and movie_model_card != "Wan-AI/Wan2.1-VACE-1.3B-diffusers"
         ) or movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
             # Frame by Frame
@@ -3877,7 +3878,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 print("Stable Video Diffusion needs image input")
                 return {"CANCELLED"}
 
-            elif movie_model_card == "Wan-AI/Wan2.1-T2V-1.3B-Diffusers":
+            elif movie_model_card == "FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers":
                 if (scene.movie_path or scene.image_path) and input == "input_strips":
                     print("Wan2.1-T2V doesn't support img/vid2vid!")
                     return {"CANCELLED"}
@@ -3898,11 +3899,11 @@ class SEQUENCER_OT_generate_movie(Operator):
                     components_to_quantize=["transformer"],
                 )
 
-                print("Loading Wan-AI/Wan2.1-T2V-1.3B-Diffusers with 4-bit quantization API...")
+                print("Loading FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers with 4-bit quantization API...")
                 
                 # Pass the new config object to from_pretrained
                 pipe = WanPipeline.from_pretrained(
-                    "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
+                    "FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers",
                     quantization_config=pipeline_quant_config,
                 )
 
@@ -3967,7 +3968,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 else:
                     pipe.enable_model_cpu_offload()
 
-            elif movie_model_card == "Wan-AI/Wan2.1-I2V-14B-480P-Diffusers":
+            elif movie_model_card == "FastDM/Wan2.2-I2V-A14B-Merge-Lightning-V1.0-Diffusers":
                 if (not scene.movie_path and not scene.image_path) and not input == "input_strips":
                     print("Wan2.1-I2V doesn't support txt2vid!")
                     self.report({'ERROR'}, "Wan2.1-I2V requires an input image or video.")
@@ -4618,7 +4619,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         #max_sequence_length=512,
                     ).frames[0]
 
-                elif movie_model_card == "Wan-AI/Wan2.1-I2V-14B-480P-Diffusers":
+                elif movie_model_card == "FastDM/Wan2.2-I2V-A14B-Merge-Lightning-V1.0-Diffusers":
                     from diffusers.utils import load_image, export_to_video
                     import numpy as np
                     if scene.movie_path:
@@ -4702,7 +4703,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     movie_model_card != "Hailuo/MiniMax/txt2vid"
                     and movie_model_card != "Hailuo/MiniMax/img2vid"
                     and movie_model_card != "Hailuo/MiniMax/subject2vid"
-                    and movie_model_card != "Wan-AI/Wan2.1-T2V-1.3B-Diffusers"
+                    and movie_model_card != "FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers"
                 ): #something is broken here?
                     if scene.movie_path:
                         print("Process: Video to video")
@@ -4755,7 +4756,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         generator=generator,
                     ).frames[0]
 
-                elif movie_model_card == "Wan-AI/Wan2.1-T2V-1.3B-Diffusers":
+                elif movie_model_card == "FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers":
                     if (scene.movie_path or scene.image_path) and input == "input_strips":
                         print("Wan2.1-T2V doesn't support img/vid2vid!")
                         return {"CANCELLED"}
