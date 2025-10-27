@@ -114,6 +114,7 @@ The generated media will be saved to the directory specified in the addon prefer
 
 
 ## Change Log
+* 2025-10-27: Remove 30 dead models. 
 * 2025-10-1: Fix: Deps. Add: Qwen Multi-image Edit.
 * 2025-7-05: Add: FLUX Kontext Relight.
 * 2025-6-26: Add: FLUX.1 Dev Kontext. Update Diffusers by installing this: "git+https://github.com/huggingface/diffusers.git" with the Python Module Manager add-on (link below), and restart Blender. 
@@ -196,25 +197,6 @@ https://github.com/tin2tin/Pallaidium/assets/1322593/28098eb6-3a93-4bcb-bd6f-53b
 ### Voices for Parler TTS: 
 Laura, Gary, Jon, Lea, Karen, Rick, Brenda, David, Eileen, Jordan, Mike, Yann, Joy, James, Eric, Lauren, Rose, Will, Jason, Aaron, Naomie, Alisa, Patrick, Jerry, Tina, Jenna, Bill, Tom, Carol, Barbara, Rebecca, Anna, Bruce, Emily
 
-### Bark
-Find Bark documentation here: https://github.com/suno-ai/bark
-* [laughter]
-* [laughs]
-* [sighs]
-* [music]
-* [gasps]
-* [clears throat]
-* — or ... for hesitations
-* ♪ for song lyrics
-* capitalization for emphasis on a word
-* MAN/WOMAN: for bias towards the speaker
-
-Speaker Library: https://suno-ai.notion.site/8b8e8749ed514b0cbf3f699013548683?v=bc67cff786b04b50b3ceb756fd05f68c
-
-If the audio breaks up           |
-:------------- |
-Try processing longer sentences.      |
-
 ## Useful add-ons
 
 ### GPT4BLENDER
@@ -223,7 +205,7 @@ Use GPT4ALL to generate image prompts or stories:
 
 https://github.com/tin2tin/GPT4BLENDER
 
-![image](https://github.com/user-attachments/assets/464e0fe3-0994-4920-9ceb-ef68b331866b)
+![image](https://github.com/user-attachments/assets/464e0fe3-0994-4920-9ceb-ef68331866b)
 
 ### Text to Strip
 
@@ -339,35 +321,18 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 - [SkyReels-V1-Hunyuan-I2V/T2V](https://huggingface.co/Skywork/SkyReels-V1-Hunyuan-I2V)
 - [HunyuanVideo](https://huggingface.co/tencent/HunyuanVideo)
 - [Lightricks/LTX-Video](https://huggingface.co/Lightricks/LTX-Video)
-- [stabilityai/stable-video-diffusion-img2vid-xt](https://huggingface.co/stabilityai/stable-video-diffusion-img2vid-xt)
-- [stabilityai/stable-video-diffusion-img2vid](https://huggingface.co/stabilityai/stable-video-diffusion-img2vid)
 - [THUDM/CogVideoX-5b](https://huggingface.co/THUDM/CogVideoX-5b)
-- [cerspense/zeroscope_v2_XL](https://huggingface.co/cerspense/zeroscope_v2_XL)
 
 ### Image:
 - [stabilityai/stable-diffusion-xl-base-1.0](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0)
-- [ByteDance/SDXL-Lightning](https://huggingface.co/ByteDance/SDXL-Lightning)
-- [stabilityai/stable-diffusion-3-medium-diffusers](https://huggingface.co/stabilityai/stable-diffusion-3-medium-diffusers)
 - [black-forest-labs/FLUX.1-schnell](https://huggingface.co/black-forest-labs/FLUX.1-schnell)
 - [black-forest-labs/FLUX.1-dev](https://huggingface.co/ChuckMcSneed/FLUX.1-dev)
 - [black-forest-labs/FLUX.1-Kontext-dev](https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev)
-- [fluently/Fluently-XL-Final](https://huggingface.co/fluently/Fluently-XL-Final)
-- [shuttleai/shuttle-jaguar](https://huggingface.co/shuttleai/shuttle-jaguar)
-- [Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers](https://huggingface.co/Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers)
-- [Kwai-Kolors/Kolors-diffusers](https://huggingface.co/Kwai-Kolors/Kolors-diffusers)
-- [dataautogpt3/OpenDalleV1.1](https://huggingface.co/dataautogpt3/OpenDalleV1.1)
-- [PixArt-alpha/PixArt-Sigma_16bit](https://huggingface.co/Vargol/PixArt-Sigma_16bit)
-- [PixArt-alpha/PixArt-Sigma_2k_16bit](https://huggingface.co/Vargol/PixArt-Sigma_2k_16bit)
-- [dataautogpt3/ProteusV0.4](https://huggingface.co/Vargol/ProteusV0.4)
-- [SG161222/RealVisXL_V4.0](https://huggingface.co/SG161222/RealVisXL_V4.0)
-- [Salesforce/blipdiffusion](https://huggingface.co/Salesforce/blipdiffusion)
 - [diffusers/controlnet-canny-sdxl-1.0-small](https://huggingface.co/diffusers/controlnet-canny-sdxl-1.0-small)
 - [xinsir/controlnet-openpose-sdxl-1.0](https://huggingface.co/xinsir/controlnet-openpose-sdxl-1.0)
 - [xinsir/controlnet-scribble-sdxl-1.0](https://huggingface.co/xinsir/controlnet-scribble-sdxl-1.0)
 - [ZhengPeng7/BiRefNet](https://huggingface.co/ZhengPeng7/BiRefNet)
-- [Flex](https://huggingface.co/ostris/Flex.1-alpha)
 - [Lumina 2](https://huggingface.co/Alpha-VLLM/Lumina-Image-2.0)
-- [Sana](https://huggingface.co/Efficient-Large-Model/Sana_1600M_1024px_diffusers)
 - [OmniGen](https://github.com/VectorSpaceLab/OmniGen)
 - [Chroma](https://huggingface.co/lodestones/Chroma)
 - [Relight](https://huggingface.co/kontext-community/relighting-kontext-dev-lora-v3)
@@ -396,14 +361,3 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 > 🚨 Please help us report this scam — otherwise, we may be forced to delete this GitHub repository.
 
 ![PallAIdium](https://github.com/tin2tin/Generative_AI/assets/1322593/1b1b232f-00d9-4b0b-86fb-5f0f24136d2c)
-
-
-
-
-
-
-
-
-
-
-
