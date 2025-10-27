@@ -102,9 +102,9 @@ for path in unique_ordered_paths:
 
 sys.path[:] = non_site_paths + final_site_paths
 
-#print("\n--- Modified Python Path (site-packages moved to the end) ---")
-#for i, path in enumerate(sys.path):
-#    print(f"{i}: {path}")
+print("\n--- Modified Python Path (site-packages moved to the end) ---")
+for i, path in enumerate(sys.path):
+    print(f"{i}: {path}")
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning, module="xformers.*")
@@ -1097,17 +1097,16 @@ def install_modules(self):
 #        pybin, "pip", "install", "--disable-pip-version-check",
 #        "--use-deprecated=legacy-resolver", "timm", "--upgrade"
 #    ])
+
     install_module("sageattention","sageattention==1.0.6")
     install_module("timm", "git+https://github.com/rwightman/pytorch-image-models.git")
     install_module("protobuf", "protobuf==3.20.1")
     install_module("numpy", "numpy==1.26.4")
     #install_module("tokenizers", "tokenizers==0.21.1")
-    install_module("tokenizers", "tokenizers==0.22.0")
+    install_module("tokenizers", "tokenizers==0.20.4")
     #install_module("transformers", "transformers==4.46.1")
     #install_module("transformers", "git+https://github.com/huggingface/transformers.git")
-    install_module("transformers", "transformers==4.56.2")
-    install_module("onnx", "onnx==1.18.0"),
-    install_module("onnxruntime", "onnxruntime==1.21.0"),
+    install_module("transformers", "transformers==4.49.0")
     #print("Cleaning up cache...")
     #subprocess.check_call([pybin, "-m", "pip", "cache", "purge"])
     subprocess.check_call([pybin, "-m", "pip", "list"])
@@ -1198,7 +1197,7 @@ class GENERATOR_OT_uninstall(Operator):
                 "resemble-enhance", "mediapipe", "flash_attn", "stable-audio-tools",
                 "beautifulsoup4", "ftfy", "deepspeed",
                 "gradio-client" , "suno-bark", "peft", "ultralytics",
-                "parler-tts", "onnx", "onnxruntime"
+                "parler-tts"
             ], # "albumentations", "datasets", "insightface"
             "Utils": [
                 "celluloid", "omegaconf", "pandas", "ptflops", "rich", "resampy",
@@ -1266,7 +1265,6 @@ def input_strips_updated(self, context):
             "xinsir/controlnet-openpose-sdxl-1.0",
             "xinsir/controlnet-scribble-sdxl-1.0",
             "ZhengPeng7/BiRefNet_HR",
-            "Salesforce/blipdiffusion",
             "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora",
             "romanfratric234/FLUX.1-Depth-dev-lora",
             "Runware/FLUX.1-Redux-dev",
@@ -1275,21 +1273,12 @@ def input_strips_updated(self, context):
             scene.input_strips = "input_strips"
 
         # Handle specific image models
-        if image_model in {
-            "dataautogpt3/OpenDalleV1.1",
-            "Kwai-Kolors/Kolors-diffusers",
-            "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers"
-        }:
-            scene.use_lcm = False
         if image_model == "lzyvegetable/FLUX.1-schnell":
             scene.movie_num_inference_steps = 4
             scene.movie_num_guidance = 0
         elif image_model == "ChuckMcSneed/FLUX.1-dev":
             scene.movie_num_inference_steps = 25
             scene.movie_num_guidance = 4
-        elif image_model == "ostris/Flex.2-preview":
-            scene.movie_num_inference_steps = 28
-            scene.movie_num_guidance = 3.5
 
     # Movie Type Handling
     elif scene_type == "movie":
@@ -1386,28 +1375,18 @@ def output_strips_updated(self, context):
             "xinsir/controlnet-openpose-sdxl-1.0",
             "xinsir/controlnet-scribble-sdxl-1.0",
             "ZhengPeng7/BiRefNet_HR",
-            "Salesforce/blipdiffusion",
             "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora",
             "romanfratric234/FLUX.1-Depth-dev-lora",
             "Runware/FLUX.1-Redux-dev",
             "kontext-community/relighting-kontext-dev-lora-v3",
         ]:
             scene.input_strips = "input_strips"
-        elif image_model == "dataautogpt3/OpenDalleV1.1":
-            scene.use_lcm = False
-        elif image_model == "Kwai-Kolors/Kolors-diffusers":
-            scene.use_lcm = False
-        elif image_model == "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers":
-            scene.use_lcm = False
         elif image_model == "lzyvegetable/FLUX.1-schnell":
             movie_inference = 4
             movie_guidance = 0
         elif image_model == "ChuckMcSneed/FLUX.1-dev":
             movie_inference = 25
             movie_guidance = 4
-        elif image_model == "ostris/Flex.2-preview":
-            movie_inference = 28
-            movie_guidance = 3.5
 
     # === MOVIE TYPE === #
     elif type == "movie":
@@ -1459,11 +1438,9 @@ def output_strips_updated(self, context):
     if type == "movie":
         scene.generate_movie_x = movie_res_x
         scene.generate_movie_y = movie_res_y
-        scene.generate_movie_frames = movie_frames
-        scene.movie_num_inference_steps = movie_inference
-        scene.movie_num_guidance = movie_guidance
-
-
+        scene.generate_movie_frames
+        
+        
 # Relight:
 
 # Illumination options mapping
@@ -1646,14 +1623,14 @@ class GeneratorAddonPreferences(AddonPreferences):
 #            ),
             #            ("genmo/mochi-1-preview", "Mochi-1", "genmo/mochi-1-preview"), #noot good enough yet!
             (
-                "FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers",
+                "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
                 "Wan2.1-T2V (832x480x81)",
-                "FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers",
+                "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
             ),
             (
-                "FastDM/Wan2.2-I2V-A14B-Merge-Lightning-V1.0-Diffusers",
-                "Wan2.2-I2V-14B-480P (832x480x81)",
-                "FastDM/Wan2.2-I2V-A14B-Merge-Lightning-V1.0-Diffusers",
+                "Wan-AI/Wan2.2-I2V-A14B-Diffusers",
+                "Wan2.1-I2V-14B-480P (832x480x81)",
+                "Wan-AI/Wan2.2-I2V-A14B-Diffusers",
             ),
             
 #            (
@@ -1689,131 +1666,51 @@ class GeneratorAddonPreferences(AddonPreferences):
     image_model_card: bpy.props.EnumProperty(
         name="Image Model",
         items=[
-            ("ChuckMcSneed/FLUX.1-dev", "Flux 1 Dev", "ChuckMcSneed/FLUX.1-dev"),
+            ("ChuckMcSneed/FLUX.1-dev", "Flux Dev", "ChuckMcSneed/FLUX.1-dev"),
             (
                 "lzyvegetable/FLUX.1-schnell",
                 "Flux Schnell",
                 "lzyvegetable/FLUX.1-schnell",
             ),
-            ("yuvraj108c/FLUX.1-Kontext-dev", "Flux.1 Kontext Dev", "yuvraj108c/FLUX.1-Kontext-dev"),
-            ("kontext-community/relighting-kontext-dev-lora-v3", "Relight Flux.1 Kontext", "kontext-community/relighting-kontext-dev-lora-v3"),
-            # Not ready for 4bit and depth has tensor problems
-            ("fuliucansheng/FLUX.1-Canny-dev-diffusers-lora", "FLUX Canny", "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"),
-            ("romanfratric234/FLUX.1-Depth-dev-lora", "FLUX Depth", "romanfratric234/FLUX.1-Depth-dev-lora"),
+            ("yuvraj108c/FLUX.1-Kontext-dev", "Flux Kontext", "yuvraj108c/FLUX.1-Kontext-dev"),
+            ("kontext-community/relighting-kontext-dev-lora-v3", "Flux Kontext Relight", "kontext-community/relighting-kontext-dev-lora-v3"),
+            ("fuliucansheng/FLUX.1-Canny-dev-diffusers-lora", "Flux Canny", "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"),
+            ("romanfratric234/FLUX.1-Depth-dev-lora", "Flux Depth", "romanfratric234/FLUX.1-Depth-dev-lora"),
             ("Runware/FLUX.1-Redux-dev", "FLUX Redux", "Runware/FLUX.1-Redux-dev"),
-
-#            ("ostris/Flex.2-preview", "Flex 2 Preview", "ostris/Flex.2-preview"),
-            ("Qwen/Qwen-Image", "Qwen-Image", "Qwen/Qwen-Image"),
-            (
-                "Qwen/Qwen-Image-Edit-2509",
-                "Qwen Multi-image Edit",
-                "Text and multiple images as input.",
-            ),            
             ("lodestones/Chroma", "Chroma", "Chroma is a 8.9B parameter model based on FLUX.1-schnell"),
             (
                 "stabilityai/stable-diffusion-xl-base-1.0",
-                "Stable Diffusion XL 1.0 (1024x1024)",
+                "SDXL (1024x1024)",
                 "stabilityai/stable-diffusion-xl-base-1.0",
             ),
-#            (
-#                "ByteDance/SDXL-Lightning",
-#                "Stable Diffusion XL Lightning (1024x1024)",
-#                "ByteDance/SDXL-Lightning",
-#            ),
             (
                 "adamo1139/stable-diffusion-3.5-large-ungated",
-                "Stable Diffusion 3.5 Large",
+                "SDXL 3.5 Large",
                 "adamo1139/stable-diffusion-3.5-large-ungated",
             ),
             (
                 "adamo1139/stable-diffusion-3.5-medium-ungated",
-                "Stable Diffusion 3.5 Medium",
+                "SDXL 3.5 Medium",
                 "adamo1139/stable-diffusion-3.5-medium-ungated",
             ),
-            ("Bercraft/Illustrious-XL-v2.0-FP16-Diffusers", "Illustrious XL", "Bercraft/Illustrious-XL-v2.0-FP16-Diffusers"),
-            ("John6666/cyberrealistic-xl-v53-sdxl", "Cyberrealistic XL", "John6666/cyberrealistic-xl-v53-sdxl"),
-#            (
-#                "stabilityai/stable-diffusion-3-medium-diffusers",
-#                "Stable Diffusion 3",
-#                "stabilityai/stable-diffusion-3-medium-diffusers",
-#            ),
-#            (
-#                "stabilityai/sdxl-turbo",
-#                "Stable Diffusion XL Turbo (1024 x 1024)",
-#                "stabilityai/sdxl-turbo",
-#            ),
             (
                 "Alpha-VLLM/Lumina-Image-2.0",
                 "Lumina Image 2.0",
                 "Alpha-VLLM/Lumina-Image-2.0",
             ),
             (
-                "THUDM/CogView4-6B",
-                "CogView4-6B (2048x2048)",
-                "THUDM/CogView4-6B",
-            ),
-            (
-                "Efficient-Large-Model/Sana_1600M_1024px_diffusers",
-                "Sana 1600M 1024px",
-                "Efficient-Large-Model/Sana_1600M_1024px_diffusers",
-            ),
-#            (
-#                "fluently/Fluently-XL-Final",
-#                "Fluently (1024x1024)",
-#                "fluently/Fluently-XL-Final",
-#            ),
-            (
-                "Vargol/PixArt-Sigma_16bit",
-                "PixArt Sigma XL 16 bit(1024x1024)",
-                "Vargol/PixArt-Sigma_16bit",
-            ),
-            (
-                "Vargol/PixArt-Sigma_2k_16bit",
-                "PixArt Sigma 2K 16 bit (2560x1440)",
-                "Vargol/PixArt-Sigma_2k_16bit",
-            ),
-            # Must be optimized
-            # ("shuttleai/shuttle-jaguar", "Shuttle Jaguar (1024x1024)", "shuttleai/shuttle-jaguar"),
-#            (
-#                "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers",
-#                "HunyuanDiT-v1.2",
-#                "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers",
-#            ),
-#            ("Kwai-Kolors/Kolors-diffusers", "Kolors", "Kwai-Kolors/Kolors-diffusers"),
-            # ("Corcelio/mobius", "Mobius (1024x1024)", "Corcelio/mobius"),
-            (
-                "dataautogpt3/OpenDalleV1.1",
-                "OpenDalle (1024 x 1024)",
-                "dataautogpt3/OpenDalleV1.1",
-            ),
-            (
-                "Vargol/ProteusV0.4",
-                "Proteus 0.4 (1024x1024)",
-                "Vargol/ProteusV0.4",
-            ),
-            (
-                "SG161222/RealVisXL_V4.0",
-                "RealVisXL_V4 (1024x1024)",
-                "SG161222/RealVisXL_V4.0",
-            ),
-#            (
-#                "Salesforce/blipdiffusion",
-#                "Blip Subject (512x512)",
-#                "Salesforce/blipdiffusion",
-#            ),
-            (
                 "diffusers/controlnet-canny-sdxl-1.0-small",
-                "Canny ControlNet XL (1024 x 1024)",
+                "SDXL Canny (1024 x 1024)",
                 "diffusers/controlnet-canny-sdxl-1.0-small",
             ),
             (
                 "xinsir/controlnet-openpose-sdxl-1.0",
-                "OpenPose ControlNet XL (1024 x 1024)",
+                "SDXL OpenPose (1024 x 1024)",
                 "xinsir/controlnet-openpose-sdxl-1.0",
             ),
             (
                 "xinsir/controlnet-scribble-sdxl-1.0",
-                "Scribble ControlNet XL (1024x1024)",
+                "SDXL Scribble (1024x1024)",
                 "xinsir/controlnet-scribble-sdxl-1.0",
             ),
             (
@@ -1952,8 +1849,7 @@ class GeneratorAddonPreferences(AddonPreferences):
         except:
             pass
         if (
-            self.image_model_card == "stabilityai/stable-diffusion-3-medium-diffusers"
-            or self.image_model_card == "adamo1139/stable-diffusion-3.5-large-ungated"
+            self.image_model_card == "adamo1139/stable-diffusion-3.5-large-ungated"
             or (self.image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin")
             or (self.image_model_card == "lzyvegetable/FLUX.1-schnell" and os_platform == "Darwin")
         ):
@@ -1992,7 +1888,6 @@ class GeneratorAddonPreferences(AddonPreferences):
         row_row.label(text="")
         row_row.label(text="")
         row_row.label(text="")
-
 
 class GENERATOR_OT_sound_notification(Operator):
     """Test your notification settings"""
@@ -2336,8 +2231,8 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
 
         if scene.sequence_editor is None:
             scene.sequence_editor_create()
-            
-        # OmniGen
+
+        # Input
         if image_model_card == "Shitao/OmniGen-v1-diffusers" and type == "image":
             col.prop(context.scene, "omnigen_prompt_1", text="", icon="ADD")
             row = col.row(align=True)
@@ -2375,59 +2270,12 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             )
             row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = "omni_select3"
 
-        elif image_model_card == "Salesforce/blipdiffusion" and type == "image":
-            col.prop(context.scene, "input_strips", text="Source Image")
-            col.prop(context.scene, "blip_cond_subject", text="Source Subject")
 
-            col.prop_search(
-                scene,
-                "blip_subject_image",
-                scene.sequence_editor,
-                "sequences",
-                text="Target Image",
-                icon="SEQ_STRIP_DUPLICATE",
-            )
-            col.prop(context.scene, "blip_tgt_subject", text="Target Subject")
         else:
             try:
                 col.prop(context.scene, "input_strips", text="Input")
             except:
                 pass
-
-        # Qwen multi-image
-        if image_model_card == "Qwen/Qwen-Image-Edit-2509" and type == "image":
-            row = col.row(align=True)
-            row.prop_search(
-                scene,
-                "qwen_strip_1",
-                scene.sequence_editor,
-                "sequences",
-                text="",
-                icon="FILE_IMAGE",
-            )
-            row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = "qwen_select1"
-
-            row = col.row(align=True)
-            row.prop_search(
-                scene,
-                "qwen_strip_2",
-                scene.sequence_editor,
-                "sequences",
-                text="",
-                icon="FILE_IMAGE",
-            )
-            row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = "qwen_select2"
-
-            row = col.row(align=True)
-            row.prop_search(
-                scene,
-                "qwen_strip_3",
-                scene.sequence_editor,
-                "sequences",
-                text="",
-                icon="FILE_IMAGE",
-            )
-            row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = "qwen_select3"
 
         if image_model_card == "kontext-community/relighting-kontext-dev-lora-v3" and type == "image":
             box = layout.box()
@@ -2470,10 +2318,8 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     type == "image"
                     and image_model_card != "xinsir/controlnet-openpose-sdxl-1.0"
                     and image_model_card != "xinsir/controlnet-scribble-sdxl-1.0"
-                    and image_model_card != "Salesforce/blipdiffusion"
                     and image_model_card != "ZhengPeng7/BiRefNet_HR"
                     and image_model_card != "Shitao/OmniGen-v1-diffusers"
-                    and image_model_card != "Qwen/Qwen-Image-Edit-2509"
                     and image_model_card != "Runware/FLUX.1-Redux-dev"
                     and image_model_card != "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"
                     and image_model_card != "romanfratric234/FLUX.1-Depth-dev-lora"
@@ -2487,7 +2333,6 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                             movie_model_card == "lzyvegetable/FLUX.1-schnell"
                             or movie_model_card == "ChuckMcSneed/FLUX.1-dev"
                             #or movie_model_card == "yuvraj108c/FLUX.1-Kontext-dev"
-                            #or movie_model_card == "ostris/Flex.2-preview"
                         ):
                             pass
                         else:
@@ -2514,7 +2359,6 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         bpy.context.scene.sequence_editor is not None
                         and image_model_card
                         != "diffusers/controlnet-canny-sdxl-1.0-small"
-                        and image_model_card != "ByteDance/SDXL-Lightning"
                     ):
                         if input == "input_strips" and type == "image":
                             row = col.row(align=True)
@@ -2556,7 +2400,6 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             # IPAdapter.
             if (
                 image_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
-                or image_model_card == "stabilityai/sdxl-turbo"
                 # or image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
                 # or image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
                 # or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
@@ -2621,7 +2464,6 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         and image_model_card == "yuvraj108c/FLUX.1-Kontext-dev"
                     )
                     or (type == "image" and image_model_card == "kontext-community/relighting-kontext-dev-lora-v3")
-                    or (type == "image" and image_model_card == "ostris/Flex.2-preview")
                     or (
                         type == "image"
                         and image_model_card
@@ -2739,9 +2581,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     )
                 else:
                     if (
-                        type == "image"
-                        and (image_model_card == "ByteDance/SDXL-Lightning")
-                        or (
+                        (
                             type == "audio"
                             and (
                                 audio_model_card == "parler-tts/parler-tts-mini-v1"
@@ -2791,21 +2631,12 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         )
                         or (
                             scene.use_lcm
-                            and not (
-                                type == "image"
-                                and image_model_card
-                                == image_model_card
-                                == "ByteDance/SDXL-Lightning"
-                            )
                         )
                     ):
                         pass
                     else:
                         if (
                             image_model_card == "Shitao/OmniGen-v1-diffusers"
-                            and type == "image"
-                        ) or (
-                            image_model_card == "Qwen/Qwen-Image-Edit-2509"
                             and type == "image"
                         ):
                             col.prop(
@@ -2866,14 +2697,6 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                             type == "image"
                             and image_model_card == "segmind/Segmind-Vega"
                         )
-                        or (
-                            type == "image"
-                            and image_model_card == "Vargol/PixArt-Sigma_16bit"
-                        )
-                        or (
-                            type == "image"
-                            and image_model_card == "Vargol/PixArt-Sigma_2k_16bit"
-                        )
                     ):
                         row.prop(context.scene, "use_lcm", text="Speed")
 
@@ -2902,30 +2725,24 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             if (
                 (
                     image_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
-                    or image_model_card == "stabilityai/sdxl-turbo"
                     or image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
                     or image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
                     or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
                     or image_model_card == "lzyvegetable/FLUX.1-schnell"
                     or image_model_card == "yuvraj108c/FLUX.1-Kontext-dev"
-                    or image_model_card == "ostris/Flex.2-preview"
                     or image_model_card == "lodestones/Chroma"
-                    or image_model_card == "Qwen/Qwen-Image"
-                    or image_model_card == "Qwen/Qwen-Image-Edit-2509"
                     or image_model_card == "ChuckMcSneed/FLUX.1-dev"
                     or image_model_card == "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"
                     or image_model_card == "romanfratric234/FLUX.1-Depth-dev-lora"
                     or image_model_card == "Runware/FLUX.1-Redux-dev"
-                    or image_model_card == "Bercraft/Illustrious-XL-v2.0-FP16-Diffusers"
-                    or image_model_card == "John6666/cyberrealistic-xl-v53-sdxl"
                 )
                 and type == "image"
             ) or ((
                 type == "movie")
                 and (movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
                 or (movie_model_card == "hunyuanvideo-community/HunyuanVideo")
-                or (movie_model_card == "FastDM/Wan2.2-I2V-A14B-Merge-Lightning-V1.0-Diffusers")
-                or (movie_model_card == "FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers")
+                or (movie_model_card == "Wan-AI/Wan2.2-I2V-A14B-Diffusers")
+                or (movie_model_card == "Wan-AI/Wan2.1-T2V-1.3B-Diffusers")
                 or (movie_model_card == "Wan-AI/Wan2.1-VACE-1.3B-diffusers")
             )):
                 layout = self.layout
@@ -2979,8 +2796,6 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             col.prop(addon_prefs, "image_model_card", text=" ")
             if (
                 addon_prefs.image_model_card
-                == "stabilityai/stable-diffusion-3-medium-diffusers"
-                or addon_prefs.image_model_card
                 == "adamo1139/stable-diffusion-3.5-large-ungated"
             ):
                 row = col.row(align=True)
@@ -3326,7 +3141,7 @@ class SEQUENCER_OT_generate_movie(Operator):
             and movie_model_card != "Hailuo/MiniMax/img2vid"
             and movie_model_card != "Hailuo/MiniMax/subject2vid"
             and movie_model_card != "Skywork/SkyReels-V1-Hunyuan-T2V"
-            and movie_model_card != "FastDM/Wan2.2-I2V-A14B-Merge-Lightning-V1.0-Diffusers"
+            and movie_model_card != "Wan-AI/Wan2.2-I2V-A14B-Diffusers"
             and movie_model_card != "Wan-AI/Wan2.1-VACE-1.3B-diffusers"
         ) or movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
             # Frame by Frame
@@ -3352,8 +3167,6 @@ class SEQUENCER_OT_generate_movie(Operator):
                     variant="fp16",
                     vae=vae,
                 )
-                #                pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", vae=vae, torch_dtype=torch.float16, variant="fp16")
-                #                pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained("stabilityai/sdxl-turbo", torch_dtype=torch.float16, variant="fp16")
                 pipe.watermark = NoWatermark()
 
                 scene = context.scene
@@ -3878,7 +3691,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 print("Stable Video Diffusion needs image input")
                 return {"CANCELLED"}
 
-            elif movie_model_card == "FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers":
+            elif movie_model_card == "Wan-AI/Wan2.1-T2V-1.3B-Diffusers":
                 if (scene.movie_path or scene.image_path) and input == "input_strips":
                     print("Wan2.1-T2V doesn't support img/vid2vid!")
                     return {"CANCELLED"}
@@ -3899,11 +3712,11 @@ class SEQUENCER_OT_generate_movie(Operator):
                     components_to_quantize=["transformer"],
                 )
 
-                print("Loading FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers with 4-bit quantization API...")
+                print("Loading Wan-AI/Wan2.1-T2V-1.3B-Diffusers with 4-bit quantization API...")
                 
                 # Pass the new config object to from_pretrained
                 pipe = WanPipeline.from_pretrained(
-                    "FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers",
+                    "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
                     quantization_config=pipeline_quant_config,
                 )
 
@@ -3968,7 +3781,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 else:
                     pipe.enable_model_cpu_offload()
 
-            elif movie_model_card == "FastDM/Wan2.2-I2V-A14B-Merge-Lightning-V1.0-Diffusers":
+            elif movie_model_card == "Wan-AI/Wan2.2-I2V-A14B-Diffusers":
                 if (not scene.movie_path and not scene.image_path) and not input == "input_strips":
                     print("Wan2.1-I2V doesn't support txt2vid!")
                     self.report({'ERROR'}, "Wan2.1-I2V requires an input image or video.")
@@ -4619,7 +4432,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         #max_sequence_length=512,
                     ).frames[0]
 
-                elif movie_model_card == "FastDM/Wan2.2-I2V-A14B-Merge-Lightning-V1.0-Diffusers":
+                elif movie_model_card == "Wan-AI/Wan2.2-I2V-A14B-Diffusers":
                     from diffusers.utils import load_image, export_to_video
                     import numpy as np
                     if scene.movie_path:
@@ -4703,7 +4516,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     movie_model_card != "Hailuo/MiniMax/txt2vid"
                     and movie_model_card != "Hailuo/MiniMax/img2vid"
                     and movie_model_card != "Hailuo/MiniMax/subject2vid"
-                    and movie_model_card != "FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers"
+                    and movie_model_card != "Wan-AI/Wan2.1-T2V-1.3B-Diffusers"
                 ): #something is broken here?
                     if scene.movie_path:
                         print("Process: Video to video")
@@ -4756,7 +4569,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         generator=generator,
                     ).frames[0]
 
-                elif movie_model_card == "FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers":
+                elif movie_model_card == "Wan-AI/Wan2.1-T2V-1.3B-Diffusers":
                     if (scene.movie_path or scene.image_path) and input == "input_strips":
                         print("Wan2.1-T2V doesn't support img/vid2vid!")
                         return {"CANCELLED"}
@@ -6733,15 +6546,11 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
             and not image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
             and not image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
-            and not image_model_card == "Salesforce/blipdiffusion"
             # and not image_model_card == "Corcelio/mobius"
-            and not image_model_card == "stabilityai/stable-diffusion-3-medium-diffusers"
             and not image_model_card == "adamo1139/stable-diffusion-3.5-large-ungated"
             and not image_model_card == "adamo1139/stable-diffusion-3.5-medium-ungated"
-            and not image_model_card == "Vargol/ProteusV0.4"
             and not image_model_card == "ZhengPeng7/BiRefNet_HR"
             and not image_model_card == "Shitao/OmniGen-v1-diffusers"
-            and not image_model_card == "Qwen/Qwen-Image-Edit-2509"
 #            and (not scene.ip_adapter_face_folder and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0")
 #            and (not scene.ip_adapter_style_folder and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0")
         )
@@ -6750,12 +6559,8 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
             and not image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
             and not image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
-            and not image_model_card == "Salesforce/blipdiffusion"
-            and not image_model_card == "ByteDance/SDXL-Lightning"
-            and not image_model_card == "Vargol/ProteusV0.4"
             and not image_model_card == "ZhengPeng7/BiRefNet_HR"
             and not image_model_card == "Shitao/OmniGen-v1-diffusers"
-            and not image_model_card == "Qwen/Qwen-Image-Edit-2509"
 #            and (not scene.ip_adapter_face_folder and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0")
 #            and (not scene.ip_adapter_style_folder and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0")
             and not do_inpaint
@@ -6767,11 +6572,9 @@ class SEQUENCER_OT_generate_image(Operator):
             or image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
             or image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
             or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
-            or image_model_card == "Salesforce/blipdiffusion"
             and not scene.ip_adapter_face_folder
             and not scene.ip_adapter_style_folder
             and not image_model_card == "Shitao/OmniGen-v1-diffusers"
-            and not image_model_card == "Qwen/Qwen-Image-Edit-2509"
         ):
             if not strips:
                 self.report({"INFO"}, "Select strip(s) for processing.")
@@ -6879,7 +6682,6 @@ class SEQUENCER_OT_generate_image(Operator):
             elif (
                 image_model_card == "lzyvegetable/FLUX.1-schnell"
                 or image_model_card == "ChuckMcSneed/FLUX.1-dev"
-                or image_model_card == "ostris/Flex.2-preview"
             ):
                 print("Load Inpaint: " + image_model_card)
                 from diffusers import (
@@ -6944,32 +6746,10 @@ class SEQUENCER_OT_generate_image(Operator):
                     converter.enable_model_cpu_offload()
                 else:
                     converter.to(gfx_device)
-
-            elif image_model_card == "Kwai-Kolors/Kolors-diffusers":
-                from diffusers import DPMSolverMultistepScheduler, KolorsImg2ImgPipeline
-                from diffusers.utils import load_image
-
-                converter = KolorsImg2ImgPipeline.from_pretrained(
-                    image_model_card,
-                    torch_dtype=torch.float16,
-                    variant="fp16",
-                    local_files_only=local_files_only,
-                )
-                converter.scheduler = DPMSolverMultistepScheduler.from_config(
-                    converter.scheduler.config, use_karras_sigmas=True
-                )
-                if gfx_device == "mps":
-                    converter.to("mps")
-                elif low_vram():
-                    converter.enable_model_cpu_offload()
-                else:
-                    converter.to(gfx_device)
             else:
                 from diffusers import AutoPipelineForImage2Image
                 if (
-                    image_model_card
-                    == "stabilityai/stable-diffusion-3-medium-diffusers"
-                    or os_platform == "Darwin"
+                    os_platform == "Darwin"
                 ):  # or image_model_card == "adamo1139/stable-diffusion-3.5-large-ungated":
                     from huggingface_hub.commands.user import login
 
@@ -6997,7 +6777,6 @@ class SEQUENCER_OT_generate_image(Operator):
                     or image_model_card == "ChuckMcSneed/FLUX.1-dev"
                     or image_model_card == "yuvraj108c/FLUX.1-Kontext-dev"
                     or image_model_card == "kontext-community/relighting-kontext-dev-lora-v3"
-                    or image_model_card == "ostris/Flex.2-preview"
                 ):
                     relight = False
                     from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
@@ -7168,65 +6947,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         #converter.enable_model_cpu_offload() # too slow
                         converter.enable_vae_slicing()
                         converter.vae.enable_tiling()
-                        
-                elif image_model_card == "Qwen/Qwen-Image":
-                    print("Load: Qwen-Image - img2img")
 
-                    from diffusers.utils import load_image
-                    from transformers import BitsAndBytesConfig as TransformersBitsAndBytesConfig
-                    from transformers import Qwen2_5_VLForConditionalGeneration
-                    from diffusers import BitsAndBytesConfig as DiffusersBitsAndBytesConfig
-                    from diffusers import QwenImageImg2ImgPipeline, QwenImageTransformer2DModel
-
-                    model_id = "Qwen/Qwen-Image"
-                    torch_dtype = torch.bfloat16
-                    device = gfx_device
-
-                    quantization_config_transformer = DiffusersBitsAndBytesConfig(
-                        load_in_4bit=True,
-                        bnb_4bit_quant_type="nf4",
-                        bnb_4bit_compute_dtype=torch.bfloat16,
-                        llm_int8_skip_modules=["transformer_blocks.0.img_mod"],
-                    )
-
-                    quantization_config_text_encoder = TransformersBitsAndBytesConfig(
-                        load_in_4bit=True,
-                        bnb_4bit_quant_type="nf4",
-                        bnb_4bit_compute_dtype=torch.bfloat16,
-                    )
-
-                    transformer = QwenImageTransformer2DModel.from_pretrained(
-                        model_id,
-                        subfolder="transformer",
-                        quantization_config=quantization_config_transformer,
-                        torch_dtype=torch_dtype,
-                    )
-                    transformer = transformer.to("cpu")
-
-                    text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-                        model_id,
-                        subfolder="text_encoder",
-                        quantization_config=quantization_config_text_encoder,
-                        torch_dtype=torch_dtype,
-                    )
-                    text_encoder = text_encoder.to("cpu")
-
-                    converter = QwenImageImg2ImgPipeline.from_pretrained(
-                        model_id,
-                        transformer=transformer,
-                        text_encoder=text_encoder,
-                        torch_dtype=torch_dtype
-                    )
-
-                    if gfx_device == "mps":
-                        converter.to("mps")
-                    elif low_vram():
-                        converter.enable_model_cpu_offload()
-                        converter.enable_vae_slicing()
-                        converter.vae.enable_tiling()
-                    else:
-                        converter.enable_model_cpu_offload()   
-                    
                 else:
                     try:
                         converter = AutoPipelineForImage2Image.from_pretrained(
@@ -7358,30 +7079,6 @@ class SEQUENCER_OT_generate_image(Operator):
             else:
                 pipe.to(gfx_device)
 
-        # Blip
-        elif image_model_card == "Salesforce/blipdiffusion":
-            print("Load: Blip Model")
-            from diffusers.utils import load_image
-            import torch
-
-            if not find_strip_by_name(scene, scene.blip_subject_image):
-                from diffusers.pipelines import BlipDiffusionPipeline
-
-                pipe = BlipDiffusionPipeline.from_pretrained(
-                    "Salesforce/blipdiffusion",
-                    torch_dtype=torch.float16,
-                    local_files_only=local_files_only,
-                ).to(gfx_device)
-            else:
-                from controlnet_aux import CannyDetector
-                from diffusers.pipelines import BlipDiffusionControlNetPipeline
-
-                pipe = BlipDiffusionControlNetPipeline.from_pretrained(
-                    "Salesforce/blipdiffusion-controlnet",
-                    torch_dtype=torch.float16,
-                    local_files_only=local_files_only,
-                ).to(gfx_device)
-
         # OpenPose
         elif image_model_card == "xinsir/controlnet-openpose-sdxl-1.0":
             print("Load: OpenPose Model")
@@ -7502,44 +7199,6 @@ class SEQUENCER_OT_generate_image(Operator):
                 "ZhengPeng7/BiRefNet_HR", trust_remote_code=True
             )
             
-            if gfx_device == "mps":
-                pipe.to("mps")
-            elif low_vram():
-                pipe.enable_model_cpu_offload()
-            else:
-                pipe.to(gfx_device)
-
-        # HunyuanDiT
-        elif (
-            do_convert == False
-            and image_model_card == "Tencent-Hunyuan/HunyuanDiT-v1.2-Diffusers"
-        ):
-            from diffusers import HunyuanDiTPipeline
-
-            pipe = HunyuanDiTPipeline.from_pretrained(
-                image_model_card, torch_dtype=torch.float16
-            )
-            pipe = pipe.to(gfx_device)
-
-        # SD3 Stable Diffusion 3
-        elif (
-            image_model_card == "stabilityai/stable-diffusion-3-medium-diffusers"
-        ):
-            print("Load: Stable Diffusion 3 Model")
-            import torch
-            from huggingface_hub.commands.user import login
-
-            result = login(
-                token=addon_prefs.hugginface_token, add_to_git_credential=True
-            )
-            print(str(result))
-            from diffusers import StableDiffusion3Pipeline
-
-            pipe = StableDiffusion3Pipeline.from_pretrained(
-                image_model_card,
-                torch_dtype=torch.float16,
-            )
-
             if gfx_device == "mps":
                 pipe.to("mps")
             elif low_vram():
@@ -7756,165 +7415,6 @@ class SEQUENCER_OT_generate_image(Operator):
             else:
                 converter.enable_model_cpu_offload()
 
-        # FLEX
-        elif image_model_card == "ostris/Flex.2-preview":
-            print("Load: Flex Model")
-            clear_cuda_cache()
-
-            if not do_inpaint and not enabled_items and not do_convert:
-                import torch
-                #image_model_card = "ostris/Flex.1-alpha"
-                image_model_card = "ostris/Flex.2-preview"
-
-                from diffusers import BitsAndBytesConfig, FluxTransformer2DModel, FluxPipeline
-                sys.path.append(os.path.dirname(__file__))
-
-                nf4_config = BitsAndBytesConfig(
-                    load_in_4bit=True,
-                    bnb_4bit_quant_type="nf4",
-                    bnb_4bit_compute_dtype=torch.bfloat16,
-                )
-#                    model_nf4 = FluxTransformer2DModel.from_pretrained(
-#                        image_model_card,
-#                        subfolder="transformer",
-#                        quantization_config=nf4_config,
-#                        torch_dtype=torch.bfloat16,
-#                    )
-                model_nf4 = FluxTransformer2DModel.from_pretrained(
-                    "ChuckMcSneed/FLUX.1-dev",
-                    quantization_config=nf4_config,
-                    torch_dtype=torch.bfloat16
-                )
-                #flex_pipeline_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pipelines", "flex_pipeline.py")
-                #print(flex_pipeline_path)
-                pipe = FluxPipeline.from_pretrained(
-                    image_model_card,
-                    #custom_pipeline=flex_pipeline_path,
-                    #trust_remote_code=True,
-                    transformer=model_nf4,
-                    torch_dtype=torch.bfloat16,
-                )
-
-                if gfx_device == "mps":
-                    pipe.to("mps")
-                elif low_vram():
-                    pipe.enable_model_cpu_offload()
-                    pipe.enable_vae_slicing()
-                    pipe.vae.enable_tiling()
-                else:
-                    pipe.enable_model_cpu_offload()
-
-
-        # Qwen-Image
-        elif image_model_card == "Qwen/Qwen-Image":
-                clear_cuda_cache()
-                
-                if not do_inpaint and not do_convert:
-                    print("Load: Qwen-Image")
-
-                    from transformers import BitsAndBytesConfig as TransformersBitsAndBytesConfig
-                    from transformers import Qwen2_5_VLForConditionalGeneration
-
-                    from diffusers import BitsAndBytesConfig as DiffusersBitsAndBytesConfig
-                    from diffusers import QwenImagePipeline, QwenImageTransformer2DModel
-
-
-                    model_id = "Qwen/Qwen-Image"
-                    torch_dtype = torch.bfloat16
-                    device = gfx_device
-
-                    quantization_config = DiffusersBitsAndBytesConfig(
-                        load_in_4bit=True,
-                        bnb_4bit_quant_type="nf4",
-                        bnb_4bit_compute_dtype=torch.bfloat16,
-                        llm_int8_skip_modules=["transformer_blocks.0.img_mod"],
-                    )
-
-                    transformer = QwenImageTransformer2DModel.from_pretrained(
-                        model_id,
-                        subfolder="transformer",
-                        quantization_config=quantization_config,
-                        torch_dtype=torch_dtype,
-                    )
-                    transformer = transformer.to("cpu")
-
-                    quantization_config = TransformersBitsAndBytesConfig(
-                        load_in_4bit=True,
-                        bnb_4bit_quant_type="nf4",
-                        bnb_4bit_compute_dtype=torch.bfloat16,
-                    )
-
-                    text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-                        model_id,
-                        subfolder="text_encoder",
-                        quantization_config=quantization_config,
-                        torch_dtype=torch_dtype,
-                    )
-                    text_encoder = text_encoder.to("cpu")
-
-                    pipe = QwenImagePipeline.from_pretrained(
-                        model_id, transformer=transformer, text_encoder=text_encoder, torch_dtype=torch_dtype
-                    )
-                    
-                else:
-                    print("Load: Qwen-Image - img2img")
-
-                    from diffusers.utils import load_image
-                    from transformers import BitsAndBytesConfig as TransformersBitsAndBytesConfig
-                    from transformers import Qwen2_5_VLForConditionalGeneration
-                    from diffusers import BitsAndBytesConfig as DiffusersBitsAndBytesConfig
-                    from diffusers import QwenImageImg2ImgPipeline, QwenImageTransformer2DModel
-
-                    model_id = "Qwen/Qwen-Image"
-                    torch_dtype = torch.bfloat16
-                    device = gfx_device
-
-                    quantization_config_transformer = DiffusersBitsAndBytesConfig(
-                        load_in_4bit=True,
-                        bnb_4bit_quant_type="nf4",
-                        bnb_4bit_compute_dtype=torch.bfloat16,
-                        llm_int8_skip_modules=["transformer_blocks.0.img_mod"],
-                    )
-
-                    quantization_config_text_encoder = TransformersBitsAndBytesConfig(
-                        load_in_4bit=True,
-                        bnb_4bit_quant_type="nf4",
-                        bnb_4bit_compute_dtype=torch.bfloat16,
-                    )
-
-                    transformer = QwenImageTransformer2DModel.from_pretrained(
-                        model_id,
-                        subfolder="transformer",
-                        quantization_config=quantization_config_transformer,
-                        torch_dtype=torch_dtype,
-                    )
-                    transformer = transformer.to("cpu")
-
-                    text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-                        model_id,
-                        subfolder="text_encoder",
-                        quantization_config=quantization_config_text_encoder,
-                        torch_dtype=torch_dtype,
-                    )
-                    text_encoder = text_encoder.to("cpu")
-
-                    pipe = QwenImageImg2ImgPipeline.from_pretrained(
-                        model_id,
-                        transformer=transformer,
-                        text_encoder=text_encoder,
-                        torch_dtype=torch_dtype
-                    )
-
-                if gfx_device == "mps":
-                    pipe.to("mps")
-                elif low_vram():
-                    pipe.enable_model_cpu_offload()
-                    pipe.enable_vae_slicing()
-                    pipe.vae.enable_tiling()
-                else:
-                    pipe.enable_model_cpu_offload()                   
-                    #pipe.to(device)                 
-        
         # Chroma
         elif image_model_card == "lodestones/Chroma":
 
@@ -7985,50 +7485,6 @@ class SEQUENCER_OT_generate_image(Operator):
                     pipe.to("cuda")
             else:
                 print("Inpaint, LoRA and img2img is not supported for Chroma!")
-
-        # Fluently-XL
-        elif image_model_card == "fluently/Fluently-XL-Final":
-            from diffusers import DiffusionPipeline, DDIMScheduler
-
-            pipe = DiffusionPipeline.from_pretrained(
-                image_model_card,
-                torch_dtype=torch.float16,
-                scheduler=DDIMScheduler(
-                    beta_start=0.00085,
-                    beta_end=0.012,
-                    beta_schedule="scaled_linear",
-                    clip_sample=False,
-                    set_alpha_to_one=False,
-                ),
-            )
-
-            if gfx_device == "mps":
-                pipe.to("mps")
-            elif low_vram():
-                pipe.enable_model_cpu_offload()
-            else:
-                pipe.to(gfx_device)
-
-        # Shuttle-Jaguar # needs a quantinized version
-        elif image_model_card == "shuttleai/shuttle-jaguar":
-            from diffusers import DiffusionPipeline
-
-            pipe = DiffusionPipeline.from_pretrained(
-                image_model_card,
-                torch_dtype=torch.float16,
-            )
-
-            # pipe.to("cuda")
-
-            pipe.enable_sequential_cpu_offload()
-            # pipe.enable_model_cpu_offload()
-            pipe.enable_vae_slicing()
-            pipe.vae.enable_tiling()
-            pipe.transformer.to(memory_format=torch.channels_last)
-            pipe.transformer = torch.compile(
-                pipe.transformer, mode="max-autotune", fullgraph=True
-            )
-
         elif image_model_card == "Alpha-VLLM/Lumina-Image-2.0":
             from diffusers import Lumina2Pipeline
 
@@ -8046,53 +7502,6 @@ class SEQUENCER_OT_generate_image(Operator):
                 # pipe.enable_sequential_cpu_offload()
                 # pipe.vae.enable_tiling()
                 pipe.enable_model_cpu_offload()
-        elif image_model_card == "THUDM/CogView4-6B":
-            from diffusers import CogView4Pipeline
-            pipe = CogView4Pipeline.from_pretrained("THUDM/CogView4-6B", torch_dtype=torch.bfloat16)
-            if gfx_device == "mps":
-                pipe.to("mps")
-            elif low_vram():
-                #pipe.enable_sequential_cpu_offload()
-                pipe.enable_model_cpu_offload()
-                pipe.vae.enable_tiling()
-            else:
-                # pipe.enable_sequential_cpu_offload()
-                # pipe.vae.enable_tiling()
-                pipe.enable_model_cpu_offload()
-
-        elif image_model_card == "Efficient-Large-Model/Sana_1600M_1024px_diffusers":
-            from diffusers import (
-                BitsAndBytesConfig as DiffusersBitsAndBytesConfig,
-                SanaTransformer2DModel,
-                SanaPipeline,
-            )
-            from transformers import BitsAndBytesConfig as BitsAndBytesConfig, AutoModel
-
-            quant_config = BitsAndBytesConfig(load_in_8bit=True)
-            text_encoder_8bit = AutoModel.from_pretrained(
-                "Efficient-Large-Model/Sana_1600M_1024px_diffusers",
-                subfolder="text_encoder",
-                quantization_config=quant_config,
-                torch_dtype=torch.float16,
-            )
-
-            quant_config = DiffusersBitsAndBytesConfig(load_in_8bit=True)
-            transformer_8bit = SanaTransformer2DModel.from_pretrained(
-                "Efficient-Large-Model/Sana_1600M_1024px_diffusers",
-                subfolder="transformer",
-                quantization_config=quant_config,
-                torch_dtype=torch.float16,
-            )
-
-            pipe = SanaPipeline.from_pretrained(
-                "Efficient-Large-Model/Sana_1600M_1024px_diffusers",
-                text_encoder=text_encoder_8bit,
-                transformer=transformer_8bit,
-                torch_dtype=torch.float16,
-                device_map="balanced",
-                low_cpu_mem_usage=True,
-            )
-
         # OmniGen
         elif image_model_card == "Shitao/OmniGen-v1-diffusers":
             from diffusers import OmniGenPipeline
@@ -8110,79 +7519,6 @@ class SEQUENCER_OT_generate_image(Operator):
                 # pipe.enable_sequential_cpu_offload()
                 # pipe.vae.enable_tiling()
                 pipe.enable_model_cpu_offload()
-                
-        # Qwen Multi-image
-        elif image_model_card == "Qwen/Qwen-Image-Edit-2509":
-            clear_cuda_cache() 
-
-            print("Load: Qwen-Image-Edit-2509")
-
-            # Import necessary classes for quantization and model components
-            from transformers import BitsAndBytesConfig as TransformersBitsAndBytesConfig
-            from transformers import Qwen2_5_VLForConditionalGeneration
-            from diffusers import BitsAndBytesConfig as DiffusersBitsAndBytesConfig
-            from diffusers import QwenImageEditPlusPipeline, QwenImageTransformer2DModel
-
-            # Define model ID, data type, and device
-            model_id = "Qwen/Qwen-Image-Edit-2509"
-            torch_dtype = torch.bfloat16
-            device = gfx_device
-
-            # Configure 4-bit quantization for the transformer model
-            quantization_config_diffusers = DiffusersBitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_quant_type="nf4",
-                bnb_4bit_compute_dtype=torch.bfloat16,
-                llm_int8_skip_modules=["transformer_blocks.0.img_mod"],
-            )
-
-            # Load the transformer model with quantization and move to CPU initially
-            transformer = QwenImageTransformer2DModel.from_pretrained(
-                model_id,
-                subfolder="transformer",
-                quantization_config=quantization_config_diffusers,
-                torch_dtype=torch_dtype,
-            )
-            transformer = transformer.to("cpu")
-
-            # Configure 4-bit quantization for the text encoder
-            quantization_config_transformers = TransformersBitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_quant_type="nf4",
-                bnb_4bit_compute_dtype=torch.bfloat16,
-            )
-
-            # Load the text encoder with quantization and move to CPU initially
-            text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-                model_id,
-                subfolder="text_encoder",
-                quantization_config=quantization_config_transformers,
-                torch_dtype=torch_dtype,
-            )
-            text_encoder = text_encoder.to("cpu")
-
-            # Assemble the pipeline from the pre-loaded, quantized components
-            pipe = QwenImageEditPlusPipeline.from_pretrained(
-                model_id,
-                transformer=transformer,
-                text_encoder=text_encoder,
-                torch_dtype=torch_dtype
-            )
-
-            print("Pipeline loaded")
-
-            # Move the complete pipeline to the GPU for inference
-            # pipeline.to(device)
-
-            if gfx_device == "mps":
-                pipe.to("mps")
-            elif low_vram():
-                pipe.enable_sequential_cpu_offload()
-                pipe.vae.enable_tiling()
-            else:
-                #pipe.enable_sequential_cpu_offload()
-                # pipe.vae.enable_tiling()
-                pipe.to(gfx_device)
 
         # Stable diffusion etc.
         else:
@@ -8279,128 +7615,6 @@ class SEQUENCER_OT_generate_image(Operator):
                         pipe.scheduler = DDIMScheduler.from_config(
                             pipe.scheduler.config
                         )
-
-            #                    scale = {
-            #                        "down": {"block_2": [0.0, 1.0]},
-            #                        "up": {"block_0": [0.0, 1.0, 0.0]},
-            #                    }
-            #                    pipe.set_ip_adapter_scale(scale)#[scale, scale])
-
-            elif image_model_card == "Vargol/PixArt-Sigma_16bit":
-                from diffusers import PixArtAlphaPipeline
-
-                if scene.use_lcm:
-                    pipe = PixArtAlphaPipeline.from_pretrained(
-                        "PixArt-alpha/PixArt-LCM-XL-2-1024-MS",
-                        torch_dtype=torch.float16,
-                        local_files_only=local_files_only,
-                    )
-                else:
-                    pipe = PixArtAlphaPipeline.from_pretrained(
-                        "Vargol/PixArt-Sigma_16bit",
-                        torch_dtype=torch.float16,
-                        variant="fp16",
-                        local_files_only=local_files_only,
-                    )
-
-                if gfx_device == "mps":
-                    pipe.to("mps")
-                elif low_vram():
-                    pipe.enable_model_cpu_offload()
-                    pipe.vae.enable_tiling()
-                else:
-                    pipe.to(gfx_device)
-
-            elif image_model_card == "Vargol/PixArt-Sigma_2k_16bit":
-                from diffusers import PixArtSigmaPipeline
-
-                pipe = PixArtSigmaPipeline.from_pretrained(
-                    "Vargol/PixArt-Sigma_2k_16bit",
-                    torch_dtype=torch.float16,
-                    variant="fp16",
-                    local_files_only=local_files_only,
-                )
-                if gfx_device == "mps":
-                    pipe.to("mps")
-                elif low_vram():
-                    pipe.enable_model_cpu_offload()
-                else:
-                    pipe.to(gfx_device)
-
-            elif image_model_card == "ByteDance/SDXL-Lightning":
-                import torch
-                from diffusers import (
-                    StableDiffusionXLPipeline,
-                    EulerAncestralDiscreteScheduler,
-                    AutoencoderKL,
-                )
-                from huggingface_hub import hf_hub_download
-
-                base = "stabilityai/stable-diffusion-xl-base-1.0"
-                repo = "ByteDance/SDXL-Lightning"
-                ckpt = "sdxl_lightning_2step_lora.safetensors"  # Use the correct ckpt for your step setting!
-
-                vae = AutoencoderKL.from_pretrained(
-                    "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
-                )
-
-                # Load model.
-                pipe = StableDiffusionXLPipeline.from_pretrained(
-                    base, torch_dtype=torch.float16, vae=vae, variant="fp16"
-                ).to("cuda")
-                pipe.load_lora_weights(hf_hub_download(repo, ckpt))
-                pipe.fuse_lora()
-
-                # Ensure sampler uses "trailing" timesteps.
-                pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(
-                    pipe.scheduler.config, timestep_spacing="trailing"
-                )
-
-            elif image_model_card == "Vargol/ProteusV0.4":
-                from diffusers import (
-                    StableDiffusionXLPipeline,
-                    EulerAncestralDiscreteScheduler,
-                )
-                from diffusers import AutoencoderKL
-
-                vae = AutoencoderKL.from_pretrained(
-                    "madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16
-                )
-                pipe = StableDiffusionXLPipeline.from_pretrained(
-                    "Vargol/ProteusV0.4",
-                    vae=vae,
-                    torch_dtype=torch.float16,
-                    variant="fp16",
-                )
-                pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(
-                    pipe.scheduler.config
-                )
-                if gfx_device == "mps":
-                    pipe.to("mps")
-                elif low_vram():
-                    pipe.enable_model_cpu_offload()
-                else:
-                    pipe.to(gfx_device)
-
-            elif image_model_card == "Kwai-Kolors/Kolors-diffusers":
-                import torch
-                from diffusers import DPMSolverMultistepScheduler, KolorsPipeline
-
-                pipe = KolorsPipeline.from_pretrained(
-                    image_model_card,
-                    torch_dtype=torch.float16,
-                    variant="fp16",
-                    local_files_only=local_files_only,
-                )
-                pipe.scheduler = DPMSolverMultistepScheduler.from_config(
-                    pipe.scheduler.config, use_karras_sigmas=True
-                )
-                if gfx_device == "mps":
-                    pipe.to("mps")
-                elif low_vram():
-                    pipe.enable_model_cpu_offload()
-                else:
-                    pipe.to(gfx_device)
             else:
                 print("Load: Auto Pipeline")
                 try:
@@ -8470,21 +7684,15 @@ class SEQUENCER_OT_generate_image(Operator):
                 image_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
                 and ((not scene.image_path and not scene.movie_path) or do_inpaint)
             )
-            or image_model_card == "stabilityai/sdxl-turbo"
             or image_model_card == "xinsir/controlnet-openpose-sdxl-1.0"
             or image_model_card == "diffusers/controlnet-canny-sdxl-1.0-small"
             or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
             or image_model_card == "lzyvegetable/FLUX.1-schnell"
             or image_model_card == "ChuckMcSneed/FLUX.1-dev"
-            or image_model_card == "ostris/Flex.2-preview"
-            or image_model_card == "Qwen/Qwen-Image-Edit-2509"
-            or image_model_card == "Qwen/Qwen-Image"
 #            or image_model_card == "Runware/FLUX.1-Redux-dev"
 #            or image_model_card == "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"
 #            or image_model_card == "romanfratric234/FLUX.1-Depth-dev-lora"
         ):
-            if image_model_card == "ostris/Flex.2-preview":
-                image_model_card = "ostris/Flex.1-alpha"
             scene = context.scene
             if do_convert:
                 pipe = converter
@@ -8529,7 +7737,7 @@ class SEQUENCER_OT_generate_image(Operator):
             else:
                 refiner.to(gfx_device)
 
-        # --------------------- Main Generate Loop Image -------------------------
+        # Main Generate Loop Image:
         from PIL import Image
         import random
 
@@ -8645,7 +7853,6 @@ class SEQUENCER_OT_generate_image(Operator):
                     image = load_first_frame(scene.movie_path)
                 if not image:
                     print("Loading strip failed!")
-                    clear_cuda_cache() 
                     return {"CANCELLED"}
                 image = image.resize((x, y))
                 # image = scale_image_within_dimensions(np.array(init_image),x,None)
@@ -8688,7 +7895,6 @@ class SEQUENCER_OT_generate_image(Operator):
                     init_image = load_first_frame(scene.movie_path)
                 if not init_image:
                     print("Loading strip failed!")
-                    clear_cuda_cache() 
                     return {"CANCELLED"}
                 image = scale_image_within_dimensions(np.array(init_image), x, None)
 
@@ -8735,7 +7941,6 @@ class SEQUENCER_OT_generate_image(Operator):
                     init_image = load_first_frame(scene.movie_path)
                 if not init_image:
                     print("Loading strip failed!")
-                    clear_cuda_cache() 
                     return {"CANCELLED"}
                 image = init_image
                 #image = scale_image_within_dimensions(np.array(init_image), x, None)
@@ -8774,7 +7979,6 @@ class SEQUENCER_OT_generate_image(Operator):
                     init_image = load_first_frame(scene.movie_path)
                 if not init_image:
                     print("Loading strip failed!")
-                    clear_cuda_cache() 
                     return {"CANCELLED"}
                 image = init_image
                 pipe_prior_output = pipe_prior_redux(image)
@@ -8797,7 +8001,6 @@ class SEQUENCER_OT_generate_image(Operator):
                     init_image = load_first_frame(scene.movie_path)
                 if not init_image:
                     print("Loading strip failed!")
-                    clear_cuda_cache() 
                     return {"CANCELLED"}
                 image = scale_image_within_dimensions(np.array(init_image), x, None)
 
@@ -8834,112 +8037,6 @@ class SEQUENCER_OT_generate_image(Operator):
 
                 # Apply the refined mask to the image to remove the background
                 image.putalpha(mask)
-
-            # Blip
-            elif image_model_card == "Salesforce/blipdiffusion":
-                print("Process: Subject Driven")
-                text_prompt_input = prompt
-                style_subject = str(scene.blip_cond_subject)
-                tgt_subject = str(scene.blip_tgt_subject)
-                init_image = None
-                if scene.image_path:
-                    init_image = load_first_frame(scene.image_path)
-                if scene.movie_path:
-                    init_image = load_first_frame(scene.movie_path)
-                if not init_image:
-                    print("Loading strip failed!")
-                    clear_cuda_cache() 
-                    return {"CANCELLED"}
-                init_image = init_image.resize((x, y))
-                style_image = init_image
-                subject_strip = find_strip_by_name(scene, scene.blip_subject_image)
-                if subject_strip:
-                    if (
-                        subject_strip.type == "MASK"
-                        or subject_strip.type == "COLOR"
-                        or subject_strip.type == "SCENE"
-                        or subject_strip.type == "META"
-                    ):
-                        subject_strip = get_render_strip(self, context, subject_strip)
-                    subject_path = get_strip_path(subject_strip)
-                    cldm_cond_image = load_first_frame(subject_path)
-                    canny = CannyDetector()
-                    cldm_cond_image = canny(cldm_cond_image, 30, 70, output_type="pil")
-                    if cldm_cond_image:
-                        cldm_cond_image = cldm_cond_image.resize((x, y))
-                        image = pipe(
-                            text_prompt_input,
-                            style_image,
-                            cldm_cond_image,
-                            style_subject,
-                            tgt_subject,
-                            guidance_scale=image_num_guidance,
-                            num_inference_steps=image_num_inference_steps,
-                            neg_prompt=negative_prompt,
-                            height=y,
-                            width=x,
-                            generator=generator,
-                        ).images[0]
-                    else:
-                        print("Subject strip loading failed!")
-                        subject_strip = ""
-                if not subject_strip:
-                    image = pipe(
-                        text_prompt_input,
-                        style_image,
-                        style_subject,
-                        tgt_subject,
-                        guidance_scale=image_num_guidance,
-                        num_inference_steps=image_num_inference_steps,
-                        neg_prompt=negative_prompt,
-                        height=y,
-                        width=x,
-                        generator=generator,
-                    ).images[0]
-
-            elif image_model_card == "ByteDance/SDXL-Lightning":
-                inference_parameters = {
-                    "prompt": prompt,
-                    "negative_prompt": negative_prompt,
-                    "height": y,
-                    "width": x,
-                    "guidance_scale": 0.0,
-                    "output_type": "pil",
-                    "num_inference_steps": 2,
-                }
-                image = pipe(
-                    **inference_parameters,
-                ).images[0]
-                decoder = None
-
-            elif image_model_card == "Vargol/ProteusV0.4":
-                inference_parameters = {
-                    "prompt": prompt,
-                    "negative_prompt": negative_prompt,
-                    "num_inference_steps": image_num_inference_steps,
-                    "guidance_scale": image_num_guidance,
-                    "height": y,
-                    "width": x,
-                    "generator": generator,
-                }
-                image = pipe(
-                    **inference_parameters,
-                ).images[0]
-
-            elif image_model_card == "Vargol/PixArt-Sigma_2k_16bit":
-                inference_parameters = {
-                    "prompt": prompt,
-                    "negative_prompt": negative_prompt,
-                    "num_inference_steps": image_num_inference_steps,
-                    "guidance_scale": image_num_guidance,
-                    "height": y,
-                    "width": x,
-                    "generator": generator,
-                }
-                image = pipe(
-                    **inference_parameters,
-                ).images[0]
-
             elif image_model_card == "Alpha-VLLM/Lumina-Image-2.0":
                 inference_parameters = {
                     "prompt": prompt,
@@ -8955,23 +8052,6 @@ class SEQUENCER_OT_generate_image(Operator):
                 image = pipe(
                     **inference_parameters,
                 ).images[0]
-            elif (
-                image_model_card == "Efficient-Large-Model/Sana_1600M_1024px_diffusers"
-            ):
-                inference_parameters = {
-                    "prompt": prompt,
-                    "negative_prompt": negative_prompt,
-                    "num_inference_steps": image_num_inference_steps,
-                    "guidance_scale": image_num_guidance,
-                    "height": y,
-                    "width": x,
-                    "generator": generator,
-                }
-                image = pipe(
-                    **inference_parameters,
-                ).images[0]
-                
-            # OmniGen    
             elif image_model_card == "Shitao/OmniGen-v1-diffusers":
                 omnigen_images = []
 
@@ -9029,75 +8109,6 @@ class SEQUENCER_OT_generate_image(Operator):
                     **inference_parameters,
                 ).images[0]
 
-            #Qwen Multi-image
-            elif image_model_card == "Qwen/Qwen-Image-Edit-2509":
-                
-                qwen_images = []
-                init_image = None
-                
-                if scene.input_strips == "input_strips":
-                    if scene.image_path:
-                        init_image = load_first_frame(scene.image_path)
-                    if scene.movie_path:
-                        init_image = load_first_frame(scene.movie_path)
-                    if init_image:
-                        qwen_images.append(init_image)
-
-                if find_strip_by_name(scene, scene.qwen_strip_1):
-                    qwen_images.append(
-                        load_first_frame(
-                            get_strip_path(
-                                find_strip_by_name(scene, scene.qwen_strip_1)
-                            )
-                        )
-                    )
-
-                if find_strip_by_name(scene, scene.qwen_strip_2):
-                    qwen_images.append(
-                        load_first_frame(
-                            get_strip_path(
-                                find_strip_by_name(scene, scene.qwen_strip_2)
-                            )
-                        )
-                    )
-
-                if init_image != None and find_strip_by_name(scene, scene.qwen_strip_3):
-                    qwen_images.append(
-                        load_first_frame(
-                            get_strip_path(
-                                find_strip_by_name(scene, scene.qwen_strip_3)
-                            )
-                        )
-                    )
-
-                if not qwen_images:
-                    qwen_images = None
-                    print("No input images found. Cancelled!")
-                    clear_cuda_cache() 
-                    return {"CANCELLED"}
-
-                inference_parameters = {
-                    "image": qwen_images,
-                    "prompt": prompt,
-                    "generator": generator,
-                    "true_cfg_scale": 4.0,
-                    "negative_prompt": negative_prompt+" ",
-                    "num_inference_steps": image_num_inference_steps,
-                    #"guidance_scale": 1.0,
-                    "num_images_per_prompt": 1,
-#                    "height": y,
-#                    "width": x,
-                }
-
-                with torch.inference_mode():
-                    image = pipe(
-                        **inference_parameters,
-                    ).images[0]
-#                    output = pipeline(**inputs)
-#                    output_image = output.images[0]
-#                    output_image.save("output_image_edit_plus.png")
-#                    print("Image saved at", os.path.abspath("output_image_edit_plus.png"))
-
             # Inpaint
             elif do_inpaint:
                 mask_image = None
@@ -9107,7 +8118,6 @@ class SEQUENCER_OT_generate_image(Operator):
 
                 if not mask_strip:
                     print("Selected mask not found!")
-                    clear_cuda_cache() 
                     return {"CANCELLED"}
                 if (
                     mask_strip.type == "MASK"
@@ -9131,7 +8141,6 @@ class SEQUENCER_OT_generate_image(Operator):
                     init_image = load_first_frame(scene.movie_path)
                 if not init_image:
                     print("Loading init image failed!")
-                    clear_cuda_cache() 
                     return {"CANCELLED"}
                 else:
                     init_image = init_image.resize((x, y))
@@ -9152,10 +8161,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 if (
                     image_model_card == "lzyvegetable/FLUX.1-schnell"
                     or image_model_card == "ChuckMcSneed/FLUX.1-dev"
-                    or image_model_card == "ostris/Flex.2-preview"
                 ):
-                    if image_model_card == "ostris/Flex.2-preview":
-                        image_model_card = "ostris/Flex.1-alpha"
                     print("Process Inpaint: " + image_model_card)
                     inference_parameters = {
                         "prompt": prompt,
@@ -9276,7 +8282,6 @@ class SEQUENCER_OT_generate_image(Operator):
                 if (image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin") or (image_model_card == "lzyvegetable/FLUX.1-schnell" and os_platform == "Darwin"):
                     if not img_path:
                         print("Please, input an image!")
-                        clear_cuda_cache() 
                         return {"CANCELLED"}
                     image = converter.generate_image(
                        seed=abs(int(seed)),
@@ -9291,8 +8296,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     )
                     
                 elif (
-                    image_model_card == "stabilityai/sdxl-turbo"
-                    or image_model_card == "lzyvegetable/FLUX.1-schnell"
+                    image_model_card == "lzyvegetable/FLUX.1-schnell"
                 ):
                     image = converter(
                         prompt=prompt,
@@ -9311,28 +8315,10 @@ class SEQUENCER_OT_generate_image(Operator):
                     
                 elif (
                     image_model_card == "ChuckMcSneed/FLUX.1-dev"
-                    or image_model_card == "ostris/Flex.2-preview"
                 ):
                     image = converter(
                         prompt=prompt,
                         #prompt_2=None,
-                        max_sequence_length=512,
-                        image=init_image,
-                        strength=1.00 - scene.image_power,
-                        # negative_prompt=negative_prompt,
-                        num_inference_steps=image_num_inference_steps,
-                        guidance_scale=image_num_guidance,
-                        height=y,
-                        width=x,
-                        generator=generator,
-                    ).images[0]
-                elif (
-                    image_model_card == "Qwen/Qwen-Image"
-                ):
-                    image = converter(
-                        prompt=prompt,
-                        #prompt_2=None,
-                        negative_prompt=negative_prompt,
                         max_sequence_length=512,
                         image=init_image,
                         strength=1.00 - scene.image_power,
@@ -9456,7 +8442,6 @@ class SEQUENCER_OT_generate_image(Operator):
             # Flux Dev
             elif (
                 image_model_card == "ChuckMcSneed/FLUX.1-dev"
-                or image_model_card == "ostris/Flex.2-preview"
             ):
                 inference_parameters = {
                     "prompt": prompt,
@@ -9523,8 +8508,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             # Generate Stable Diffusion etc.
             elif (
-                image_model_card == "stabilityai/stable-diffusion-3-medium-diffusers"
-                or image_model_card == "adamo1139/stable-diffusion-3.5-large-ungated"
+                image_model_card == "adamo1139/stable-diffusion-3.5-large-ungated"
                 or image_model_card == "adamo1139/stable-diffusion-3.5-medium-ungated"
             ):
                 print("Generate: Stable Diffusion Image ")
@@ -9582,7 +8566,6 @@ class SEQUENCER_OT_generate_image(Operator):
 
                         if not mask_strip:
                             print("Selected mask not found!")
-                            clear_cuda_cache() 
                             return {"CANCELLED"}
                         if (
                             mask_strip.type == "MASK"
@@ -9608,7 +8591,6 @@ class SEQUENCER_OT_generate_image(Operator):
                             init_image = load_first_frame(scene.movie_path)
                         if not init_image:
                             print("Loading strip failed!")
-                            clear_cuda_cache() 
                             return {"CANCELLED"}
                         image = pipe(
                             prompt,
@@ -9636,7 +8618,6 @@ class SEQUENCER_OT_generate_image(Operator):
                             init_image = load_first_frame(scene.movie_path)
                         if not init_image:
                             print("Loading strip failed!")
-                            clear_cuda_cache() 
                             return {"CANCELLED"}
                         image = pipe(
                             prompt,
@@ -9662,64 +8643,6 @@ class SEQUENCER_OT_generate_image(Operator):
                             height=y,
                             width=x,
                             generator=generator,
-                        ).images[0]
-
-                # SDXL Turbo
-                elif image_model_card == "stabilityai/sdxl-turbo":
-                    # LoRA.
-                    if enabled_items:
-                        image = pipe(
-                            # prompt_embeds=prompt, # for compel - long prompts
-                            prompt,
-                            # negative_prompt=negative_prompt,
-                            num_inference_steps=image_num_inference_steps,
-                            guidance_scale=0.0,
-                            height=y,
-                            width=x,
-                            cross_attention_kwargs={"scale": 1.0},
-                            generator=generator,
-                        ).images[0]
-
-                    # No LoRA.
-                    else:
-                        image = pipe(
-                            prompt,
-                            # negative_prompt=negative_prompt,
-                            num_inference_steps=image_num_inference_steps,
-                            guidance_scale=0.0,
-                            height=y,
-                            width=x,
-                            generator=generator,
-                            max_sequence_length=512,
-                        ).images[0]
-                        
-                # Qwen
-                elif image_model_card == "Qwen/Qwen-Image":
-                    # LoRA.
-                    if enabled_items:
-                        image = pipe(
-                            # prompt_embeds=prompt, # for compel - long prompts
-                            prompt,
-                            negative_prompt=negative_prompt,
-                            num_inference_steps=image_num_inference_steps,
-                            #guidance_scale=0.0,
-                            height=y,
-                            width=x,
-                            true_cfg_scale=4.0,
-                            generator=generator,
-                        ).images[0]
-
-                    # No LoRA.
-                    else:
-                        image = pipe(
-                            prompt,
-                            negative_prompt=negative_prompt,
-                            num_inference_steps=image_num_inference_steps,
-                            true_cfg_scale=4.0,
-                            height=y,
-                            width=x,
-                            generator=generator,
-                            max_sequence_length=512,
                         ).images[0]
 
                 # Not Turbo
@@ -10662,46 +9585,27 @@ class SEQUENCER_OT_ai_strip_picker(Operator):
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):
                 context.scene.omnigen_strip_3 = strip.name
-                
-        if self.action == "qwen_select1":
-            self.report({"INFO"}, f"Picked: {strip.name}")
-            if find_strip_by_name(scene, strip.name):
-                scene.qwen_strip_1 = strip.name
-        elif self.action == "qwen_select2":
-            print(f"Picked Strip Name: {strip.name}")
-            self.report({"INFO"}, f"Picked '{strip.name}'")
-            if find_strip_by_name(scene, strip.name):
-                context.scene.qwen_strip_2 = strip.name
-        elif self.action == "qwen_select3":
-            print(f"Picked Strip Name: {strip.name}")
-            self.report({"INFO"}, f"Picked '{strip.name}'")
-            if find_strip_by_name(scene, strip.name):
-                context.scene.qwen_strip_3 = strip.name
-                
         elif self.action == "minimax_select":
             print(f"Picked Strip Name: {strip.name}")
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):
                 context.scene.minimax_subject = strip.name
-                
         elif self.action == "inpaint_select":
             print(f"Picked Strip Name: {strip.name}")
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):
                 context.scene.inpaint_selected_strip = strip.name
-                
         elif self.action == "out_frame_select":
             print(f"Picked Strip Name: {strip.name}")
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):
                 context.scene.out_frame = strip.name
-                
         if self.action == "kontext_select1":
             self.report({"INFO"}, f"Picked: {strip.name}")
             if find_strip_by_name(scene, strip.name):
                 scene.kontext_strip_1 = strip.name
-#        else:
-#            self.report({"WARNING"}, f"Unknown action: {self.action}")
+        else:
+            self.report({"WARNING"}, f"Unknown action: {self.action}")
 
     def invoke(self, context, event):
         if context.area.type == 'SEQUENCE_EDITOR':
@@ -11244,17 +10148,6 @@ def register():
     bpy.types.Scene.omnigen_strip_3 = bpy.props.StringProperty(
         name="omnigen_strip_3", options={"TEXTEDIT_UPDATE"}, default=""
     )
-
-    bpy.types.Scene.qwen_strip_1 = bpy.props.StringProperty(
-        name="qwen_strip_1", options={"TEXTEDIT_UPDATE"}, default=""
-    )
-    bpy.types.Scene.qwen_strip_2 = bpy.props.StringProperty(
-        name="qwen_strip_2", options={"TEXTEDIT_UPDATE"}, default=""
-    )
-    bpy.types.Scene.qwen_strip_3 = bpy.props.StringProperty(
-        name="qwen_strip_3", options={"TEXTEDIT_UPDATE"}, default=""
-    )
-
     # The guidance number.
     bpy.types.Scene.img_guidance_scale = bpy.props.FloatProperty(
         name="img_guidance_scale",
