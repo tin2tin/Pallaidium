@@ -29,6 +29,7 @@ bl_info = {
 # Use a-z for batches
 
 import bpy
+from bpy_extras.io_utils import ExportHelper
 import ctypes
 import random
 import site
@@ -786,6 +787,7 @@ def clear_cuda_cache():
 
 
 def python_exec():
+    """Returns the path to the Blender internal python executable"""
     return sys.executable
 
 
@@ -844,400 +846,384 @@ def parse_python_version(version_info):
     return f"{major}.{minor}"
 
 
-def install_modules(self):
-    os_platform = platform.system()
+def python_exec():
+    return sys.executable
+
+def install_requirements_binary_only(requirements_file):
+    """
+    Installs using --only-binary=:all:
+    """
+    if os.path.getsize(requirements_file) == 0:
+        return True
+
     pybin = python_exec()
-
-    def ensure_pip():
-        print("Ensuring: pip")
-        try:
-            subprocess.check_call([pybin, "-m", "pip", "install", "--upgrade", "pip"])
-        except Exception as e:
-            print(f"Error installing pip: {e}")
-            return False
-        return True
-
-    def install_module(name, package=None, use_git=False):
-        package = package if package else name
-        try:
-            subprocess.check_call([
-                pybin, "-m", "pip", "install", "--disable-pip-version-check",
-                "--use-deprecated=legacy-resolver", package,
-                "--no-warn-script-location", #"--upgrade"
-            ])
-            print(f"Successfully installed {name}")
-        except subprocess.CalledProcessError as e:
-            print(f"Error installing {name}: {e}")
-            return False
-        return True
-
-    # Common modules
-    common_modules = [
-        ("requests", "requests"),
-        #("huggingface_hub", "huggingface_hub"),
-        ("huggingface_hub", "huggingface_hub[hf_xet]"),
-        ("gguf", "gguf"),
-        ("pydub", "pydub"),
-        ("safetensors", "safetensors"),
-        ("cv2", "opencv_python"),
-        ("PIL", "pillow"),
-        ("IPython", "IPython"),
-        ("omegaconf", "omegaconf"),
-        ("aura_sr", "aura-sr"),
-        ("stable_audio_tools", "stable-audio-tools"),
-        ("beautifulsoup4", "beautifulsoup4"),
-        ("ftfy", "ftfy"),
-        ("librosa", "librosa"),
-        ("imageio", "imageio[ffmpeg]==2.4.1"),
-        ("imageio", "imageio-ffmpeg"),
-        ("imWatermark", "imWatermark"),
-        ("mediapipe", "mediapipe"),
-        ("scipy", "scipy"), #scipy==1.12.0
-        ("protobuf", "protobuf==3.20.1"),
-        ("scikit_learn", "scikit-learn==1.2.2"),
-        ("bitsandbytes", "bitsandbytes"),
-#        #("chatterbox", "--no-deps git+https://https://github.com/tin2tin/chatterbox.git"),
-        ("chatterbox", "--no-deps chatterbox-tts"),
-        ("numpy", "numpy==1.26.4"),
-        ("jax", "jax"),
-        #("jaxlib", "jaxlib>=0.5.0")
-        ("tqdm", "tqdm"),
-        ("tempfile", "tempfile"),
-        ("f5_tts", "git+https://github.com/SWivid/F5-TTS.git"),
-        ("resemble_perth", "resemble-perth==1.0.1"),
-        ("s3tokenizer", "s3tokenizer"),
-        ("conformer", "conformer"),
-        ("spacy", "spacy"),
-        ("hf_xet", "hf-xet"),
-        ("packaging", "packaging"),
-        #("kernels", "kernels"),
+    cmd = [
+        pybin, "-m", "pip", "install", 
+        "--disable-pip-version-check", 
+        "--no-warn-script-location", 
+        "--no-deps", 
+        "--only-binary=:all:", 
+        "-r", requirements_file
     ]
+    try:
+        subprocess.check_call(cmd)
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Error installing binaries: {e}")
+        return False
 
-    show_system_console(True)
-    set_system_console_topmost(True)
-    ensure_pip()
-
-    for module_name, package_name in common_modules:
-        install_module(module_name, package_name)
-
-    # Platform-specific installations
-    if os_platform == "Windows":
-        windows_modules = [
-            # How to install a patch: git+https://github.com/huggingface/diffusers@integrations/ltx-097
-            #("diffusers", "diffusers==0.34.0"),
-            ("diffusers", "git+https://github.com/huggingface/diffusers.git"),
-            ("mmaudio", "git+https://github.com/hkchengrex/MMAudio.git"),
-            #("deepspeed", "https://www.piwheels.org/simple/deepspeed/deepspeed-0.16.5-py3-none-any.whl"),
-            #("deepspeed", "https://github.com/agwosdz/DeepSpeed-Wheels-for-Windows/releases/download/DeepSpeed/deepspeed-0.16.1+unknown-cp311-cp311-win_amd64_cu124.whl"),
-            #("deepspeed", "https://github.com/daswer123/deepspeed-windows/releases/download/13.1/deepspeed-0.13.1+cu121-cp311-cp311-win_amd64.whl"),
-            #("deepspeed", "https://github.com/agwosdz/DeepSpeed-Wheels-for-Windows/releases/download/DeepSpeed/deepspeed-0.15.1+51c6eae-cp311-cp311-win_amd64_cu124.whl"),
-            ("resemble_enhance", "git+https://github.com/tin2tin/resemble-enhance-windows.git"),
-            #("flash_attn", "https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.4.19/flash_attn-2.7.4.post1+cu126torch2.6-cp311-cp311-win_amd64.whl"),
-            ("triton", "triton-windows<3.3"),
-            #("sageattention", "https://github.com/woct0rdho/SageAttention/releases/download/v2.1.1-windows/sageattention-2.1.1+cu124torch2.5.1-cp311-cp311-win_amd64.whl"),
-            #("triton", "https://github.com/woct0rdho/triton-windows/releases/download/v3.2.0-windows.post10/triton-3.2.0-cp311-cp311-win_amd64.whl"),
-            #("triton", "https://github.com/woct0rdho/triton-windows/releases/download/v3.2.0-windows.post10/triton-3.2.0-cp311-cp311-win_amd64.whl"),
-            # Use this for low cards/cuda?
-            #("triton", "https://hf-mirror.com/LightningJay/triton-2.1.0-python3.11-win_amd64-wheel/resolve/main/triton-2.1.0-cp311-cp311-win_amd64.whl"),
-        ]
-
-        for module_name, package_name in windows_modules:
-            install_module(module_name, package_name)
-    else:
-        other_modules = [
-            ("diffusers", "git+https://github.com/huggingface/diffusers.git"),
-            #("deepspeed", "deepspeed"), #==0.14.4
-            ("resemble_enhance", "resemble-enhance"),
-            ("flash_attn", "flash-attn"),
-            ("triton", "triton"),
-            ("sageattention","sageattention==1.0.6")
-        ]
-
-        for module_name, package_name in other_modules:
-            install_module(module_name, package_name)
-
-    if os_platform == "Darwin":
-        install_module("mflux","--no-deps mflux")
-        install_module("matplotlib","--no-deps matplotlib")
-        install_module("mlx","--no-deps mlx")
-        install_module("opencv_python","--no-deps opencv-python")
-        install_module("piexif","--no-deps piexif")
-        install_module("platformdirs","--no-deps platformdirs")
-        install_module("toml","--no-deps toml")
-
-    # Python version-specific installations
-    from packaging import version
-    python_version = sys.version_info
-    if version.parse(".".join(map(str, python_version[:3]))) >= version.parse("3.8"):
-        install_module("image_gen_aux", "git+https://github.com/huggingface/image_gen_aux")
-
-    # Additional installations
-#    subprocess.check_call([
-#        pybin, "-m", "spacy", "download", "en_core_web_md",
-#    ])
-    subprocess.call(
-        [
-            pybin,
-            "-m",
-            "pip",
-            "install",
-            "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl",
-            "--no-deps",
-            "--disable-pip-version-check",
-            "--no-warn-script-location",
-        ]
-    )
-        #    subprocess.check_call([
-        #        pybin, "-m", "pip", "install", "--disable-pip-version-check",
-        #        "--use-deprecated=legacy-resolver", "tensorflow<2.11", "--upgrade"
-        #    ])
-        #    deepspeed_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deepspeed", "deepspeed-0.16.5-py3-none-any.whl")
-        #    print(deepspeed_path)
-        #    subprocess.call(
-        #        [
-        #            pybin,
-        #            "-m",
-        #            "pip",
-        #            "install",
-        #            "--disable-pip-version-check",
-        #            "--use-deprecated=legacy-resolver",
-        #            deepspeed_path,
-        #            "--no-warn-script-location",
-        #        ]
-        #    )
-#    install_module("controlnet_aux", "controlnet-aux")
-#    install_module("whisperspeech", "WhisperSpeech==0.8")
-#    install_module(
-#        "parler_tts", "git+https://github.com/huggingface/parler-tts.git"
-#    )
-#    install_module("laion_clap", "laion-clap==1.1.6")
-    install_module("numpy", "numpy==1.26.4")
-#    subprocess.call(
-#        [
-#            pybin,
-#            "-m",
-#            "pip",
-#            "install",
-#            "--disable-pip-version-check",
-#            "--use-deprecated=legacy-resolver",
-#            "ultralytics",
-#            "--no-warn-script-location",
-#            "--upgrade",
-#        ]
-#    )
-#    subprocess.call(
-#        [
-#            pybin,
-#            "-m",
-#            "pip",
-#            "install",
-#            "--disable-pip-version-check",
-#            "--use-deprecated=legacy-resolver",
-#            "git+https://github.com/tin2tin/adetailer_sdxl.git",
-#        ]
-#    )
-#    #subprocess.call([pybin, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", "git+https://github.com/theblackhatmagician/adetailer_sdxl.git"])
-#    subprocess.call(
-#        [
-#            pybin,
-#            "-m",
-#            "pip",
-#            "install",
-#            "--disable-pip-version-check",
-#            "--use-deprecated=legacy-resolver",
-#            "lmdb",
-#            "--no-warn-script-location",
-#            "--upgrade",
-#        ]
-#    )
-#    subprocess.call(
-#        [
-#            pybin,
-#            "-m",
-#            "pip",
-#            "install",
-#            "--disable-pip-version-check",
-#            "--use-deprecated=legacy-resolver",
-#            "git+https://github.com/huggingface/accelerate.git",
-#            "--no-warn-script-location",
-#            "--upgrade",
-#        ]
-#    )
-#    uninstall_module_with_dependencies("timm")
-#    subprocess.check_call([
-#        pybin, "-m", "pip", "uninstall", "-y", "timm",
-#    ])
-    # Torch installations
-    if os_platform == "Windows":
-        subprocess.check_call([
-            pybin, "-m", "pip", "uninstall", "-y", "torch", "torchvision", "torchaudio", "xformers"
-        ])
-        subprocess.check_call([
-            pybin, "-m", "pip", "install",
-            "torch", "xformers", "torchvision", "torchaudio",
-            "--index-url", "https://download.pytorch.org/whl/cu124",
-            "--no-warn-script-location", "--upgrade"
-        ])
-        #        subprocess.check_call([
-        #            pybin, "-m", "pip", "install",
-        #            "torch==2.3.1+cu121", "xformers", "torchvision",
-        #            "--index-url", "https://download.pytorch.org/whl/cu121",
-        #            "--no-warn-script-location", "--upgrade"
-        #        ])
-        #        subprocess.check_call([
-        #            pybin, "-m", "pip", "install",
-        #            "torchaudio==2.3.1+cu121",
-        #            "--index-url", "https://download.pytorch.org/whl/cu121",
-        #            "--no-warn-script-location", "--upgrade"
-        #        ])
-    else:
-        install_module("torch", "torch")
-        install_module("torchvision", "torchvision")
-        install_module("torchaudio", "torchaudio")
-        install_module("xformers", "xformers")
-
-    install_module("torcheval", "torcheval")
-    install_module("torchao", "torchao==0.12.0")
-    install_module("sentencepiece", "sentencepiece==0.1.99")
-
-    # Final tasks
-    subprocess.check_call([
-        pybin, "-m", "pip", "install", "--disable-pip-version-check",
-        "peft", "--upgrade"
-    ])
-    #    subprocess.check_call([
-    #        pybin, "pip", "install", "--disable-pip-version-check",
-    #        "--use-deprecated=legacy-resolver", "timm", "--upgrade"
-    #    ])
-#    install_module("sageattention","sageattention==1.0.6")
-#    install_module("timm", "git+https://github.com/rwightman/pytorch-image-models.git")
-    install_module("protobuf", "protobuf==3.20.1")
-    install_module("numpy", "numpy==1.26.4")
-#    #install_module("tokenizers", "tokenizers==0.21.1")
-    install_module("tokenizers", "tokenizers==0.22.0") #0.22.0
-#    #install_module("transformers", "transformers==4.46.1")
-#    #install_module("transformers", "git+https://github.com/huggingface/transformers.git")
-    install_module("transformers", "transformers")#==4.49.0") #4.56.2
-    #    install_module("onnx", "onnx==1.18.0"),
-    #    install_module("onnxruntime", "onnxruntime==1.21.0"),
-    #print("Cleaning up cache...")
-    #subprocess.check_call([pybin, "-m", "pip", "cache", "purge"])
-    subprocess.check_call([pybin, "-m", "pip", "list"])
-
-    self.report({"INFO"}, "All modules installed successfully.")
-
-
-def get_module_dependencies(module_name):
+def install_requirements_allow_source(requirements_file):
     """
-    Get the list of dependencies for a given module.
+    Installs WITHOUT --only-binary. 
     """
+    if os.path.getsize(requirements_file) == 0: return True
+
     pybin = python_exec()
-    result = subprocess.run(
-        [pybin, "-m", "pip", "show", module_name], capture_output=True, text=True
-    )
-    dependencies = []
-    if result.stdout:
-        output = result.stdout.strip()
-    else:
-        return dependencies
-    for line in output.split("\n"):
-        if line.startswith("Requires:"):
-            dependencies = line.split(":")[1].strip().split(", ")
-            break
-    return dependencies
+    cmd = [
+        pybin, "-m", "pip", "install", 
+        "--disable-pip-version-check", 
+        "--no-warn-script-location", 
+        "--no-deps", 
+        "-r", requirements_file
+    ]
+    try:
+        subprocess.check_call(cmd)
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Error installing source libs: {e}")
+        return False
+
+def write_requirements_file(filename, lines):
+    with open(filename, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines))
+
+def get_platform_specs():
+    return platform.system()
 
 
-def uninstall_module_with_dependencies(module_name):
-    """
-    Uninstall a module and its dependencies.
-    """
-    show_system_console(True)
-    set_system_console_topmost(True)
-    pybin = python_exec()
-    dependencies = get_module_dependencies(module_name)
+class SmartSkipManager:
+    @staticmethod
+    def extract_package_name(line):
+        line = line.strip()
+        if not line or line.startswith("#") or line.startswith("--"): return None
+        if "git+" in line or "http" in line:
+            basename = line.split('/')[-1]
+            clean = basename.replace('.git', '').replace('.whl', '')
+            if "-" in clean: return clean.split('-')[0]
+            return clean
+        name = re.split(r'[=<>!~]', line)[0].strip()
+        if "[" in name: name = name.split("[")[0]
+        return name
 
-    subprocess.run([pybin, "-m", "pip", "uninstall", "-y", module_name])
+    @staticmethod
+    def parse_req_version(line):
+        name = SmartSkipManager.extract_package_name(line)
+        if not name: return None, None
+        if "==" in line:
+            try:
+                parts = line.split("==")
+                return name, parts[1].strip().split(' ')[0]
+            except: return name, None
+        return name, None
 
-    for dependency in dependencies:
-        if (
-            len(dependency) > 5 and str(dependency[5].lower) != "numpy"
-        ) and not dependency.find("requests"):
-            subprocess.run([pybin, "-m", "pip", "uninstall", "-y", dependency])
+    @staticmethod
+    def is_installed(line):
+        name, req_version = SmartSkipManager.parse_req_version(line)
+        if not name: return False
 
+        try:
+            installed_version = importlib.metadata.version(name)
+        except importlib.metadata.PackageNotFoundError:
+            try:
+                alt_name = name.replace("-", "_") if "-" in name else name.replace("_", "-")
+                installed_version = importlib.metadata.version(alt_name)
+            except importlib.metadata.PackageNotFoundError:
+                return False
+
+        if "git+" in line or "http" in line:
+            print(f"  [SKIP] {name} is already installed.")
+            return True
+
+        if req_version:
+            if installed_version == req_version:
+                print(f"  [SKIP] {name} {installed_version} is already installed.")
+                return True
+            else:
+                print(f"  [UPDATE] {name}: Installed {installed_version} != Required {req_version}")
+                return False 
+        
+        print(f"  [SKIP] {name} is already installed.")
+        return True
+
+    @staticmethod
+    def filter_existing(requirements_list):
+        needed = []
+        for line in requirements_list:
+            if not SmartSkipManager.is_installed(line):
+                needed.append(line)
+        return needed
+
+class BlenderInternalManager:
+    @staticmethod
+    def get_protected_modules():
+        return {
+            "pip", "setuptools", "wheel", "ensurepip", "_distutils_hack", "distutils",
+            "numpy", "requests", "cython", "zstandard", 
+            "urllib3", "idna", "certifi", "charset-normalizer", 
+            "openimageio", "pyopencolorio", "materialx", "oslquery", 
+            "mesonbuild", "autopep8", "pycodestyle", 
+            "bpy", "mathutils", "gpu", "bl_math", "bl_ui_utils"
+        }
+
+    @staticmethod
+    def is_protected(package_name):
+        if not package_name: return False
+        clean = package_name.lower().replace("_", "-")
+        return clean in BlenderInternalManager.get_protected_modules()
+
+    @staticmethod
+    def filter_list(requirements_list):
+        safe_list = []
+        for line in requirements_list:
+            name = SmartSkipManager.extract_package_name(line)
+            if not BlenderInternalManager.is_protected(name):
+                safe_list.append(line)
+        return safe_list
+
+
+class DependencyManager:
+    def __init__(self):
+        self.os_platform = get_platform_specs()
+        self.py_major = sys.version_info[0]
+        self.py_minor = sys.version_info[1]
+
+    def get_phase_1_5_source_libs(self):
+        """
+        Pure Python libs or libs needing source build (no wheels).
+        """
+        return [
+            "antlr4-python3-runtime==4.9.3",
+            "argbind==0.3.9",
+            "chatterbox-tts",
+            "dctorch==0.1.2",
+            "einx==0.3.0",
+            "encodec==0.1.1",
+            "imhist==0.0.4",
+            "julius==0.2.7",
+            "pathtools==0.1.2",
+            "progressbar==2.5",
+            "pyloudnorm==0.1.1",
+            "pystoi==0.4.1",
+            "pyvers==0.1.0",
+            "randomname==0.2.1",
+            "s3tokenizer==0.2.0",
+            "screenplain==0.11.1",
+            "torch-stoi==0.2.3",
+            "transformers-stream-generator==0.0.5",
+            "wget==3.2",
+            "x-transformers==2.11.23",
+        ]
+
+    def get_phase_2_torch(self):
+        if self.os_platform == "Windows":
+            return [
+                "--index-url https://download.pytorch.org/whl/cu124", 
+                "torch==2.6.0+cu124", 
+                "torchvision==0.21.0+cu124", 
+                "torchaudio==2.6.0+cu124", 
+                "xformers"
+            ]
+        else:
+            return ["torch", "torchvision", "torchaudio", "xformers"]
+
+    def get_phase_3_git_and_extensions(self):
+        reqs = [
+            "git+https://github.com/huggingface/diffusers.git", 
+            "git+https://github.com/SWivid/F5-TTS.git",
+            "stable-audio-tools", 
+            "torcheval", 
+            "torchao==0.12.0", 
+            "spacy",
+            "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl"
+        ]
+        
+        if self.py_major == 3 and self.py_minor >= 8:
+             reqs.append("git+https://github.com/huggingface/image_gen_aux")
+             
+        if self.os_platform == "Windows":
+            reqs.extend([
+                "git+https://github.com/hkchengrex/MMAudio.git", 
+                "git+https://github.com/tin2tin/resemble-enhance-windows.git", 
+                "triton-windows<3.3"
+            ])
+        else:
+            reqs.extend([
+                "resemble-enhance", 
+                "flash-attn", 
+                "triton", 
+                "sageattention==1.0.6"
+            ])
+        return reqs
+
+
+class GENERATOR_OT_export_requirements(Operator, ExportHelper):
+    bl_idname = "sequencer.export_requirements"
+    bl_label = "Export requirements.txt"
+    bl_options = {'REGISTER'}
+    filename_ext = ".txt"
+    filter_glob: bpy.props.StringProperty(default="requirements.txt", options={'HIDDEN'}, maxlen=255)
+
+    def execute(self, context):
+        dists = importlib.metadata.distributions()
+        lines = []
+        for dist in dists:
+            try: lines.append(f"{dist.metadata['Name']}=={dist.version}")
+            except: pass
+        lines.sort()
+        try:
+            with open(self.filepath, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(lines))
+        except Exception: return {'CANCELLED'}
+        return {'FINISHED'}
 
 class GENERATOR_OT_install(Operator):
-    """Install all dependencies"""
-
     bl_idname = "sequencer.install_generator"
     bl_label = "Install Dependencies"
     bl_options = {"REGISTER", "UNDO"}
+    force_reinstall: bpy.props.BoolProperty(name="Force Reinstall", default=False)
 
     def execute(self, context):
-        preferences = context.preferences
-        addon_prefs = preferences.addons[__name__].preferences
-        install_modules(self)
-        self.report(
-            {"INFO"},
-            "Installation of dependencies is finished.",
-        )
+        try:
+            from . import console_utils 
+            console_utils.show_system_console(True)
+            console_utils.set_system_console_topmost(True)
+        except ImportError: pass
+
+        pybin = python_exec()
+        addon_dir = os.path.dirname(os.path.realpath(__file__))
+        local_req_file = os.path.join(addon_dir, "requirements.txt")
+        mgr = DependencyManager()
+        
+        # BATCH SIZE for all phases
+        BATCH_SIZE = 5
+        
+        try: subprocess.check_call([pybin, "-m", "pip", "install", "--upgrade", "pip"])
+        except: pass
+
+        def process_in_batches(lines, phase_name, install_func):
+            safe_lines = BlenderInternalManager.filter_list(lines)
+            if not self.force_reinstall:
+                final_lines = SmartSkipManager.filter_existing(safe_lines)
+            else:
+                final_lines = safe_lines
+
+            total_items = len(final_lines)
+            if total_items == 0:
+                print(f"--- {phase_name}: All up to date. ---")
+                return True
+
+            print(f"--- {phase_name}: Installing {total_items} packages in batches of {BATCH_SIZE} ---")
+            
+            for i in range(0, total_items, BATCH_SIZE):
+                batch_lines = final_lines[i : i + BATCH_SIZE]
+                current_batch_num = (i // BATCH_SIZE) + 1
+                total_batches = (total_items + BATCH_SIZE - 1) // BATCH_SIZE
+                
+                # Log batch content
+                batch_names = [SmartSkipManager.extract_package_name(x) or x for x in batch_lines]
+                print(f"   [Batch {current_batch_num}/{total_batches}] Installing: {', '.join(batch_names)}")
+                
+                temp_req = os.path.join(addon_dir, f"temp_{phase_name.replace(' ', '_')}_batch_{current_batch_num}.txt")
+                write_requirements_file(temp_req, batch_lines)
+                
+                success = install_func(temp_req)
+                if os.path.exists(temp_req): os.remove(temp_req)
+                if not success:
+                    print(f"!!! Error installing Batch {current_batch_num} !!!")
+                    return False
+            return True
+
+        # -----------------------------------------------------------
+        # Step 1: Base Requirements (Binary Only)
+        # -----------------------------------------------------------
+        if os.path.exists(local_req_file):
+            with open(local_req_file, 'r') as f:
+                raw_lines = f.read().splitlines()
+            
+            if not process_in_batches(raw_lines, "Base Binaries", install_requirements_binary_only):
+                 self.report({"ERROR"}, "Failed to install base binaries.")
+                 return {"CANCELLED"}
+
+        # -----------------------------------------------------------
+        # Step 2: Source Libs, Torch, Git (Allow Source Build)
+        # -----------------------------------------------------------
+        phases = [
+            ("Source_Libs", mgr.get_phase_1_5_source_libs()),
+            ("Torch", mgr.get_phase_2_torch()),
+            ("Git_Extensions", mgr.get_phase_3_git_and_extensions()),
+        ]
+        
+        for phase_name, lines in phases:
+            torch_installed = any("torch" in x for x in lines) and not self.force_reinstall and importlib.util.find_spec("torch")
+            if "Torch" in phase_name and mgr.os_platform == "Windows" and not torch_installed:
+                 clean_lines = SmartSkipManager.filter_existing(lines)
+                 if clean_lines:
+                     print("Ensuring clean Torch installation...")
+                     subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "torch", "torchvision", "torchaudio", "xformers"])
+
+            if not process_in_batches(lines, phase_name, install_requirements_allow_source):
+                self.report({"ERROR"}, f"Failed to install: {phase_name}")
+                return {"CANCELLED"}
+
+        self.report({"INFO"}, "Installation check finished.")
         return {"FINISHED"}
 
 
 class GENERATOR_OT_uninstall(Operator):
-    """Uninstall all dependencies"""
-
     bl_idname = "sequencer.uninstall_generator"
     bl_label = "Uninstall Dependencies"
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
         pybin = python_exec()
-        preferences = context.preferences
-        addon_prefs = preferences.addons[__name__].preferences
+        mgr = DependencyManager()
+        addon_dir = os.path.dirname(os.path.realpath(__file__))
+        local_req_file = os.path.join(addon_dir, "requirements.txt")
+        
+        all_targets = set()
+        
+        if os.path.exists(local_req_file):
+            with open(local_req_file, 'r') as f:
+                lines = f.read().splitlines()
+                for line in lines:
+                    name = SmartSkipManager.extract_package_name(line)
+                    if name: all_targets.add(name)
 
-        # List of modules to uninstall grouped by category
-        modules_to_uninstall = {
-            "AI Tools": [
-                "torch", "torchvision", "torchaudio", "diffusers", "transformers",
-                "sentencepiece", "safetensors", "xformers", "imageio",
-                "imWatermark", "controlnet-aux", "bitsandbytes"
-            ],
-            "ML Frameworks": [
-                "opencv_python", "scipy", "IPython", "pillow", "libtorrent", "accelerate",
-                "triton", "cv2", "protobuf", "tensorflow"
-            ],
-            "Model Tools": [
-                "resemble-enhance", "mediapipe", "flash_attn", "stable-audio-tools",
-                "beautifulsoup4", "ftfy", "deepspeed",
-                "gradio-client" , "peft", "ultralytics",
-                "parler-tts", "onnx", "onnxruntime"
-            ], # "albumentations", "datasets", "insightface"
-            "Utils": [
-                "celluloid", "omegaconf", "pandas", "ptflops", "rich", "resampy",
-                "tabulate", "gradio", "jax", "jaxlib", "sympy"
-            ],
-            "WhisperSpeech Components": [
-                "ruamel.yaml.clib", "fastprogress", "fastcore", "ruamel.yaml",
-                "hyperpyyaml", "speechbrain", "vocos", "WhisperSpeech", "pydub"
-            ],
-            "Speech Components": [
-                "chatterbox-tts", "f5-tts", "resemble-perth", "s3tokenizer",
-                "conformer"
-            ],
-        }
-
-        # Uninstall all modules and their dependencies
-        for category, modules in modules_to_uninstall.items():
-            for module in modules:
-                uninstall_module_with_dependencies(module)
-
-#        # Clear pip cache
-#        subprocess.check_call([pybin, "-m", "pip", "cache", "purge"])
-
-        self.report(
-            {"INFO"},
-            "\nRemove AI Models manually: \nLinux and macOS: ~/.cache/huggingface/hub\nWindows: %userprofile%\\.cache\\huggingface\\hub",
+        script_phases = (
+            mgr.get_phase_1_5_source_libs() + 
+            mgr.get_phase_2_torch() + 
+            mgr.get_phase_3_git_and_extensions()
         )
+        for line in script_phases:
+            name = SmartSkipManager.extract_package_name(line)
+            if name: all_targets.add(name)
+
+        safe_uninstall_list = []
+        for pkg in all_targets:
+            if not BlenderInternalManager.is_protected(pkg):
+                safe_uninstall_list.append(pkg)
+
+        uninstall_file = os.path.join(addon_dir, "temp_uninstall_list.txt")
+        write_requirements_file(uninstall_file, safe_uninstall_list)
+
+        print(f"Uninstalling {len(safe_uninstall_list)} packages...")
+        try:
+            subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "-r", uninstall_file])
+        except Exception as e:
+            print(f"Error: {e}")
+
+        if os.path.exists(uninstall_file): os.remove(uninstall_file)
+        self.report({"INFO"}, "Uninstallation finished. Please, restart Blender.")
         return {"FINISHED"}
 
 
@@ -1799,6 +1785,7 @@ class GeneratorAddonPreferences(AddonPreferences):
         row = box.row()
         row.operator("sequencer.install_generator")
         row.operator("sequencer.uninstall_generator")
+        row.operator("sequencer.export_requirements")
         try:
             box.prop(self, "movie_model_card")
             box.prop(self, "image_model_card")
@@ -9803,6 +9790,7 @@ classes = (
     LORABROWSER_UL_files,
     GENERATOR_OT_install,
     GENERATOR_OT_uninstall,
+    GENERATOR_OT_export_requirements,
     SequencerOpenAudioFile,
     IPAdapterFaceProperties,
     IPAdapterFaceFileBrowserOperator,
