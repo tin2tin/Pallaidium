@@ -909,6 +909,7 @@ def install_modules(self):
         ("conformer", "conformer"),
         ("spacy", "spacy"),
         ("hf_xet", "hf-xet"),
+        ("packaging", "packaging"),
         #("kernels", "kernels"),
     ]
 
