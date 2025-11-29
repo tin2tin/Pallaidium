@@ -1231,8 +1231,8 @@ class GENERATOR_OT_uninstall(Operator):
             for module in modules:
                 uninstall_module_with_dependencies(module)
 
-        # Clear pip cache
-        subprocess.check_call([pybin, "-m", "pip", "cache", "purge"])
+#        # Clear pip cache
+#        subprocess.check_call([pybin, "-m", "pip", "cache", "purge"])
 
         self.report(
             {"INFO"},
