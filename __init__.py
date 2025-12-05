@@ -1163,7 +1163,6 @@ class GENERATOR_OT_install(Operator):
             ("Torch", mgr.get_phase_2_torch()),
             ("Git_Extensions", mgr.get_phase_3_git_and_extensions()),
         ]
-        
         for phase_name, lines in phases:
             torch_installed = any("torch" in x for x in lines) and not self.force_reinstall and importlib.util.find_spec("torch")
             if "Torch" in phase_name and mgr.os_platform == "Windows" and not torch_installed:
@@ -7478,6 +7477,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 or image_model_card == "ChuckMcSneed/FLUX.1-dev"
                 or image_model_card == "Qwen/Qwen-Image-Edit-2509"
                 or image_model_card == "Qwen/Qwen-Image"
+                or image_model_card == "Tongyi-MAI/Z-Image-Turbo"
     #            or image_model_card == "Runware/FLUX.1-Redux-dev"
     #            or image_model_card == "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"
     #            or image_model_card == "romanfratric234/FLUX.1-Depth-dev-lora"
