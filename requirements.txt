@@ -38,6 +38,7 @@ six==1.17.0
 tqdm==4.67.1
 
 # --- ML Framework Dependencies & Extensions ---
+kernels
 timm==1.0.22
 kornia==0.8.2
 kornia_rs==0.1.10
@@ -265,4 +266,5 @@ virtualenv==20.35.4
 wcwidth==0.2.14
 win32_setctime==1.2.0
 wrapt==2.0.1
+
 yarl==1.22.0
