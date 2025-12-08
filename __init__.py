@@ -2368,7 +2368,6 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     and image_model_card != "romanfratric234/FLUX.1-Depth-dev-lora"
                     #and image_model_card != "yuvraj108c/FLUX.1-Kontext-dev"
                     and image_model_card != "kontext-community/relighting-kontext-dev-lora-v3"
-                    and image_model_card != "Tongyi-MAI/Z-Image-Turbo"
                 ):
                     if input == "input_strips" and (not scene.inpaint_selected_strip or image_model_card == "yuvraj108c/FLUX.1-Kontext-dev"):
                         col = col.column(heading="Use", align=True)
@@ -6510,10 +6509,12 @@ class SEQUENCER_OT_generate_image(Operator):
                             converter.vae.enable_tiling()
                         else:
                             converter.enable_model_cpu_offload()
-
+                            
+                    # zimage turbo img2img
                     elif image_model_card == "Tongyi-MAI/Z-Image-Turbo":
-                        from diffusers import ZImagePipeline
-                        converter = ZImagePipeline.from_pretrained(
+                        from diffusers import ZImageImg2ImgPipeline
+                        from diffusers.utils import load_image
+                        converter = ZImageImg2ImgPipeline.from_pretrained(
                             "Tongyi-MAI/Z-Image-Turbo",
                             torch_dtype=torch.bfloat16,
                             low_cpu_mem_usage=False,
@@ -6521,7 +6522,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         if gfx_device == "mps":
                             converter.to("mps")
                         elif low_vram():
-                            converterenable_model_cpu_offload()
+                            converter.enable_model_cpu_offload()
                             #pipe.enable_sequential_cpu_offload()
                             converter.vae.enable_tiling()
                         else:
@@ -8328,6 +8329,24 @@ class SEQUENCER_OT_generate_image(Operator):
                         image=init_image, prompt=final_prompt, num_inference_steps=image_num_inference_steps, guidance_scale=image_num_guidance,
                         width=x, height=y, generator=generator
                     ).images[0]
+                    
+                elif image_model_card == "Tongyi-MAI/Z-Image-Turbo":
+                    image = converter(
+                        prompt=prompt,
+                        #prompt_2=None,
+                        negative_prompt=negative_prompt,
+                        max_sequence_length=512,
+                        image=init_image,
+                        strength=1.00 - scene.image_power,
+                        num_inference_steps=9,
+                        guidance_scale=0.0,
+                        # negative_prompt=negative_prompt,
+#                        num_inference_steps=image_num_inference_steps,
+#                        guidance_scale=image_num_guidance,
+                        height=y,
+                        width=x,
+                        generator=generator,
+                    ).images[0]                  
 
                 # Not Turbo
                 else:
