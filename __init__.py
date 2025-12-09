@@ -1596,16 +1596,16 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "SkyReels-V1-Hunyuan (960x544x97)",
                 "Skywork/SkyReels-V1-Hunyuan-T2V",
             ),
-#            (
-#                "FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers",
-#                "Wan2.1-T2V (832x480x81)",
-#                "FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers",
-#            ),
-#            (
-#                "FastDM/Wan2.2-I2V-A14B-Merge-Lightning-V1.0-Diffusers",
-#                "Wan2.2-I2V-14B-480P (832x480x81)",
-#                "FastDM/Wan2.2-I2V-A14B-Merge-Lightning-V1.0-Diffusers",
-#            ),
+            (
+                "Wan-AI/Wan2.2-T2V-A14B-Diffusers",
+                "Wan2.1-T2V (832x480x81)",
+                "Wan-AI/Wan2.2-T2V-A14B-Diffusers",
+            ),
+            (
+                "Wan-AI/Wan2.2-I2V-A14B-Diffusers",
+                "Wan2.2-I2V-14B (832x480x81)",
+                "Wan-AI/Wan2.2-I2V-A14B-Diffusers",
+            ),
             (
                 "stabilityai/stable-diffusion-xl-base-1.0",
                 "Frame by Frame SDXL Turbo (1024x1024)",
@@ -2598,6 +2598,14 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                                 type == "image"
                                 and image_model_card == "ZhengPeng7/BiRefNet_HR"
                             )
+                            or (
+                                type == "movie"
+                                and (movie_model_card == "Wan-AI/Wan2.2-I2V-A14B-Diffusers")
+                            )
+                            or (
+                                type == "movie"
+                                and (movie_model_card == "Wan-AI/Wan2.2-T2V-A14B-Diffusers")
+                            )
                         )
                     ):
                         pass
@@ -2629,6 +2637,14 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         or (
                             scene.use_lcm
                         )
+                        or (
+                            type == "movie"
+                            and (movie_model_card == "Wan-AI/Wan2.2-I2V-A14B-Diffusers")
+                        )
+                        or (
+                            type == "movie"
+                            and (movie_model_card == "Wan-AI/Wan2.2-T2V-A14B-Diffusers")
+                        )                        
                     ):
                         pass
                     else:
@@ -2739,8 +2755,8 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 type == "movie")
                 and (movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0"
                 or (movie_model_card == "hunyuanvideo-community/HunyuanVideo")
-                or (movie_model_card == "FastDM/Wan2.2-I2V-A14B-Merge-Lightning-V1.0-Diffusers")
-                or (movie_model_card == "FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers")
+                or (movie_model_card == "Wan-AI/Wan2.2-I2V-A14B-Diffusers")
+                or (movie_model_card == "Wan-AI/Wan2.2-T2V-A14B-Diffusers")
                 or (movie_model_card == "Wan-AI/Wan2.1-VACE-1.3B-diffusers")
             )):
                 layout = self.layout
@@ -3164,7 +3180,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 and movie_model_card != "Hailuo/MiniMax/img2vid"
                 and movie_model_card != "Hailuo/MiniMax/subject2vid"
                 and movie_model_card != "Skywork/SkyReels-V1-Hunyuan-T2V"
-                and movie_model_card != "FastDM/Wan2.2-I2V-A14B-Merge-Lightning-V1.0-Diffusers"
+                and movie_model_card != "Wan-AI/Wan2.2-I2V-A14B-Diffusers"
                 and movie_model_card != "Wan-AI/Wan2.1-VACE-1.3B-diffusers"
             ) or movie_model_card == "stabilityai/stable-diffusion-xl-base-1.0":
                 # Frame by Frame
@@ -3593,37 +3609,141 @@ class SEQUENCER_OT_generate_movie(Operator):
                         #pipe.enable_xformers_memory_efficient_attention()
                         #pipe.to("cuda")
 
-                elif movie_model_card == "FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers":
+                elif movie_model_card == "Wan-AI/Wan2.2-T2V-A14B-Diffusers":
                     if (scene.movie_path or scene.image_path) and input == "input_strips":
                         print("Wan2.1-T2V doesn't support img/vid2vid!")
                         return {"CANCELLED"}
 
                     # Import all necessary classes
-                    from diffusers import WanPipeline, AutoencoderKLWan
-                    from diffusers.quantizers import PipelineQuantizationConfig
+                    import gc
+                    from diffusers import WanPipeline, WanTransformer3DModel, FlowMatchEulerDiscreteScheduler
                     from diffusers.utils import export_to_video
-                    dtype = torch.bfloat16
-                    vae = AutoencoderKLWan.from_pretrained("FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers", subfolder="vae", torch_dtype=torch.float32)
-                    pipe = WanPipeline.from_pretrained("FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers", vae=vae, torch_dtype=dtype)
+                    from transformers import BitsAndBytesConfig
+                    
+                    print("--- Initializing ---")
+                    gc.collect()
+                    torch.cuda.empty_cache()
 
-    #                pipeline_quant_config = PipelineQuantizationConfig(
-    #                    quant_backend="bitsandbytes_4bit",
-    #                    quant_kwargs={
-    #                        "load_in_4bit": True,
-    #                        "bnb_4bit_quant_type": "nf4",
-    #                        "bnb_4bit_compute_dtype": torch.bfloat16
-    #                    },
-    #                    # Specify which part of the pipeline to quantize. For Wan-AI, it's the transformer.
-    #                    components_to_quantize=["transformer"],
-    #                )
+                    MODEL_ID = "Wan-AI/Wan2.2-T2V-A14B-Diffusers"
 
-    #                print("Loading FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers with 4-bit quantization API...")
+                    # 4-Bit Configuration (Mandatory for 24GB VRAM)
+                    nf4_config = BitsAndBytesConfig(
+                        load_in_4bit=True,
+                        bnb_4bit_quant_type="nf4",
+                        bnb_4bit_compute_dtype=torch.bfloat16
+                    )
 
-    #                # Pass the new config object to from_pretrained
-    #                pipe = WanPipeline.from_pretrained(
-    #                    "FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers",
-    #                    quantization_config=pipeline_quant_config,
-    #                )
+                    # LOAD MODELS (4-BIT QUANTIZED)
+                    print("--- Loading Models ---")
+
+                    # Load Transformer 1 (High Noise)
+                    transformer_high = WanTransformer3DModel.from_pretrained(
+                        MODEL_ID,
+                        subfolder="transformer",
+                        quantization_config=nf4_config,
+                        torch_dtype=torch.bfloat16,
+                        low_cpu_mem_usage=True
+                    )
+
+                    # Load Transformer 2 (Low Noise)
+                    transformer_low = WanTransformer3DModel.from_pretrained(
+                        MODEL_ID,
+                        subfolder="transformer_2",
+                        quantization_config=nf4_config,
+                        torch_dtype=torch.bfloat16,
+                        low_cpu_mem_usage=True
+                    )
+
+                    # Create Pipeline (WanPipeline for Text-to-Video)
+                    pipe = WanPipeline.from_pretrained(
+                        MODEL_ID,
+                        transformer=transformer_high,
+                        transformer_2=transformer_low,
+                        torch_dtype=torch.bfloat16,
+                        low_cpu_mem_usage=True
+                    )
+
+                    # MEMORY & SCHEDULER SETUP
+                    print("--- Configuring Optimization ---")
+
+                    if gfx_device == "mps":
+                        # Note: bitsandbytes quantization typically requires a CUDA-enabled GPU.
+                        # This line will likely fail on MPS. You may need to add logic
+                        # to skip quantization if gfx_device is "mps".
+                        pipe.to("mps")
+                    else:
+                        # 1. CPU Offload (Saves VRAM)
+                        pipe.enable_model_cpu_offload()
+
+                        # We enable slicing (frame-by-frame decode) and DISABLE tiling.
+                        pipe.vae.enable_slicing()
+                        pipe.vae.disable_tiling()
+
+                        # 3. Set Scheduler to Euler + Shift 5.0 (Required for Lightx2v LoRA)
+                        pipe.scheduler = FlowMatchEulerDiscreteScheduler.from_config(
+                            pipe.scheduler.config,
+                            shift=5.0,
+                            use_dynamic_shifting=False
+                        )
+
+                    # LOAD T2V LORA (FROM SCREENSHOT)
+                    print("--- Loading T2V Turbo LoRA ---")
+                    try:
+                        # Filename from your screenshot: lightx2v_T2V_14B_...
+                        LORA_FILENAME = "Lightx2v/lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank128_bf16.safetensors"
+                        
+                        # Load into High Noise Transformer
+                        pipe.load_lora_weights(
+                            "Kijai/WanVideo_comfy",
+                            weight_name=LORA_FILENAME,
+                            adapter_name="lightx2v"
+                        )
+                        # Load into Low Noise Transformer
+                        pipe.load_lora_weights(
+                            "Kijai/WanVideo_comfy",
+                            weight_name=LORA_FILENAME,
+                            adapter_name="lightx2v_2",
+                            load_into_transformer_2=True
+                        )
+                        
+                        pipe.set_adapters(["lightx2v", "lightx2v_2"], adapter_weights=[1.0, 1.0])
+                        print("T2V LoRA loaded successfully.")
+                        
+                    except Exception as e:
+                        print(f"LoRA Load Failed: {e}")
+                        print("STOPPING: This script is optimized for the LoRA. Running without it might produce bad results at low steps.")
+                                        
+                    lora_files = scene.lora_files
+                    enabled_names = []
+                    enabled_weights = []
+                    # Check if there are any enabled items before loading
+                    enabled_items = [item for item in lora_files if item.enabled]
+
+                    if enabled_items:
+                        for item in enabled_items:
+                            enabled_names.append(
+                                (clean_filename(item.name)).replace(".", "")
+                            )
+                            enabled_weights.append(item.weight_value)
+                            pipe.load_lora_weights(
+                                bpy.path.abspath(scene.lora_folder),
+                                weight_name=item.name + ".safetensors",
+                                adapter_name=((clean_filename(item.name)).replace(".", "")),
+                            )
+                        pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)
+                        print("Load LoRAs: " + " ".join(enabled_names))
+
+#                    if gfx_device == "mps":
+#                        # Note: bitsandbytes quantization typically requires a CUDA-enabled GPU.
+#                        # This line will likely fail on MPS. You may need to add logic
+#                        # to skip quantization if gfx_device is "mps".
+#                        pipe.to("mps")
+#                    elif low_vram():
+#                        pipe.enable_model_cpu_offload()
+#                    else:
+#                        pipe.to("cuda")
+#                        #pipe.enable_model_cpu_offload()
+
 
                     lora_files = scene.lora_files
                     enabled_names = []
@@ -3653,41 +3773,9 @@ class SEQUENCER_OT_generate_movie(Operator):
                     elif low_vram():
                         pipe.enable_model_cpu_offload()
                     else:
-                        pipe.to("cuda")
-                        #pipe.enable_model_cpu_offload()
-
-
-                    lora_files = scene.lora_files
-                    enabled_names = []
-                    enabled_weights = []
-                    # Check if there are any enabled items before loading
-                    enabled_items = [item for item in lora_files if item.enabled]
-
-                    if enabled_items:
-                        for item in enabled_items:
-                            enabled_names.append(
-                                (clean_filename(item.name)).replace(".", "")
-                            )
-                            enabled_weights.append(item.weight_value)
-                            pipe.load_lora_weights(
-                                bpy.path.abspath(scene.lora_folder),
-                                weight_name=item.name + ".safetensors",
-                                adapter_name=((clean_filename(item.name)).replace(".", "")),
-                            )
-                        pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)
-                        print("Load LoRAs: " + " ".join(enabled_names))
-
-                    if gfx_device == "mps":
-                        # Note: bitsandbytes quantization typically requires a CUDA-enabled GPU.
-                        # This line will likely fail on MPS. You may need to add logic
-                        # to skip quantization if gfx_device is "mps".
-                        pipe.to("mps")
-                    elif low_vram():
-                        pipe.enable_model_cpu_offload()
-                    else:
                         pipe.enable_model_cpu_offload()
 
-                elif movie_model_card == "FastDM/Wan2.2-I2V-A14B-Merge-Lightning-V1.0-Diffusers":
+                elif movie_model_card == "Wan-AI/Wan2.2-I2V-A14B-Diffusers":
                     if (not scene.movie_path and not scene.image_path) and not input == "input_strips":
                         print("Wan2.1-I2V doesn't support txt2vid!")
                         self.report({'ERROR'}, "Wan2.1-I2V requires an input image or video.")
@@ -3696,38 +3784,86 @@ class SEQUENCER_OT_generate_movie(Operator):
                     print(f"Load: {movie_model_card} with maximum memory optimization.")
 
                     import torch
-                    from diffusers import WanImageToVideoPipeline
+                    from diffusers import WanImageToVideoPipeline, WanTransformer3DModel, FlowMatchEulerDiscreteScheduler
                     from diffusers.utils import export_to_video, load_image
-                    #from diffusers.quantizers import PipelineQuantizationConfig
-                    dtype = torch.bfloat16
+                    from transformers import BitsAndBytesConfig
+                    import gc  
+      
+                    MODEL_ID = "Wan-AI/Wan2.2-I2V-A14B-Diffusers"
 
-                    pipe = WanImageToVideoPipeline.from_pretrained(movie_model_card, torch_dtype=dtype)
-    #                model_id = movie_model_card
+                    # 4-Bit Configuration (Crucial for 24GB VRAM)
+                    nf4_config = BitsAndBytesConfig(
+                        load_in_4bit=True,
+                        bnb_4bit_quant_type="nf4",
+                        bnb_4bit_compute_dtype=torch.bfloat16
+                    )
 
-    #                pipeline_quant_config = PipelineQuantizationConfig(
-    #                    quant_backend="bitsandbytes_4bit",
-    #                    quant_kwargs={
-    #                        "load_in_4bit": True,
-    #                        "bnb_4bit_quant_type": "nf4",
-    #                        "bnb_4bit_compute_dtype": torch.bfloat16
-    #                    },
-    #                    components_to_quantize=["transformer", "text_encoder"],
-    #                )
+                    print("--- Loading Models (This takes a moment) ---")
 
-    #                print("Loading pipeline with 4-bit quantization to minimize RAM/VRAM usage...")
+                    # Load Transformer 1 (High Noise)
+                    transformer_high = WanTransformer3DModel.from_pretrained(
+                        MODEL_ID,
+                        subfolder="transformer",
+                        quantization_config=nf4_config,
+                        torch_dtype=torch.bfloat16,
+                        low_cpu_mem_usage=True
+                    )
 
-    #                try:
-    #                    pipe = WanImageToVideoPipeline.from_pretrained(
-    #                        model_id,
-    #                        quantization_config=pipeline_quant_config,
-    #                    )
+                    # Load Transformer 2 (Low Noise)
+                    transformer_low = WanTransformer3DModel.from_pretrained(
+                        MODEL_ID,
+                        subfolder="transformer_2",
+                        quantization_config=nf4_config,
+                        torch_dtype=torch.bfloat16,
+                        low_cpu_mem_usage=True
+                    )
 
-    #                    print("Pipeline loaded successfully in quantized state.")
+                    # Create Pipeline
+                    pipe = WanImageToVideoPipeline.from_pretrained(
+                        MODEL_ID,
+                        transformer=transformer_high,
+                        transformer_2=transformer_low,
+                        torch_dtype=torch.bfloat16,
+                        low_cpu_mem_usage=True
+                    )
 
-    #                except Exception as e:
-    #                    print(f"An error occurred during quantized model loading: {e}")
-    #                    self.report({'ERROR'}, f"Failed to load model. Check console: {e}")
-    #                    return {'CANCELLED'}
+                    # Enable CPU Offload (Saves VRAM)
+                    if gfx_device == "mps":
+                        # Note: bitsandbytes quantization typically requires a CUDA-enabled GPU.
+                        # This line will likely fail on MPS. You may need to add logic
+                        # to skip quantization if gfx_device is "mps".
+                        pipe.to("mps")
+                    elif low_vram():
+                        pipe.enable_model_cpu_offload()
+                    else:
+                        pipe.enable_model_cpu_offload()
+
+                    pipe.scheduler = FlowMatchEulerDiscreteScheduler.from_config(
+                        pipe.scheduler.config,
+                        shift=5.0
+                    )
+
+                    # LOAD LORA (4-Step Turbo)
+                    print("--- Loading LoRAs ---")
+                    try:
+                        # Load LoRA for High Noise Transformer
+                        pipe.load_lora_weights(
+                            "Kijai/WanVideo_comfy",
+                            weight_name="Lightx2v/lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
+                            adapter_name="lightx2v"
+                        )
+                        # Load LoRA for Low Noise Transformer
+                        pipe.load_lora_weights(
+                            "Kijai/WanVideo_comfy",
+                            weight_name="Lightx2v/lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
+                            adapter_name="lightx2v_2",
+                            load_into_transformer_2=True
+                        )
+                        pipe.set_adapters(["lightx2v", "lightx2v_2"], adapter_weights=[1.0, 1.0])
+                        print("LoRAs loaded successfully.")
+                    except Exception as e:
+                        print(f"LoRA Load Failed: {e}")
+                        print("Continuing without LoRA (Standard Speed)...")
 
                     lora_files = scene.lora_files
                     enabled_names = []
@@ -3747,13 +3883,6 @@ class SEQUENCER_OT_generate_movie(Operator):
                             )
                         pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)
                         print("Load LoRAs: " + " ".join(enabled_names))
-
-                    if gfx_device == "mps":
-                        pipe.to("mps")
-                    else:
-                        pipe.to(gfx_device)
-                        #torch.cuda.empty_cache()
-                        #pipe.enable_model_cpu_offload()
 
                 # Wan Vace - Refactored and Optimized
                 elif movie_model_card == "Wan-AI/Wan2.1-VACE-1.3B-diffusers":
@@ -4268,41 +4397,48 @@ class SEQUENCER_OT_generate_movie(Operator):
                         #max_sequence_length=512,
                     ).frames[0]
 
-                elif movie_model_card == "FastDM/Wan2.2-I2V-A14B-Merge-Lightning-V1.0-Diffusers":
+                elif movie_model_card == "Wan-AI/Wan2.2-I2V-A14B-Diffusers":
                     from diffusers.utils import load_image, export_to_video
                     import numpy as np
                     if scene.movie_path:
-                        print("Process: Video Image to Video (Wan2.1-I2V-14B-480P-Diffusers)")
+                        print("Process: Video Image to Video (Wan-AI/Wan2.2-I2V-A14B-Diffusers)")
                         if not os.path.isfile(scene.movie_path):
                             print("No file found.")
                             return {"CANCELLED"}
                         image = load_first_frame(bpy.path.abspath(scene.movie_path))
                     if scene.image_path:
-                        print("Process: Image to video (Wan2.1-I2V-14B-480P-Diffusers)")
+                        print("Process: Image to video (Wan-AI/Wan2.2-I2V-A14B-Diffusers)")
                         strip = scene.sequence_editor.active_strip
                         img_path = os.path.join(bpy.path.abspath(strip.directory), strip.elements[0].filename)
                         if not os.path.isfile(img_path):
                             print("No file found.")
                             return {"CANCELLED"}
                         image = load_image(img_path)
-                    #                    image = image.resize(
-                    #                        (closest_divisible_32(int(x)), closest_divisible_32(int(y)))
-                    #                    )
-#                    max_area = 480 * 832
-#                    aspect_ratio = image.height / image.width
-#                    mod_value = pipe.vae_scale_factor_spatial * pipe.transformer.config.patch_size[1]
-#                    height = round(np.sqrt(max_area * aspect_ratio)) // mod_value * mod_value
-#                    width = round(np.sqrt(max_area / aspect_ratio)) // mod_value * mod_value
-#                    image = image.resize((width, height))
+                        
+                    def resize_for_wan(image, max_dim=832):
+                        w, h = image.size
+                        scale = max_dim / max(w, h)
+                        new_w = int(w * scale)
+                        new_h = int(h * scale)
+                        # Round to nearest 16
+                        new_w = (new_w // 16) * 16
+                        new_h = (new_h // 16) * 16
+                        return image.resize((new_w, new_h), Image.LANCZOS)
+
+                    image = resize_for_wan(image)                        
+
+                    gc.collect()
+                    torch.cuda.empty_cache()
                     video_frames = pipe(
                         image=image,
                         prompt=prompt,
                         negative_prompt=negative_prompt,
-                        num_inference_steps=4,
-                        guidance_scale=1,
+                        num_frames=abs(duration),
+                        num_inference_steps=8,
+                        guidance_scale=1.0,
+                        guidance_scale_2=1.0,
                         height=y,
                         width=x,
-                        num_frames=abs(duration),
                         generator=generator,
                         max_sequence_length=512,
                     ).frames[0]
@@ -4352,7 +4488,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     movie_model_card != "Hailuo/MiniMax/txt2vid"
                     and movie_model_card != "Hailuo/MiniMax/img2vid"
                     and movie_model_card != "Hailuo/MiniMax/subject2vid"
-                    #and movie_model_card != "FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers"
+                    #and movie_model_card != "Wan-AI/Wan2.2-T2V-A14B-Diffusers"
                 ): #something is broken here?
                     if scene.movie_path:
                         print("Process: Video to video")
@@ -4405,7 +4541,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         generator=generator,
                     ).frames[0]
 
-                elif movie_model_card == "FastDM/Wan2.2-T2V-A14B-Merge-Lightning-V1.1-Diffusers":
+                elif movie_model_card == "Wan-AI/Wan2.2-T2V-A14B-Diffusers":
                     if (scene.movie_path or scene.image_path) and input == "input_strips":
                         print("Wan2.1-T2V doesn't support img/vid2vid!")
                         return {"CANCELLED"}
@@ -4478,6 +4614,19 @@ class SEQUENCER_OT_generate_movie(Operator):
                         max_sequence_length=512,
                         #true_cfg_scale=6.0,
                         # use_dynamic_cfg=True,
+                    ).frames[0]
+                # Wan t2i
+                elif movie_model_card == "Wan-AI/Wan2.2-T2V-A14B-Diffusers":
+                    video_frames = pipe(
+                        prompt=prompt,
+                        negative_prompt=negative_prompt,
+                        num_inference_steps=8,
+                        guidance_scale=1.0,
+                        height=y,
+                        width=x,
+                        num_frames=abs(duration),
+                        generator=generator,
+                        max_sequence_length=256,
                     ).frames[0]
                 else:
                     video_frames = pipe(
@@ -4613,6 +4762,8 @@ class SEQUENCER_OT_generate_movie(Operator):
                 # Move to folder.
                 render = bpy.context.scene.render
                 fps = round((render.fps / render.fps_base), 3)
+                if (movie_model_card == "Wan-AI/Wan2.2-I2V-A14B-Diffusers" or movie_model_card == "Wan-AI/Wan2.2-T2V-A14B-Diffusers"):
+                    fps = 16  
                 src_path = export_to_video(video_frames, fps=fps)
                 dst_path = solve_path(clean_filename(str(seed) + "_" + prompt) + ".mp4")
                 shutil.move(src_path, dst_path)
