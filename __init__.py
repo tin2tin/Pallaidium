@@ -739,6 +739,7 @@ def low_vram():
 
 
 def clear_cuda_cache():
+    import gc
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
@@ -1598,7 +1599,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             ),
             (
                 "Wan-AI/Wan2.2-T2V-A14B-Diffusers",
-                "Wan2.1-T2V (832x480x81)",
+                "Wan2.2-T2V (832x480x81)",
                 "Wan-AI/Wan2.2-T2V-A14B-Diffusers",
             ),
             (
@@ -3621,6 +3622,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     from transformers import BitsAndBytesConfig
                     
                     print("--- Initializing ---")
+                    import gc
                     gc.collect()
                     torch.cuda.empty_cache()
 
@@ -4057,7 +4059,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 )
             else:
                 if seed != 0:
-                    generator = torch.Generator()
+                    generator = torch.Generator(device=gfx_device)
                     generator.manual_seed(seed)
                 else:
                     generator = None
@@ -4426,7 +4428,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         return image.resize((new_w, new_h), Image.LANCZOS)
 
                     image = resize_for_wan(image)                        
-
+                    import gc
                     gc.collect()
                     torch.cuda.empty_cache()
                     video_frames = pipe(
@@ -4490,6 +4492,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     and movie_model_card != "Hailuo/MiniMax/subject2vid"
                     #and movie_model_card != "Wan-AI/Wan2.2-T2V-A14B-Diffusers"
                 ): #something is broken here?
+                    from diffusers.utils import load_image, export_to_video
                     if scene.movie_path:
                         print("Process: Video to video")
                         if not os.path.isfile(scene.movie_path):
@@ -5463,7 +5466,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                 )
             else:
                 if seed != 0:
-                    generator = torch.Generator()
+                    generator = torch.Generator(device=gfx_device)
                     generator.manual_seed(seed)
                 else:
                     generator = None
@@ -5728,7 +5731,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                     )
                 else:
                     if seed != 0:
-                        generator = torch.Generator()
+                        generator = torch.Generator(device=gfx_device)
                         generator.manual_seed(seed)
                     else:
                         generator = None
@@ -7567,6 +7570,13 @@ class SEQUENCER_OT_generate_image(Operator):
                             pipe.scheduler = DDIMScheduler.from_config(
                                 pipe.scheduler.config
                             )
+                            
+                    if gfx_device == "mps":
+                        pipe.to("mps")
+                    elif low_vram():
+                        pipe.enable_model_cpu_offload()
+                    else:
+                        pipe.to(gfx_device)
 
                 #                    scale = {
                 #                        "down": {"block_2": [0.0, 1.0]},
@@ -7727,7 +7737,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 )
             else:
                 if seed != 0:
-                    generator = torch.Generator()
+                    generator = torch.Generator(device=gfx_device)
                     generator.manual_seed(seed)
                 else:
                     generator = None
@@ -8970,6 +8980,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 # bpy.ops.sequencer.rebuild_proxy()
             else:
                 print("No resulting file found.")
+            import gc
             gc.collect()
 
             for window in bpy.context.window_manager.windows:
