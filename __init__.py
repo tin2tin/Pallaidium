@@ -64,6 +64,8 @@ import asyncio
 import inspect
 from fractions import Fraction
 import importlib
+import importlib.metadata
+
 
 print("Python: " + sys.version)
 
@@ -144,7 +146,7 @@ try:
           raise Exception("Device set to CUDA, but CUDA is not available")
 except:
     print(
-        "Pallaidium dependencies needs to be installed and Blender needs to be restarted."
+        ""
     )
 
 # Disable oneDNN optimizations
@@ -1033,7 +1035,7 @@ class DependencyManager:
                 "torch==2.6.0+cu124", 
                 "torchvision==0.21.0+cu124", 
                 "torchaudio==2.6.0+cu124", 
-                "xformers"
+                #"xformers"
             ]
         else:
             return ["torch", "torchvision", "torchaudio", "xformers"]
@@ -1170,7 +1172,7 @@ class GENERATOR_OT_install(Operator):
                  clean_lines = SmartSkipManager.filter_existing(lines)
                  if clean_lines:
                      print("Ensuring clean Torch installation...")
-                     subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "torch", "torchvision", "torchaudio", "xformers"])
+                     subprocess.call([pybin, "-m", "pip", "uninstall", "-y", "torch", "torchvision", "torchaudio"])#, "xformers"
 
             if not process_in_batches(lines, phase_name, install_requirements_allow_source):
                 self.report({"ERROR"}, f"Failed to install: {phase_name}")
@@ -1709,6 +1711,7 @@ class GeneratorAddonPreferences(AddonPreferences):
     if os_platform != "Linux":
         items = [
             ("Chatterbox", "Speech: Chatterbox", "Zero shot TTS & voice conversion"),
+            ("ChatterboxTurbo", "Speech: ChatterboxTurbo", "Zero shot TTS & voice conversion"),
             ("SWivid/F5-TTS", "Speech: F5-TTS", "Zero shot TTS"),
 #            ("WhisperSpeech", "Speech: WhisperSpeech", "Zero shot TTS"),
             ("MMAudio", "Audio: Video to Audio", "Add sync audio to video"),
@@ -1723,6 +1726,7 @@ class GeneratorAddonPreferences(AddonPreferences):
         items = [
             ("SWivid/F5-TTS", "Speech: F5-TTS", "SWivid/F5-TTS"),
             ("Chatterbox", "Chatterbox", "Zero shot txt2speech & voice cloning"),
+            ("ChatterboxTurbo", "Speech: ChatterboxTurbo", "Zero shot TTS & voice conversion"),
             ("MMAudio", "Audio: Video to Audio", "Add sync audio to video"),
             (
                 "stabilityai/stable-audio-open-1.0",
@@ -2496,7 +2500,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     )
                     or (
                         type == "audio"
-                        and (audio_model_card == "WhisperSpeech" or audio_model_card == "SWivid/F5-TTS" or audio_model_card == "Chatterbox")
+                        and (audio_model_card == "WhisperSpeech" or audio_model_card == "SWivid/F5-TTS" or audio_model_card == "Chatterbox" or audio_model_card == "ChatterboxTurbo")
                     )
                     or (type == "movie" and "Hailuo/MiniMax/" in movie_model_card)
                 ):
@@ -2557,17 +2561,18 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     and audio_model_card != "WhisperSpeech"
                     and audio_model_card != "SWivid/F5-TTS"
                     and audio_model_card != "Chatterbox"
+                    and audio_model_card != "ChatterboxTurbo"
                     and audio_model_card != "parler-tts/parler-tts-large-v1"
                     and audio_model_card != "parler-tts/parler-tts-mini-v1"
                 ):
                     col.prop(context.scene, "audio_length_in_f", text="Frames")
-                if type == "audio" and (audio_model_card == "WhisperSpeech" or audio_model_card == "SWivid/F5-TTS" or audio_model_card == "Chatterbox"):
+                if type == "audio" and (audio_model_card == "WhisperSpeech" or audio_model_card == "SWivid/F5-TTS" or audio_model_card == "Chatterbox" or audio_model_card == "ChatterboxTurbo"):
                     row = col.row(align=True)
                     row.prop(context.scene, "audio_path", text="Speaker")
                     row.operator(
                         "sequencer.open_audio_filebrowser", text="", icon="FILEBROWSER"
                     )
-                    if audio_model_card == "Chatterbox":
+                    if audio_model_card == "Chatterbox" or audio_model_card == "ChatterboxTurbo":
                         col.prop(context.scene, "chat_exaggeration")
                         col.prop(context.scene, "chat_pace")
                         col.prop(context.scene, "chat_temperature")
@@ -2577,7 +2582,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         else:
                             col.prop(context.scene, "audio_speed_tts", text="Speed")
 
-                if type == "audio" and (audio_model_card == "WhisperSpeech"  or audio_model_card == "Chatterbox"):
+                if type == "audio" and (audio_model_card == "WhisperSpeech" or audio_model_card == "Chatterbox" or audio_model_card == "Chatterbox"):
                     pass
 
                 elif type == "audio" and (
@@ -2633,6 +2638,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                                 or audio_model_card == "parler-tts/parler-tts-large-v1"
                                 or audio_model_card == "SWivid/F5-TTS"
                                 or audio_model_card == "Chatterbox"
+                                or audio_model_card == "ChatterboxTurbo"
                             )
                         )
                         or (
@@ -5238,6 +5244,26 @@ class SEQUENCER_OT_generate_audio(Operator):
                 return {"CANCELLED"}
 
         if (
+            addon_prefs.audio_model_card == "ChatterboxTurbo"
+        ):
+            import numpy as np
+            try:
+                import torchaudio as ta
+                import torch
+                from chatterbox.tts_turbo import ChatterboxTurboTTS
+            except ModuleNotFoundError as e:
+                missing_module_name = e.name
+                error_message = (
+                    f"Module '{missing_module_name}' not found. "
+                    "This dependency needs to be installed. "
+                    "Please check the add-on preferences to install missing dependencies."
+                )
+                print(error_message)
+                if hasattr(self, 'report'):
+                    self.report({"ERROR"}, error_message)
+                return {"CANCELLED"}
+
+        if (
             addon_prefs.audio_model_card == "parler-tts/parler-tts-large-v1"
             or addon_prefs.audio_model_card == "parler-tts/parler-tts-mini-v1"
         ):
@@ -5356,6 +5382,22 @@ class SEQUENCER_OT_generate_audio(Operator):
                 # We instantiate TTS here to cache it for text strips
                 try:
                     model = ChatterboxTTS.from_pretrained(device=device)
+                except:
+                    pass
+
+            # ChatterboxTurbo
+            elif addon_prefs.audio_model_card == "ChatterboxTurbo":
+                if torch.cuda.is_available():
+                    device = "cuda"
+                elif torch.backends.mps.is_available():
+                    device = "mps"
+                else:
+                    device = "cpu"
+                print(f"Using device: {device}")
+                # Pre-load TTS model if possible, though Chatterbox logic below handles VC vs TTS dynamically
+                # We instantiate TTS here to cache it for text strips
+                try:
+                    model = ChatterboxTurboTTS.from_pretrained(device=device)
                 except:
                     pass
 
@@ -5647,6 +5689,80 @@ class SEQUENCER_OT_generate_audio(Operator):
                         # Use cached model if available
                         if model is None:
                             model = ChatterboxTTS.from_pretrained(device=device)
+                            _pallaidium_audio_model_cache["model"] = model
+                            
+                        chunks = split_text_for_tts(prompt)
+                        all_wav_chunks = []
+                        for i, chunk_text in enumerate(chunks):
+                            if not chunk_text.strip():
+                                continue
+                            print(f"Synthesizing chunk {i+1}/{len(chunks)}: '{chunk_text}...'")
+                            try:
+                                wav_chunk_tensor = model.generate(
+                                    chunk_text,
+                                    audio_prompt_path=speaker,
+                                    exaggeration=exaggeration,
+                                    cfg_weight=pace,
+                                    temperature=temperature
+                                )
+                                all_wav_chunks.append(wav_chunk_tensor.flatten())
+                            except Exception as e:
+                                print(f"Error synthesizing chunk {i+1}: {e}")
+                        if all_wav_chunks:
+                            final_wav = torch.cat(all_wav_chunks, dim=0)
+                            ta.save(output_audio_path, final_wav.unsqueeze(0), model.sr)
+                            print(f"Successfully saved combined audio to {output_audio_path}")
+                        else:
+                            print("No audio was generated. The prompt might have been empty or resulted in errors.")
+                    except Exception as e:
+                        print(f"An unexpected error occurred in the TTS process: {e}")
+
+            # ChatterboxTurbo
+            elif (
+                addon_prefs.audio_model_card == "ChatterboxTurbo"
+            ):
+                output_audio_path = filename = solve_path(clean_filename(str(seed) + "_" + prompt) + ".wav")
+                strip = scene.sequence_editor.active_strip
+                if scene.audio_path:
+                    speaker = speaker = bpy.path.abspath(scene.audio_path)
+                else:
+                    speaker = None
+                seed = context.scene.movie_num_seed
+                seed = (
+                    seed
+                    if not context.scene.movie_use_random
+                    else random.randint(0, 2147483647)
+                )
+                torch.manual_seed(seed)
+                if torch.cuda.is_available():
+                    device = "cuda"
+                elif torch.backends.mps.is_available():
+                    device = "mps"
+                else:
+                    device = "cpu"
+                    
+                if device == "cuda":
+                    torch.cuda.manual_seed(seed)
+                    torch.cuda.manual_seed_all(seed)
+                random.seed(seed)
+                np.random.seed(seed)
+                pace = scene.chat_pace
+                exaggeration = scene.chat_exaggeration
+                temperature = scene.chat_temperature
+
+                if input and input == "input_strips" and strip.type == "SOUND": # Voice clone
+                    AUDIO_PROMPT_PATH = os.path.join(bpy.path.abspath(strip.sound.filepath))
+                    print("Voice cloning: "+strip.sound.name)
+                    # For VC we might need to load a different model, but we try to reuse cached if compatible or load fresh
+                    vc_model = ChatterboxTurboTTS.from_pretrained(device)
+                    wav = vc_model.generate(audio=AUDIO_PROMPT_PATH,target_voice_path=speaker)
+                    ta.save(output_audio_path, wav, vc_model.sr)
+                else: # Text-to-Speech
+                    try:
+                        print(f"Starting Text-to-Speech for prompt: '{prompt}'")
+                        # Use cached model if available
+                        if model is None:
+                            model = ChatterboxTurboTTS.from_pretrained(device=device)
                             _pallaidium_audio_model_cache["model"] = model
                             
                         chunks = split_text_for_tts(prompt)
