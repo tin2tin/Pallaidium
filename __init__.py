@@ -1621,10 +1621,10 @@ class GeneratorAddonPreferences(AddonPreferences):
     image_model_card: bpy.props.EnumProperty(
         name="Image Model",
         items=[
-            ("Qwen/Qwen-Image", "Qwen-Image", "Qwen/Qwen-Image"),
+            ("Qwen/Qwen-Image-2512", "Qwen-Image-2512-Turbo", "Qwen/Qwen-Image-2512"),
             (
-                "Qwen/Qwen-Image-Edit-2509",
-                "Qwen Multi-image Edit",
+                "Qwen/Qwen-Image-Edit-2511",
+                "Qwen Multi-image Edit 2511",
                 "Text and multiple images as input.",
             ),
             ("diffusers/FLUX.2-dev-bnb-4bit", "Flux2", "diffusers/FLUX.2-dev-bnb-4bit"),
@@ -2264,7 +2264,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 pass
 
         # Qwen multi-image
-        if image_model_card == "Qwen/Qwen-Image-Edit-2509" and type == "image":
+        if image_model_card == "Qwen/Qwen-Image-Edit-2511" and type == "image":
             row = col.row(align=True)
             row.prop_search(
                 scene,
@@ -2299,7 +2299,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = "qwen_select3"
 
         # Flux multi-image
-        if image_model_card == "diffusers/FLUX.2-dev-bnb-4bit" and type == "image": # Keep "Qwen/Qwen-Image-Edit-2509" if it's the model card being checked
+        if image_model_card == "diffusers/FLUX.2-dev-bnb-4bit" and type == "image": # Keep "Qwen/Qwen-Image-Edit-2511" if it's the model card being checked
             # Loop through the currently visible strips
             for i in range(1, scene.flux_visible_strips + 1):
                 row = col.row(align=True)
@@ -2367,7 +2367,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     and image_model_card != "xinsir/controlnet-scribble-sdxl-1.0"
                     and image_model_card != "ZhengPeng7/BiRefNet_HR"
                     and image_model_card != "Shitao/OmniGen-v1-diffusers"
-                    and image_model_card != "Qwen/Qwen-Image-Edit-2509"
+                    and image_model_card != "Qwen/Qwen-Image-Edit-2511"
                     and image_model_card != "Runware/FLUX.1-Redux-dev"
                     and image_model_card != "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"
                     and image_model_card != "romanfratric234/FLUX.1-Depth-dev-lora"
@@ -2659,7 +2659,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                             image_model_card == "Shitao/OmniGen-v1-diffusers"
                             and type == "image"
                         ) or (
-                            image_model_card == "Qwen/Qwen-Image-Edit-2509"
+                            image_model_card == "Qwen/Qwen-Image-Edit-2511"
                             and type == "image"
                         ):
                             col.prop(
@@ -2748,8 +2748,8 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     or image_model_card == "yuvraj108c/FLUX.1-Kontext-dev"
                     or image_model_card == "lodestones/Chroma"
                     or image_model_card == "Tongyi-MAI/Z-Image-Turbo"
-                    or image_model_card == "Qwen/Qwen-Image"
-                    or image_model_card == "Qwen/Qwen-Image-Edit-2509"
+                    or image_model_card == "Qwen/Qwen-Image-2512"
+                    or image_model_card == "Qwen/Qwen-Image-Edit-2511"
                     or image_model_card == "ChuckMcSneed/FLUX.1-dev"
                     or image_model_card == "diffusers/FLUX.2-dev-bnb-4bit"
                     or image_model_card == "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"
@@ -6340,7 +6340,7 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "adamo1139/stable-diffusion-3.5-medium-ungated"
             and not image_model_card == "ZhengPeng7/BiRefNet_HR"
             and not image_model_card == "Shitao/OmniGen-v1-diffusers"
-            and not image_model_card == "Qwen/Qwen-Image-Edit-2509"
+            and not image_model_card == "Qwen/Qwen-Image-Edit-2511"
             and not image_model_card == "diffusers/FLUX.2-dev-bnb-4bit"
 #            and (not scene.ip_adapter_face_folder and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0")
 #            and (not scene.ip_adapter_style_folder and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0")
@@ -6352,7 +6352,7 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
             and not image_model_card == "ZhengPeng7/BiRefNet_HR"
             and not image_model_card == "Shitao/OmniGen-v1-diffusers"
-            and not image_model_card == "Qwen/Qwen-Image-Edit-2509"
+            and not image_model_card == "Qwen/Qwen-Image-Edit-2511"
             and not image_model_card == "diffusers/FLUX.2-dev-bnb-4bit"
 #            and (not scene.ip_adapter_face_folder and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0")
 #            and (not scene.ip_adapter_style_folder and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0")
@@ -6368,7 +6368,7 @@ class SEQUENCER_OT_generate_image(Operator):
             and not scene.ip_adapter_face_folder
             and not scene.ip_adapter_style_folder
             and not image_model_card == "Shitao/OmniGen-v1-diffusers"
-            and not image_model_card == "Qwen/Qwen-Image-Edit-2509"
+            and not image_model_card == "Qwen/Qwen-Image-Edit-2511"
             and not image_model_card == "diffusers/FLUX.2-dev-bnb-4bit"
         ):
             if not strips:
@@ -6722,7 +6722,7 @@ class SEQUENCER_OT_generate_image(Operator):
                             converter.enable_vae_slicing()
                             converter.vae.enable_tiling()
 
-                    elif image_model_card == "Qwen/Qwen-Image":
+                    elif image_model_card == "Qwen/Qwen-Image-2512":
                         print("Load: Qwen-Image - img2img")
 
                         from diffusers.utils import load_image
@@ -6731,7 +6731,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         from diffusers import BitsAndBytesConfig as DiffusersBitsAndBytesConfig
                         from diffusers import QwenImageImg2ImgPipeline, QwenImageTransformer2DModel
 
-                        model_id = "Qwen/Qwen-Image"
+                        model_id = "Qwen/Qwen-Image-2512"
                         torch_dtype = torch.bfloat16
                         device = gfx_device
 
@@ -6770,6 +6770,8 @@ class SEQUENCER_OT_generate_image(Operator):
                             text_encoder=text_encoder,
                             torch_dtype=torch_dtype
                         )
+                        converter.load_lora_weights("Wuli-Art/Qwen-Image-2512-Turbo-LoRA", weight_name="Wuli-Qwen-Image-2512-Turbo-LoRA-4steps-V1.0-bf16.safetensors")
+                        #converter.fuse_lora()
 
                         if gfx_device == "mps":
                             converter.to("mps")
@@ -7001,7 +7003,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
                     pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
                     pipe.load_lora_weights("latent-consistency/lcm-lora-sdxl")
-                    pipe.fuse_lora()
+                    #pipe.fuse_lora()
                     scene.movie_num_guidance = 0
                 else:
                     eulera_scheduler = EulerAncestralDiscreteScheduler.from_pretrained(
@@ -7245,56 +7247,74 @@ class SEQUENCER_OT_generate_image(Operator):
                     converter.enable_model_cpu_offload()
 
             # Qwen-Image
-            elif image_model_card == "Qwen/Qwen-Image":
+            elif image_model_card == "Qwen/Qwen-Image-2512":
                     clear_cuda_cache()
 
                     if not do_inpaint and not do_convert:
-                        print("Load: Qwen-Image")
+#                        print("Load: Qwen-Image")
 
-                        from transformers import BitsAndBytesConfig as TransformersBitsAndBytesConfig
+#                        from transformers import BitsAndBytesConfig as TransformersBitsAndBytesConfig
+#                        from transformers import Qwen2_5_VLForConditionalGeneration
+
+#                        from diffusers import BitsAndBytesConfig as DiffusersBitsAndBytesConfig
+#                        from diffusers import QwenImagePipeline, QwenImageTransformer2DModel
+
+
+#                        model_id = "Qwen/Qwen-Image-2512"
+#                        torch_dtype = torch.bfloat16
+#                        device = gfx_device
+
+#                        quantization_config = DiffusersBitsAndBytesConfig(
+#                            load_in_4bit=True,
+#                            bnb_4bit_quant_type="nf4",
+#                            bnb_4bit_compute_dtype=torch.bfloat16,
+#                            llm_int8_skip_modules=["transformer_blocks.0.img_mod"],
+#                        )
+
+#                        transformer = QwenImageTransformer2DModel.from_pretrained(
+#                            model_id,
+#                            subfolder="transformer",
+#                            quantization_config=quantization_config,
+#                            torch_dtype=torch_dtype,
+#                        )
+#                        transformer = transformer.to("cpu")
+
+#                        quantization_config = TransformersBitsAndBytesConfig(
+#                            load_in_4bit=True,
+#                            bnb_4bit_quant_type="nf4",
+#                            bnb_4bit_compute_dtype=torch.bfloat16,
+#                        )
+
+#                        text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+#                            model_id,
+#                            subfolder="text_encoder",
+#                            quantization_config=quantization_config,
+#                            torch_dtype=torch_dtype,
+#                        )
+#                        text_encoder = text_encoder.to("cpu")
+
+#                        pipe = QwenImagePipeline.from_pretrained(
+#                            model_id, transformer=transformer, text_encoder=text_encoder, torch_dtype=torch.dtype
+#                        )
+
+
+                        import torch
+                        from diffusers import QwenImagePipeline, QwenImageTransformer2DModel
                         from transformers import Qwen2_5_VLForConditionalGeneration
 
-                        from diffusers import BitsAndBytesConfig as DiffusersBitsAndBytesConfig
-                        from diffusers import QwenImagePipeline, QwenImageTransformer2DModel
 
-
-                        model_id = "Qwen/Qwen-Image"
                         torch_dtype = torch.bfloat16
-                        device = gfx_device
-
-                        quantization_config = DiffusersBitsAndBytesConfig(
-                            load_in_4bit=True,
-                            bnb_4bit_quant_type="nf4",
-                            bnb_4bit_compute_dtype=torch.bfloat16,
-                            llm_int8_skip_modules=["transformer_blocks.0.img_mod"],
-                        )
 
                         transformer = QwenImageTransformer2DModel.from_pretrained(
-                            model_id,
-                            subfolder="transformer",
-                            quantization_config=quantization_config,
-                            torch_dtype=torch_dtype,
+                            "OzzyGT/Qwen-Image-2512-bnb-4bit-transformer", torch_dtype=torch_dtype, device_map="cpu"
                         )
-                        transformer = transformer.to("cpu")
-
-                        quantization_config = TransformersBitsAndBytesConfig(
-                            load_in_4bit=True,
-                            bnb_4bit_quant_type="nf4",
-                            bnb_4bit_compute_dtype=torch.bfloat16,
-                        )
-
                         text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-                            model_id,
-                            subfolder="text_encoder",
-                            quantization_config=quantization_config,
-                            torch_dtype=torch_dtype,
+                            "OzzyGT/Qwen-Image-2512-bnb-4bit-text-encoder", torch_dtype=torch_dtype, device_map="cpu"
                         )
-                        text_encoder = text_encoder.to("cpu")
 
                         pipe = QwenImagePipeline.from_pretrained(
-                            model_id, transformer=transformer, text_encoder=text_encoder, torch_dtype=torch.dtype
+                            "Qwen/Qwen-Image-2512", transformer=transformer, text_encoder=text_encoder, torch_dtype=torch_dtype
                         )
-
                     else:
                         print("Load: Qwen-Image - img2img")
 
@@ -7304,7 +7324,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         from diffusers import BitsAndBytesConfig as DiffusersBitsAndBytesConfig
                         from diffusers import QwenImageImg2ImgPipeline, QwenImageTransformer2DModel
 
-                        model_id = "Qwen/Qwen-Image"
+                        model_id = "Qwen/Qwen-Image-2512"
                         torch_dtype = torch.bfloat16
                         device = gfx_device
 
@@ -7343,6 +7363,9 @@ class SEQUENCER_OT_generate_image(Operator):
                             text_encoder=text_encoder,
                             torch_dtype=torch_dtype
                         )
+
+                    pipe.load_lora_weights("Wuli-Art/Qwen-Image-2512-Turbo-LoRA", weight_name="Wuli-Qwen-Image-2512-Turbo-LoRA-4steps-V1.0-bf16.safetensors")
+                    #pipe.fuse_lora()
 
                     if gfx_device == "mps":
                         pipe.to("mps")
@@ -7481,10 +7504,10 @@ class SEQUENCER_OT_generate_image(Operator):
                     pipe.enable_model_cpu_offload()
 
             # Qwen Multi-image
-            elif image_model_card == "Qwen/Qwen-Image-Edit-2509":
+            elif image_model_card == "Qwen/Qwen-Image-Edit-2511":
                 clear_cuda_cache()
 
-                print("Load: Qwen-Image-Edit-2509")
+                print("Load: Qwen-Image-Edit-2511")
 
                 # Import necessary classes for quantization and model components
                 from transformers import BitsAndBytesConfig as TransformersBitsAndBytesConfig
@@ -7493,7 +7516,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 from diffusers import QwenImageEditPlusPipeline, QwenImageTransformer2DModel
 
                 # Define model ID, data type, and device
-                model_id = "Qwen/Qwen-Image-Edit-2509"
+                model_id = "Qwen/Qwen-Image-Edit-2511"
                 torch_dtype = torch.bfloat16
                 device = gfx_device
 
@@ -7538,6 +7561,8 @@ class SEQUENCER_OT_generate_image(Operator):
                     text_encoder=text_encoder,
                     torch_dtype=torch_dtype
                 )
+                pipe.load_lora_weights("lightx2v/Qwen-Image-Edit-2511-Lightning", weight_name="Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors")
+                #pipe.fuse_lora()
 
                 print("Pipeline loaded")
 
@@ -7740,7 +7765,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     elif image_model_card == "segmind/Segmind-Vega":
                         scene.movie_num_guidance = 0
                         pipe.load_lora_weights("segmind/Segmind-VegaRT")
-                        pipe.fuse_lora()
+                        #pipe.fuse_lora()
 
             # LoRA
             if (
@@ -7753,8 +7778,8 @@ class SEQUENCER_OT_generate_image(Operator):
                 or image_model_card == "xinsir/controlnet-scribble-sdxl-1.0"
                 or image_model_card == "lzyvegetable/FLUX.1-schnell"
                 or image_model_card == "ChuckMcSneed/FLUX.1-dev"
-                or image_model_card == "Qwen/Qwen-Image-Edit-2509"
-                or image_model_card == "Qwen/Qwen-Image"
+                or image_model_card == "Qwen/Qwen-Image-Edit-2511"
+                or image_model_card == "Qwen/Qwen-Image-2512"
                 or image_model_card == "Tongyi-MAI/Z-Image-Turbo"
     #            or image_model_card == "Runware/FLUX.1-Redux-dev"
     #            or image_model_card == "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"
@@ -8191,7 +8216,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 ).images[0]
 
             #Qwen Multi-image
-            elif image_model_card == "Qwen/Qwen-Image-Edit-2509":
+            elif image_model_card == "Qwen/Qwen-Image-Edit-2511":
 
                 qwen_images = []
                 init_image = None
@@ -8525,7 +8550,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         generator=generator,
                     ).images[0]
                 elif (
-                    image_model_card == "Qwen/Qwen-Image"
+                    image_model_card == "Qwen/Qwen-Image-2512"
                 ):
                     image = converter(
                         prompt=prompt,
@@ -8903,7 +8928,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         ).images[0]
 
                 # Qwen
-                elif image_model_card == "Qwen/Qwen-Image":
+                elif image_model_card == "Qwen/Qwen-Image-2512":
                     # LoRA.
                     if enabled_items:
                         image = pipe(
