@@ -114,6 +114,7 @@ The generated media will be saved to the directory specified in the addon prefer
 
 
 ## Change Log
+* 2026-01-23: Add: Support for BFL-FLUX.2 Klein 4B and 9B
 * 2025-11-28: Add: FLUX2 & Z-Image & Optimized model-loading
 * 2025-10-27: Remove 30 dead models. 
 * 2025-10-1: Fix: Deps. Add: Qwen Multi-image Edit.
