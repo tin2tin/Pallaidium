@@ -112,57 +112,108 @@ The addon panel is located in the **Video Sequence Editor > Sidebar (N-Panel) > 
 
 The generated media will be saved to the directory specified in the addon preferences and automatically added to your VSE timeline on a new channel.
 
-
 ## Change Log
-* 2026-01-23: Add: Support for BFL-FLUX.2 Klein 4B and 9B
-* 2025-11-28: Add: FLUX2 & Z-Image & Optimized model-loading
-* 2025-10-27: Remove 30 dead models. 
-* 2025-10-1: Fix: Deps. Add: Qwen Multi-image Edit.
-* 2025-7-05: Add: FLUX Kontext Relight.
-* 2025-6-26: Add: FLUX.1 Dev Kontext. Update Diffusers by installing this: "git+https://github.com/huggingface/diffusers.git" with the Python Module Manager add-on (link below), and restart Blender. 
-* 2025-6-22: Add: Long string parsing for Chatterbox (for Audiobooks). Use Blender 5.0 Alpha.
-* 2025-6-14: Add: Chroma txt2vid
-* 2025-6-12: Add: ZuluVision/MoviiGen1.1_Prompt_Rewriter
-* 2025-6-01: Add: Chatterbox with zero shot text to speech and speech to speech voice cloning.
-* 2025_5_29: Add: Flux depth+canny+redux Fix: neg Flux input + py libs
-* 2025-5-12: Add: F5-TTS Voice Cloning
-* 2025-5-09: Update: LTX 0.9.7 w. img, txt & vid input
-* 2025-5-08: FramePack (Img/+Last Img), Img+txt for MMAudio, Flux De-distilled
-* 2025-4-11: Improved LTX 0.95, MetaData, StripPicker, Wan t2i
-* 2025-2-25: Add: MMAudio for Video to Sync Audio 
-* 2025-2-21: Support for Skywork/SkyReels-V1-Hunyuan-T2V/I2V. Need a full update of dependencies! (Thx newgenai79 for int4 transformer)
-* 2025-2-15: Add: LoRA support for HunyuanVideo + better preset  
-* 2025-2-12: Add multi-media prompting via: [OmniGen](https://github.com/VectorSpaceLab/OmniGen)
-* 2025-2-10: 
+
+2026-01-23: Add: Support for BFL-FLUX.2 Klein 4B and 9B
+
+2025-11-28: Add: FLUX2 & Z-Image & Optimized model-loading
+
+2025-10-27: Remove 30 dead models.
+
+2025-10-1: Fix: Deps. Add: Qwen Multi-image Edit.
+
+2025-7-05: Add: FLUX Kontext Relight.
+
+<details>
+<summary><strong>Older Changes</strong></summary>
+
+
+2025-6-26: Add: FLUX.1 Dev Kontext. Update Diffusers by installing this: "git+https://github.com/huggingface/diffusers.git" with the Python Module Manager add-on (link below), and restart Blender.
+
+2025-6-22: Add: Long string parsing for Chatterbox (for Audiobooks). Use Blender 5.0 Alpha.
+
+2025-6-14: Add: Chroma txt2vid
+
+2025-6-12: Add: ZuluVision/MoviiGen1.1_Prompt_Rewriter
+
+2025-6-01: Add: Chatterbox with zero shot text to speech and speech to speech voice cloning.
+
+2025_5_29: Add: Flux depth+canny+redux Fix: neg Flux input + py libs
+
+2025-5-12: Add: F5-TTS Voice Cloning
+
+2025-5-09: Update: LTX 0.9.7 w. img, txt & vid input
+
+2025-5-08: FramePack (Img/+Last Img), Img+txt for MMAudio, Flux De-distilled
+
+2025-4-11: Improved LTX 0.95, MetaData, StripPicker, Wan t2i
+
+2025-2-25: Add: MMAudio for Video to Sync Audio
+
+2025-2-21: Support for Skywork/SkyReels-V1-Hunyuan-T2V/I2V. Need a full update of dependencies! (Thx newgenai79 for int4 transformer)
+
+2025-2-15: Add: LoRA support for HunyuanVideo + better preset
+
+2025-2-12: Add multi-media prompting via: OmniGen
+
+2025-2-10:
 Update: a-r-r-o-w/LTX-Video-0.9.1-diffusers ZhengPeng7/BiRefNet_HR MiaoshouAI/Florence-2-large-PromptGen-v2.0
 New: ostris/Flex.1-alpha Alpha-VLLM/Lumina-Image-2.0 Efficient-Large-Model/Sana_1600M_1024px_diffusers
 Fix: Frame by frame (SD XL)
 Remove: Corcelio/mobius
-* 2025-1-26: Add: MiniMax Cloud txt/img/subject to video (insert your MiniMax API key in MiniMax_API.txt) and fast FLUX LoRA
-* 2025-1-15: FLUX: faster img2img and inpaint
-* 2024-11-2: Add: Image Background Removal, Stable Diffusion 3.5 Medium, Fast Flux(t2i)
-* 2024-9-19: Add: Image to Video for CogVideoX
-* 2024-9-15: Add: LoRA import for Flux
-* 2024-9-14: Add: Flux Inpaint & Img2img.
-* 2024-9-4: Add: Florence 2 (Image Caption), AudioLDM2-Large, CogVideox-2b, flash_attn on Win.
-* 2024-9-2: Add: Vid2vid for CogVideoX-5b and Parler TTS
-* 2024-8-28: Make CogVideox-5b run on 6 GB VRAM & Flux on 2 GB VRAM
-* 2024-8-27: Add: CogVideoX-5b Remove: Low-quality models
-* 2024-8-5: Add: Flux Dev - NB. needs update of dependencies and 24 GB VRAM
-* 2024-8-2: Add: Flux Schnell - NB. needs update of dependencies and 24 GB VRAM
-* 2024-7-12: Add: Kwai/Kolors (txt2img & img2img)
-* 2024-6-13: Add: SD3 - A "Read" token from HuggingFace must be entered, it's free (img2img). Fix: Installation of Dependencies
-* 2024-6-6: Add: Stable Audio Open, Frame:-1 will inherit duration. 
-* 2024-6-1: IP Adapter(When using SDXL): Face (Image or folder), Style (image or folder) New image models: Mobius, OpenVision, Juggernaut X Hyper
-* 2024-4-29: Add: PixArt Sigma 2k, PixArt 1024 and RealViz V4
-* 2024-2-23: Add: Proteus Lightning and Dreamshaper XL Lightning
-* 2024-2-21: Add: SDXL-Lightning 2 Step & Proteus v. 0.3
-* 2024-1-02: Add: WhisperSpeech
-* 2024-01-01: Fix installation and Bark bugs.
-* 2024-01-31: Add OpenDalle, Speed option, SDXL, and LoRA support for Canny and OpenPose, including OpenPose rig images. Prune old models including SD. 
-* 2023-12-18: Add: Bark audio enhance, Segmind Vega. 
-* 2023-12-1: Add SD Turbo & MusicGen Medium, MPS device for MacOS.
-* 2023-11-30: Add: SVD, SVD-XT, SDXL Turbo
+
+2025-1-26: Add: MiniMax Cloud txt/img/subject to video (insert your MiniMax API key in MiniMax_API.txt) and fast FLUX LoRA
+
+2025-1-15: FLUX: faster img2img and inpaint
+
+2024-11-2: Add: Image Background Removal, Stable Diffusion 3.5 Medium, Fast Flux(t2i)
+
+2024-9-19: Add: Image to Video for CogVideoX
+
+2024-9-15: Add: LoRA import for Flux
+
+2024-9-14: Add: Flux Inpaint & Img2img.
+
+2024-9-4: Add: Florence 2 (Image Caption), AudioLDM2-Large, CogVideox-2b, flash_attn on Win.
+
+2024-9-2: Add: Vid2vid for CogVideoX-5b and Parler TTS
+
+2024-8-28: Make CogVideox-5b run on 6 GB VRAM & Flux on 2 GB VRAM
+
+2024-8-27: Add: CogVideoX-5b Remove: Low-quality models
+
+2024-8-5: Add: Flux Dev - NB. needs update of dependencies and 24 GB VRAM
+
+2024-8-2: Add: Flux Schnell - NB. needs update of dependencies and 24 GB VRAM
+
+2024-7-12: Add: Kwai/Kolors (txt2img & img2img)
+
+2024-6-13: Add: SD3 - A "Read" token from HuggingFace must be entered, it's free (img2img). Fix: Installation of Dependencies
+
+2024-6-6: Add: Stable Audio Open, Frame:-1 will inherit duration.
+
+2024-6-1: IP Adapter(When using SDXL): Face (Image or folder), Style (image or folder) New image models: Mobius, OpenVision, Juggernaut X Hyper
+
+2024-4-29: Add: PixArt Sigma 2k, PixArt 1024 and RealViz V4
+
+2024-2-23: Add: Proteus Lightning and Dreamshaper XL Lightning
+
+2024-2-21: Add: SDXL-Lightning 2 Step & Proteus v. 0.3
+
+2024-1-02: Add: WhisperSpeech
+
+2024-01-01: Fix installation and Bark bugs.
+
+2024-01-31: Add OpenDalle, Speed option, SDXL, and LoRA support for Canny and OpenPose, including OpenPose rig images. Prune old models including SD.
+
+2023-12-18: Add: Bark audio enhance, Segmind Vega.
+
+2023-12-1: Add SD Turbo & MusicGen Medium, MPS device for MacOS.
+
+2023-11-30: Add: SVD, SVD-XT, SDXL Turbo
+
+</details>
+
 
 ## Location
 
