@@ -1044,11 +1044,13 @@ class DependencyManager:
         reqs = [
             "git+https://github.com/huggingface/diffusers.git", 
             "git+https://github.com/SWivid/F5-TTS.git",
+            "git+https://github.com/QwenLM/Qwen3-TTS.git",
             "stable-audio-tools", 
             "torcheval", 
             "torchao==0.12.0", 
             "spacy",
             "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl"
+            "https://huggingface.co/lldacing/flash-attention-windows-wheel/resolve/main/flash_attn-2.7.4.post1%2Bcu128torch2.7.0cxx11abiFALSE-cp311-cp311-win_amd64.whl"
         ]
         
         if self.py_major == 3 and self.py_minor >= 8:
@@ -1590,6 +1592,11 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "lllyasviel/FramePackI2V_HY",
             ),
             (
+                "rootonchair/LTX-2-19b-distilled",
+                "LTX-2 19b Distilled",
+                "rootonchair/LTX-2-19b-distilled",
+            ),            
+            (
                 "Lightricks/LTX-Video",
                 "LTX 0.9.7 (1280x720x257(frames/8+1))",
                 "Lightricks/LTX-Video",
@@ -1714,6 +1721,7 @@ class GeneratorAddonPreferences(AddonPreferences):
         items = [
             ("Chatterbox", "Speech: Chatterbox", "Zero shot TTS & voice conversion"),
             ("ChatterboxTurbo", "Speech: ChatterboxTurbo", "Zero shot TTS & voice conversion"),
+            ("Qwen/Qwen3-TTS-12Hz-1.7B-Base", "Speech: Qwen3-TTS Clone", "Qwen/Qwen3-TTS-12Hz-1.7B-Base"),
             ("SWivid/F5-TTS", "Speech: F5-TTS", "Zero shot TTS"),
 #            ("WhisperSpeech", "Speech: WhisperSpeech", "Zero shot TTS"),
             ("MMAudio", "Audio: Video to Audio", "Add sync audio to video"),
@@ -1729,6 +1737,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             ("SWivid/F5-TTS", "Speech: F5-TTS", "SWivid/F5-TTS"),
             ("Chatterbox", "Chatterbox", "Zero shot txt2speech & voice cloning"),
             ("ChatterboxTurbo", "Speech: ChatterboxTurbo", "Zero shot TTS & voice conversion"),
+            ("Qwen/Qwen3-TTS-12Hz-1.7B-Base", "Speech: Qwen3-TTS Clone", "Qwen/Qwen3-TTS-12Hz-1.7B-Base"),
             ("MMAudio", "Audio: Video to Audio", "Add sync audio to video"),
             (
                 "stabilityai/stable-audio-open-1.0",
@@ -1757,11 +1766,11 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Image Captioning: Blip",
                 "Image Captioning",
             ),
-#            ( #killed by transformers updates
-#                "florence-community/Florence-2-large",
-#                "Image Captioning: Florence-2",
-#                "Image Captioning",
-#            ),
+            ( #killed by transformers updates
+                "florence-community/Florence-2-large",
+                "Image Captioning: Florence-2",
+                "Image Captioning",
+            ),
             (
                 "ZuluVision/MoviiGen1.1_Prompt_Rewriter",
                 "Prompt Enhancer: MoviiGen",
@@ -2512,7 +2521,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     )
                     or (
                         type == "audio"
-                        and (audio_model_card == "WhisperSpeech" or audio_model_card == "SWivid/F5-TTS" or audio_model_card == "Chatterbox" or audio_model_card == "ChatterboxTurbo")
+                        and (audio_model_card == "WhisperSpeech" or audio_model_card == "SWivid/F5-TTS" or audio_model_card == "Chatterbox" or audio_model_card == "ChatterboxTurbo" or audio_model_card == "Qwen/Qwen3-TTS-12Hz-1.7B-Base")
                     )
                     or (type == "movie" and "Hailuo/MiniMax/" in movie_model_card)
                 ):
@@ -2574,16 +2583,20 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     and audio_model_card != "SWivid/F5-TTS"
                     and audio_model_card != "Chatterbox"
                     and audio_model_card != "ChatterboxTurbo"
+                    and audio_model_card != "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
                     and audio_model_card != "parler-tts/parler-tts-large-v1"
                     and audio_model_card != "parler-tts/parler-tts-mini-v1"
                 ):
                     col.prop(context.scene, "audio_length_in_f", text="Frames")
-                if type == "audio" and (audio_model_card == "WhisperSpeech" or audio_model_card == "SWivid/F5-TTS" or audio_model_card == "Chatterbox" or audio_model_card == "ChatterboxTurbo"):
+                if type == "audio" and (audio_model_card == "WhisperSpeech" or audio_model_card == "SWivid/F5-TTS" or audio_model_card == "Chatterbox" or audio_model_card == "ChatterboxTurbo" or audio_model_card == "Qwen/Qwen3-TTS-12Hz-1.7B-Base"):
                     row = col.row(align=True)
-                    row.prop(context.scene, "audio_path", text="Speaker")
+                    row.prop(context.scene, "audio_path", text="Speaker Ref.")
                     row.operator(
                         "sequencer.open_audio_filebrowser", text="", icon="FILEBROWSER"
                     )
+                    if audio_model_card == "Qwen/Qwen3-TTS-12Hz-1.7B-Base":
+                        row = col.row(align=True)
+                        row.prop(context.scene, "audio_text", text="Text Ref.")
                     if audio_model_card == "Chatterbox" or audio_model_card == "ChatterboxTurbo":
                         col.prop(context.scene, "chat_exaggeration")
                         col.prop(context.scene, "chat_pace")
@@ -2594,7 +2607,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         else:
                             col.prop(context.scene, "audio_speed_tts", text="Speed")
 
-                if type == "audio" and (audio_model_card == "WhisperSpeech" or audio_model_card == "Chatterbox" or audio_model_card == "Chatterbox"):
+                if type == "audio" and (audio_model_card == "WhisperSpeech" or audio_model_card == "Chatterbox" or audio_model_card == "Chatterbox" or audio_model_card == "Qwen/Qwen3-TTS-12Hz-1.7B-Base"):
                     pass
 
                 elif type == "audio" and (
@@ -2651,6 +2664,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                                 or audio_model_card == "SWivid/F5-TTS"
                                 or audio_model_card == "Chatterbox"
                                 or audio_model_card == "ChatterboxTurbo"
+                                or audio_model_card == "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
                             )
                         )
                         or (
@@ -3096,6 +3110,52 @@ _pallaidium_movie_model_cache = {
     "last_model_card": None
 }
 
+
+def resize_and_pad_image(input_image, target_width, target_height, background_color=(0, 0, 0)):
+    """
+    Resizes an image to fit within the target dimensions while preserving aspect ratio,
+    then pads the remaining space.
+
+    Args:
+        input_image (PIL.Image.Image): The image to process.
+        target_width (int): The final width of the image.
+        target_height (int): The final height of the image.
+        background_color (tuple): RGB tuple for the padding color.
+
+    Returns:
+        PIL.Image.Image: The resized and padded image.
+    """
+    from PIL import Image
+    # Calculate the aspect ratios
+    target_aspect = target_width / target_height
+    image_aspect = input_image.width / input_image.height
+
+    # Determine the new size
+    if image_aspect > target_aspect:
+        # Image is wider than target, fit to target width
+        new_width = target_width
+        new_height = int(new_width / image_aspect)
+    else:
+        # Image is taller than target (or same aspect), fit to target height
+        new_height = target_height
+        new_width = int(new_height * image_aspect)
+
+    # Resize the image using a high-quality filter
+    resized_image = input_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+    # Create a new image with the target dimensions and background color
+    padded_image = Image.new("RGB", (target_width, target_height), background_color)
+
+    # Calculate coordinates to paste the resized image in the center
+    paste_x = (target_width - new_width) // 2
+    paste_y = (target_height - new_height) // 2
+
+    # Paste the resized image onto the padded background
+    padded_image.paste(resized_image, (paste_x, paste_y))
+
+    return padded_image
+
+
 class SEQUENCER_OT_generate_movie(Operator):
     """Generate Video"""
 
@@ -3195,6 +3255,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 and movie_model_card != "THUDM/CogVideoX-5b"
                 and movie_model_card != "THUDM/CogVideoX-2b"
                 and movie_model_card != "Lightricks/LTX-Video"
+                and movie_model_card != "rootonchair/LTX-2-19b-distilled"
                 and movie_model_card != "hunyuanvideo-community/HunyuanVideo"
                 and movie_model_card != "lllyasviel/FramePackI2V_HY"
                 and movie_model_card != "Hailuo/MiniMax/txt2vid"
@@ -3350,6 +3411,37 @@ class SEQUENCER_OT_generate_movie(Operator):
                     else:
                         pipe.vae.enable_tiling()
                         pipe.enable_model_cpu_offload()
+
+                # LTX-2
+                elif movie_model_card == "rootonchair/LTX-2-19b-distilled":
+                    print("LTX-2 Video: Load Model")
+
+                    import torch
+                    from diffusers.pipelines.ltx2 import LTX2ImageToVideoPipeline, LTX2LatentUpsamplePipeline
+                    from diffusers.pipelines.ltx2.latent_upsampler import LTX2LatentUpsamplerModel
+                    from diffusers.pipelines.ltx2.utils import DISTILLED_SIGMA_VALUES, STAGE_2_DISTILLED_SIGMA_VALUES
+                    from diffusers.pipelines.ltx2.export_utils import encode_video
+                    from diffusers import BitsAndBytesConfig
+                    from diffusers.utils import export_to_video, load_video, load_image
+
+                    from diffusers.utils import load_image
+
+                    pipe = LTX2ImageToVideoPipeline.from_pretrained(movie_model_card, torch_dtype=torch.bfloat16)
+                    
+                    if gfx_device == "mps":
+                        pipe.to("mps")
+                    elif low_vram():
+                        pipe.vae.enable_tiling()
+                        pipe.enable_sequential_cpu_offload(device=gfx_device)
+                    else:
+                        pipe.vae.enable_tiling()
+                        pipe.enable_sequential_cpu_offload(device=gfx_device)
+                    
+#                    latent_upsampler = LTX2LatentUpsamplerModel.from_pretrained(
+#                        movie_model_card,
+#                        subfolder="latent_upsampler",
+#                        torch_dtype=torch.bfloat16,
+#                    )
 
                 # HunyuanVideo
                 elif movie_model_card == "hunyuanvideo-community/HunyuanVideo":
@@ -4287,6 +4379,108 @@ class SEQUENCER_OT_generate_movie(Operator):
                         image_cond_noise_scale=0.025,
                     ).frames[0]
 
+                # LTX-2
+                elif movie_model_card == "rootonchair/LTX-2-19b-distilled":
+                    if scene.movie_path:
+                        print("Process: Video to Video")
+                        if not os.path.isfile(bpy.path.abspath(scene.movie_path)):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        image = load_video(bpy.path.abspath(scene.movie_path))
+                        #image = load_first_frame(bpy.path.abspath(scene.movie_path))
+                    if scene.image_path:
+                        strip = scene.sequence_editor.active_strip
+                        print("Process: Image to video (LTX)")
+                        img_path = os.path.join(bpy.path.abspath(strip.directory), strip.elements[0].filename)
+                        print("Path: "+img_path)
+                        if not os.path.isfile(img_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        image = load_image(img_path)
+                        
+                    render = bpy.context.scene.render
+                    fps = round((render.fps / render.fps_base), 3) 
+ 
+                    x = width_clean = (x // 32) * 32
+                    y = height_clean = (y // 32) * 32
+                    
+                    # 2. Ensure frame count follows (n * 8) + 1 rule (Temporal Requirement)
+                    # LTX-2 VAE compresses time by 8x. Arbitrary frame counts cause tensor mismatch.
+                    target_frames = abs(duration)
+                    duration = valid_num_frames = ((target_frames - 1) // 8) * 8 + 1
+                    
+                    # Ensure a minimum valid length (9 frames is the smallest block: 1*8 + 1)
+                    if valid_num_frames < 9:
+                        duration = valid_num_frames = 9
+                        
+                    #print(f"LTX-2 Adjustment: Resizing {x}x{y} -> {width_clean}x{height_clean}")
+#                    print(f"LTX-2 Adjustment: Frames {target_frames} -> {valid_num_frames}")
+#                    print(f"Preprocessing input image to fit {width_clean}x{height_clean} without distortion.")
+#                    image = resize_and_pad_image(image, width_clean, height_clean) 
+                    
+                    print("Stage 1: Image → video latents")
+                                                          
+                    video_latent, audio_latent = pipe(
+                        image=image,
+                        prompt=prompt,
+                        negative_prompt=negative_prompt,
+                        width=x,
+                        height=y,
+                        num_frames=abs(duration),
+                        frame_rate=fps,
+                        max_sequence_length=512,
+                        num_inference_steps=8,
+                        sigmas=DISTILLED_SIGMA_VALUES,
+                        guidance_scale=1.0,
+                        generator=generator,
+                        output_type="latent",
+                        return_dict=False,
+                    )
+                    print("Stage 1.5: Latent upsampling")
+                    #clear_cuda_cache()
+                    latent_upsampler = LTX2LatentUpsamplerModel.from_pretrained(
+                        movie_model_card,
+                        subfolder="latent_upsampler",
+                        torch_dtype=torch.bfloat16,
+                    )
+                    upsample_pipe = LTX2LatentUpsamplePipeline(vae=pipe.vae, latent_upsampler=latent_upsampler)
+                    upsample_pipe.enable_model_cpu_offload(device=gfx_device)
+                    upscaled_video_latent = upsample_pipe(
+                        latents=video_latent,
+                        output_type="latent",
+                        return_dict=False,
+                    )[0]
+                    print("Stage 2: Decode + final upscale")
+                    video, audio = pipe(
+                        image=image,
+                        latents=upscaled_video_latent,
+                        audio_latents=audio_latent,
+                        prompt=prompt,
+                        negative_prompt=negative_prompt,
+                        width=x * 2,
+                        height=y * 2,
+                        num_inference_steps=3,
+                        num_frames=abs(duration),
+                        noise_scale=STAGE_2_DISTILLED_SIGMA_VALUES[0],
+                        sigmas=STAGE_2_DISTILLED_SIGMA_VALUES,
+                        generator=generator,
+                        guidance_scale=1.0,
+                        output_type="np",
+                        return_dict=False,
+                    )
+                    video = (video * 255).round().astype("uint8")
+                    video = torch.from_numpy(video)
+                    #clear_cuda_cache()
+                    dst_path = solve_path(clean_filename(str(seed) + "_" + prompt) + ".mp4")
+
+                    encode_video(
+                        video[0],
+                        fps=fps,
+                        audio=audio[0].float().cpu(),
+                        audio_sample_rate=pipe.vocoder.config.output_sampling_rate,
+                        output_path=dst_path,
+                    )                                      
+
                 #Skyreel
                 elif movie_model_card == "Skywork/SkyReels-V1-Hunyuan-T2V":
                     from diffusers.utils import load_image, export_to_video
@@ -4781,6 +4975,9 @@ class SEQUENCER_OT_generate_movie(Operator):
                         return {"CANCELLED"}
 
                 print("Result: " + dst_path)
+                
+            elif movie_model_card == "rootonchair/LTX-2-19b-distilled": 
+                pass
             else:
                 # Move to folder.
                 render = bpy.context.scene.render
@@ -4802,6 +4999,24 @@ class SEQUENCER_OT_generate_movie(Operator):
                         from bpy import context
 
                         with context.temp_override(window=window, area=area):
+                            if movie_model_card == "rootonchair/LTX-2-19b-distilled": 
+                                filepath = dst_path
+                                if os.path.isfile(filepath):
+                                    strip = scene.sequence_editor.sequences.new_sound(
+                                        name=prompt,
+                                        filepath=filepath,
+                                        channel=empty_channel,
+                                        frame_start=start_frame,
+                                    )
+                                    scene.sequence_editor.active_strip = strip
+#                                    if i > 0:
+#                                        scene.frame_current = (
+#                                            scene.sequence_editor.active_strip.frame_final_start
+#                                        )
+                                    empty_channel = empty_channel+1 
+                                else:
+                                    print("No resulting audio-file found!")
+                            
                             bpy.ops.sequencer.movie_strip_add(
                                 filepath=dst_path,
                                 frame_start=start_frame,
@@ -5108,6 +5323,7 @@ def simple_fallback_splitter(full_text: str, max_len: int) -> list[str]:
 
 
 
+prompt_items=None
 
 _pallaidium_audio_model_cache = {
     "pipe": None,
@@ -5278,6 +5494,26 @@ class SEQUENCER_OT_generate_audio(Operator):
                 return {"CANCELLED"}
 
         if (
+            addon_prefs.audio_model_card == "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
+        ):
+            import numpy as np
+            try:
+                import torch
+                import soundfile as sf
+                from qwen_tts import Qwen3TTSModel
+            except ModuleNotFoundError as e:
+                missing_module_name = e.name
+                error_message = (
+                    f"Module '{missing_module_name}' not found. "
+                    "This dependency needs to be installed. "
+                    "Please check the add-on preferences to install missing dependencies."
+                )
+                print(error_message)
+                if hasattr(self, 'report'):
+                    self.report({"ERROR"}, error_message)
+                return {"CANCELLED"}
+
+        if (
             addon_prefs.audio_model_card == "parler-tts/parler-tts-large-v1"
             or addon_prefs.audio_model_card == "parler-tts/parler-tts-mini-v1"
         ):
@@ -5414,6 +5650,23 @@ class SEQUENCER_OT_generate_audio(Operator):
                     model = ChatterboxTurboTTS.from_pretrained(device=device)
                 except:
                     pass
+            
+            #Qwen3-TTS
+            elif addon_prefs.audio_model_card == "Qwen/Qwen3-TTS-12Hz-1.7B-Base":
+                if torch.cuda.is_available():
+                    device = "cuda"
+                elif torch.backends.mps.is_available():
+                    device = "mps"
+                else:
+                    device = "cpu"
+                print(f"Using device: {device}")
+                
+                model = Qwen3TTSModel.from_pretrained(
+                    "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+                    device_map=device,
+                    dtype=torch.bfloat16,
+                    attn_implementation="flash_attention_2",
+                )
 
             # Parler
             elif (
@@ -5804,6 +6057,73 @@ class SEQUENCER_OT_generate_audio(Operator):
                             print("No audio was generated. The prompt might have been empty or resulted in errors.")
                     except Exception as e:
                         print(f"An unexpected error occurred in the TTS process: {e}")
+
+            #Qwen3-TTS
+            elif addon_prefs.audio_model_card == "Qwen/Qwen3-TTS-12Hz-1.7B-Base":
+                output_audio_path = filename = solve_path(clean_filename(str(seed) + "_" + prompt) + ".wav")
+                strip = scene.sequence_editor.active_strip
+                seed = context.scene.movie_num_seed
+                seed = (
+                    seed
+                    if not context.scene.movie_use_random
+                    else random.randint(0, 2147483647)
+                )
+                if torch.cuda.is_available():
+                    device = "cuda"
+                elif torch.backends.mps.is_available():
+                    device = "mps"
+                else:
+                    device = "cpu"            
+                if device == "cuda":
+                    torch.cuda.manual_seed(seed)
+                    torch.cuda.manual_seed_all(seed)
+                random.seed(seed)
+                np.random.seed(seed)
+ 
+                print(f"Starting Text-to-Speech for prompt: '{prompt}'")
+                try:
+                    # Use cached model if available
+                    if model is None:
+                        model = Qwen3TTSModel.from_pretrained(
+                            "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+                            device_map=device,
+                            dtype=torch.bfloat16,
+                            attn_implementation="flash_attention_2",
+                        )
+                except Exception as e:
+                    print(f"An unexpected error occurred in the TTS process: {e}")
+
+                if scene.audio_path:
+                    ref_audio = bpy.path.abspath(scene.audio_path)
+                else:
+                    ref_audio = None
+                    print("Reference speaker file not found.")
+                    self.report({"INFO"}, "Reference speaker file not found.")
+                    return {"CANCELLED"}
+
+                if scene.audio_text:
+                    ref_text = bpy.path.abspath(scene.audio_text)
+                else:
+                    ref_text = None
+                    print("Reference text file not found.")
+                    self.report({"INFO"}, "Reference text file not found.")
+                    return {"CANCELLED"}        
+
+                prompt_items = model.create_voice_clone_prompt(
+                    ref_audio=ref_audio,
+                    ref_text=ref_text,
+                    x_vector_only_mode=False,
+                )
+                wavs = None
+                wavs, sr = model.generate_voice_clone(
+                    text=[prompt],
+                    language=["English"],
+                    voice_clone_prompt=prompt_items,
+                )
+                if not wavs:
+                    print("Audio generation failed")
+                out=sf.write(output_audio_path, wavs[0], sr)
+                print("Audio saved: "+str(out))     
 
             # Parler
             elif (
@@ -9368,7 +9688,7 @@ class SEQUENCER_OT_generate_text(Operator):
             addon_prefs.text_model_card == "florence-community/Florence-2-large"
         ):
             try:
-                from transformers import AutoModelForCausalLM, AutoProcessor, AutoConfig
+                from transformers import AutoModelForSeq2SeqLM, AutoProcessor, AutoConfig
             except ModuleNotFoundError as e:
                 print("Dependencies needs to be installed in the add-on preferences. "+str(e.name))
 
@@ -9406,18 +9726,16 @@ class SEQUENCER_OT_generate_text(Operator):
                 ).to(gfx_device)
             
             elif addon_prefs.text_model_card == "florence-community/Florence-2-large":
-                from transformers import AutoModelForCausalLM, AutoProcessor
-                
-                model = (
-                    AutoModelForCausalLM.from_pretrained(
-                        "florence-community/Florence-2-large", trust_remote_code=False, attn_implementation="eager"
-                    )
-                    .to(gfx_device)
-                    .eval()
+                from transformers import AutoProcessor, Florence2ForConditionalGeneration
+                import torch
+
+                # Move model to GPU
+                model = Florence2ForConditionalGeneration.from_pretrained(
+                    "florence-community/Florence-2-large",
+                    device_map="auto",  # automatically puts model on GPU
                 )
-                processor = AutoProcessor.from_pretrained(
-                    "florence-community/Florence-2-large", trust_remote_code=False
-                )
+
+                processor = AutoProcessor.from_pretrained("florence-community/Florence-2-large")
                 
             elif addon_prefs.text_model_card == "ZuluVision/MoviiGen1.1_Prompt_Rewriter":
                 import torch
@@ -9474,17 +9792,42 @@ class SEQUENCER_OT_generate_text(Operator):
         elif (
             addon_prefs.text_model_card == "florence-community/Florence-2-large"
         ):
-            # Ensure the image is in RGB mode
+            
+            # Ensure image is RGB
             if init_image.mode != "RGB":
                 init_image = init_image.convert("RGB")
 
-            # prompt = "<MIXED_CAPTION_PLUS>"
             caption_prompt = "<MORE_DETAILED_CAPTION>"
 
-            inputs = processor(text=caption_prompt, images=init_image, return_tensors="pt").to(
-                gfx_device
+            # Prepare inputs and move all tensors to the same device as the model
+            inputs = processor(text=caption_prompt, images=init_image, return_tensors="pt")
+            inputs = {k: v.to(model.device) for k, v in inputs.items()}
+
+            # Generate
+            generated_ids = model.generate(
+                **inputs,
+                max_new_tokens=1024,
+                num_beams=3,
+                repetition_penalty=1.10,
             )
 
+            # Decode
+            generated_text = processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
+            parsed_answer = processor.post_process_generation(
+                generated_text,
+                task=caption_prompt,
+                image_size=(init_image.width, init_image.height),
+            )
+            text = parsed_answer[caption_prompt]
+            print("Generated text:", text)            
+            
+            # Process inputs
+            inputs = processor(text=caption_prompt, images=init_image, return_tensors="pt")
+
+            # Move all tensors to the GPU
+            inputs = {k: v.to(gfx_device) for k, v in inputs.items()}
+
+            # Generate text
             generated_ids = model.generate(
                 input_ids=inputs["input_ids"],
                 pixel_values=inputs["pixel_values"],
@@ -9492,16 +9835,18 @@ class SEQUENCER_OT_generate_text(Operator):
                 num_beams=3,
                 repetition_penalty=1.10,
             )
-            generated_text = processor.batch_decode(
-                generated_ids, skip_special_tokens=False
-            )[0]
+
+            # Decode output
+            generated_text = processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
             parsed_answer = processor.post_process_generation(
                 generated_text,
                 task=caption_prompt,
                 image_size=(init_image.width, init_image.height),
             )
             text = parsed_answer[caption_prompt]
-            print("Generated text: " + str(text))
+            print("Generated text:", text)
+
+            
 
         elif addon_prefs.text_model_card == "ZuluVision/MoviiGen1.1_Prompt_Rewriter":
             import torch
@@ -10476,7 +10821,12 @@ def register():
         description="Path to speaker voice",
         options={"TEXTEDIT_UPDATE"},
     )
-
+    bpy.types.Scene.audio_text = bpy.props.StringProperty(
+        name="audio_text",
+        default="",
+        description="Path to speaker voice",
+        options={"TEXTEDIT_UPDATE"},
+    )
     # The frame audio duration.
     bpy.types.Scene.audio_speed = bpy.props.IntProperty(
         name="audio_speed",
