@@ -1042,6 +1042,7 @@ class DependencyManager:
 
     def get_phase_3_git_and_extensions(self):
         reqs = [
+            #git+https://github.com/rootonchair/diffusers.git@feat/distill-ltx2
             "git+https://github.com/huggingface/diffusers.git", 
             "git+https://github.com/SWivid/F5-TTS.git",
             "git+https://github.com/QwenLM/Qwen3-TTS.git",
@@ -1049,8 +1050,8 @@ class DependencyManager:
             "torcheval", 
             "torchao==0.12.0", 
             "spacy",
-            "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl"
-            "https://huggingface.co/lldacing/flash-attention-windows-wheel/resolve/main/flash_attn-2.7.4.post1%2Bcu128torch2.7.0cxx11abiFALSE-cp311-cp311-win_amd64.whl"
+            "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl",
+            "https://huggingface.co/lldacing/flash-attention-windows-wheel/resolve/main/flash_attn-2.7.4.post1%2Bcu128torch2.7.0cxx11abiFALSE-cp311-cp311-win_amd64.whl",
         ]
         
         if self.py_major == 3 and self.py_minor >= 8:
@@ -1065,7 +1066,7 @@ class DependencyManager:
         else:
             reqs.extend([
                 "resemble-enhance", 
-                "flash-attn", 
+                #"flash-attn", 
                 "triton", 
                 "sageattention==1.0.6"
             ])
@@ -1286,7 +1287,10 @@ def input_strips_updated(self, context):
         elif image_model == "Tongyi-MAI/Z-Image-Turbo":
             scene.movie_num_inference_steps = 8
             scene.movie_num_guidance = 0
-
+        elif image_model == "Tongyi-MAI/Z-Image":
+            scene.movie_num_inference_steps = 28
+            scene.movie_num_guidance = 4
+            
     # Movie Type Handling
     elif scene_type == "movie":
         if movie_model == "hunyuanvideo-community/HunyuanVideo":
@@ -1389,6 +1393,9 @@ def output_strips_updated(self, context):
         elif image_model == "Tongyi-MAI/Z-Image-Turbo":
             scene.movie_num_inference_steps = 8
             scene.movie_num_guidance = 0
+        elif image_model == "Tongyi-MAI/Z-Image":
+            scene.movie_num_inference_steps = 28
+            scene.movie_num_guidance = 4
 
     # === MOVIE TYPE === #
     elif type == "movie":
@@ -1638,7 +1645,8 @@ class GeneratorAddonPreferences(AddonPreferences):
             ("Runware/BFL-FLUX.2-klein-base-4B", "FLUX.2 klein 4B", "Runware/BFL-FLUX.2-klein-base-4B"),
             ("Runware/BFL-FLUX.2-klein-base-9B", "FLUX.2 klein 9B", "Runware/BFL-FLUX.2-klein-base-9B"),
             ("ChuckMcSneed/FLUX.1-dev", "Flux Dev", "ChuckMcSneed/FLUX.1-dev"),
-            ("Tongyi-MAI/Z-Image-Turbo", "Z Image Turbo", "Tongyi-MAI/Z-Image-Turbo"),
+            ("Tongyi-MAI/Z-Image", "Z-Image", "Tongyi-MAI/Z-Image"),
+            ("Tongyi-MAI/Z-Image-Turbo", "Z-Image Turbo", "Tongyi-MAI/Z-Image-Turbo"),
             (
                 "lzyvegetable/FLUX.1-schnell",
                 "Flux Schnell",
@@ -2773,6 +2781,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     or image_model_card == "lzyvegetable/FLUX.1-schnell"
                     or image_model_card == "yuvraj108c/FLUX.1-Kontext-dev"
                     or image_model_card == "lodestones/Chroma"
+                    or image_model_card == "Tongyi-MAI/Z-Image"
                     or image_model_card == "Tongyi-MAI/Z-Image-Turbo"
                     or image_model_card == "Qwen/Qwen-Image-2512"
                     or image_model_card == "Qwen/Qwen-Image-Edit-2511"
@@ -7168,6 +7177,27 @@ class SEQUENCER_OT_generate_image(Operator):
                             #pipe.enable_model_cpu_offload()            
                             converter.to("cuda")  
 
+                    # zimage img2img
+                    elif image_model_card == "Tongyi-MAI/Z-Image":
+                        from diffusers import ZImageImg2ImgPipeline
+                        from diffusers.utils import load_image
+                        converter = ZImageImg2ImgPipeline.from_pretrained(
+                            "Tongyi-MAI/Z-Image",
+                            torch_dtype=torch.bfloat16,
+                            low_cpu_mem_usage=False,
+                        )
+                        if gfx_device == "mps":
+                            converter.to("mps")
+                        elif low_vram():
+                            converter.enable_model_cpu_offload()
+                            #pipe.enable_sequential_cpu_offload()
+                            converter.vae.enable_tiling()
+                        else:
+                            # pipe.enable_sequential_cpu_offload()
+                            # pipe.vae.enable_tiling()
+                            #pipe.enable_model_cpu_offload()            
+                            converter.to("cuda") 
+
                     else:
                         try:
                             converter = AutoPipelineForImage2Image.from_pretrained(
@@ -7794,8 +7824,26 @@ class SEQUENCER_OT_generate_image(Operator):
                     # pipe.enable_sequential_cpu_offload()
                     # pipe.vae.enable_tiling()
                     #pipe.enable_model_cpu_offload()            
-                    pipe.to("cuda")      
-                          
+                    pipe.to("cuda")   
+                       
+            elif image_model_card == "Tongyi-MAI/Z-Image":
+                from diffusers import ZImagePipeline
+                pipe = ZImagePipeline.from_pretrained(
+                    "Tongyi-MAI/Z-Image",
+                    torch_dtype=torch.bfloat16,
+                    low_cpu_mem_usage=False,
+                )
+                if gfx_device == "mps":
+                    pipe.to("mps")
+                elif low_vram():
+                    pipe.enable_model_cpu_offload()
+                    #pipe.enable_sequential_cpu_offload()
+                    pipe.vae.enable_tiling()
+                else:
+                    # pipe.enable_sequential_cpu_offload()
+                    # pipe.vae.enable_tiling()
+                    pipe.enable_model_cpu_offload()            
+                                              
             elif image_model_card == "Alpha-VLLM/Lumina-Image-2.0":
                 from diffusers import Lumina2Pipeline
 
@@ -8114,6 +8162,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 or image_model_card == "ChuckMcSneed/FLUX.1-dev"
                 or image_model_card == "Qwen/Qwen-Image-Edit-2511"
                 or image_model_card == "Qwen/Qwen-Image-2512"
+                or image_model_card == "Tongyi-MAI/Z-Image"
                 or image_model_card == "Tongyi-MAI/Z-Image-Turbo"
                 or image_model_card == "Runware/BFL-FLUX.2-klein-base-4B"
                 or image_model_card == "Runware/BFL-FLUX.2-klein-base-9B"
@@ -8986,6 +9035,19 @@ class SEQUENCER_OT_generate_image(Operator):
                         width=x, height=y, generator=generator
                     ).images[0]
                     
+                elif image_model_card == "Tongyi-MAI/Z-Image":
+                    image = converter(
+                        prompt=prompt,
+                        negative_prompt=negative_prompt,
+                        max_sequence_length=512,
+                        image=init_image,
+                        strength=1.00 - scene.image_power,
+                        num_inference_steps=image_num_inference_steps,
+                        guidance_scale=image_num_guidance,
+                        height=y,
+                        width=x,
+                        generator=generator,
+                    ).images[0] 
                 elif image_model_card == "Tongyi-MAI/Z-Image-Turbo":
                     image = converter(
                         prompt=prompt,
@@ -9120,6 +9182,18 @@ class SEQUENCER_OT_generate_image(Operator):
                     height=y,
                     width=x,
                 ).images[0]
+
+            elif (image_model_card == "Tongyi-MAI/Z-Image"):                
+                image = pipe(
+                    prompt=prompt,
+                    negative_prompt=negative_prompt,
+                    generator=generator,#generator=torch.Generator(device=device).manual_seed(42),
+                    max_sequence_length=512,
+                    num_inference_steps=image_num_inference_steps,
+                    guidance_scale=image_num_guidance,
+                    height=y,
+                    width=x,
+                ).images[0]  
                 
             elif (image_model_card == "Tongyi-MAI/Z-Image-Turbo"):                
                 image = pipe(
