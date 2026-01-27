@@ -38,7 +38,7 @@ six==1.17.0
 tqdm==4.67.1
 
 # --- ML Framework Dependencies & Extensions ---
-kernels
+optimum-quanto
 timm==1.0.22
 kornia==0.8.2
 kornia_rs==0.1.10
@@ -95,6 +95,10 @@ resampy==0.4.3
 sounddevice==0.5.3
 torchlibrosa==0.1.0
 soxr==1.0.0
+sox
+onnxruntime==1.20.1
+wheel
+flash-attn
 
 # --- Image & Vision ---
 opencv-python==4.12.0.88
@@ -182,7 +186,7 @@ s3transfer==0.15.0
 absl-py==2.3.1
 aiofiles==24.1.0
 aiohappyeyeballs==2.6.1
-aiohttp==3.13.3
+aiohttp==3.13.2
 aiosignal==1.4.0
 annotated-doc==0.0.4
 appdirs==1.4.4
@@ -266,6 +270,4 @@ virtualenv==20.35.4
 wcwidth==0.2.14
 win32_setctime==1.2.0
 wrapt==2.0.1
-
 yarl==1.22.0
-
