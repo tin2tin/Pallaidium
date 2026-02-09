@@ -252,13 +252,15 @@ Laura, Gary, Jon, Lea, Karen, Rick, Brenda, David, Eileen, Jordan, Mike, Yann, J
 
 ## Useful add-ons
 
+<details>
+
 ### GPT4BLENDER
 
 Use GPT4ALL to generate image prompts or stories:
 
 https://github.com/tin2tin/GPT4BLENDER
 
-![image](https://github.com/user-attachments/assets/464e0fe3-0994-4920-9ceb-ef68331866b)
+https://github.com/tin2tin/GPT4BLENDER/assets/1322593/ae0d54ae-f904-4eaa-a0c6-e8d0874f8249
 
 ### Text to Strip
 
@@ -317,10 +319,11 @@ Disable System memory fallback: https://nvidia.custhelp.com/app/answers/detail/a
 ### Trainer for LoRAs: 
 https://github.com/Nerogar/OneTrainer
 
+</details>
 
-## Video Examples
+## Video Examples (Old)
 
-
+<details>
 ### Image to Text
 https://github.com/tin2tin/Pallaidium/assets/1322593/91eb17e4-72d6-4c69-8e5c-a3d38af5a770
 
@@ -350,7 +353,7 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/0105cd35-b3b2-49cf-91c1-
 
 ### Frame by Frame:
 https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-ffce872b79c3
-
+</details>
 
 ## Restrictions on using Pallaidium:
 - The team behind Pallaidium does not endorse or take responsibility for third-party use.
@@ -408,9 +411,9 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 ### MacOS:
 - [MFLUX](https://github.com/filipstrand/mflux)
 
+![PallAIdium](https://github.com/tin2tin/Generative_AI/assets/1322593/1b1b232f-00d9-4b0b-86fb-5f0f24136d2c)
+
 > [!WARNING]
 > SCAM ALERT!
 > Scammers are misusing our free software, Pallaidium, along with our content and name, on a phishing site: pallaidium . com. We are NOT associated with this site!
 > 🚨 Please help us report this scam — otherwise, we may be forced to delete this GitHub repository.
-
-![PallAIdium](https://github.com/tin2tin/Generative_AI/assets/1322593/1b1b232f-00d9-4b0b-86fb-5f0f24136d2c)
