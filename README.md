@@ -54,7 +54,7 @@ For Mac and Linux, we'll have to rely on contributor support. So, post your issu
 
 * First, download and install git (must be on PATH): https://git-scm.com/downloads
 
-* Download Blender 4.5.3 (not 5.0) https://builder.blender.org/download/daily/ and unzip it into the Documents folder.  
+* Download Blender 4.5.X (not 5.0) https://builder.blender.org/download/daily/ and unzip it into the Documents folder.  
 
 * Download the add-on: [https://github.com/tin2tin/text_to_video/archive/refs/heads/main.zip](https://github.com/tin2tin/Pallaidium/archive/refs/heads/main.zip)
 
