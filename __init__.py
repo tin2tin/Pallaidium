@@ -11735,7 +11735,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     
             # 3B. Intermediate Strip Handling
             elif strip.type in {"SCENE", "MOVIE", "META", "SOUND", "TEXT"}: 
-                if target_type == "image" or target_type == "text":
+                if (target_type == "image" or target_type == "text") and not strip.type == "TEXT":
                     trim_frame = find_overlapping_frame(strip, current_frame)
                     if trim_frame and len(strips) == 1:
                         bpy.ops.sequencer.duplicate_move(
@@ -11759,9 +11759,8 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                         if intermediate_strip: delete_strip(intermediate_strip)
                     else:
                         temp_strip = strip = get_render_strip(self, context, strip)
-                else:
+                elif not strip.type == "TEXT":
                     temp_strip = strip = get_render_strip(self, context, strip)
-
 
                 # 4. Processing Variables Setup
                 # We calculate specific prompts into these variables, then apply them
