@@ -11600,6 +11600,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         temp_strip = None
         temp_strips = []
         current_temp_strip = None
+        run_generation = False
         
         # --- Input Validation ---
         if not strips:
@@ -11734,8 +11735,8 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                 print(f"Prompt: {current_prompt_text}")
                     
             # 3B. Intermediate Strip Handling
-            elif strip.type in {"SCENE", "MOVIE", "META", "SOUND", "TEXT"}: 
-                if (target_type == "image" or target_type == "text") and not strip.type == "TEXT":
+            elif strip.type in {"SCENE", "MOVIE", "META", "SOUND", "TEXT", "IMAGE"}: 
+                if (target_type == "image" or target_type == "text") and strip.type not in {"TEXT", "IMAGE"}:
                     trim_frame = find_overlapping_frame(strip, current_frame)
                     if trim_frame and len(strips) == 1:
                         bpy.ops.sequencer.duplicate_move(
@@ -11759,7 +11760,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                         if intermediate_strip: delete_strip(intermediate_strip)
                     else:
                         temp_strip = strip = get_render_strip(self, context, strip)
-                elif not strip.type == "TEXT":
+                elif strip.type not in {"TEXT", "IMAGE"}:
                     temp_strip = strip = get_render_strip(self, context, strip)
 
                 # 4. Processing Variables Setup
@@ -11796,6 +11797,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                         elif strip.type == "SOUND":
                             file_path = bpy.path.abspath(strip.sound.filepath)
                             bpy.types.Scene.sound_path = file_path
+                    run_generation = True
 
                     if strip.name:
                         strip_prompt = os.path.splitext(strip.name)[0]
@@ -11819,7 +11821,6 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     if current_prompt_text == "":
                         current_prompt_text = base_prompt
                         
-                    run_generation = True
 #                    if target_type != "text":
 #                        print(f"Prompt: {current_prompt_text}")
                     print(f"Prompt: {current_prompt_text}")
