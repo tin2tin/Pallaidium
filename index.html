@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PALLAIDIUM | The Integrated GenAI Studio</title>
+    <meta name="description" content="The only software in the world that gathers all the currently best open-source generative AI projects for all media in a video editor.">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Fonts: Inter (UI) and JetBrains Mono (Code/Tech) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Inter"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                    colors: {
+                        nordic: {
+                            black: '#0a0b0d',     /* Deep Obsidian */
+                            charcoal: '#141619',  /* Soft Dark */
+                            slate: '#2d333b',     /* Border Colors */
+                            white: '#f0f6fc',     /* Off White */
+                            blue: '#44b3ff',      /* Electric Ice Blue */
+                            muted: '#8b949e',     /* Secondary Text */
+                            orange: '#d25d38'     /* Alert/Action */
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 1.2s ease-out forwards',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0a0b0d; }
+        ::-webkit-scrollbar-thumb { background: #2d333b; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #44b3ff; }
+
+        /* Grid Background Pattern */
+        .bg-grid {
+            background-size: 60px 60px;
+            background-image: linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+        }
+        
+        .glass-panel {
+            background: rgba(20, 22, 25, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        /* Subtle Glow for the AI text */
+        .ai-glow {
+            text-shadow: 0 0 20px rgba(68, 179, 255, 0.4);
+        }
+    </style>
+</head>
+<body class="bg-nordic-black text-nordic-white font-sans antialiased overflow-x-hidden selection:bg-nordic-blue selection:text-black">
+
+    <!-- SCAM ALERT BANNER -->
+    <div class="bg-nordic-orange/10 border-b border-nordic-orange/30 px-4 py-2 text-center relative z-50">
+        <p class="text-xs font-mono text-nordic-orange">
+            <span class="font-bold">SECURITY ALERT:</span> "pallaidium.com" is a phishing scam. Only download Pallaidium from this GitHub repository.
+        </p>
+    </div>
+
+    <!-- NAVIGATION -->
+    <nav class="fixed top-6 left-0 right-0 z-40 px-6 pointer-events-none">
+        <div class="max-w-7xl mx-auto flex justify-between items-center pointer-events-auto">
+            <!-- Brand -->
+            <div class="glass-panel px-6 py-3 rounded-full flex items-center gap-4">
+                <span class="font-bold tracking-tight text-lg">
+                    PALL<span class="text-nordic-blue">AI</span>DIUM
+                </span>
+                <span class="hidden md:block w-px h-4 bg-white/10"></span>
+                <span class="hidden md:block text-xs text-nordic-muted font-mono uppercase">V. 2026.02</span>
+            </div>
+            
+            <!-- Links -->
+            <div class="glass-panel px-6 py-3 rounded-full hidden md:flex gap-8 text-xs font-bold uppercase tracking-wider text-nordic-muted">
+                <a href="#studio" class="hover:text-nordic-blue transition-colors">The Studio</a>
+                <a href="#matrix" class="hover:text-nordic-blue transition-colors">Matrix</a>
+                <a href="#install" class="hover:text-nordic-blue transition-colors">Install</a>
+                <a href="https://github.com/tin2tin/Pallaidium/wiki" target="_blank" class="hover:text-nordic-blue transition-colors">Wiki</a>
+            </div>
+
+            <!-- GitHub Link -->
+            <div class="glass-panel px-4 py-2 rounded-full">
+                <a href="https://github.com/tin2tin/Pallaidium" target="_blank" class="flex items-center gap-2 hover:text-white transition group">
+                    <svg height="20" width="20" viewBox="0 0 16 16" fill="currentColor" class="text-nordic-muted group-hover:text-white transition">
+                        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- HERO SECTION -->
+    <header class="relative min-h-screen flex flex-col items-center justify-center pt-20 bg-grid">
+        <!-- Radial Glow Background -->
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-nordic-blue/5 rounded-full blur-[100px] pointer-events-none"></div>
+
+        <div class="relative z-10 text-center max-w-5xl px-6 animate-fade-in">
+            <!-- Headline -->
+            <h1 class="text-6xl md:text-9xl font-extrabold tracking-tighter mb-6 leading-none text-white">
+                PALL<span class="text-nordic-blue ai-glow italic">AI</span>DIUM
+            </h1>
+
+            <!-- Subtitle -->
+            <h2 class="text-xl md:text-2xl text-nordic-white font-light tracking-wide mb-8">
+                Emotive Narrative Development Across All Media
+            </h2>
+
+            <!-- The Pitch -->
+            <p class="text-nordic-muted max-w-2xl mx-auto mb-12 leading-relaxed text-sm md:text-base">
+                The only software in the world that unites the best open-source generative AI projects into a professional video editor. Pallaidium embraces every stage of the film development process, allowing you to batch generate and transform content across any medium—Text, Image, Video, and Audio—directly on your timeline.
+                <br><br>
+                <span class="text-nordic-blue font-mono text-xs uppercase tracking-widest">Designed for Vibe Filmmaking</span>
+            </p>
+
+            <!-- CTAs -->
+            <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                <a href="#install" class="bg-nordic-white text-nordic-black px-8 py-4 rounded font-bold hover:bg-nordic-blue hover:text-white transition duration-300 w-full sm:w-auto text-center shadow-[0_0_20px_rgba(255,255,255,0.1)]">
+                    Free Download
+                </a>
+                <a href="https://discord.gg/HMYpnPzbTm" class="px-8 py-4 rounded border border-nordic-slate hover:border-nordic-white hover:bg-white/5 transition duration-300 w-full sm:w-auto text-center flex items-center justify-center gap-2">
+                    <img src="https://img.icons8.com/ios-filled/50/ffffff/discord-logo.png" class="w-4 h-4" alt="Discord">
+                    Join Community
+                </a>
+            </div>
+        </div>
+
+        <!-- Video Demo Container -->
+        <div class="mt-20 w-full max-w-6xl px-4 relative z-10 group">
+            <div class="absolute -inset-1 bg-gradient-to-r from-nordic-blue/20 to-purple-500/20 rounded-xl blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
+            <div class="relative rounded border border-white/10 bg-nordic-black overflow-hidden shadow-2xl aspect-video">
+                <video autoplay loop muted playsinline class="w-full h-full object-cover opacity-90">
+                    <source src="https://github.com/user-attachments/assets/81d30bc1-01f6-4b52-8ce7-abf53d53e854" type="video/mp4">
+                </video>
+                <!-- UI Overlay Badge -->
+                <div class="absolute top-4 right-4 bg-black/80 backdrop-blur px-3 py-1 rounded text-[10px] font-mono text-nordic-muted border border-white/10">
+                    BLENDER VSE // INTEGRATED WORKFLOW
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- THE STUDIO ARSENAL -->
+    <section id="studio" class="py-32 border-t border-white/5">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-px bg-nordic-slate/30 border border-nordic-slate/30">
+                <!-- Card 1 -->
+                <div class="bg-nordic-black p-10 hover:bg-white/5 transition duration-500">
+                    <div class="font-mono text-nordic-blue text-xs mb-4">01 // VISUAL SYNTHESIS</div>
+                    <h3 class="text-xl font-bold mb-4 text-white">Generative Video & Image</h3>
+                    <p class="text-sm text-nordic-muted leading-relaxed">
+                        Access the bleeding edge: <strong>Flux, Hunyuan, LTX-Video, and CogVideoX</strong>. Generate clips from prompts or transform existing footage directly on the timeline.
+                    </p>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="bg-nordic-black p-10 hover:bg-white/5 transition duration-500">
+                    <div class="font-mono text-nordic-blue text-xs mb-4">02 // SONIC ARCHITECTURE</div>
+                    <h3 class="text-xl font-bold mb-4 text-white">Full Audio Suite</h3>
+                    <p class="text-sm text-nordic-muted leading-relaxed">
+                        Clone voices with <strong>Chatterbox & F5-TTS</strong>. Compose scores with <strong>MusicGen</strong>. Sync sound effects to video with <strong>MMAudio</strong>.
+                    </p>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="bg-nordic-black p-10 hover:bg-white/5 transition duration-500">
+                    <div class="font-mono text-nordic-blue text-xs mb-4">03 // DIRECTORIAL CONTROL</div>
+                    <h3 class="text-xl font-bold mb-4 text-white">Precision & Batching</h3>
+                    <p class="text-sm text-nordic-muted leading-relaxed">
+                        Direct the latent space. Use <strong>ControlNet</strong> (Canny/OpenPose) for composition. Batch process hundreds of strips overnight to evolve your narrative.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- MATRIX SECTION -->
+    <section id="matrix" class="py-32 bg-nordic-charcoal relative overflow-hidden">
+        <div class="absolute inset-0 bg-grid opacity-20"></div>
+        <div class="max-w-7xl mx-auto px-6 relative z-10">
+            <div class="flex items-end justify-between mb-12">
+                <h2 class="text-3xl font-bold text-white">The Capability Matrix</h2>
+                <span class="text-xs font-mono text-nordic-muted uppercase hidden md:block">Mapping Input to Output</span>
+            </div>
+            
+            <div class="overflow-x-auto border border-white/5 rounded bg-nordic-black/50 backdrop-blur">
+                <table class="w-full text-left font-mono text-sm border-collapse">
+                    <thead>
+                        <tr class="text-nordic-muted text-xs uppercase tracking-widest border-b border-white/10 bg-white/5">
+                            <th class="py-5 pl-6">Input Source</th>
+                            <th class="py-5 px-4 text-center">Image</th>
+                            <th class="py-5 px-4 text-center text-nordic-white">Video</th>
+                            <th class="py-5 px-4 text-center">Audio/FX</th>
+                            <th class="py-5 px-4 text-center">Speech/TTS</th>
+                            <th class="py-5 px-4 text-center">Music</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-nordic-muted">
+                        <tr class="border-b border-white/5 hover:bg-white/5 transition">
+                            <td class="py-5 pl-6 font-bold text-white">Text Prompt</td>
+                            <td class="py-5 text-center text-nordic-blue">●</td>
+                            <td class="py-5 text-center text-nordic-blue">●</td>
+                            <td class="py-5 text-center text-nordic-blue">●</td>
+                            <td class="py-5 text-center text-nordic-blue">●</td>
+                            <td class="py-5 text-center text-nordic-blue">●</td>
+                        </tr>
+                        <tr class="border-b border-white/5 hover:bg-white/5 transition">
+                            <td class="py-5 pl-6 font-bold text-white">Image Strip</td>
+                            <td class="py-5 text-center text-nordic-blue">●</td>
+                            <td class="py-5 text-center text-nordic-blue">●</td>
+                            <td class="py-5 text-center text-nordic-blue">●</td>
+                            <td class="py-5 text-center opacity-20">—</td>
+                            <td class="py-5 text-center opacity-20">—</td>
+                        </tr>
+                        <tr class="border-b border-white/5 hover:bg-white/5 transition">
+                            <td class="py-5 pl-6 font-bold text-white">Video Strip</td>
+                            <td class="py-5 text-center text-nordic-blue">●</td>
+                            <td class="py-5 text-center text-nordic-blue">●</td>
+                            <td class="py-5 text-center text-nordic-blue">●</td>
+                            <td class="py-5 text-center opacity-20">—</td>
+                            <td class="py-5 text-center opacity-20">—</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-8 flex flex-wrap gap-2 text-[10px] font-mono uppercase text-nordic-muted">
+                <span class="px-3 py-1 bg-white/5 rounded hover:text-white transition cursor-default">BFL-FLUX.2</span>
+                <span class="px-3 py-1 bg-white/5 rounded hover:text-white transition cursor-default">HunyuanVideo</span>
+                <span class="px-3 py-1 bg-white/5 rounded hover:text-white transition cursor-default">SkyReels-V1</span>
+                <span class="px-3 py-1 bg-white/5 rounded hover:text-white transition cursor-default">LTX-Video</span>
+                <span class="px-3 py-1 bg-white/5 rounded hover:text-white transition cursor-default">OmniGen</span>
+                <span class="px-3 py-1 bg-white/5 rounded hover:text-white transition cursor-default">MMAudio</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- INSTALLATION PROTOCOL -->
+    <section id="install" class="py-32 border-t border-white/5 bg-[#050505]">
+        <div class="max-w-4xl mx-auto px-6">
+            <div class="flex items-center gap-4 mb-12">
+                <div class="p-2 bg-nordic-blue/10 rounded text-nordic-blue">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                </div>
+                <h2 class="text-3xl font-bold">Installation Protocol</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-12 mb-12">
+                <!-- Requirements -->
+                <div class="space-y-4">
+                    <h3 class="text-sm font-bold uppercase tracking-wider text-nordic-muted">System Requirements</h3>
+                    <ul class="space-y-3 text-sm text-nordic-white">
+                        <li class="flex items-start gap-3">
+                            <span class="text-nordic-blue">✓</span> Windows 10/11 (Preferred)
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="text-nordic-blue">✓</span> NVIDIA GPU (6GB+ VRAM)
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="text-nordic-blue">✓</span> CUDA 12.4
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="text-nordic-blue">✓</span> 20GB+ HDD Space
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Step 0 -->
+                <div class="space-y-4">
+                    <h3 class="text-sm font-bold uppercase tracking-wider text-nordic-muted">Pre-Flight Check</h3>
+                    <p class="text-sm text-nordic-muted">1. Install <a href="https://git-scm.com/downloads" class="text-nordic-blue underline">Git</a> (add to PATH).</p>
+                    <p class="text-sm text-nordic-muted">2. Download <a href="https://builder.blender.org/download/daily/" class="text-nordic-blue underline">Blender 4.5.x</a>. <br> <span class="text-nordic-orange">⚠ Do NOT use Blender 5.0.</span></p>
+                </div>
+            </div>
+
+            <!-- Steps -->
+            <div class="glass-panel p-8 rounded-xl font-mono text-sm shadow-2xl border-l-4 border-l-nordic-blue">
+                <ol class="list-decimal list-inside space-y-6 text-nordic-muted marker:text-nordic-blue marker:font-bold">
+                    <li>
+                        <span class="text-white">Run as Admin:</span> Right-click <span class="bg-white/10 px-1 rounded">blender.exe</span> & select "Run as Administrator".
+                    </li>
+                    <li>
+                        <span class="text-white">Install Add-on:</span> Preferences > Add-ons > Install > Select Pallaidium ZIP.
+                    </li>
+                    <li class="pl-4 border-l border-nordic-orange/50 ml-1">
+                        <span class="text-nordic-orange font-bold">CRITICAL:</span> In Add-on Preferences, click <span class="text-white border border-white/20 px-1 bg-white/5">Uninstall Dependencies</span> first to clear conflicts.
+                    </li>
+                    <li>
+                        <span class="text-white">Restart Blender</span> (Always as Administrator).
+                    </li>
+                    <li>
+                        <span class="text-white">Install Deps:</span> In Add-on Preferences, click <span class="text-white border border-white/20 px-1 bg-white/5">Install Dependencies</span>.
+                    </li>
+                    <li>
+                        <span class="text-white">Launch:</span> Restart Computer. Open VSE Sidebar (N) > Generative AI.
+                    </li>
+                </ol>
+                <div class="mt-8 pt-4 border-t border-white/10 text-xs text-nordic-muted">
+                    NOTE: First run downloads 5-10GB of models. The screen may freeze. This is normal behavior.
+                </div>
+            </div>
+            
+            <div class="mt-12 text-center">
+                 <a href="https://github.com/tin2tin/text_to_video/archive/refs/heads/main.zip" class="inline-block bg-nordic-blue text-black px-8 py-4 rounded font-bold hover:bg-white transition shadow-lg shadow-nordic-blue/20">
+                     Download Add-on .ZIP
+                 </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="py-20 border-t border-white/5 text-center bg-nordic-black">
+        <div class="max-w-7xl mx-auto px-6">
+            <h2 class="text-2xl font-bold tracking-tight mb-8 text-white">PALLAIDIUM</h2>
+            
+            <div class="flex flex-wrap justify-center gap-8 text-sm font-bold uppercase tracking-wider text-nordic-muted mb-12">
+                <a href="https://github.com/tin2tin/Pallaidium" class="hover:text-white transition">Source Code</a>
+                <a href="https://discord.gg/HMYpnPzbTm" class="hover:text-white transition">Discord</a>
+                <a href="https://github.com/tin2tin/Pallaidium/issues" class="hover:text-white transition">Issues</a>
+                <a href="https://github.com/tin2tin/Blender_Screenwriter" class="hover:text-white transition">Screenwriter</a>
+            </div>
+            
+            <div class="max-w-3xl mx-auto text-xs text-nordic-muted leading-relaxed space-y-4 font-mono">
+                <p>
+                    Pallaidium acts as a GUI for Hugging Face Diffusers. Models are downloaded directly from Hugging Face. 
+                    Users are responsible for adhering to the licenses of individual models.
+                </p>
+                <p>
+                    Strictly prohibited for harmful, demeaning, or illegal content generation. 
+                    <br>Created & maintained by Tin2Tin.
+                </p>
+                <p class="pt-8 opacity-40">© 2026 Pallaidium Project</p>
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>
