@@ -812,6 +812,9 @@ def get_strip_path(strip):
     if strip.type == "MOVIE":
         movie_path = bpy.path.abspath(strip.filepath)
         return movie_path
+    if strip.type == "SOUND":
+        sound_path = bpy.path.abspath(strip.filepath)
+        return sound_path
     return None
 
 
@@ -1040,9 +1043,10 @@ class DependencyManager:
         else:
             return ["torch", "torchvision", "torchaudio", "xformers"]
 
+    # for installing branch: git+https://github.com/huggingface/diffusers.git@ltx2-i2v-lora-mixin-fix
+
     def get_phase_3_git_and_extensions(self):
         reqs = [
-            #git+https://github.com/rootonchair/diffusers.git@feat/distill-ltx2
             "git+https://github.com/huggingface/diffusers.git", 
             "git+https://github.com/SWivid/F5-TTS.git",
             "git+https://github.com/QwenLM/Qwen3-TTS.git",
@@ -1314,7 +1318,10 @@ def input_strips_updated(self, context):
             #scene.generate_movie_frames = 49
             scene.movie_num_inference_steps = 40
             scene.movie_num_guidance = 1
-
+#        elif movie_model in {"LTX-2 Multi-Input File","rootonchair/LTX-2-19b-distilled","Lighttricks/LTX-2"}:
+#            scene.generate_movie_x = 512
+#            scene.generate_movie_y = 288
+#            scene.generate_movie_frames = 121            
         # Handle specific input strips for movie types
         if (
             movie_model in {
@@ -1343,6 +1350,7 @@ def input_strips_updated(self, context):
     if scene.input_strips == "input_prompt":
         bpy.types.Scene.movie_path = ""
         bpy.types.Scene.image_path = ""
+        bpy.types.Scene.sound_path = ""
 
 
 def output_strips_updated(self, context):
@@ -1417,6 +1425,10 @@ def output_strips_updated(self, context):
             movie_frames = 49
             movie_inference = 50
             movie_guidance = 6
+        elif movie_model in {"LTX-2 Multi-Input File","rootonchair/LTX-2-19b-distilled","Lighttricks/LTX-2"}:
+            scene.generate_movie_x = 512
+            scene.generate_movie_y = 288
+            scene.generate_movie_frames = 121 
         elif movie_model in [
             "Hailuo/MiniMax/img2vid",
             "Hailuo/MiniMax/subject2vid"
@@ -1599,10 +1611,20 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "lllyasviel/FramePackI2V_HY",
             ),
             (
+                "Lightricks/LTX-2",
+                "LTX-2",
+                "Lightricks/LTX-2",
+            ), 
+            (
                 "rootonchair/LTX-2-19b-distilled",
                 "LTX-2 19b Distilled",
                 "rootonchair/LTX-2-19b-distilled",
-            ),            
+            ), 
+            (
+                "LTX-2 Multi-Input File",
+                "LTX-2 Multi-Input (Txt, Aud & Imag in Meta Strips)",
+                "LTX-2 Multi-Input File",
+            ),           
             (
                 "Lightricks/LTX-Video",
                 "LTX 0.9.7 (1280x720x257(frames/8+1))",
@@ -1914,211 +1936,260 @@ class GENERATOR_OT_sound_notification(Operator):
         return {"FINISHED"}
 
 
+#def copy_struct(source, target):
+#    if not source or not target:
+#        return
+#    for name, prop in source.bl_rna.properties.items():
+#        if name in ("rna_type", "name", "name_full", "original", "is_evaluated"):
+#            continue
+#        try:
+#            setattr(target, name, getattr(source, name))
+#        except AttributeError:
+#            new_source = getattr(source, name)
+#            new_target = getattr(target, name)
+#            if hasattr(new_source, "bl_rna"):
+#                copy_struct(new_source, new_target)
+#        except TypeError:
+#            pass
+
+
 def copy_struct(source, target):
+    """
+    Robustly copies properties from source to target. 
+    Handles cases where source has properties that target does not (e.g. Movie -> Sound).
+    """
     if not source or not target:
         return
+
+    # Properties to ignore
+    ignore_props = {"rna_type", "name", "name_full", "original", "is_evaluated"}
+
     for name, prop in source.bl_rna.properties.items():
-        if name in ("rna_type", "name", "name_full", "original", "is_evaluated"):
+        if name in ignore_props:
             continue
+
+        # 1. Safely get the source value
         try:
-            setattr(target, name, getattr(source, name))
+            src_value = getattr(source, name)
+        except (AttributeError, TypeError):
+            continue
+
+        # 2. Try to set the property on the target
+        try:
+            setattr(target, name, src_value)
         except AttributeError:
-            new_source = getattr(source, name)
-            new_target = getattr(target, name)
-            if hasattr(new_source, "bl_rna"):
-                copy_struct(new_source, new_target)
+            # 3. If setattr failed, it's either:
+            #    A) A read-only nested struct (like strip.transform)
+            #    B) A property that doesn't exist on the target (like use_deinterlace on Sound)
+            
+            # Safely check if the target actually HAS this property
+            # We use default=None to prevent the crash you are seeing
+            tgt_value = getattr(target, name, None)
+
+            # Only recurse if both exist and are valid structs
+            if tgt_value is not None and src_value is not None:
+                if hasattr(src_value, "bl_rna"):
+                    copy_struct(src_value, tgt_value)
+                    
         except TypeError:
+            # Handles issues like attempting to write to collection properties
             pass
 
 
-def get_render_strip(self, context, strip):
-    """Render selected strip to hard-disk"""
-    # Check for the context and selected strips
+def get_render_strip(self, context, strip, meta_strip=None):
+    """Render selected strip to hard-disk. Returns the new strip object or None."""
+    
+    # --- 1. STRICT INPUT SANITIZATION ---
+    if isinstance(meta_strip, (set, dict, list, tuple)):
+        meta_strip = None
+
+    if isinstance(strip, (set, dict, list, tuple)):
+        print(f"Error: Invalid strip passed: {strip}")
+        return None
+
+    if not strip:
+        return None
 
     if not context or not context.scene or not context.scene.sequence_editor:
-        self.report({"ERROR"}, "No valid context or selected strips")
-        return {"CANCELLED"}
+        return None
+
     bpy.context.preferences.system.sequencer_proxy_setup = "MANUAL"
     current_scene = context.scene
     sequencer = current_scene.sequence_editor
-    current_frame_old = bpy.context.scene.frame_current
-    selected_sequences = strip
+    
+    # --- 2. DETERMINE TARGET ---
+    target_to_copy = meta_strip if meta_strip else strip
 
-    # Get the first empty channel above all strips
-    insert_channel_total = 1
-    for s in sequencer.sequences_all:
-        if s.channel >= insert_channel_total:
-            insert_channel_total = s.channel + 1
+    if not hasattr(target_to_copy, "select"):
+        return None
 
-    print("Strip type: " + str(strip.type))
+    area = next((area for area in context.screen.areas if area.type == "SEQUENCE_EDITOR"), None)
+    if not area:
+        return None
 
-    if strip.type in {
-        "MOVIE",
-        "IMAGE",
-        "SOUND",
-        "SCENE",
-        "TEXT",
-        "COLOR",
-        "META",
-        "MASK",
-    }:
-        for s in sequencer.sequences_all:
-            s.select = False
-        strip.select = True
-        bpy.context.scene.frame_current = int(strip.frame_start)
+    # --- 3. COPY OPERATION ---
+    with bpy.context.temp_override(area=area):
+        bpy.ops.sequencer.select_all(action='DESELECT')
+        target_to_copy.select = True
+        sequencer.active_strip = target_to_copy
+        context.scene.frame_current = int(target_to_copy.frame_start)
 
-        if strip.type != "SCENE":
+        if target_to_copy.type != "SCENE":
             bpy.ops.sequencer.copy()
 
-        # Create a new scene
-        new_scene = bpy.ops.scene.new(type="EMPTY")
+    # --- 4. CREATE SANDBOX SCENE ---
+    new_scene = bpy.ops.scene.new(type="EMPTY")
+    new_scene = bpy.context.scene
+    new_scene.sequence_editor_create()
+    context.window.scene = new_scene
 
-        # Get the newly created scene
-        new_scene = bpy.context.scene
-
-        # Add a sequencer to the new scene
-        new_scene.sequence_editor_create()
-
-        # Set the new scene as the active scene
-        context.window.scene = new_scene
-
-        # Copy the scene properties from the current scene to the new scene
-        new_scene.render.resolution_x = current_scene.render.resolution_x
-        new_scene.render.resolution_y = current_scene.render.resolution_y
-        new_scene.render.resolution_percentage = (
-            current_scene.render.resolution_percentage
-        )
-        new_scene.render.pixel_aspect_x = current_scene.render.pixel_aspect_x
-        new_scene.render.pixel_aspect_y = current_scene.render.pixel_aspect_y
-        new_scene.render.fps = current_scene.render.fps
-        new_scene.render.fps_base = current_scene.render.fps_base
-        new_scene.render.sequencer_gl_preview = (
-            current_scene.render.sequencer_gl_preview
-        )
-        new_scene.render.use_sequencer_override_scene_strip = (
-            current_scene.render.use_sequencer_override_scene_strip
-        )
-        new_scene.world = current_scene.world
-
-        area = [
-            area for area in context.screen.areas if area.type == "SEQUENCE_EDITOR"
-        ][0]
-        with bpy.context.temp_override(area=area):
-            if strip.type == "SCENE":
-                bpy.ops.sequencer.scene_strip_add(
-                    frame_start=0, channel=8, replace_sel=True
-                )
-            else:
-                # Paste the strip from the clipboard to the new scene
+    # Copy Render Settings
+    new_scene.render.resolution_x = current_scene.render.resolution_x
+    new_scene.render.resolution_y = current_scene.render.resolution_y
+    new_scene.render.fps = current_scene.render.fps
+    new_scene.render.fps_base = current_scene.render.fps_base
+    
+    # --- 5. PASTE AND UNPACK ---
+    new_strip = None
+    
+    with bpy.context.temp_override(area=area):
+        if target_to_copy.type == "SCENE":
+            bpy.ops.sequencer.scene_strip_add(frame_start=0, channel=8, replace_sel=True)
+            new_strip = new_scene.sequence_editor.active_strip
+        else:
+            try:
                 bpy.ops.sequencer.paste()
-                # bpy.ops.sequencer.meta_separate()
+            except RuntimeError:
+                bpy.data.scenes.remove(new_scene, do_unlink=True)
+                context.window.scene = current_scene
+                return None
 
-        # Get the new strip in the new scene
-        new_strip = new_scene.sequence_editor.active_strip = (
-            bpy.context.selected_sequences[0]
-        )
+            if meta_strip:
+                # We need to unpack until the target strip is at the TOP LEVEL
+                # This ensures we can safely delete everything else later.
+                found_at_top_level = False
+                
+                for _ in range(10): # Safety loop
+                    # Check if our strip is at the top level
+                    candidates = [s for s in new_scene.sequence_editor.sequences 
+                                  if s.name == strip.name and s.type == strip.type]
+                    
+                    if candidates:
+                        new_strip = candidates[0]
+                        found_at_top_level = True
+                        break
+                    
+                    # If not at top level, check if it exists deeper
+                    all_candidates = [s for s in new_scene.sequence_editor.sequences_all 
+                                      if s.name == strip.name and s.type == strip.type]
+                    
+                    # If we found it deep, but not top, we must separate all METAs to bring it up
+                    metas = [s for s in new_scene.sequence_editor.sequences if s.type == 'META']
+                    
+                    if not metas:
+                        # No more metas to open, but we haven't found it at top level.
+                        # If we found it deeply, grab it (though cleanup might be messy)
+                        if all_candidates:
+                            new_strip = all_candidates[0]
+                        break
+                    
+                    bpy.ops.sequencer.select_all(action='DESELECT')
+                    for m in metas:
+                        m.select = True
+                        new_scene.sequence_editor.active_strip = m
+                    
+                    bpy.ops.sequencer.meta_separate()
+                
+                # Fallback: if name changed, check by type if it's the only one left
+                if not new_strip:
+                     # Check top level only
+                     matches = [s for s in new_scene.sequence_editor.sequences if s.type == strip.type]
+                     if len(matches) == 1:
+                         new_strip = matches[0]
 
-        copy_struct(strip, new_strip)
+                # --- FIX FOR "STRIP NOT IN SCENE" ERROR ---
+                # We only remove strips that are at the TOP LEVEL (sequences, not sequences_all)
+                if new_strip:
+                    # If the found strip is inside a meta (not top level), we can't easily clean up
+                    # without deleting the parent. However, the loop above tries to bring it to top.
+                    
+                    # Safe cleanup: Select everything except our strip, then use Operator to delete
+                    bpy.ops.sequencer.select_all(action='SELECT')
+                    new_strip.select = False # Deselect our target
+                    
+                    # If our target is hidden inside a meta, new_strip.select might fail or do nothing useful.
+                    # But if the unpack worked, it is at the top level.
+                    bpy.ops.sequencer.delete()
+            else:
+                # Normal Paste
+                if bpy.context.selected_sequences:
+                    for s in bpy.context.selected_sequences:
+                        if s.type == strip.type:
+                            new_strip = s
+                            break
+                    if not new_strip:
+                        new_strip = bpy.context.selected_sequences[0]
 
-        # Set the range in the new scene to fit the pasted strip
-        new_scene.frame_start = int(new_strip.frame_final_start)
-        new_scene.frame_end = (
-            int(new_strip.frame_final_start + new_strip.frame_final_duration) - 1
-        )
+    if not new_strip:
+        print(f"Error: Failed to extract {strip.name}")
+        bpy.data.scenes.remove(new_scene, do_unlink=True)
+        context.window.scene = current_scene
+        return None
 
-        # Set the render settings for rendering animation with FFmpeg and MP4 with sound
+    # --- 6. RENDER EXECUTION ---
+    new_strip.select = True
+    new_scene.sequence_editor.active_strip = new_strip
+    copy_struct(strip, new_strip)
+
+    # Frame Range
+    new_scene.frame_start = int(new_strip.frame_final_start)
+    new_scene.frame_end = int(new_strip.frame_final_start + new_strip.frame_final_duration) - 1
+
+    # Render Settings
+    preferences = bpy.context.preferences
+    addon_prefs = preferences.addons[__name__].preferences
+    rendered_dir = os.path.join(addon_prefs.generator_ai, str(date.today()), "Rendered_Strips")
+    
+    if not os.path.exists(rendered_dir):
+        os.makedirs(rendered_dir)
+
+    safe_name = re.sub(r'[<>:"/\\|?*]', '', strip.name)
+    output_path = os.path.join(rendered_dir, safe_name + "_rendered")
+    
+    if strip.type == "SOUND":
+        output_path += ".wav"
+        output_path = ensure_unique_filename(output_path)
+        bpy.ops.sound.mixdown(filepath=output_path, relative_path=True, container='WAV', codec='PCM')
+    else:
+        output_path += ".mp4"
+        output_path = ensure_unique_filename(output_path)
+        new_scene.render.filepath = output_path
         bpy.context.scene.render.image_settings.file_format = "FFMPEG"
         bpy.context.scene.render.ffmpeg.format = "MPEG4"
         bpy.context.scene.render.ffmpeg.audio_codec = "AAC"
-
-        # Make dir
-        preferences = bpy.context.preferences
-        addon_prefs = preferences.addons[__name__].preferences
-        rendered_dir = os.path.join(addon_prefs.generator_ai, str(date.today()))
-        rendered_dir = os.path.join(rendered_dir, "Rendered_Strips")
-
-        # Set the name of the file
-        src_name = strip.name
-        src_dir = ""
-        src_ext = ".mp4"
-
-        # Create a new folder for the rendered files
-        if not os.path.exists(rendered_dir):
-            os.makedirs(rendered_dir)
-
-        # Set the output path for the rendering
-        output_path = os.path.join(rendered_dir, src_name + "_rendered" + src_ext)
-        output_path = ensure_unique_filename(output_path)
-        new_scene.render.filepath = output_path
-
-        # Render the strip to hard disk
         bpy.ops.render.opengl(animation=True, sequencer=True)
 
-        # Delete the new scene
-        bpy.data.scenes.remove(new_scene, do_unlink=True)
-
-        if not os.path.exists(output_path):
-            print("Render failed: " + output_path)
-            bpy.context.preferences.system.sequencer_proxy_setup = "AUTOMATIC"
-            return {"CANCELLED"}
-
-        # Set the original scene as the active scene
-        context.window.scene = current_scene
-
-        # Reset to total top channel
-        insert_channel = insert_channel_total
-        area = [
-            area for area in context.screen.areas if area.type == "SEQUENCE_EDITOR"
-        ][0]
-        with bpy.context.temp_override(area=area):
-            insert_channel = find_first_empty_channel(
-                strip.frame_final_start,
-                strip.frame_final_start + strip.frame_final_duration,
-            )
-            if strip.type == "SOUND":
-                # Insert the rendered file as a sound strip in the original scene without video.
-
-                bpy.ops.sequencer.sound_strip_add(
-                    channel=insert_channel,
-                    filepath=output_path,
-                    frame_start=int(strip.frame_final_start),
-                    overlap=0,
-                )
-            #            elif strip.type == "SCENE":
-            #                # Insert the rendered file as a scene strip in the original scene.
-
-            #                bpy.ops.sequencer.movie_strip_add(
-            #                    channel=insert_channel,
-            #                    filepath=output_path,
-            #                    frame_start=int(strip.frame_final_start),
-            #                    overlap=0,
-            #                    sound=False,
-            #                )
-            #            elif strip.type == "IMAGE":
-            #                # Insert the rendered file as an image strip in the original scene.
-            #                bpy.ops.sequencer.image_strip_add(
-            #                    channel=insert_channel,
-            #                    filepath=output_path,
-            #                    frame_start=int(strip.frame_final_start),
-            #                    overlap=0,
-            #                    sound=False,
-            #                )
-
-            else:
-                # Insert the rendered file as a movie strip in the original scene without sound.
-                bpy.ops.sequencer.movie_strip_add(
-                    channel=insert_channel,
-                    filepath=output_path,
-                    frame_start=int(strip.frame_final_start),
-                    overlap=0,
-                    sound=False,
-                )
+    # --- 7. CLEANUP & RETURN ---
+    bpy.data.scenes.remove(new_scene, do_unlink=True)
+    context.window.scene = current_scene
+    
+    area = [a for a in context.screen.areas if a.type == "SEQUENCE_EDITOR"][0]
+    with bpy.context.temp_override(area=area):
+        insert_channel = 1
+        for s in sequencer.sequences_all:
+             if s.channel >= insert_channel: insert_channel = s.channel + 1
+             
+        if strip.type == "SOUND":
+            bpy.ops.sequencer.sound_strip_add(channel=insert_channel, filepath=output_path, frame_start=int(strip.frame_final_start), overlap=0)
+        else:
+            bpy.ops.sequencer.movie_strip_add(channel=insert_channel, filepath=output_path, frame_start=int(strip.frame_final_start), overlap=0, sound=False)
+            
         resulting_strip = sequencer.active_strip
-        resulting_strip.use_proxy = False
-
-        # Reset current frame
-        bpy.context.scene.frame_current = current_frame_old
-        bpy.context.preferences.system.sequencer_proxy_setup = "AUTOMATIC"
+        if resulting_strip:
+            # SAFETY CHECK: Only set use_proxy if the strip has that attribute
+            if hasattr(resulting_strip, "use_proxy"):
+                resulting_strip.use_proxy = False
+             
     return resulting_strip
 
 
@@ -2645,6 +2716,14 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                                 type == "movie"
                                 and (movie_model_card == "Wan-AI/Wan2.2-T2V-A14B-Diffusers")
                             )
+                            or (
+                                type == "movie"
+                                and (movie_model_card == "Lightricks/LTX-2")
+                            )
+                            or (
+                                type == "movie"
+                                and (movie_model_card == "LTX-2 Multi-Input File")
+                            )                            
                         )
                     ):
                         pass
@@ -2685,6 +2764,14 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         or (
                             type == "movie"
                             and (movie_model_card == "Wan-AI/Wan2.2-T2V-A14B-Diffusers")
+                        ) 
+                        or (
+                            type == "movie"
+                            and (movie_model_card == "Lightricks/LTX-2")
+                        ) 
+                        or (
+                            type == "movie"
+                            and (movie_model_card == "LTX-2 Multi-Input File")
                         )                        
                     ):
                         pass
@@ -2802,6 +2889,8 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 or (movie_model_card == "Wan-AI/Wan2.2-I2V-A14B-Diffusers")
                 or (movie_model_card == "Wan-AI/Wan2.2-T2V-A14B-Diffusers")
                 or (movie_model_card == "Wan-AI/Wan2.1-VACE-1.3B-diffusers")
+                or (movie_model_card == "Lightricks/LTX-2")
+                or (movie_model_card == "LTX-2 Multi-Input File")
             )):
                 layout = self.layout
                 layout.use_property_split = True
@@ -3175,6 +3264,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
     def execute(self, context):
         global _pallaidium_movie_model_cache
+        import random
         
         scene = context.scene
 
@@ -3259,12 +3349,14 @@ class SEQUENCER_OT_generate_movie(Operator):
 
             # Models for refine imported image or movie
             if (
-                (scene.movie_path or scene.image_path)
+                (scene.movie_path or scene.image_path or scene.sound_path)
                 and input == "input_strips"
                 and movie_model_card != "THUDM/CogVideoX-5b"
                 and movie_model_card != "THUDM/CogVideoX-2b"
                 and movie_model_card != "Lightricks/LTX-Video"
                 and movie_model_card != "rootonchair/LTX-2-19b-distilled"
+                and movie_model_card != "LTX-2 Multi-Input File"
+                and movie_model_card != "Lightricks/LTX-2"
                 and movie_model_card != "hunyuanvideo-community/HunyuanVideo"
                 and movie_model_card != "lllyasviel/FramePackI2V_HY"
                 and movie_model_card != "Hailuo/MiniMax/txt2vid"
@@ -3452,6 +3544,11 @@ class SEQUENCER_OT_generate_movie(Operator):
 #                        torch_dtype=torch.bfloat16,
 #                    )
 
+                elif movie_model_card == "Lightricks/LTX-2":
+                    pass
+                elif movie_model_card == "LTX-2 Multi-Input File":
+                    pass
+                
                 # HunyuanVideo
                 elif movie_model_card == "hunyuanvideo-community/HunyuanVideo":
                     # vid2vid
@@ -4354,7 +4451,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 # LTX
                 elif movie_model_card == "Lightricks/LTX-Video":
                     if scene.movie_path:
-                        print("Process: Video to Video")
+                        print("Process: Image from Video to Video")
                         if not os.path.isfile(bpy.path.abspath(scene.movie_path)):
                             print("No file found.")
                             return {"CANCELLED"}
@@ -4391,17 +4488,15 @@ class SEQUENCER_OT_generate_movie(Operator):
                 # LTX-2
                 elif movie_model_card == "rootonchair/LTX-2-19b-distilled":
                     if scene.movie_path:
-                        print("Process: Video to Video")
-                        if not os.path.isfile(bpy.path.abspath(scene.movie_path)):
+                        print("Process: Video Image to Video")
+                        if not os.path.isfile(scene.movie_path):
                             print("No file found.")
                             return {"CANCELLED"}
-                        image = load_video(bpy.path.abspath(scene.movie_path))
-                        #image = load_first_frame(bpy.path.abspath(scene.movie_path))
+                        image = load_first_frame(bpy.path.abspath(scene.movie_path))
                     if scene.image_path:
+                        print("Process: Image to video")
                         strip = scene.sequence_editor.active_strip
-                        print("Process: Image to video (LTX)")
                         img_path = os.path.join(bpy.path.abspath(strip.directory), strip.elements[0].filename)
-                        print("Path: "+img_path)
                         if not os.path.isfile(img_path):
                             print("No file found.")
                             return {"CANCELLED"}
@@ -4489,6 +4584,697 @@ class SEQUENCER_OT_generate_movie(Operator):
                         audio_sample_rate=pipe.vocoder.config.output_sampling_rate,
                         output_path=dst_path,
                     )                                      
+
+                # LTX-2
+                elif movie_model_card == "Lightricks/LTX-2":
+                    import gc
+                    import os
+                    import time
+                    import torch
+                    import cv2
+                    import numpy as np
+                    from diffusers import LTX2ImageToVideoPipeline, LTX2LatentUpsamplePipeline, LTX2VideoTransformer3DModel
+                    from diffusers.pipelines.ltx2.export_utils import encode_video
+                    from diffusers.pipelines.ltx2.latent_upsampler import LTX2LatentUpsamplerModel
+                    from diffusers.pipelines.ltx2.utils import DISTILLED_SIGMA_VALUES, STAGE_2_DISTILLED_SIGMA_VALUES
+                    from diffusers.utils import load_image
+                    from transformers import Gemma3ForConditionalGeneration
+                    if scene.movie_path:
+                        print("Process: Video Image to Video ")
+                        if not os.path.isfile(scene.movie_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        image = load_first_frame(bpy.path.abspath(scene.movie_path))
+                    if scene.image_path:
+                        print("Process: Image to video")
+                        strip = scene.sequence_editor.active_strip
+                        img_path = os.path.join(bpy.path.abspath(strip.directory), strip.elements[0].filename)
+                        if not os.path.isfile(img_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        image = load_image(img_path)
+                        
+                    render = bpy.context.scene.render
+                    fps = round((render.fps / render.fps_base), 3) 
+ 
+                    x = width_clean = (x // 32) * 32
+                    y = height_clean = (y // 32) * 32
+                    
+                    # 2. Ensure frame count follows (n * 8) + 1 rule (Temporal Requirement)
+                    # LTX-2 VAE compresses time by 8x. Arbitrary frame counts cause tensor mismatch.
+                    target_frames = abs(duration)
+                    duration = valid_num_frames = ((target_frames - 1) // 8) * 8 + 1
+                    
+                    # Ensure a minimum valid length (9 frames is the smallest block: 1*8 + 1)
+                    if valid_num_frames < 9:
+                        duration = valid_num_frames = 9
+                        
+
+                    # Start global timer
+                    total_start_time = time.time()
+
+                    torch_dtype = torch.bfloat16
+                    device = "cuda"
+                    model_path = "Lightricks/LTX-2"
+                    #width = 928-64
+                    #height = 512-32
+                    #num_frames = 145
+                    seed = int.from_bytes(os.urandom(8), "big")
+                    generator = torch.Generator("cpu").manual_seed(seed)
+
+                    print("Loading base models...")
+                    load_start = time.time()
+
+#                    image = load_image(
+#                        r"C:\Users\peter\Downloads\Nordic Siblings - Mid Shot 3.png"
+#                    )
+
+                    text_encoder = Gemma3ForConditionalGeneration.from_pretrained(
+                        "OzzyGT/LTX-2-bnb-4bit-text-encoder",
+                        dtype=torch_dtype,
+                        device_map="cpu",
+                    )
+
+                    transformer = LTX2VideoTransformer3DModel.from_pretrained(
+                        "OzzyGT/LTX-2-bnb-4bit-transformer-distilled",
+                        torch_dtype=torch_dtype,
+                        device_map="cpu",
+                    )
+
+                    pipe = LTX2ImageToVideoPipeline.from_pretrained(
+                        model_path, transformer=transformer, text_encoder=text_encoder, torch_dtype=torch_dtype
+                    )
+                    pipe.vae.enable_tiling(
+                        tile_sample_min_height=256,
+                        tile_sample_min_width=256,
+                        tile_sample_min_num_frames=16,
+                        tile_sample_stride_height=192,
+                        tile_sample_stride_width=192,
+                        tile_sample_stride_num_frames=8,
+                    )
+                    pipe.vae.use_framewise_encoding = True
+                    pipe.vae.use_framewise_decoding = True
+                    pipe.enable_model_cpu_offload()
+
+                    torch.cuda.synchronize()
+                    print(f"Base models loaded in: {time.time() - load_start:.2f} seconds")
+
+                    #prompt = "A warm sunny backyard. The camera starts in a tight cinematic close-up of a woman and a man in their 30s, facing each other with serious expressions. The woman, emotional and dramatic, says softly, “That’s it... Dad’s lost it. And we’ve lost Dad.” The man looks at her and exhales, saying softly: “Stop being so dramatic, Jess.” A beat. Then he glances aside, then mutters defensively, “He’s just having fun.” The camera slowly pans right, revealing the grandfather in the garden wearing enormous butterfly wings, waving his arms in the air like he’s trying to take off. He shouts, “Wheeeew!” as he flaps his wings with full commitment. The woman covers her face, on the verge of tears. The tone is deadpan, absurd, and quietly tragic."
+                    #negative_prompt = "worst quality, inconsistent motion, blurry, jittery, distorted"
+
+                    frame_rate = 24.0
+
+                    print("Starting base generation (Stage 1)...")
+                    base_gen_start = time.time()
+
+                    video_latent, audio_latent = pipe(
+                        prompt=prompt,
+                        image=image,
+                        width=x,
+                        height=y,
+                        num_frames=duration,
+                        frame_rate=frame_rate,
+                        num_inference_steps=8,
+                        sigmas=DISTILLED_SIGMA_VALUES,
+                        guidance_scale=1.0,
+                        generator=generator,
+                        output_type="latent",
+                        return_dict=False,
+                    )
+
+                    torch.cuda.synchronize()
+                    print(f"Base generation finished in: {time.time() - base_gen_start:.2f} seconds")
+
+                    print("Loading Latent Upsampler...")
+                    upsampler_load_start = time.time()
+
+                    latent_upsampler = LTX2LatentUpsamplerModel.from_pretrained(
+                        "rootonchair/LTX-2-19b-distilled",
+                        subfolder="latent_upsampler",
+                        torch_dtype=torch_dtype,
+                    )
+                    upsample_pipe = LTX2LatentUpsamplePipeline(vae=pipe.vae, latent_upsampler=latent_upsampler)
+                    upsample_pipe.enable_model_cpu_offload(device=device)
+
+                    torch.cuda.synchronize()
+                    print(f"Latent Upsampler loaded in: {time.time() - upsampler_load_start:.2f} seconds")
+
+                    print("Starting Latent Upscaling...")
+                    upscale_start = time.time()
+
+                    upscaled_video_latent = upsample_pipe(
+                        latents=video_latent,
+                        output_type="latent",
+                        return_dict=False,
+                    )[0]
+
+                    torch.cuda.synchronize()
+                    print(f"Latent Upscaling finished in: {time.time() - upscale_start:.2f} seconds")
+
+                    print("Cleaning up memory...")
+                    cleanup_start = time.time()
+
+                    latent_upsampler.to("cpu")
+                    del video_latent
+                    del upsample_pipe
+                    del latent_upsampler
+                    gc.collect()
+                    torch.cuda.empty_cache()
+
+                    torch.cuda.synchronize()
+                    print(f"Memory cleanup finished in: {time.time() - cleanup_start:.2f} seconds")
+
+                    print("Starting Stage 2 Generation (High-Res Decoding)...")
+                    stage2_start = time.time()
+
+                    video, audio = pipe(
+                        image=image,
+                        latents=upscaled_video_latent,
+                        audio_latents=audio_latent,
+                        prompt=prompt,
+                        negative_prompt=negative_prompt,
+                        width = x * 2,
+                        height = y * 2,
+                        num_frames=duration,
+                        num_inference_steps=3,
+                        noise_scale=STAGE_2_DISTILLED_SIGMA_VALUES[0],
+                        sigmas=STAGE_2_DISTILLED_SIGMA_VALUES,
+                        generator=generator,
+                        guidance_scale=1.0,
+                        output_type="np",
+                        return_dict=False,
+                    )
+
+                    torch.cuda.synchronize()
+                    print(f"Stage 2 Generation finished in: {time.time() - stage2_start:.2f} seconds")
+
+                    # --- IN-MEMORY SHARPENING STEP ---
+                    print("Applying sharpening to frames in memory...")
+                    sharpen_proc_start = time.time()
+
+                    # Convert from float [0, 1] to uint8 [0, 255]
+                    video_np = (video[0] * 255).round().astype("uint8")
+
+                    # Define the sharpening kernel
+                    # Adjust '5' to '4.8' for slightly softer or '5.5' for stronger sharpening
+                    kernel = np.array([[0, -1, 0], 
+                                       [-1, 4.9, -1], 
+                                       [0, -1, 0]])
+
+                    sharpened_frames = []
+                    for frame in video_np:
+                        # Apply filter to each frame in the sequence
+                        s_frame = cv2.filter2D(frame, -1, kernel)
+                        sharpened_frames.append(s_frame)
+
+                    # Stack back into a single numpy array and convert to torch tensor for encode_video
+                    video_sharpened = np.stack(sharpened_frames)
+                    video_final = torch.from_numpy(video_sharpened)
+
+                    print(f"In-memory sharpening finished in: {time.time() - sharpen_proc_start:.2f} seconds")
+                    # ---------------------------------
+
+                    # --- PURE RESTORATION PIPELINE (NO GRADING) ---
+                    print("Applying clean restoration...")
+                    post_proc_start = time.time()
+
+                    video_np = (video[0] * 255).round().astype("uint8")
+                    processed_frames = []
+
+                    for frame in video_np:
+
+                        # -------------------------------------------------
+                        # 1 Recover Highlights (Soft Compression)
+                        # -------------------------------------------------
+                        frame_f = frame.astype(np.float32) / 255.0
+
+                        # Compress only upper range
+                        highlight_mask = frame_f > 0.85
+                        frame_f[highlight_mask] = 0.85 + (frame_f[highlight_mask] - 0.85) * 0.5
+
+                        restored = np.clip(frame_f * 255, 0, 255).astype(np.uint8)
+
+                        # -------------------------------------------------
+                        # 2 Mild Edge-Preserving Denoise
+                        # -------------------------------------------------
+                        denoised = cv2.bilateralFilter(
+                            restored,
+                            d=5,
+                            sigmaColor=30,
+                            sigmaSpace=30
+                        )
+
+                        # -------------------------------------------------
+                        # 3 Advanced Face-Safe Detail Restoration
+                        # -------------------------------------------------
+
+                        # Convert to float
+                        frame_f = denoised.astype(np.float32) / 255.0
+
+                        # --- Band 1: Micro detail (small radius) ---
+                        blur_small = cv2.GaussianBlur(frame_f, (0, 0), 0.6)
+                        micro = frame_f - blur_small
+                        micro_boost = frame_f + micro * 0.8
+
+                        # --- Band 2: Structure detail (larger radius) ---
+                        blur_large = cv2.GaussianBlur(frame_f, (0, 0), 2.0)
+                        structure = frame_f - blur_large
+                        structure_boost = micro_boost + structure * 0.4
+
+                        # Clip safely
+                        restored = np.clip(structure_boost, 0, 1)
+
+                        final_frame = (restored * 255).astype(np.uint8)
+
+
+                        processed_frames.append(final_frame)
+
+                    video_processed = np.stack(processed_frames)
+                    video_final = torch.from_numpy(video_processed)
+
+                    print(f"Restoration finished in: {time.time() - post_proc_start:.2f} seconds")
+                    # ----------------------------------------------------
+
+                    print("Processing and exporting video...")
+                    export_start = time.time()
+
+#                    output_filename = f"ltx2_upscale_{width*2}x{height*2}x{num_frames}_sharpened_d.mp4"
+#                    output_path = os.path.join(r"C:\Users\peter\Downloads", output_filename)
+                    dst_path = solve_path(clean_filename(str(seed) + "_" + prompt) + ".mp4")
+                    
+                    encode_video(
+                        video_final,
+                        fps=frame_rate,
+                        audio=audio[0].float().cpu(),
+                        audio_sample_rate=pipe.vocoder.config.output_sampling_rate,
+                        output_path=dst_path,
+                    )
+
+                    print(f"Export finished in: {time.time() - export_start:.2f} seconds")
+                    print(f"Total script execution time: {time.time() - total_start_time:.2f} seconds")
+#                    print("Saved sharpened video to: " + output_path)                        
+                
+                #LTX2-Multifile
+                elif movie_model_card == "LTX-2 Multi-Input File":
+
+                    import gc
+                    import os
+                    import time
+                    #import torch
+                    import wave
+                    from PIL import Image
+                    from diffusers.utils import load_image
+                    from diffusers.utils import load_video
+                    from diffusers import (
+                        AutoencoderKLLTX2Video,
+                        LTX2LatentUpsamplePipeline,
+                        LTX2Pipeline,
+                        LTX2VideoTransformer3DModel,
+                    )
+                    from diffusers.pipelines.ltx2.export_utils import encode_video
+                    from diffusers.pipelines.ltx2.latent_upsampler import LTX2LatentUpsamplerModel
+                    from diffusers.pipelines.ltx2.utils import (
+                        DISTILLED_SIGMA_VALUES,
+                        STAGE_2_DISTILLED_SIGMA_VALUES,
+                    )
+                    from diffusers.schedulers import FlowMatchEulerDiscreteScheduler
+
+                    from sdnq.common import use_torch_compile as triton_is_available
+                    from sdnq.loader import apply_sdnq_options_to_model
+                    from transformers import Gemma3ForConditionalGeneration
+
+                    # ==========================================================
+                    # CLEANUP
+                    # ==========================================================
+
+                    def cleanup():
+                        gc.collect()
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+                    cleanup()
+
+                    # ==========================================================
+                    # SETTINGS
+                    # ==========================================================
+
+                    MODEL_PATH = "Lightricks/LTX-2"
+                    #MODEL_PATH = "OzzyGT/tiny_LTX2"
+                    #MODEL_PATH = "OzzyGT/LTX2_distilled_SDNQ_4bit_dynamic"
+
+                    DEFAULT_NUM_FRAMES = 121
+                    num_frames = DEFAULT_NUM_FRAMES
+
+                    torch_dtype = torch.bfloat16
+                    onload_device = torch.device("cuda")
+                    offload_device = torch.device("cpu")
+
+                    total_start_time = time.time()
+
+                    # ==========================================================
+                    # INPUT DETECTION
+                    # ==========================================================
+
+                    image = None
+                    sound_path = None
+
+#                    render = bpy.context.scene.render
+#                    fps = round((render.fps / render.fps_base), 3) 
+                    fps=24.0
+                    
+                    if scene.movie_path:
+                        print("Process: Video Image to Video")
+                        if not os.path.isfile(scene.movie_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        image = load_first_frame(bpy.path.abspath(scene.movie_path))
+                    if scene.image_path:
+                        print("Process: Image to video ")
+                        strip = scene.sequence_editor.active_strip
+                        img_path = os.path.join(bpy.path.abspath(strip.directory), strip.elements[0].filename)
+                        if not os.path.isfile(img_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        image = load_image(img_path)
+
+                    if scene.sound_path:
+                        print("Process: Sound to Video")
+                        if not os.path.isfile(bpy.path.abspath(scene.sound_path)):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        sound_path = bpy.path.abspath(scene.sound_path)
+                        
+                    # MISSING: make a trimmed temp file
+                    def get_wav_duration(path):
+                        import soundfile as sf
+                        try:
+                            info = sf.info(path)
+                            return info.frames / info.samplerate
+                        except Exception as e:
+                            print("Duration detection failed:", e)
+                            return DEFAULT_NUM_FRAMES / fps
+
+                    if sound_path:
+                        duration = get_wav_duration(sound_path)
+
+                        raw_frames = duration * fps
+                        multiple_of_8 = int((raw_frames + 7) // 8) * 8
+                        num_frames = multiple_of_8 + 1
+
+                        print(f"Audio duration: {duration:.2f}s")
+                    else:
+                        # 2. Ensure frame count follows (n * 8) + 1 rule (Temporal Requirement)
+                        # LTX-2 VAE compresses time by 8x. Arbitrary frame counts cause tensor mismatch.
+                        target_frames = abs(duration)
+                        num_frames = valid_num_frames = ((target_frames - 1) // 8) * 8 + 1
+                        
+                        # Ensure a minimum valid length (9 frames is the smallest block: 1*8 + 1)
+                        if valid_num_frames < 9:
+                            num_frames = valid_num_frames = 9
+
+                    print(f"Image enabled: {image is not None}")
+                    print(f"Audio enabled: {sound_path is not None}")
+                    print(f"Frames: {num_frames}")
+
+                    if image is None:
+                        image = Image.new("RGB", (x, y), (0, 0, 0))
+                        
+                    cleanup()
+
+                    # ==========================================================
+                    # TEXT ENCODING
+                    # ==========================================================
+
+                    text_encoder = Gemma3ForConditionalGeneration.from_pretrained(
+                        "OzzyGT/LTX-2-bnb-8bit-text-encoder",
+                        dtype=torch_dtype,
+                    )
+
+                    embeds_pipe = LTX2Pipeline.from_pretrained(
+                        MODEL_PATH,
+                        text_encoder=text_encoder,
+                        transformer=None,
+                        vae=None,
+                        audio_vae=None,
+                        vocoder=None,
+                        scheduler=None,
+                        connectors=None,
+                        torch_dtype=torch_dtype,
+                    )
+
+                    embeds_pipe.enable_sequential_cpu_offload()
+                    #embeds_pipe.enable_model_cpu_offload()
+
+                    with torch.inference_mode():
+                        prompt_embeds, prompt_attention_mask, _, _ = embeds_pipe.encode_prompt(
+                            prompt, negative_prompt, do_classifier_free_guidance=False
+                        )
+
+                    prompt_embeds = prompt_embeds.detach().to(offload_device, copy=True)
+                    prompt_attention_mask = prompt_attention_mask.detach().to(offload_device, copy=True)
+
+                    del embeds_pipe, text_encoder
+                    cleanup()
+
+                    # ==========================================================
+                    # STAGE 1
+                    # ==========================================================
+
+                    transformer = LTX2VideoTransformer3DModel.from_pretrained(
+                        "OzzyGT/LTX_2_SDNQ_4bit_dynamic_distilled_transformer",
+                        torch_dtype=torch_dtype,
+                        device_map="cpu",
+                    )
+
+                    if triton_is_available and torch.cuda.is_available():
+                        transformer = apply_sdnq_options_to_model(transformer, use_quantized_matmul=True)
+
+                    pipe = LTX2Pipeline.from_pretrained(
+                        "rootonchair/LTX-2-19b-distilled",
+                        custom_pipeline="multimodalart/ltx2-audio-to-video",
+                        transformer=transformer,
+                        torch_dtype=torch_dtype,
+                    )
+
+                    pipe.enable_group_offload(
+                        onload_device=onload_device,
+                        offload_device=offload_device,
+                        offload_type="leaf_level",
+                        low_cpu_mem_usage=True,
+                    )
+
+                    with torch.inference_mode():
+
+                        kwargs = dict(
+                            prompt_embeds=prompt_embeds.to(onload_device),
+                            prompt_attention_mask=prompt_attention_mask.to(onload_device),
+                            width=x,
+                            height=y,
+                            num_frames=num_frames,
+                            frame_rate=fps,
+                            num_inference_steps=8,
+                            sigmas=DISTILLED_SIGMA_VALUES,
+                            guidance_scale=1.0,
+                            generator=generator,
+                            output_type="latent",
+                            return_dict=False,
+                        )
+
+                        if sound_path:
+                            kwargs["audio"] = sound_path
+
+                        if image is not None:
+                            kwargs["image"] = image
+
+                        outputs = pipe(**kwargs)
+
+                    if isinstance(outputs, tuple):
+                        video_latent = outputs[0]
+                        audio_latent = outputs[1] if len(outputs) > 1 else None
+                    else:
+                        video_latent = outputs
+                        audio_latent = None
+
+                    video_latent = video_latent.detach().to(offload_device, copy=True)
+                    if audio_latent is not None:
+                        audio_latent = audio_latent.detach().to(offload_device, copy=True)
+
+                    del pipe, transformer
+                    cleanup()
+
+
+                    # ==========================================================
+                    # LATENT UPSCALE
+                    # ==========================================================
+
+                    latent_upsampler = LTX2LatentUpsamplerModel.from_pretrained(
+                        "rootonchair/LTX-2-19b-distilled",
+                        subfolder="latent_upsampler",
+                        torch_dtype=torch_dtype,
+                    ).to(onload_device)
+
+                    vae = AutoencoderKLLTX2Video.from_pretrained(
+                        MODEL_PATH,
+                        subfolder="vae",
+                        torch_dtype=torch_dtype,
+                    ).to(onload_device)
+
+                    upscale_pipe = LTX2LatentUpsamplePipeline(vae=vae, latent_upsampler=latent_upsampler)
+                    upscale_pipe.enable_model_cpu_offload(device=onload_device)
+
+                    with torch.inference_mode():
+                        up_latent = upscale_pipe(
+                            latents=video_latent,
+                            output_type="latent",
+                            return_dict=False,
+                        )[0]
+
+                    up_latent = up_latent.detach().to(offload_device, copy=True)
+
+                    del upscale_pipe, latent_upsampler, vae, video_latent
+                    cleanup()
+
+
+                    # ==========================================================
+                    # STAGE 2
+                    # ==========================================================
+
+                    transformer = LTX2VideoTransformer3DModel.from_pretrained(
+                        "OzzyGT/LTX_2_SDNQ_4bit_dynamic_distilled_transformer",
+                        torch_dtype=torch_dtype,
+                        device_map="cpu",
+                    )
+
+                    if triton_is_available and torch.cuda.is_available():
+                        transformer = apply_sdnq_options_to_model(transformer, use_quantized_matmul=True)
+
+                    refine_pipe = LTX2Pipeline.from_pretrained(
+                        MODEL_PATH,
+                        transformer=transformer,
+                        text_encoder=None,
+                        torch_dtype=torch_dtype,
+                    )
+
+                    refine_pipe.scheduler = FlowMatchEulerDiscreteScheduler.from_config(
+                        refine_pipe.scheduler.config,
+                        use_dynamic_shifting=False,
+                        shift_terminal=None,
+                    )
+
+                    refine_pipe.enable_group_offload(
+                        onload_device=onload_device,
+                        offload_device=offload_device,
+                        offload_type="leaf_level",
+                        low_cpu_mem_usage=True,
+                    )
+
+                    refine_kwargs = dict(
+                        latents=up_latent.to(onload_device),
+                        prompt_embeds=prompt_embeds.to(onload_device),
+                        prompt_attention_mask=prompt_attention_mask.to(onload_device),
+                        width=x * 2,
+                        height=y * 2,
+                        num_frames=num_frames,
+                        num_inference_steps=3,
+                        sigmas=STAGE_2_DISTILLED_SIGMA_VALUES,
+                        noise_scale=STAGE_2_DISTILLED_SIGMA_VALUES[0],
+                        guidance_scale=1.0,
+                        generator=generator,
+                        output_type="latent",
+                        return_dict=False,
+                    )
+
+                    if audio_latent is not None:
+                        refine_kwargs["audio_latents"] = audio_latent.to(onload_device)
+
+                    with torch.inference_mode():
+                        outputs = refine_pipe(**refine_kwargs)
+
+                    if isinstance(outputs, tuple):
+                        final_v_latent = outputs[0]
+                        final_a_latent = outputs[1] if len(outputs) > 1 else None
+                    else:
+                        final_v_latent = outputs
+                        final_a_latent = None
+
+                    del refine_pipe, transformer, up_latent, audio_latent
+                    cleanup()
+
+
+                    # ==========================================================
+                    # DECODE (TILING RESTORED)
+                    # ==========================================================
+
+                    decode_pipe = LTX2Pipeline.from_pretrained(
+                        MODEL_PATH,
+                        text_encoder=None,
+                        transformer=None,
+                        scheduler=None,
+                        connectors=None,
+                        torch_dtype=torch_dtype,
+                    )
+
+                    decode_pipe.to(onload_device)
+
+                    decode_pipe.vae.enable_tiling(
+                        tile_sample_min_height=256,
+                        tile_sample_min_width=256,
+                        tile_sample_min_num_frames=16,
+                        tile_sample_stride_height=192,
+                        tile_sample_stride_width=192,
+                        tile_sample_stride_num_frames=8,
+                    )
+
+                    decode_pipe.vae.use_framewise_encoding = True
+                    decode_pipe.vae.use_framewise_decoding = True
+                    decode_pipe.enable_model_cpu_offload()
+
+                    with torch.inference_mode():
+
+                        video = decode_pipe.vae.decode(
+                            final_v_latent.to(onload_device, dtype=decode_pipe.vae.dtype),
+                            None,
+                            return_dict=False,
+                        )[0]
+
+                        video = decode_pipe.video_processor.postprocess_video(video, output_type="np")
+
+                        audio_out = None
+                        if final_a_latent is not None:
+                            mel = decode_pipe.audio_vae.decode(
+                                final_a_latent.to(onload_device, dtype=decode_pipe.audio_vae.dtype),
+                                return_dict=False,
+                            )[0]
+                            audio_out = decode_pipe.vocoder(mel)
+
+                    del decode_pipe
+                    cleanup()
+
+
+                    # ==========================================================
+                    # SAVE
+                    # ==========================================================
+
+                    video_tensor = torch.from_numpy((video * 255).round().astype("uint8"))
+                    #output_path = os.path.join(OUTPUT_FOLDER, f"ltx2_final_{seed}.mp4")
+                    dst_path = solve_path(clean_filename(str(seed) + "_" + prompt) + ".mp4")
+
+                    if audio_out is not None:
+                        encode_video(
+                            video_tensor[0],
+                            fps=fps,
+                            audio=audio_out[0].float().cpu(),
+                            audio_sample_rate=24000,
+                            output_path=dst_path,
+                        )
+                    else:
+                        encode_video(
+                            video_tensor[0],
+                            fps=fps,
+                            output_path=dst_path,
+                        )
+
+                    print(f"\nSaved to: {dst_path}")
+                    print(f"Total time: {time.time() - total_start_time:.2f}s")                
 
                 #Skyreel
                 elif movie_model_card == "Skywork/SkyReels-V1-Hunyuan-T2V":
@@ -4854,6 +5640,662 @@ class SEQUENCER_OT_generate_movie(Operator):
                         generator=generator,
                         max_sequence_length=256,
                     ).frames[0]
+                    
+                elif movie_model_card == "Lightricks/LTX-2":
+                    import gc
+                    import os
+                    import time
+                    import torch
+                    import cv2
+                    import numpy as np
+                    from diffusers import LTX2Pipeline, LTX2LatentUpsamplePipeline, LTX2VideoTransformer3DModel
+                    from diffusers.pipelines.ltx2.export_utils import encode_video
+                    from diffusers.pipelines.ltx2.latent_upsampler import LTX2LatentUpsamplerModel
+                    from diffusers.pipelines.ltx2.utils import DISTILLED_SIGMA_VALUES, STAGE_2_DISTILLED_SIGMA_VALUES
+                    from diffusers.utils import load_image
+                    from transformers import Gemma3ForConditionalGeneration
+                        
+                    render = bpy.context.scene.render
+                    fps = round((render.fps / render.fps_base), 3) 
+ 
+                    x = width_clean = (x // 32) * 32
+                    y = height_clean = (y // 32) * 32
+                    
+                    # 2. Ensure frame count follows (n * 8) + 1 rule (Temporal Requirement)
+                    # LTX-2 VAE compresses time by 8x. Arbitrary frame counts cause tensor mismatch.
+                    target_frames = abs(duration)
+                    duration = valid_num_frames = ((target_frames - 1) // 8) * 8 + 1
+                    
+                    # Ensure a minimum valid length (9 frames is the smallest block: 1*8 + 1)
+                    if valid_num_frames < 9:
+                        duration = valid_num_frames = 9
+                        
+
+                    # Start global timer
+                    total_start_time = time.time()
+
+                    torch_dtype = torch.bfloat16
+                    device = "cuda"
+                    model_path = "Lightricks/LTX-2"
+
+                    seed = int.from_bytes(os.urandom(8), "big")
+                    generator = torch.Generator("cpu").manual_seed(seed)
+
+                    print("Loading base models...")
+                    load_start = time.time()
+
+                    text_encoder = Gemma3ForConditionalGeneration.from_pretrained(
+                        "OzzyGT/LTX-2-bnb-4bit-text-encoder",
+                        dtype=torch_dtype,
+                        device_map="cpu",
+                    )
+
+                    transformer = LTX2VideoTransformer3DModel.from_pretrained(
+                        "OzzyGT/LTX-2-bnb-4bit-transformer-distilled",
+                        torch_dtype=torch_dtype,
+                        device_map="cpu",
+                    )
+
+                    pipe = LTX2Pipeline.from_pretrained(
+                        model_path, transformer=transformer, text_encoder=text_encoder, torch_dtype=torch_dtype
+                    )
+                    
+                    lora_files = scene.lora_files
+                    enabled_names = []
+                    enabled_weights = []
+                    enabled_items = [item for item in lora_files if item.enabled]
+
+                    if enabled_items:
+                        for item in enabled_items:
+                            enabled_names.append(
+                                (clean_filename(item.name)).replace(".", "")
+                            )
+                            enabled_weights.append(item.weight_value)
+                            pipe.load_lora_weights(
+                                bpy.path.abspath(scene.lora_folder),
+                                weight_name=item.name + ".safetensors",
+                                adapter_name=((clean_filename(item.name)).replace(".", "")),
+                            )
+                        pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)
+                        print("Load LoRAs: " + " ".join(enabled_names))                    
+                    
+                    pipe.vae.enable_tiling(
+                        tile_sample_min_height=256,
+                        tile_sample_min_width=256,
+                        tile_sample_min_num_frames=16,
+                        tile_sample_stride_height=192,
+                        tile_sample_stride_width=192,
+                        tile_sample_stride_num_frames=8,
+                    )
+                    pipe.vae.use_framewise_encoding = True
+                    pipe.vae.use_framewise_decoding = True
+                    pipe.enable_model_cpu_offload()
+
+                    torch.cuda.synchronize()
+                    print(f"Base models loaded in: {time.time() - load_start:.2f} seconds")
+
+                    frame_rate = 24.0
+
+                    print("Starting base generation (Stage 1)...")
+                    base_gen_start = time.time()
+
+                    video_latent, audio_latent = pipe(
+                        prompt=prompt,
+                        width=x,
+                        height=y,
+                        num_frames=duration,
+                        frame_rate=frame_rate,
+                        num_inference_steps=8,
+                        sigmas=DISTILLED_SIGMA_VALUES,
+                        guidance_scale=1.0,
+                        generator=generator,
+                        output_type="latent",
+                        return_dict=False,
+                    )
+
+                    torch.cuda.synchronize()
+                    print(f"Base generation finished in: {time.time() - base_gen_start:.2f} seconds")
+
+                    print("Loading Latent Upsampler...")
+                    upsampler_load_start = time.time()
+
+                    latent_upsampler = LTX2LatentUpsamplerModel.from_pretrained(
+                        "rootonchair/LTX-2-19b-distilled",
+                        subfolder="latent_upsampler",
+                        torch_dtype=torch_dtype,
+                    )
+                    upsample_pipe = LTX2LatentUpsamplePipeline(vae=pipe.vae, latent_upsampler=latent_upsampler)
+                    upsample_pipe.enable_model_cpu_offload(device=device)
+
+                    torch.cuda.synchronize()
+                    print(f"Latent Upsampler loaded in: {time.time() - upsampler_load_start:.2f} seconds")
+
+                    print("Starting Latent Upscaling...")
+                    upscale_start = time.time()
+
+                    upscaled_video_latent = upsample_pipe(
+                        latents=video_latent,
+                        output_type="latent",
+                        return_dict=False,
+                    )[0]
+
+                    torch.cuda.synchronize()
+                    print(f"Latent Upscaling finished in: {time.time() - upscale_start:.2f} seconds")
+
+                    print("Cleaning up memory...")
+                    cleanup_start = time.time()
+
+                    latent_upsampler.to("cpu")
+                    del video_latent
+                    del upsample_pipe
+                    del latent_upsampler
+                    gc.collect()
+                    torch.cuda.empty_cache()
+
+                    torch.cuda.synchronize()
+                    print(f"Memory cleanup finished in: {time.time() - cleanup_start:.2f} seconds")
+
+                    print("Starting Stage 2 Generation (High-Res Decoding)...")
+                    stage2_start = time.time()
+
+                    video, audio = pipe(
+                        latents=upscaled_video_latent,
+                        audio_latents=audio_latent,
+                        prompt=prompt,
+                        negative_prompt=negative_prompt,
+                        width = x * 2,
+                        height = y * 2,
+                        num_frames=duration,
+                        num_inference_steps=3,
+                        noise_scale=STAGE_2_DISTILLED_SIGMA_VALUES[0],
+                        sigmas=STAGE_2_DISTILLED_SIGMA_VALUES,
+                        generator=generator,
+                        guidance_scale=1.0,
+                        output_type="np",
+                        return_dict=False,
+                    )
+
+                    torch.cuda.synchronize()
+                    print(f"Stage 2 Generation finished in: {time.time() - stage2_start:.2f} seconds")
+                    
+                    # --- PURE RESTORATION PIPELINE (NO GRADING) ---
+                    print("Applying clean restoration...")
+                    post_proc_start = time.time()
+
+                    video_np = (video[0] * 255).round().astype("uint8")
+                    processed_frames = []
+
+                    for frame in video_np:
+
+                        # -------------------------------------------------
+                        # 1 Recover Highlights (Soft Compression)
+                        # -------------------------------------------------
+                        frame_f = frame.astype(np.float32) / 255.0
+
+                        # Compress only upper range
+                        highlight_mask = frame_f > 0.85
+                        frame_f[highlight_mask] = 0.85 + (frame_f[highlight_mask] - 0.85) * 0.5
+
+                        restored = np.clip(frame_f * 255, 0, 255).astype(np.uint8)
+
+                        # -------------------------------------------------
+                        # 2 Mild Edge-Preserving Denoise
+                        # -------------------------------------------------
+                        denoised = cv2.bilateralFilter(
+                            restored,
+                            d=5,
+                            sigmaColor=30,
+                            sigmaSpace=30
+                        )
+
+                        # -------------------------------------------------
+                        # 3 Advanced Face-Safe Detail Restoration
+                        # -------------------------------------------------
+
+                        # Convert to float
+                        frame_f = denoised.astype(np.float32) / 255.0
+
+                        # --- Band 1: Micro detail (small radius) ---
+                        blur_small = cv2.GaussianBlur(frame_f, (0, 0), 0.6)
+                        micro = frame_f - blur_small
+                        micro_boost = frame_f + micro * 0.8
+
+                        # --- Band 2: Structure detail (larger radius) ---
+                        blur_large = cv2.GaussianBlur(frame_f, (0, 0), 2.0)
+                        structure = frame_f - blur_large
+                        structure_boost = micro_boost + structure * 0.4
+
+                        # Clip safely
+                        restored = np.clip(structure_boost, 0, 1)
+
+                        final_frame = (restored * 255).astype(np.uint8)
+
+
+                        processed_frames.append(final_frame)
+
+                    video_processed = np.stack(processed_frames)
+                    video_final = torch.from_numpy(video_processed)
+
+                    print(f"Restoration finished in: {time.time() - post_proc_start:.2f} seconds")
+
+                    print("Processing and exporting video...")
+                    export_start = time.time()
+
+                    dst_path = solve_path(clean_filename(str(seed) + "_" + prompt) + ".mp4")
+                    
+                    encode_video(
+                        video_final,
+                        fps=frame_rate,
+                        audio=audio[0].float().cpu(),
+                        audio_sample_rate=pipe.vocoder.config.output_sampling_rate,
+                        output_path=dst_path,
+                    )
+
+                    print(f"Export finished in: {time.time() - export_start:.2f} seconds")
+                    print(f"Total script execution time: {time.time() - total_start_time:.2f} seconds")
+
+                #LTX2-Multifile
+                elif movie_model_card == "LTX-2 Multi-Input File":
+
+                    import gc
+                    import os
+                    import time
+                    #import torch
+                    import wave
+                    from PIL import Image
+                    from diffusers.utils import load_image
+                    from diffusers.utils import load_video
+                    from diffusers import (
+                        AutoencoderKLLTX2Video,
+                        LTX2LatentUpsamplePipeline,
+                        LTX2Pipeline,
+                        LTX2VideoTransformer3DModel,
+                    )
+                    from diffusers.pipelines.ltx2.export_utils import encode_video
+                    from diffusers.pipelines.ltx2.latent_upsampler import LTX2LatentUpsamplerModel
+                    from diffusers.pipelines.ltx2.utils import (
+                        DISTILLED_SIGMA_VALUES,
+                        STAGE_2_DISTILLED_SIGMA_VALUES,
+                    )
+                    from diffusers.schedulers import FlowMatchEulerDiscreteScheduler
+
+                    from sdnq.common import use_torch_compile as triton_is_available
+                    from sdnq.loader import apply_sdnq_options_to_model
+                    from transformers import Gemma3ForConditionalGeneration
+
+                    # ==========================================================
+                    # CLEANUP
+                    # ==========================================================
+
+                    def cleanup():
+                        gc.collect()
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+                    cleanup()
+
+                    # ==========================================================
+                    # SETTINGS
+                    # ==========================================================
+
+                    MODEL_PATH = "Lightricks/LTX-2"
+                    #MODEL_PATH = "OzzyGT/tiny_LTX2"
+                    #MODEL_PATH = "OzzyGT/LTX2_distilled_SDNQ_4bit_dynamic"
+
+                    DEFAULT_NUM_FRAMES = 121
+                    num_frames = DEFAULT_NUM_FRAMES
+
+                    torch_dtype = torch.bfloat16
+                    onload_device = torch.device("cuda")
+                    offload_device = torch.device("cpu")
+
+                    total_start_time = time.time()
+
+                    # ==========================================================
+                    # INPUT DETECTION
+                    # ==========================================================
+
+                    image = None
+                    sound_path = None
+
+#                    render = bpy.context.scene.render
+#                    fps = round((render.fps / render.fps_base), 3) 
+                    fps=24.0
+                    
+                    if scene.movie_path:
+                        print("Process: Video Image to Video")
+                        if not os.path.isfile(scene.movie_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        image = load_first_frame(bpy.path.abspath(scene.movie_path)).convert("RGB")
+                    if scene.image_path:
+                        print("Process: Image to video")
+                        strip = scene.sequence_editor.active_strip
+                        img_path = os.path.join(bpy.path.abspath(strip.directory), strip.elements[0].filename)
+                        if not os.path.isfile(img_path):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        image = load_image(img_path).convert("RGB")
+
+                    if scene.sound_path:
+                        print("Process: Sound to Video")
+                        if not os.path.isfile(bpy.path.abspath(scene.sound_path)):
+                            print("No file found.")
+                            return {"CANCELLED"}
+                        sound_path = bpy.path.abspath(scene.sound_path)
+                        
+                    # MISSING: make a trimmed temp file
+                    def get_wav_duration(path):
+                        import soundfile as sf
+                        try:
+                            info = sf.info(path)
+                            return info.frames / info.samplerate
+                        except Exception as e:
+                            print("Duration detection failed:", e)
+                            return DEFAULT_NUM_FRAMES / fps
+
+                    if sound_path:
+                        duration = get_wav_duration(sound_path)
+
+                        raw_frames = duration * fps
+                        multiple_of_8 = int((raw_frames + 7) // 8) * 8
+                        num_frames = multiple_of_8 + 1
+
+                        print(f"Audio duration: {duration:.2f}s")
+                    else:
+                        # 2. Ensure frame count follows (n * 8) + 1 rule (Temporal Requirement)
+                        # LTX-2 VAE compresses time by 8x. Arbitrary frame counts cause tensor mismatch.
+                        target_frames = abs(duration)
+                        num_frames = valid_num_frames = ((target_frames - 1) // 8) * 8 + 1
+                        
+                        # Ensure a minimum valid length (9 frames is the smallest block: 1*8 + 1)
+                        if valid_num_frames < 9:
+                            num_frames = valid_num_frames = 9
+
+                    print(f"Image enabled: {image is not None}")
+                    print(f"Audio enabled: {sound_path is not None}")
+                    print(f"Frames: {num_frames}")
+
+                    if image is None:
+                        image = Image.new("RGB", (x, y), (0, 0, 0))
+                        
+                    cleanup()
+
+                    # ==========================================================
+                    # TEXT ENCODING
+                    # ==========================================================
+
+                    text_encoder = Gemma3ForConditionalGeneration.from_pretrained(
+                        "OzzyGT/LTX-2-bnb-8bit-text-encoder",
+                        dtype=torch_dtype,
+                    )
+
+                    embeds_pipe = LTX2Pipeline.from_pretrained(
+                        MODEL_PATH,
+                        text_encoder=text_encoder,
+                        transformer=None,
+                        vae=None,
+                        audio_vae=None,
+                        vocoder=None,
+                        scheduler=None,
+                        connectors=None,
+                        torch_dtype=torch_dtype,
+                    )
+
+                    embeds_pipe.enable_sequential_cpu_offload()
+                    #embeds_pipe.enable_model_cpu_offload()
+
+                    with torch.inference_mode():
+                        prompt_embeds, prompt_attention_mask, _, _ = embeds_pipe.encode_prompt(
+                            prompt, negative_prompt, do_classifier_free_guidance=False
+                        )
+
+                    prompt_embeds = prompt_embeds.detach().to(offload_device, copy=True)
+                    prompt_attention_mask = prompt_attention_mask.detach().to(offload_device, copy=True)
+
+                    del embeds_pipe, text_encoder
+                    cleanup()
+
+                    # ==========================================================
+                    # STAGE 1
+                    # ==========================================================
+
+                    transformer = LTX2VideoTransformer3DModel.from_pretrained(
+                        "OzzyGT/LTX_2_SDNQ_4bit_dynamic_distilled_transformer",
+                        torch_dtype=torch_dtype,
+                        device_map="cpu",
+                    )
+
+                    if triton_is_available and torch.cuda.is_available():
+                        transformer = apply_sdnq_options_to_model(transformer, use_quantized_matmul=True)
+
+                    pipe = LTX2Pipeline.from_pretrained(
+                        "rootonchair/LTX-2-19b-distilled",
+                        custom_pipeline="multimodalart/ltx2-audio-to-video",
+                        transformer=transformer,
+                        torch_dtype=torch_dtype,
+                    )
+
+                    pipe.enable_group_offload(
+                        onload_device=onload_device,
+                        offload_device=offload_device,
+                        offload_type="leaf_level",
+                        low_cpu_mem_usage=True,
+                    )
+
+                    with torch.inference_mode():
+
+                        kwargs = dict(
+                            prompt_embeds=prompt_embeds.to(onload_device),
+                            prompt_attention_mask=prompt_attention_mask.to(onload_device),
+                            width=x,
+                            height=y,
+                            num_frames=num_frames,
+                            frame_rate=fps,
+                            num_inference_steps=8,
+                            sigmas=DISTILLED_SIGMA_VALUES,
+                            guidance_scale=1.0,
+                            generator=generator,
+                            output_type="latent",
+                            return_dict=False,
+                        )
+
+                        if sound_path:
+                            kwargs["audio"] = sound_path
+
+                        if image is not None:
+                            kwargs["image"] = image
+
+                        outputs = pipe(**kwargs)
+
+                    if isinstance(outputs, tuple):
+                        video_latent = outputs[0]
+                        audio_latent = outputs[1] if len(outputs) > 1 else None
+                    else:
+                        video_latent = outputs
+                        audio_latent = None
+
+                    video_latent = video_latent.detach().to(offload_device, copy=True)
+                    if audio_latent is not None:
+                        audio_latent = audio_latent.detach().to(offload_device, copy=True)
+
+                    del pipe, transformer
+                    cleanup()
+
+
+                    # ==========================================================
+                    # LATENT UPSCALE
+                    # ==========================================================
+
+                    latent_upsampler = LTX2LatentUpsamplerModel.from_pretrained(
+                        "rootonchair/LTX-2-19b-distilled",
+                        subfolder="latent_upsampler",
+                        torch_dtype=torch_dtype,
+                    ).to(onload_device)
+
+                    vae = AutoencoderKLLTX2Video.from_pretrained(
+                        MODEL_PATH,
+                        subfolder="vae",
+                        torch_dtype=torch_dtype,
+                    ).to(onload_device)
+
+                    upscale_pipe = LTX2LatentUpsamplePipeline(vae=vae, latent_upsampler=latent_upsampler)
+                    upscale_pipe.enable_model_cpu_offload(device=onload_device)
+
+                    with torch.inference_mode():
+                        up_latent = upscale_pipe(
+                            latents=video_latent,
+                            output_type="latent",
+                            return_dict=False,
+                        )[0]
+
+                    up_latent = up_latent.detach().to(offload_device, copy=True)
+
+                    del upscale_pipe, latent_upsampler, vae, video_latent
+                    cleanup()
+
+
+                    # ==========================================================
+                    # STAGE 2
+                    # ==========================================================
+
+                    transformer = LTX2VideoTransformer3DModel.from_pretrained(
+                        "OzzyGT/LTX_2_SDNQ_4bit_dynamic_distilled_transformer",
+                        torch_dtype=torch_dtype,
+                        device_map="cpu",
+                    )
+
+                    if triton_is_available and torch.cuda.is_available():
+                        transformer = apply_sdnq_options_to_model(transformer, use_quantized_matmul=True)
+
+                    refine_pipe = LTX2Pipeline.from_pretrained(
+                        MODEL_PATH,
+                        transformer=transformer,
+                        text_encoder=None,
+                        torch_dtype=torch_dtype,
+                    )
+
+                    refine_pipe.scheduler = FlowMatchEulerDiscreteScheduler.from_config(
+                        refine_pipe.scheduler.config,
+                        use_dynamic_shifting=False,
+                        shift_terminal=None,
+                    )
+
+                    refine_pipe.enable_group_offload(
+                        onload_device=onload_device,
+                        offload_device=offload_device,
+                        offload_type="leaf_level",
+                        low_cpu_mem_usage=True,
+                    )
+
+                    refine_kwargs = dict(
+                        latents=up_latent.to(onload_device),
+                        prompt_embeds=prompt_embeds.to(onload_device),
+                        prompt_attention_mask=prompt_attention_mask.to(onload_device),
+                        width=x * 2,
+                        height=y * 2,
+                        num_frames=num_frames,
+                        num_inference_steps=3,
+                        sigmas=STAGE_2_DISTILLED_SIGMA_VALUES,
+                        noise_scale=STAGE_2_DISTILLED_SIGMA_VALUES[0],
+                        guidance_scale=1.0,
+                        generator=generator,
+                        output_type="latent",
+                        return_dict=False,
+                    )
+
+                    if audio_latent is not None:
+                        refine_kwargs["audio_latents"] = audio_latent.to(onload_device)
+
+                    with torch.inference_mode():
+                        outputs = refine_pipe(**refine_kwargs)
+
+                    if isinstance(outputs, tuple):
+                        final_v_latent = outputs[0]
+                        final_a_latent = outputs[1] if len(outputs) > 1 else None
+                    else:
+                        final_v_latent = outputs
+                        final_a_latent = None
+
+                    del refine_pipe, transformer, up_latent, audio_latent
+                    cleanup()
+
+
+                    # ==========================================================
+                    # DECODE
+                    # ==========================================================
+
+                    decode_pipe = LTX2Pipeline.from_pretrained(
+                        MODEL_PATH,
+                        text_encoder=None,
+                        transformer=None,
+                        scheduler=None,
+                        connectors=None,
+                        torch_dtype=torch_dtype,
+                    )
+
+                    decode_pipe.to(onload_device)
+
+                    decode_pipe.vae.enable_tiling(
+                        tile_sample_min_height=256,
+                        tile_sample_min_width=256,
+                        tile_sample_min_num_frames=16,
+                        tile_sample_stride_height=192,
+                        tile_sample_stride_width=192,
+                        tile_sample_stride_num_frames=8,
+                    )
+
+                    decode_pipe.vae.use_framewise_encoding = True
+                    decode_pipe.vae.use_framewise_decoding = True
+                    decode_pipe.enable_model_cpu_offload()
+
+                    with torch.inference_mode():
+
+                        video = decode_pipe.vae.decode(
+                            final_v_latent.to(onload_device, dtype=decode_pipe.vae.dtype),
+                            None,
+                            return_dict=False,
+                        )[0]
+
+                        video = decode_pipe.video_processor.postprocess_video(video, output_type="np")
+
+                        audio_out = None
+                        if final_a_latent is not None:
+                            mel = decode_pipe.audio_vae.decode(
+                                final_a_latent.to(onload_device, dtype=decode_pipe.audio_vae.dtype),
+                                return_dict=False,
+                            )[0]
+                            audio_out = decode_pipe.vocoder(mel)
+
+                    del decode_pipe
+                    cleanup()
+
+
+                    # ==========================================================
+                    # SAVE
+                    # ==========================================================
+
+                    video_tensor = torch.from_numpy((video * 255).round().astype("uint8"))
+                    #output_path = os.path.join(OUTPUT_FOLDER, f"ltx2_final_{seed}.mp4")
+                    dst_path = solve_path(clean_filename(str(seed) + "_" + prompt) + ".mp4")
+
+                    if audio_out is not None:
+                        encode_video(
+                            video_tensor[0],
+                            fps=fps,
+                            audio=audio_out[0].float().cpu(),
+                            audio_sample_rate=24000,
+                            output_path=dst_path,
+                        )
+                    else:
+                        encode_video(
+                            video_tensor[0],
+                            fps=fps,
+                            output_path=dst_path,
+                        )
+
+                    print(f"\nSaved to: {dst_path}")
+                    print(f"Total time: {time.time() - total_start_time:.2f}s")
+                    
                 else:
                     video_frames = pipe(
                         prompt=prompt,
@@ -4985,7 +6427,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 print("Result: " + dst_path)
                 
-            elif movie_model_card == "rootonchair/LTX-2-19b-distilled": 
+            elif movie_model_card == "rootonchair/LTX-2-19b-distilled" or movie_model_card == "Lightricks/LTX-2" or movie_model_card == "LTX-2 Multi-Input File": 
                 pass
             else:
                 # Move to folder.
@@ -5001,6 +6443,13 @@ class SEQUENCER_OT_generate_movie(Operator):
             if not os.path.isfile(dst_path):
                 print("No resulting file found.")
                 return {"CANCELLED"}
+            
+            if movie_model_card == "Lightricks/LTX-2" or movie_model_card == "rootonchair/LTX-2-19b-distilled" or movie_model_card == "LTX-2 Multi-Input File":
+                sound = True
+                empty_channel=empty_channel-1
+            else:
+                sound = False
+            
             for window in bpy.context.window_manager.windows:
                 screen = window.screen
                 for area in screen.areas:
@@ -5008,7 +6457,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         from bpy import context
 
                         with context.temp_override(window=window, area=area):
-                            if movie_model_card == "rootonchair/LTX-2-19b-distilled": 
+                            if movie_model_card == "rootonchair/LTX-2-19b-distilled" or movie_model_card == "Lightricks/LTX-2" or movie_model_card == "LTX-2 Multi-Input File": 
                                 filepath = dst_path
                                 if os.path.isfile(filepath):
                                     strip = scene.sequence_editor.sequences.new_sound(
@@ -5032,7 +6481,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                                 channel=empty_channel,
                                 fit_method="FIT",
                                 adjust_playback_rate=True,
-                                sound=False,
+                                sound=sound,
                                 use_framerate=False,
                             )
                             strip = scene.sequence_editor.active_strip
@@ -7158,24 +8607,40 @@ class SEQUENCER_OT_generate_image(Operator):
                             
                     # zimage turbo img2img
                     elif image_model_card == "Tongyi-MAI/Z-Image-Turbo":
-                        from diffusers import ZImageImg2ImgPipeline
+                        from diffusers import ZImageImg2ImgPipeline, BitsAndBytesConfig, ZImageTransformer2DModel
                         from diffusers.utils import load_image
+                        #from transformers import BitsAndBytesConfig  # Import needed for quantization
+
+#                        # 1. Define the 8-bit configuration
+#                        bnb_config = BitsAndBytesConfig(
+#                            load_in_8bit=True,
+#                            llm_int8_threshold=6.0
+#                        )
+
+                        # 2. Load the custom transformer with the quantization config
+                        transformer = ZImageTransformer2DModel.from_pretrained(
+                            "linoyts/beyond-reality-z-image-diffusers",
+                            #quantization_config=bnb_config,  # Apply 8-bit quantization here
+                            torch_dtype=torch.bfloat16,
+                        )
+
+                        # 3. Load the pipeline
                         converter = ZImageImg2ImgPipeline.from_pretrained(
                             "Tongyi-MAI/Z-Image-Turbo",
+                            transformer=transformer,
                             torch_dtype=torch.bfloat16,
-                            low_cpu_mem_usage=False,
                         )
                         if gfx_device == "mps":
                             converter.to("mps")
                         elif low_vram():
-                            converter.enable_model_cpu_offload()
-                            #pipe.enable_sequential_cpu_offload()
-                            converter.vae.enable_tiling()
+                            #converter.enable_model_cpu_offload()
+                            converter.enable_sequential_cpu_offload()
+                            #converter.vae.enable_tiling()
                         else:
                             # pipe.enable_sequential_cpu_offload()
                             # pipe.vae.enable_tiling()
-                            #pipe.enable_model_cpu_offload()            
-                            converter.to("cuda")  
+                            converter.enable_model_cpu_offload()            
+                            #converter.to("cuda")  
 
                     # zimage img2img
                     elif image_model_card == "Tongyi-MAI/Z-Image":
@@ -7808,23 +9273,41 @@ class SEQUENCER_OT_generate_image(Operator):
                     print("Inpaint, LoRA and img2img is not supported for Chroma!")
 
             elif image_model_card == "Tongyi-MAI/Z-Image-Turbo":
-                from diffusers import ZImagePipeline
+                from diffusers import ZImagePipeline, ZImageTransformer2DModel
+                from transformers import BitsAndBytesConfig  # Import needed for quantization
+
+                # 1. Define the 4-bit configuration
+#                bnb_config = BitsAndBytesConfig(
+#                    load_in_8bit=True,
+#                    bnb_8bit_quant_type="nf8",
+#                    bnb_8bit_compute_dtype=torch.float16,  # Standardize math to float16 to match bitsandbytes preference
+#                )
+
+                # 2. Load the custom transformer with the quantization config
+                transformer = ZImageTransformer2DModel.from_pretrained(
+                    "linoyts/beyond-reality-z-image-diffusers",
+                    #quantization_config=bnb_config,  # Apply 4-bit quantization here
+                    torch_dtype=torch.bfloat16,
+                )
+
+                # 3. Load the pipeline
                 pipe = ZImagePipeline.from_pretrained(
                     "Tongyi-MAI/Z-Image-Turbo",
+                    transformer=transformer,
                     torch_dtype=torch.bfloat16,
-                    low_cpu_mem_usage=False,
                 )
+                #pipe.vae.to(dtype=torch.float32)
                 if gfx_device == "mps":
                     pipe.to("mps")
                 elif low_vram():
-                    pipe.enable_model_cpu_offload()
-                    #pipe.enable_sequential_cpu_offload()
-                    pipe.vae.enable_tiling()
+                    #pipe.enable_model_cpu_offload()
+                    pipe.enable_sequential_cpu_offload()
+                    #pipe.vae.enable_tiling()
                 else:
-                    # pipe.enable_sequential_cpu_offload()
+                    #pipe.enable_sequential_cpu_offload()
                     # pipe.vae.enable_tiling()
-                    #pipe.enable_model_cpu_offload()            
-                    pipe.to("cuda")   
+                    pipe.enable_model_cpu_offload()           
+                    #pipe.to("cuda")   
                        
             elif image_model_card == "Tongyi-MAI/Z-Image":
                 from diffusers import ZImagePipeline
@@ -10042,7 +11525,32 @@ class SEQUENCER_OT_generate_text(Operator):
             clear_cuda_cache()
 
         return {"FINISHED"}
-    
+
+  
+def delete_linked_audio(context, movie_strip):
+    if movie_strip.type != 'MOVIE':
+        return
+
+    seq_editor = context.scene.sequence_editor
+    if not seq_editor:
+        return
+
+    movie_path = movie_strip.filepath
+    movie_start = movie_strip.frame_start
+
+    for s in seq_editor.sequences_all:
+        if (
+            s.type == 'SOUND' and
+            getattr(s.sound, "filepath", None) == movie_path and
+            s.frame_start == movie_start
+        ):
+            try:
+                delete_strip(s)
+                print(f"Deleted linked audio strip: {s.name}")
+            except Exception as e:
+                print(f"Warning: Could not delete linked audio {s.name}: {e}")
+            break
+            
 
 class SEQUENCER_OT_strip_to_generatorAI(Operator):
     """Convert selected text strips to Generative AI with Smart Memory Management"""
@@ -10060,6 +11568,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         # --- Initialization ---
         bpy.types.Scene.movie_path = ""
         bpy.types.Scene.image_path = ""
+        bpy.types.Scene.sound_path = ""
         preferences = context.preferences
         
         try:
@@ -10082,12 +11591,15 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         # STORE BASE PROMPTS HERE - These are our "Clean" copies
         base_prompt = scene.generate_movie_prompt
         base_negative_prompt = scene.generate_movie_negative_prompt
-        
+        current_prompt_text = base_prompt
+        current_negative_text = base_negative_prompt
         current_frame = scene.frame_current
         target_type = scene.generatorai_typeselect 
         seed = scene.movie_num_seed
         use_random = scene.movie_use_random
         temp_strip = None
+        temp_strips = []
+        current_temp_strip = None
         
         # --- Input Validation ---
         if not strips:
@@ -10106,7 +11618,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
 
         if target_type == "text":
             for strip in strips:
-                if strip.type in {"MOVIE", "IMAGE", "TEXT", "SCENE", "META"}:
+                if strip.type in {"MOVIE", "IMAGE", "TEXT", "SCENE", "META", "SOUND"}:
                     break
             else:
                 self.report({"INFO"}, "None of the selected strips are possible to process to text.")
@@ -10148,8 +11660,81 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
             
             print(f"Processing {count+1}/{total_strips} [{strip.type}]. Load: {should_load_model}, Unload: {should_unload_model}")
 
-            # 3. Intermediate Strip Handling
-            if strip.type in {"SCENE", "MOVIE", "META"}: 
+
+            # 3A. Intermediate META Strip Handling
+            if target_type == "movie" and addon_prefs.movie_model_card == "LTX-2 Multi-Input File":
+                if strip.type == "META":
+                    meta_strip = strip
+                    strips_array = strip.sequences
+                else:
+                    meta_strip = None
+                    strips_array = [strip]
+                
+                current_temp_strip = None
+                for child_strip in strips_array: 
+                    for dsel_strip in bpy.context.scene.sequence_editor.sequences:
+                        dsel_strip.select = False
+                    child_strip.select = True
+                    context.scene.sequence_editor.active_strip = child_strip 
+                                       
+                    if child_strip.type == "TEXT":
+                        pass
+                    else:
+                        # Unified call: Generate the strip regardless of type
+                        current_temp_strip = get_render_strip(self, context, child_strip, meta_strip=meta_strip)
+                        print("Adding: "+str(current_temp_strip))
+                        
+                        # If successful, add to our cleanup list
+                        if current_temp_strip:
+                            temp_strips.append(current_temp_strip)
+
+                    # 4. Processing Variables Setup
+                    # We calculate specific prompts into these variables, then apply them
+                    run_generation = False
+
+                    # --- TEXT STRIP ---
+                    if child_strip.type == "TEXT":
+                        #if child_strip.text:
+                        if meta_strip and meta_strip.type == 'META':
+                            for child in meta_strip.sequences:
+                                if child.type == 'TEXT':
+                                    print("Found text:", child.text)
+                                    current_prompt_text = child.text + ", " + base_prompt
+                            # Combine Strip Text + Base Prompt
+                            run_generation = True
+                        else:
+                            current_prompt_text = child_strip.text + ", " + base_prompt
+                            run_generation = True
+
+                    # --- IMAGE / MOVIE STRIP ---
+                    if current_temp_strip and (current_temp_strip.type == "IMAGE" or current_temp_strip.type == "MOVIE" or current_temp_strip.type == "SOUND"):
+                        # Set path
+                        if current_temp_strip.type == "IMAGE":
+                            strip_dirname = os.path.dirname(current_temp_strip.directory)
+                            file_path = bpy.path.abspath(os.path.join(current_temp_strip, current_temp_strip.elements[0].filename))
+                            bpy.types.Scene.movie_path = file_path
+                        else:
+                            if current_temp_strip.type == "MOVIE":
+                                file_path = bpy.path.abspath(current_temp_strip.filepath)
+                                bpy.types.Scene.movie_path = file_path
+                            elif current_temp_strip.type == "SOUND":
+                                file_path = bpy.path.abspath(current_temp_strip.sound.filepath)
+                                bpy.types.Scene.sound_path = file_path
+                        current_temp_strip = None
+                            
+                        run_generation = True
+                            
+                    print(bpy.types.Scene.movie_path)
+                    print(bpy.types.Scene.image_path)
+                    print(bpy.types.Scene.sound_path)
+#                    
+#                if current_prompt_text == "":
+#                    current_prompt_text == base_prompt 
+                                   
+                print(f"Prompt: {current_prompt_text}")
+                    
+            # 3B. Intermediate Strip Handling
+            elif strip.type in {"SCENE", "MOVIE", "META", "SOUND", "TEXT"}: 
                 if target_type == "image" or target_type == "text":
                     trim_frame = find_overlapping_frame(strip, current_frame)
                     if trim_frame and len(strips) == 1:
@@ -10177,71 +11762,81 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                 else:
                     temp_strip = strip = get_render_strip(self, context, strip)
 
-            # 4. Processing Variables Setup
-            # We calculate specific prompts into these variables, then apply them
-            run_generation = False
-            current_prompt_text = base_prompt
-            current_negative_text = base_negative_prompt
 
-            # --- TEXT STRIP ---
-            if strip.type == "TEXT":
-                if strip.text:
-                    # Combine Strip Text + Base Prompt
-                    current_prompt_text = strip.text + ", " + base_prompt
-                    run_generation = True
-                    print(f"Prompt: {current_prompt_text}")
+                # 4. Processing Variables Setup
+                # We calculate specific prompts into these variables, then apply them
+                run_generation = False
+                current_prompt_text = base_prompt
+                current_negative_text = base_negative_prompt
 
-            # --- SOUND STRIP ---
-            if strip.type == "SOUND":
-                if strip.sound:
-                    # Sound usually uses just the base prompt, or you can add logic here
-                    current_prompt_text = base_prompt 
-                    run_generation = True
+                # --- TEXT STRIP ---
+                if strip.type == "TEXT":
+                    if strip.text:
+                        # Combine Strip Text + Base Prompt
+                        current_prompt_text = strip.text + ", " + base_prompt
+                        run_generation = True
 
-            # --- IMAGE / MOVIE STRIP ---
-            if strip.type == "IMAGE" or strip.type == "MOVIE":
-                # Set path
-                if strip.type == "IMAGE":
-                    strip_dirname = os.path.dirname(strip.directory)
-                    file_path = bpy.path.abspath(os.path.join(strip_dirname, strip.elements[0].filename))
-                    bpy.types.Scene.image_path = file_path
-                else:
-                    file_path = bpy.path.abspath(strip.filepath)
-                    bpy.types.Scene.movie_path = file_path
+                # --- SOUND STRIP ---
+                if strip.type == "SOUND":
+                    if strip.sound:
+                        # Sound usually uses just the base prompt, or you can add logic here
+                        current_prompt_text = base_prompt 
+                        run_generation = True
 
-                if strip.name:
-                    strip_prompt = os.path.splitext(strip.name)[0]
-                    seed_nr = extract_numbers(str(strip_prompt))
-
-                    if seed_nr and use_strip_data:
-                        file_seed = int(seed_nr)
-                        strip_prompt = strip_prompt.replace(str(file_seed) + "_", "")
-                        context.scene.movie_use_random = False
-                        context.scene.movie_num_seed = file_seed
-
-                    # Style Prompts using BASE prompt
-                    if use_strip_data:
-                        styled = style_prompt(strip_prompt + ", " + base_prompt)
+                # --- IMAGE / MOVIE STRIP ---
+                if strip.type == "IMAGE" or strip.type == "MOVIE" or strip.type == "SOUND":
+                    # Set path
+                    if strip.type == "IMAGE":
+                        strip_dirname = os.path.dirname(strip.directory)
+                        file_path = bpy.path.abspath(os.path.join(strip_dirname, strip.elements[0].filename))
+                        bpy.types.Scene.image_path = file_path
                     else:
-                        styled = style_prompt(base_prompt)
+                        if strip.type == "MOVIE":
+                            file_path = bpy.path.abspath(strip.filepath)
+                            bpy.types.Scene.movie_path = file_path
+                        elif strip.type == "SOUND":
+                            file_path = bpy.path.abspath(strip.sound.filepath)
+                            bpy.types.Scene.sound_path = file_path
+
+                    if strip.name:
+                        strip_prompt = os.path.splitext(strip.name)[0]
+                        seed_nr = extract_numbers(str(strip_prompt))
+
+                        if seed_nr and use_strip_data:
+                            file_seed = int(seed_nr)
+                            strip_prompt = strip_prompt.replace(str(file_seed) + "_", "")
+                            context.scene.movie_use_random = False
+                            context.scene.movie_num_seed = file_seed
+
+                        # Style Prompts using BASE prompt
+                        if use_strip_data:
+                            styled = style_prompt(strip_prompt + ", " + base_prompt)
+                        else:
+                            styled = style_prompt(base_prompt)
+                        
+                        current_prompt_text = styled[0]
+                        current_negative_text = styled[1]
                     
-                    current_prompt_text = styled[0]
-                    current_negative_text = styled[1]
-                    
+                    if current_prompt_text == "":
+                        current_prompt_text = base_prompt
+                        
                     run_generation = True
-                    if target_type != "text":
-                        print(f"Prompt: {current_prompt_text}")
+#                    if target_type != "text":
+#                        print(f"Prompt: {current_prompt_text}")
+                    print(f"Prompt: {current_prompt_text}")
 
             # 5. EXECUTE GENERATION
             if run_generation:
                 # Apply the calculated prompt to the scene property
+                if current_prompt_text == None: current_prompt_text = ""
+                if current_negative_text == None: current_negative_text = ""
                 scene.generate_movie_prompt = current_prompt_text
                 scene.generate_movie_negative_prompt = current_negative_text
                 scene.frame_current = strip.frame_final_start
                 context.scene.sequence_editor.active_strip = strip
                 
                 # Apply Seed/Random settings
-                if use_strip_data and strip.type in {"IMAGE", "MOVIE"}:
+                if use_strip_data and strip.type in {"IMAGE", "MOVIE", "SOUND"}:
                      # Seed was already set in the block above
                      pass
                 else:
@@ -10264,10 +11859,34 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                 # Clean up paths
                 bpy.types.Scene.image_path = ""
                 bpy.types.Scene.movie_path = ""
+                bpy.types.Scene.sound_path = ""
+                # --- Single temp strip cleanup ---
                 if temp_strip is not None:
+                    if temp_strip.type == 'MOVIE':
+                        delete_linked_audio(context, temp_strip)
+
                     delete_strip(temp_strip)
                     temp_strip = None
 
+
+                # --- Batch Cleanup: Delete all temporary strips collected ---
+                for s in temp_strips:
+                    if s:
+                        try:
+                            seq_editor = context.scene.sequence_editor
+                            if seq_editor and s.name in seq_editor.sequences_all:
+
+                                if s.type == 'MOVIE':
+                                    delete_linked_audio(context, s)
+
+                                delete_strip(s)
+
+                        except Exception as e:
+                            print(f"Warning: Could not delete temp strip {s.name}: {e}")
+                
+                # Clear the list for the next iteration
+                temp_strips.clear()
+                    
         # --- Final Cleanup ---
         scene.frame_current = current_frame
         # Final safety restore
@@ -10618,7 +12237,7 @@ def register():
         name="generate_movie_x",
         default=1024,
         step=32,
-        min=256,
+        min=224,
         max=4096,
         description="Use the power of 64",
     )
@@ -10626,7 +12245,7 @@ def register():
         name="generate_movie_y",
         default=576,
         step=32,
-        min=256,
+        min=224,
         max=4096,
         description="Use the power of 64",
     )
@@ -10792,6 +12411,15 @@ def register():
         options={"TEXTEDIT_UPDATE"},
     )
     bpy.types.Scene.image_path = ""
+
+    # sound path
+    bpy.types.Scene.sound_path = bpy.props.StringProperty(
+        name="sound_path",
+        default="",
+        options={"TEXTEDIT_UPDATE"},
+    )
+    bpy.types.Scene.sound_path = ""    
+    
     bpy.types.Scene.input_strips = bpy.props.EnumProperty(
         items=[
             ("input_prompt", "Prompts", "Prompts"),
@@ -11049,6 +12677,7 @@ def unregister():
     del bpy.types.Scene.generatorai_typeselect
     del bpy.types.Scene.movie_path
     del bpy.types.Scene.image_path
+    del bpy.types.Scene.sound_path
     del bpy.types.Scene.refine_sd
     del bpy.types.Scene.aurasr
     del bpy.types.Scene.adetailer
