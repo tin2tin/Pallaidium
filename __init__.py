@@ -4918,9 +4918,10 @@ class SEQUENCER_OT_generate_movie(Operator):
                     # ==========================================================
 
                     MODEL_PATH = "Lightricks/LTX-2"
+
                     #MODEL_PATH = "OzzyGT/tiny_LTX2"
                     #MODEL_PATH = "OzzyGT/LTX2_distilled_SDNQ_4bit_dynamic"
-
+                    #MODEL_PATH = "Disty0/LTX-2-SDNQ-8bit-dynamic"
                     DEFAULT_NUM_FRAMES = 121
                     num_frames = DEFAULT_NUM_FRAMES
 
