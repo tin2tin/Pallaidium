@@ -38,6 +38,7 @@ six==1.17.0
 tqdm==4.67.1
 
 # --- ML Framework Dependencies & Extensions ---
+sdnq == 0.1.3
 optimum-quanto
 timm==1.0.22
 kornia==0.8.2
