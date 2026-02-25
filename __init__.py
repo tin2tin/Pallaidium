@@ -1426,9 +1426,9 @@ def output_strips_updated(self, context):
             movie_inference = 50
             movie_guidance = 6
         elif movie_model in {"LTX-2 Multi-Input File","rootonchair/LTX-2-19b-distilled","Lighttricks/LTX-2"}:
-            scene.generate_movie_x = 512
-            scene.generate_movie_y = 288
-            scene.generate_movie_frames = 121 
+            scene.generate_movie_x = 768
+            scene.generate_movie_y = 576
+            scene.generate_movie_frames = 121
         elif movie_model in [
             "Hailuo/MiniMax/img2vid",
             "Hailuo/MiniMax/subject2vid"
@@ -1622,7 +1622,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             ), 
             (
                 "LTX-2 Multi-Input File",
-                "LTX-2 Multi-Input (Txt, Aud & Imag in Meta Strips)",
+                "LTX-2 Multi-Input (Txt, Aud & Img in Meta Strips)",
                 "LTX-2 Multi-Input File",
             ),           
             (
@@ -3517,7 +3517,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 elif movie_model_card == "rootonchair/LTX-2-19b-distilled":
                     print("LTX-2 Video: Load Model")
 
-                    import torch
+                    import torch, os
                     from diffusers.pipelines.ltx2 import LTX2ImageToVideoPipeline, LTX2LatentUpsamplePipeline
                     from diffusers.pipelines.ltx2.latent_upsampler import LTX2LatentUpsamplerModel
                     from diffusers.pipelines.ltx2.utils import DISTILLED_SIGMA_VALUES, STAGE_2_DISTILLED_SIGMA_VALUES
@@ -5056,6 +5056,25 @@ class SEQUENCER_OT_generate_movie(Operator):
                         torch_dtype=torch_dtype,
                     )
 
+                    lora_files = scene.lora_files
+                    enabled_names = []
+                    enabled_weights = []
+                    enabled_items = [item for item in lora_files if item.enabled]
+
+                    if enabled_items:
+                        for item in enabled_items:
+                            enabled_names.append(
+                                (clean_filename(item.name)).replace(".", "")
+                            )
+                            enabled_weights.append(item.weight_value)
+                            pipe.load_lora_weights(
+                                bpy.path.abspath(scene.lora_folder),
+                                weight_name=item.name + ".safetensors",
+                                adapter_name=((clean_filename(item.name)).replace(".", "")),
+                            )
+                        pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)
+                        print("Load LoRAs: " + " ".join(enabled_names))
+
                     pipe.enable_group_offload(
                         onload_device=onload_device,
                         offload_device=offload_device,
@@ -5160,6 +5179,15 @@ class SEQUENCER_OT_generate_movie(Operator):
                         use_dynamic_shifting=False,
                         shift_terminal=None,
                     )
+
+                    adapter_name=((clean_filename("ltx-2-19b-ic-lora-detailer.safetensors")).replace(".", ""))
+                    refine_pipe.load_lora_weights(
+                        bpy.path.abspath("Lightricks/LTX-2-19b-IC-LoRA-Detailer"),
+                        weight_name="ltx-2-19b-ic-lora-detailer.safetensors",
+                        adapter_name=adapter_name,
+                    )
+                    refine_pipe.set_adapters(adapter_name)
+                    print("Load LoRA: " + " ".join(adapter_name))
 
                     refine_pipe.enable_group_offload(
                         onload_device=onload_device,
@@ -6075,6 +6103,25 @@ class SEQUENCER_OT_generate_movie(Operator):
                         transformer=transformer,
                         torch_dtype=torch_dtype,
                     )
+                    
+                    lora_files = scene.lora_files
+                    enabled_names = []
+                    enabled_weights = []
+                    enabled_items = [item for item in lora_files if item.enabled]
+                    
+                    if enabled_items:
+                        for item in enabled_items:
+                            enabled_names.append(
+                                (clean_filename(item.name)).replace(".", "")
+                            )
+                            enabled_weights.append(item.weight_value)
+                            pipe.load_lora_weights(
+                                bpy.path.abspath(scene.lora_folder),
+                                weight_name=item.name + ".safetensors",
+                                adapter_name=((clean_filename(item.name)).replace(".", "")),
+                            )
+                        pipe.set_adapters(enabled_names, adapter_weights=enabled_weights)
+                        print("Load LoRAs: " + " ".join(enabled_names))
 
                     pipe.enable_group_offload(
                         onload_device=onload_device,
@@ -6180,6 +6227,15 @@ class SEQUENCER_OT_generate_movie(Operator):
                         use_dynamic_shifting=False,
                         shift_terminal=None,
                     )
+
+                    adapter_name=((clean_filename("ltx-2-19b-ic-lora-detailer.safetensors")).replace(".", ""))
+                    refine_pipe.load_lora_weights(
+                        bpy.path.abspath("Lightricks/LTX-2-19b-IC-LoRA-Detailer"),
+                        weight_name="ltx-2-19b-ic-lora-detailer.safetensors",
+                        adapter_name=adapter_name,
+                    )
+                    refine_pipe.set_adapters(adapter_name)
+                    print("Load LoRA: " + " ".join(adapter_name))
 
                     refine_pipe.enable_group_offload(
                         onload_device=onload_device,
