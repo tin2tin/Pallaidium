@@ -114,6 +114,8 @@ The generated media will be saved to the directory specified in the addon prefer
 
 ## Change Log
 
+2026-02-26: Add: Ltx-2 Multi Input - Custom LoRA + detailer LoRA in last step.
+
 2026-02-22: Add: LTX-2 Video as Distilled or Multi-Input (via. Meta Strips)
 
 2026-01-23: Add: Support for BFL-FLUX.2 Klein 4B and 9B
