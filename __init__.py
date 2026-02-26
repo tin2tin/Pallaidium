@@ -9426,7 +9426,8 @@ class SEQUENCER_OT_generate_image(Operator):
                 clear_cuda_cache()
 
                 print("Load: Qwen-Image-Edit-2511")
-
+                      
+                
                 # Import necessary classes for quantization and model components
                 from transformers import BitsAndBytesConfig as TransformersBitsAndBytesConfig
                 from transformers import Qwen2_5_VLForConditionalGeneration
@@ -9493,9 +9494,10 @@ class SEQUENCER_OT_generate_image(Operator):
                     pipe.enable_sequential_cpu_offload()
                     pipe.vae.enable_tiling()
                 else:
+                    pipe.enable_model_cpu_offload()
                     #pipe.enable_sequential_cpu_offload()
                     # pipe.vae.enable_tiling()
-                    pipe.to(gfx_device)
+                    #pipe.to(gfx_device)
 
             # FLUX2                
             elif image_model_card == "diffusers/FLUX.2-dev-bnb-4bit":
