@@ -5439,6 +5439,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
                 elif movie_model_card == "Wan-AI/Wan2.2-I2V-A14B-Diffusers":
                     from diffusers.utils import load_image, export_to_video
+                    import os
                     import numpy as np
                     if scene.movie_path:
                         print("Process: Video Image to Video (Wan-AI/Wan2.2-I2V-A14B-Diffusers)")
