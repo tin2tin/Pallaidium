@@ -67,7 +67,7 @@ webdataset==0.2.100
 pandas==3.0.1
 k-diffusion==0.1.1
 laion-clap==1.1.4
-pywavelets==1.4.1
+pywavelets==1.9.0
 av==16.0.1
 opt_einsum==3.4.0
 safetensors==0.7.0
