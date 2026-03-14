@@ -106,7 +106,7 @@ pillow==11.2.1
 imageio==2.37.0
 imageio-ffmpeg==0.6.0
 imWatermark==0.0.2
-mediapipe==0.10.21
+mediapipe==0.10.32
 scikit-image==0.25.2
 contourpy==1.3.3
 cycler==0.12.1
