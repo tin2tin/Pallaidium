@@ -1665,7 +1665,7 @@ class GeneratorAddonPreferences(AddonPreferences):
             ),
             ("diffusers/FLUX.2-dev-bnb-4bit", "Flux2", "diffusers/FLUX.2-dev-bnb-4bit"),
             ("Runware/BFL-FLUX.2-klein-base-4B", "FLUX.2 klein 4B", "Runware/BFL-FLUX.2-klein-base-4B"),
-            ("Runware/BFL-FLUX.2-klein-base-9B", "FLUX.2 klein 9B", "Runware/BFL-FLUX.2-klein-base-9B"),
+            ("black-forest-labs/FLUX.2-klein-9b-kv", "FLUX.2 klein 9B", "black-forest-labs/FLUX.2-klein-9b-kv"),
             ("ChuckMcSneed/FLUX.1-dev", "Flux Dev", "ChuckMcSneed/FLUX.1-dev"),
             ("Tongyi-MAI/Z-Image", "Z-Image", "Tongyi-MAI/Z-Image"),
             ("Tongyi-MAI/Z-Image-Turbo", "Z-Image Turbo", "Tongyi-MAI/Z-Image-Turbo"),
@@ -2480,7 +2480,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         and image_model_card
                         != "diffusers/controlnet-canny-sdxl-1.0-small"
                         and image_model_card != "Runware/BFL-FLUX.2-klein-base-4B"
-                        and image_model_card != "Runware/BFL-FLUX.2-klein-base-9B"
+                        and image_model_card != "black-forest-labs/FLUX.2-klein-9b-kv"
                     ):
                         if input == "input_strips" and type == "image":
                             row = col.row(align=True)
@@ -2577,7 +2577,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     )
                     or (
                         type == "image"
-                        and image_model_card == "Runware/BFL-FLUX.2-klein-base-9B"
+                        and image_model_card == "black-forest-labs/FLUX.2-klein-9b-kv"
                     )
                     or (
                         type == "image"
@@ -2874,7 +2874,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     or image_model_card == "Qwen/Qwen-Image-Edit-2511"
                     or image_model_card == "ChuckMcSneed/FLUX.1-dev"
                     or image_model_card == "Runware/BFL-FLUX.2-klein-base-4B"
-                    or image_model_card == "Runware/BFL-FLUX.2-klein-base-9B"
+                    or image_model_card == "black-forest-labs/FLUX.2-klein-9b-kv"
                     or image_model_card == "diffusers/FLUX.2-dev-bnb-4bit"
                     or image_model_card == "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"
                     or image_model_card == "romanfratric234/FLUX.1-Depth-dev-lora"
@@ -8193,7 +8193,7 @@ class SEQUENCER_OT_generate_image(Operator):
             and not image_model_card == "Qwen/Qwen-Image-Edit-2511"
             and not image_model_card == "diffusers/FLUX.2-dev-bnb-4bit"
             and not image_model_card == "Runware/BFL-FLUX.2-klein-base-4B"
-            and not image_model_card == "Runware/BFL-FLUX.2-klein-base-9B"
+            and not image_model_card == "black-forest-labs/FLUX.2-klein-9b-kv" 
 #            and (not scene.ip_adapter_face_folder and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0")
 #            and (not scene.ip_adapter_style_folder and image_model_card == "stabilityai/stable-diffusion-xl-base-1.0")
         )
@@ -8337,7 +8337,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     image_model_card == "lzyvegetable/FLUX.1-schnell"
                     or image_model_card == "ChuckMcSneed/FLUX.1-dev"
                     or image_model_card == "Runware/BFL-FLUX.2-klein-base-4B"
-                    or image_model_card == "Runware/BFL-FLUX.2-klein-base-9B"
+                    or image_model_card == "black-forest-labs/FLUX.2-klein-9b-kv"
                     #or image_model_card == "diffusers/FLUX.2-dev-bnb-4bit"
                 ):
                     print("Load Inpaint: " + image_model_card)
@@ -8512,7 +8512,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         )
 
                         converter = Flux2KleinPipeline.from_pretrained(
-                            "Runware/BFL-FLUX.2-klein-base-9B", transformer=transformer, text_encoder=text_encoder, torch_dtype=dtype
+                            "black-forest-labs/FLUX.2-klein-9b-kv", transformer=transformer, text_encoder=text_encoder, torch_dtype=dtype
                         )
                         
                         if gfx_device == "mps":
@@ -9167,7 +9167,7 @@ class SEQUENCER_OT_generate_image(Operator):
             #FLUX Klein
             elif (
                 image_model_card == "Runware/BFL-FLUX.2-klein-base-4B"
-                or image_model_card == "Runware/BFL-FLUX.2-klein-base-9B"
+                or image_model_card == "black-forest-labs/FLUX.2-klein-9b-kv"
             ):
                 from diffusers import Flux2KleinPipeline, Flux2Transformer2DModel
                 from transformers import Qwen3ForCausalLM
@@ -9185,7 +9185,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 )
 
                 pipe = Flux2KleinPipeline.from_pretrained(
-                    "Runware/BFL-FLUX.2-klein-base-9B", transformer=transformer, text_encoder=text_encoder, torch_dtype=dtype
+                    "black-forest-labs/FLUX.2-klein-9b-kv", transformer=transformer, text_encoder=text_encoder, torch_dtype=dtype
                 )
                 
                 if gfx_device == "mps":
@@ -9708,7 +9708,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 or image_model_card == "Tongyi-MAI/Z-Image"
                 or image_model_card == "Tongyi-MAI/Z-Image-Turbo"
                 or image_model_card == "Runware/BFL-FLUX.2-klein-base-4B"
-                or image_model_card == "Runware/BFL-FLUX.2-klein-base-9B"
+                or image_model_card == "black-forest-labs/FLUX.2-klein-9b-kv"
     #            or image_model_card == "Runware/FLUX.1-Redux-dev"
     #            or image_model_card == "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"
     #            or image_model_card == "romanfratric234/FLUX.1-Depth-dev-lora"
@@ -10309,7 +10309,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     image_model_card == "lzyvegetable/FLUX.1-schnell"
                     or image_model_card == "ChuckMcSneed/FLUX.1-dev"
                     or image_model_card == "Runware/BFL-FLUX.2-klein-base-4B"
-                    or image_model_card == "Runware/BFL-FLUX.2-klein-base-9B"
+                    or image_model_card == "black-forest-labs/FLUX.2-klein-9b-kv"
                 ):
                     print("Process Inpaint: " + image_model_card)
                     inference_parameters = {
@@ -10480,7 +10480,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         generator=generator,
                     ).images[0]
                 elif (
-                    image_model_card == "Runware/BFL-FLUX.2-klein-base-4B" or image_model_card == "Runware/BFL-FLUX.2-klein-base-9B"
+                    image_model_card == "Runware/BFL-FLUX.2-klein-base-4B" or image_model_card == "black-forest-labs/FLUX.2-klein-9b-kv"
                 ):
                     image = converter(
                         prompt=prompt,
@@ -10715,7 +10715,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 ).images[0]
                 
             #FLUX klein
-            elif (image_model_card == "Runware/BFL-FLUX.2-klein-base-4B" or image_model_card == "Runware/BFL-FLUX.2-klein-base-9B"):
+            elif (image_model_card == "Runware/BFL-FLUX.2-klein-base-4B" or image_model_card == "black-forest-labs/FLUX.2-klein-9b-kv"):
                 image = pipe(
                     prompt=prompt,
                     generator=generator,#generator=torch.Generator(device=device).manual_seed(42),
