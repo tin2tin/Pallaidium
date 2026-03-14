@@ -64,7 +64,7 @@ v-diffusion-pytorch==0.0.2
 vector-quantize-pytorch==1.14.41
 wandb==0.15.4
 webdataset==0.2.100
-pandas==2.0.2
+pandas==3.0.1
 k-diffusion==0.1.1
 laion-clap==1.1.4
 pywavelets==1.4.1
