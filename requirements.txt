@@ -1,4 +1,4 @@
-# --- Core Utilities & IO ---
+sci# --- Core Utilities & IO ---
 filelock==3.20.0
 importlib_metadata==8.7.0
 importlib-resources==5.12.0
@@ -119,7 +119,7 @@ markupsafe
 
 # --- Scientific ---
 scipy==1.16.3
-scikit-learn==1.2.2
+scikit-learn==1.8.0
 mpmath==1.3.0
 numba==0.62.1
 llvmlite==0.45.1
