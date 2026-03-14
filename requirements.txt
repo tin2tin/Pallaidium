@@ -125,7 +125,7 @@ numba==0.62.1
 llvmlite==0.45.1
 
 # --- Text & UI ---
-sentencepiece==0.1.99
+sentencepiece==0.2.1
 gradio==6.0.1
 gradio_client==2.0.0
 resemble-perth==1.0.1
