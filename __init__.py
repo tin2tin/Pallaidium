@@ -392,8 +392,8 @@ def closest_divisible_128(num):
 
 
 def find_first_empty_channel(start_frame, end_frame):
-    for ch in range(1, len(bpy.context.scene.sequence_editor.sequences_all) + 1):
-        for seq in bpy.context.scene.sequence_editor.sequences_all:
+    for ch in range(1, len(bpy.context.scene.sequence_editor.strips_all) + 1):
+        for seq in bpy.context.scene.sequence_editor.strips_all:
             if (
                 seq.channel == ch
                 and seq.frame_final_start < end_frame
@@ -481,16 +481,33 @@ def limit_string(my_string):
 def delete_strip(input_strip):
     if input_strip is None:
         return
-    original_selection = [
-        strip
-        for strip in bpy.context.scene.sequence_editor.sequences_all
-        if strip.select
-    ]
-    bpy.ops.sequencer.select_all(action="DESELECT")
-    input_strip.select = True
-    bpy.ops.sequencer.delete()
-    for strip in original_selection:
-        strip.select = True
+    
+    # Get the sequence editor
+    seq_editor = bpy.context.scene.sequence_editor
+    if seq_editor is None:
+        return
+    
+    # Fail-safe: Delete the strip directly via the data API
+    try:
+        seq_editor.strips.remove(input_strip)
+    except ReferenceError:
+        # The strip was already deleted or is an invalid reference
+        pass
+    except Exception as e:
+        print(f"Failed to remove strip: {e}")
+#def delete_strip(input_strip):
+#    if input_strip is None:
+#        return
+#    original_selection = [
+#        strip
+#        for strip in bpy.context.scene.sequence_editor.strips_all
+#        if strip.select
+#    ]
+#    bpy.ops.sequencer.select_all(action="DESELECT")
+#    input_strip.select = True
+#    #bpy.ops.sequencer.delete() #Crash
+#    for strip in original_selection:
+#        strip.select = True
 
 
 def load_video_as_np_array(video_path):
@@ -691,7 +708,7 @@ def process_image(image_path, frames_nr):
     Image.MAX_IMAGE_PIXELS = None
     import cv2, shutil
 
-    scene = bpy.context.scene
+    scene = bpy.context.sequencer_scene
     movie_x = scene.generate_movie_x
     img = cv2.imread(image_path)
     height, width, layers = img.shape
@@ -796,7 +813,7 @@ def python_exec():
 
 
 def find_strip_by_name(scene, name):
-    for sequence in scene.sequence_editor.sequences:
+    for sequence in scene.sequence_editor.strips:
         if sequence.name == name:
             return sequence
     return None
@@ -1017,7 +1034,7 @@ class DependencyManager:
             "encodec==0.1.1",
             "imhist==0.0.4",
             "julius==0.2.7",
-            "pathtools==0.1.2",
+            #"pathtools==0.1.2",
             "progressbar==2.5",
             "pyloudnorm==0.1.1",
             "pystoi==0.4.1",
@@ -1034,10 +1051,14 @@ class DependencyManager:
     def get_phase_2_torch(self):
         if self.os_platform == "Windows":
             return [
-                "--index-url https://download.pytorch.org/whl/cu124", 
-                "torch==2.6.0+cu124", 
-                "torchvision==0.21.0+cu124", 
-                "torchaudio==2.6.0+cu124", 
+                #"--index-url https://download.pytorch.org/whl/cu124", 
+                "--index-url https://download.pytorch.org/whl/cu128", 
+                #"torch==2.6.0+cu124", 
+                "torch==2.9.1+cu128", #torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1
+                #"torchvision==0.21.0+cu124", 
+                "torchvision==0.24.1+cu128", 
+                #"torchaudio==2.6.0+cu124", 
+                "torchaudio==2.9.1+cu128", 
                 #"xformers"
             ]
         else:
@@ -1052,10 +1073,11 @@ class DependencyManager:
             "git+https://github.com/QwenLM/Qwen3-TTS.git",
             "stable-audio-tools", 
             "torcheval", 
-            "torchao==0.12.0", 
+            "torchao", 
             "spacy",
             "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl",
-            "https://huggingface.co/lldacing/flash-attention-windows-wheel/resolve/main/flash_attn-2.7.4.post1%2Bcu128torch2.7.0cxx11abiFALSE-cp311-cp311-win_amd64.whl",
+            #"https://huggingface.co/lldacing/flash-attention-windows-wheel/resolve/main/flash_attn-2.7.4.post1%2Bcu128torch2.7.0cxx11abiFALSE-cp311-cp311-win_amd64.whl",
+            "https://github.com/kingbri1/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3+cu128torch2.8.0cxx11abiFALSE-cp313-cp313-win_amd64.whl",
         ]
         
         if self.py_major == 3 and self.py_minor >= 8:
@@ -1999,197 +2021,245 @@ def copy_struct(source, target):
 def get_render_strip(self, context, strip, meta_strip=None):
     """Render selected strip to hard-disk. Returns the new strip object or None."""
     
+    debug = True  # Assuming True for your debugging, adjust as needed
+    
+    if debug: print(f"\n[DEBUG] --- get_render_strip Start ---")
+    if debug: print(f"[DEBUG] Input strip: {getattr(strip, 'name', 'None')}, meta_strip: {getattr(meta_strip, 'name', 'None')}")
+    
     # --- 1. STRICT INPUT SANITIZATION ---
     if isinstance(meta_strip, (set, dict, list, tuple)):
         meta_strip = None
 
     if isinstance(strip, (set, dict, list, tuple)):
-        print(f"Error: Invalid strip passed: {strip}")
+        if debug: print(f"Error: Invalid strip passed: {strip}")
         return None
 
     if not strip:
+        if debug: print("[DEBUG] Strip is None, returning.")
         return None
 
-    if not context or not context.scene or not context.scene.sequence_editor:
+    # BLENDER 5.1 API: VSE scene is separate from active window scene
+    vse_scene = getattr(context, 'sequencer_scene', context.scene)
+    active_scene = context.scene
+
+    if not context or not vse_scene or not vse_scene.sequence_editor:
+        if debug: print("[DEBUG] Invalid context or missing sequence_editor, returning.")
         return None
 
-    bpy.context.preferences.system.sequencer_proxy_setup = "MANUAL"
-    current_scene = context.scene
-    sequencer = current_scene.sequence_editor
+    sequencer = vse_scene.sequence_editor
     
     # --- 2. DETERMINE TARGET ---
     target_to_copy = meta_strip if meta_strip else strip
+    if debug: print(f"[DEBUG] Target to copy: {target_to_copy.name}")
 
     if not hasattr(target_to_copy, "select"):
+        if debug: print("[DEBUG] target_to_copy lacks 'select' attribute.")
         return None
 
-    area = next((area for area in context.screen.areas if area.type == "SEQUENCE_EDITOR"), None)
-    if not area:
+    area = next((a for a in context.screen.areas if a.type == "SEQUENCE_EDITOR"), None)
+    region = next((r for r in area.regions if r.type == 'WINDOW'), None) if area else None
+
+    if not area or not region:
+        if debug: print("[DEBUG] No SEQUENCE_EDITOR area/region found.")
         return None
 
-    # --- 3. COPY OPERATION ---
-    with bpy.context.temp_override(area=area):
+    # --- 3. COPY OPERATION (From Current Scene) ---
+    if debug: print("[DEBUG] Context override for COPY operation...")
+    # BLENDER 5.1 API: Ensure sequencer_scene is passed into overrides for VSE context
+    with bpy.context.temp_override(window=context.window, area=area, region=region, scene=active_scene, sequencer_scene=vse_scene):
         bpy.ops.sequencer.select_all(action='DESELECT')
         target_to_copy.select = True
         sequencer.active_strip = target_to_copy
-        context.scene.frame_current = int(target_to_copy.frame_start)
+        
+        # BLENDER 5.1 API: frame_final_start is now left_handle 
+        start_frame = int(getattr(target_to_copy, 'left_handle', getattr(target_to_copy, 'frame_final_start', 1)))
+        vse_scene.frame_current = start_frame
 
         if target_to_copy.type != "SCENE":
+            if debug: print("[DEBUG] Executing copy operator.")
             bpy.ops.sequencer.copy()
+        else:
+            if debug: print("[DEBUG] Target is SCENE type, skipping copy.")
 
-    # --- 4. CREATE SANDBOX SCENE ---
-    new_scene = bpy.ops.scene.new(type="EMPTY")
-    new_scene = bpy.context.scene
+    # --- 4. CREATE SILENT BACKGROUND SANDBOX SCENE ---
+    if debug: print("[DEBUG] Creating background sandbox scene...")
+    
+    new_scene = bpy.data.scenes.new(name="Pallaidium_Sandbox_Render")
     new_scene.sequence_editor_create()
-    context.window.scene = new_scene
+    new_scene.render.use_sequencer = True
+    
+    # Copy Render Settings from the Active Window Scene
+    if debug: print("[DEBUG] Copying render settings...")
+    new_scene.render.resolution_x = active_scene.render.resolution_x
+    new_scene.render.resolution_y = active_scene.render.resolution_y
+    new_scene.render.fps = active_scene.render.fps
+    new_scene.render.fps_base = active_scene.render.fps_base
 
-    # Copy Render Settings
-    new_scene.render.resolution_x = current_scene.render.resolution_x
-    new_scene.render.resolution_y = current_scene.render.resolution_y
-    new_scene.render.fps = current_scene.render.fps
-    new_scene.render.fps_base = current_scene.render.fps_base
-    
-    # --- 5. PASTE AND UNPACK ---
+    # --- 5. PASTE AND UNPACK (Inside Sandbox) ---
     new_strip = None
+    existing_strips = set(new_scene.sequence_editor.strips)
     
-    with bpy.context.temp_override(area=area):
+    with bpy.context.temp_override(window=context.window, area=area, region=region, scene=new_scene, sequencer_scene=new_scene):
         if target_to_copy.type == "SCENE":
-            bpy.ops.sequencer.scene_strip_add(frame_start=0, channel=8, replace_sel=True)
+            # BLENDER 5.1 API: move_strips=False prevents the operator from hanging
+            bpy.ops.sequencer.scene_strip_add(frame_start=0, channel=8, replace_sel=True, move_strips=False)
             new_strip = new_scene.sequence_editor.active_strip
         else:
             try:
                 bpy.ops.sequencer.paste()
-            except RuntimeError:
+                
+                current_strips = set(new_scene.sequence_editor.strips)
+                newly_added = list(current_strips - existing_strips)
+                
+                if newly_added:
+                    new_strip = newly_added[0]
+                    new_scene.sequence_editor.active_strip = new_strip
+                else:
+                    if debug: print("[DEBUG] Paste completed but no new strip identified.")
+
+            except RuntimeError as e:
+                if debug: print(f"[DEBUG] Paste failed: {e}")
                 bpy.data.scenes.remove(new_scene, do_unlink=True)
-                context.window.scene = current_scene
                 return None
 
-            if meta_strip:
-                # We need to unpack until the target strip is at the TOP LEVEL
-                # This ensures we can safely delete everything else later.
-                found_at_top_level = False
+            # Handle Meta Unpacking (if needed)
+            if meta_strip and new_strip and new_strip.type == 'META':
+                if debug: print("[DEBUG] Unpacking meta strip...")
+                bpy.ops.sequencer.select_all(action='DESELECT')
+                new_strip.select = True
+                new_scene.sequence_editor.active_strip = new_strip
+                bpy.ops.sequencer.meta_separate()
                 
-                for _ in range(10): # Safety loop
-                    # Check if our strip is at the top level
-                    candidates = [s for s in new_scene.sequence_editor.sequences 
-                                  if s.name == strip.name and s.type == strip.type]
-                    
-                    if candidates:
-                        new_strip = candidates[0]
-                        found_at_top_level = True
-                        break
-                    
-                    # If not at top level, check if it exists deeper
-                    all_candidates = [s for s in new_scene.sequence_editor.sequences_all 
-                                      if s.name == strip.name and s.type == strip.type]
-                    
-                    # If we found it deep, but not top, we must separate all METAs to bring it up
-                    metas = [s for s in new_scene.sequence_editor.sequences if s.type == 'META']
-                    
-                    if not metas:
-                        # No more metas to open, but we haven't found it at top level.
-                        # If we found it deeply, grab it (though cleanup might be messy)
-                        if all_candidates:
-                            new_strip = all_candidates[0]
-                        break
-                    
-                    bpy.ops.sequencer.select_all(action='DESELECT')
-                    for m in metas:
-                        m.select = True
-                        new_scene.sequence_editor.active_strip = m
-                    
-                    bpy.ops.sequencer.meta_separate()
-                
-                # Fallback: if name changed, check by type if it's the only one left
-                if not new_strip:
-                     # Check top level only
-                     matches = [s for s in new_scene.sequence_editor.sequences if s.type == strip.type]
-                     if len(matches) == 1:
-                         new_strip = matches[0]
-
-                # --- FIX FOR "STRIP NOT IN SCENE" ERROR ---
-                # We only remove strips that are at the TOP LEVEL (sequences, not sequences_all)
-                if new_strip:
-                    # If the found strip is inside a meta (not top level), we can't easily clean up
-                    # without deleting the parent. However, the loop above tries to bring it to top.
-                    
-                    # Safe cleanup: Select everything except our strip, then use Operator to delete
-                    bpy.ops.sequencer.select_all(action='SELECT')
-                    new_strip.select = False # Deselect our target
-                    
-                    # If our target is hidden inside a meta, new_strip.select might fail or do nothing useful.
-                    # But if the unpack worked, it is at the top level.
-                    bpy.ops.sequencer.delete()
-            else:
-                # Normal Paste
-                if bpy.context.selected_sequences:
-                    for s in bpy.context.selected_sequences:
-                        if s.type == strip.type:
-                            new_strip = s
-                            break
-                    if not new_strip:
-                        new_strip = bpy.context.selected_sequences[0]
-
+                final_candidates = [s for s in new_scene.sequence_editor.strips if s.name == strip.name]
+                if final_candidates:
+                    new_strip = final_candidates[0]
+                    for s in new_scene.sequence_editor.strips:
+                        if s != new_strip:
+                            new_scene.sequence_editor.strips.remove(s)
+            
     if not new_strip:
-        print(f"Error: Failed to extract {strip.name}")
-        bpy.data.scenes.remove(new_scene, do_unlink=True)
-        context.window.scene = current_scene
-        return None
+        new_strip = new_scene.sequence_editor.active_strip
 
     # --- 6. RENDER EXECUTION ---
+    if debug: print(f"[DEBUG] Preparing to render strip {new_strip.name}...")
     new_strip.select = True
     new_scene.sequence_editor.active_strip = new_strip
-    copy_struct(strip, new_strip)
+    
+    try:
+        copy_struct(strip, new_strip) # External function
+    except NameError:
+        pass
 
-    # Frame Range
-    new_scene.frame_start = int(new_strip.frame_final_start)
-    new_scene.frame_end = int(new_strip.frame_final_start + new_strip.frame_final_duration) - 1
+    # BLENDER 5.1 API: Frame boundaries 
+    render_start = int(getattr(new_strip, 'left_handle', getattr(new_strip, 'frame_final_start', 1)))
+    render_duration = int(getattr(new_strip, 'duration', getattr(new_strip, 'frame_final_duration', 1)))
 
-    # Render Settings
+    new_scene.frame_start = render_start
+    new_scene.frame_end = render_start + render_duration - 1
+    
+    if debug: print(f"[DEBUG] Render Frame Range: {new_scene.frame_start} to {new_scene.frame_end}")
+
     preferences = bpy.context.preferences
-    addon_prefs = preferences.addons[__name__].preferences
+    try:
+        addon_prefs = preferences.addons[__name__].preferences
+    except KeyError:
+        addon_prefs = preferences.addons[__package__.split('.')[0]].preferences
+        
     rendered_dir = os.path.join(addon_prefs.generator_ai, str(date.today()), "Rendered_Strips")
     
-    if not os.path.exists(rendered_dir):
-        os.makedirs(rendered_dir)
+    if rendered_dir.startswith('//'):
+        rendered_dir = bpy.path.abspath(rendered_dir)
+    rendered_dir = os.path.abspath(rendered_dir)
+
+    os.makedirs(rendered_dir, exist_ok=True)
 
     safe_name = re.sub(r'[<>:"/\\|?*]', '', strip.name)
     output_path = os.path.join(rendered_dir, safe_name + "_rendered")
     
     if strip.type == "SOUND":
         output_path += ".wav"
-        output_path = ensure_unique_filename(output_path)
-        bpy.ops.sound.mixdown(filepath=output_path, relative_path=True, container='WAV', codec='PCM')
+        try: output_path = ensure_unique_filename(output_path)
+        except NameError: pass
+            
+        output_path = os.path.abspath(bpy.path.abspath(output_path) if output_path.startswith('//') else output_path)
+        
+        if debug: print(f"[DEBUG] Mixdown FFMPEG audio to: {output_path}")
+        with bpy.context.temp_override(scene=new_scene, sequencer_scene=new_scene):
+            bpy.ops.sound.mixdown(filepath=output_path, relative_path=False, container='WAV', codec='PCM')
     else:
         output_path += ".mp4"
-        output_path = ensure_unique_filename(output_path)
+        try: output_path = ensure_unique_filename(output_path)
+        except NameError: pass
+            
+        output_path = os.path.abspath(bpy.path.abspath(output_path) if output_path.startswith('//') else output_path)
+        
+        if debug: print(f"[DEBUG] Render Video to: {output_path}")
         new_scene.render.filepath = output_path
-        bpy.context.scene.render.image_settings.file_format = "FFMPEG"
-        bpy.context.scene.render.ffmpeg.format = "MPEG4"
-        bpy.context.scene.render.ffmpeg.audio_codec = "AAC"
-        bpy.ops.render.opengl(animation=True, sequencer=True)
+        
+        # --- CRITICAL FIX: Blender 5.1 Output API ---
+        # 5.1 groups output by Media Type, replacing the raw 'FFMPEG' file_format selection.
+        if hasattr(new_scene.render.image_settings, "media_type"):
+            new_scene.render.image_settings.media_type = 'VIDEO'
+        else:
+            # Fallback for Blender 5.0 and older
+            new_scene.render.image_settings.file_format = 'FFMPEG'
+            
+        new_scene.render.ffmpeg.format = 'MPEG4'
+        new_scene.render.ffmpeg.codec = 'H264'         
+        new_scene.render.ffmpeg.audio_codec = 'AAC'
+        
+        # Explicitly lock the UI context to the sandbox scene before rendering
+        original_window_scene = context.window.scene
+        context.window.scene = new_scene
+        try:
+            with bpy.context.temp_override(scene=new_scene, sequencer_scene=new_scene):
+                # Pass the scene= parameter natively to bypass override instability
+                bpy.ops.render.render(animation=True, write_still=False, scene=new_scene.name)
+        finally:
+            context.window.scene = original_window_scene
+
+        # FFMPEG Auto-Appends frame boundaries (filename0001-0250.mp4)
+        if not os.path.exists(output_path):
+            base_path_no_ext = os.path.splitext(output_path)[0]
+            possible_files = glob.glob(base_path_no_ext + "*.mp4")
+            if possible_files:
+                possible_files.sort(key=os.path.getmtime, reverse=True)
+                actual_rendered_file = possible_files[0]
+                
+                if actual_rendered_file != output_path:
+                    try:
+                        if os.path.exists(output_path): os.remove(output_path)
+                        os.rename(actual_rendered_file, output_path)
+                    except Exception as e:
+                        if debug: print(f"[DEBUG] Could not rename: {e}")
+                        output_path = actual_rendered_file
+            else:
+                if debug: print(f"[DEBUG] ERROR: Could not find any rendered file starting with {base_path_no_ext}")
 
     # --- 7. CLEANUP & RETURN ---
+    if debug: print("[DEBUG] Cleanup sandbox scene...")
     bpy.data.scenes.remove(new_scene, do_unlink=True)
-    context.window.scene = current_scene
     
-    area = [a for a in context.screen.areas if a.type == "SEQUENCE_EDITOR"][0]
-    with bpy.context.temp_override(area=area):
-        insert_channel = 1
-        for s in sequencer.sequences_all:
-             if s.channel >= insert_channel: insert_channel = s.channel + 1
+    insert_channel = max([s.channel for s in sequencer.strips], default=0) + 1
+    if debug: print(f"[DEBUG] Re-importing rendered strip at channel {insert_channel}")
+    
+    if not os.path.exists(output_path):
+        if debug: print(f"[DEBUG] ERROR: Halting re-import because path doesn't exist: {output_path}")
+        return None
+        
+    final_start = int(getattr(strip, 'left_handle', getattr(strip, 'frame_final_start', 1)))
+    
+    if strip.type == "SOUND":
+        resulting_strip = sequencer.strips.new_sound(name="rendered_sound", filepath=output_path, channel=insert_channel, frame_start=final_start)
+    else:
+        resulting_strip = sequencer.strips.new_movie(name="rendered_movie", filepath=output_path, channel=insert_channel, frame_start=final_start)
+        
+    if resulting_strip:
+        if debug: print(f"[DEBUG] Successfully imported rendered strip: {resulting_strip.name}")
+        resulting_strip.use_proxy = False
+        sequencer.active_strip = resulting_strip
              
-        if strip.type == "SOUND":
-            bpy.ops.sequencer.sound_strip_add(channel=insert_channel, filepath=output_path, frame_start=int(strip.frame_final_start), overlap=0)
-        else:
-            bpy.ops.sequencer.movie_strip_add(channel=insert_channel, filepath=output_path, frame_start=int(strip.frame_final_start), overlap=0, sound=False)
-            
-        resulting_strip = sequencer.active_strip
-        if resulting_strip:
-            # SAFETY CHECK: Only set use_proxy if the strip has that attribute
-            if hasattr(resulting_strip, "use_proxy"):
-                resulting_strip.use_proxy = False
-             
+    if debug: print("[DEBUG] --- get_render_strip Finished ---\n")
     return resulting_strip
 
 
@@ -2318,7 +2388,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 scene,
                 "omnigen_strip_1",
                 scene.sequence_editor,
-                "sequences",
+                "strips",
                 text="",
                 icon="FILE_IMAGE",
             )
@@ -2330,7 +2400,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 scene,
                 "omnigen_strip_2",
                 scene.sequence_editor,
-                "sequences",
+                "strips",
                 text="",
                 icon="FILE_IMAGE",
             )
@@ -2342,7 +2412,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 scene,
                 "omnigen_strip_3",
                 scene.sequence_editor,
-                "sequences",
+                "strips",
                 text="",
                 icon="FILE_IMAGE",
             )
@@ -2360,7 +2430,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 scene,
                 "qwen_strip_1",
                 scene.sequence_editor,
-                "sequences",
+                "strips",
                 text="",
                 icon="FILE_IMAGE",
             )
@@ -2371,7 +2441,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 scene,
                 "qwen_strip_2",
                 scene.sequence_editor,
-                "sequences",
+                "strips",
                 text="",
                 icon="FILE_IMAGE",
             )
@@ -2382,7 +2452,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 scene,
                 "qwen_strip_3",
                 scene.sequence_editor,
-                "sequences",
+                "strips",
                 text="",
                 icon="FILE_IMAGE",
             )
@@ -2397,7 +2467,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     scene,
                     f"flux_strip_{i}",
                     scene.sequence_editor,
-                    "sequences",
+                    "strips",
                     text="",
                     icon="FILE_IMAGE",
                 )
@@ -2432,7 +2502,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                             scene,
                             "minimax_subject",
                             scene.sequence_editor,
-                            "sequences",
+                            "strips",
                             text="Subject",
                             icon="USER",
                         )
@@ -2445,7 +2515,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                             scene,
                             "out_frame",
                             scene.sequence_editor,
-                            "sequences",
+                            "strips",
                             text="End Frame",
                             icon="RENDER_RESULT",
                         )
@@ -2488,7 +2558,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                                 scene,
                                 "inpaint_selected_strip",
                                 scene.sequence_editor,
-                                "sequences",
+                                "strips",
                                 text="Inpaint Mask",
                                 icon="SEQ_STRIP_DUPLICATE",
                             )
@@ -2500,7 +2570,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     scene,
                     "kontext_strip_1",
                     scene.sequence_editor,
-                    "sequences",
+                    "strips",
                     text="Reference Image",
                     icon="FILE_IMAGE",
                 )
@@ -6518,7 +6588,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                             if movie_model_card == "rootonchair/LTX-2-19b-distilled" or movie_model_card == "Lightricks/LTX-2" or movie_model_card == "LTX-2 Multi-Input File": 
                                 filepath = dst_path
                                 if os.path.isfile(filepath):
-                                    strip = scene.sequence_editor.sequences.new_sound(
+                                    strip = scene.sequence_editor.strips.new_sound(
                                         name=prompt,
                                         filepath=filepath,
                                         channel=empty_channel,
@@ -6533,27 +6603,31 @@ class SEQUENCER_OT_generate_movie(Operator):
                                 else:
                                     print("No resulting audio-file found!")
                             
-                            bpy.ops.sequencer.movie_strip_add(
+                            scene.sequence_editor.strips.new_movie(
+                                name = str(seed) + "_" + prompt,
                                 filepath=dst_path,
                                 frame_start=start_frame,
                                 channel=empty_channel,
                                 fit_method="FIT",
-                                adjust_playback_rate=True,
-                                sound=sound,
-                                use_framerate=False,
                             )
                             strip = scene.sequence_editor.active_strip
                             scene.sequence_editor.active_strip = strip
-                            strip.name = str(seed) + "_" + prompt
-                            strip.use_proxy = True
-                            bpy.ops.sequencer.rebuild_proxy()
+                            
+                            #strip.use_framerate=False
+                            #strip.use_proxy = True
+                            #scene.sequence_editor.build_proxy()
                             if i > 0:
                                 scene.frame_current = (
                                     scene.sequence_editor.active_strip.frame_final_start
                                 )
-
+                            sound_strip = scene.sequence_editor.strips.new_sound(
+                                name=str(seed) + "_" + prompt,
+                                filepath=dst_path,
+                                channel=empty_channel-1,
+                                frame_start=start_frame,
+                            )
                             # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
-                            bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
+                            #bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
                             break
             print_elapsed_time(start_time)
         if old_duration == -1 and input == "input_strips":
@@ -6571,8 +6645,8 @@ class SEQUENCER_OT_generate_movie(Operator):
             clear_cuda_cache()
 
         bpy.types.Scene.movie_path = ""
-        if input != "input_strips":
-            bpy.ops.renderreminder.pallaidium_play_notification()
+#        if input != "input_strips":
+#            bpy.ops.renderreminder.pallaidium_play_notification()
         scene.frame_current = current_frame
         return {"FINISHED"}
     
@@ -6892,7 +6966,7 @@ class SEQUENCER_OT_generate_audio(Operator):
             print("Audio model card changed. Forcing load.")
             should_load = True
 
-        strips = context.selected_sequences
+        strips = context.selected_strips
         if strip in strips:
             duration = scene.audio_length_in_f = (
                 strip.frame_final_duration + 1
@@ -7790,14 +7864,14 @@ class SEQUENCER_OT_generate_audio(Operator):
                     # clear the VRAM
                     clear_cuda_cache()
 
-                    if input != "input_strips":
-                        bpy.ops.renderreminder.pallaidium_play_notification()
+#                    if input != "input_strips":
+#                        bpy.ops.renderreminder.pallaidium_play_notification()
                     return {"CANCELLED"}                   
 
             # Add Audio Strip
             filepath = filename
             if os.path.isfile(filepath):
-                strip = scene.sequence_editor.sequences.new_sound(
+                strip = scene.sequence_editor.strips.new_sound(
                     name=prompt,
                     filepath=filepath,
                     channel=empty_channel,
@@ -7831,8 +7905,8 @@ class SEQUENCER_OT_generate_audio(Operator):
             # clear the VRAM
             clear_cuda_cache()
 
-        if input != "input_strips":
-            bpy.ops.renderreminder.pallaidium_play_notification()
+#        if input != "input_strips":
+#            bpy.ops.renderreminder.pallaidium_play_notification()
         return {"FINISHED"}
 
 #def get_depth_map(image):
@@ -8099,7 +8173,7 @@ class SEQUENCER_OT_generate_image(Operator):
         local_files_only = addon_prefs.local_files_only
         image_model_card = addon_prefs.image_model_card
         image_power = scene.image_power
-        strips = context.selected_sequences
+        strips = context.selected_strips
         type = scene.generatorai_typeselect
 
         inference_parameters = None
@@ -11077,7 +11151,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             # Add strip
             if os.path.isfile(out_path):
-                strip = scene.sequence_editor.sequences.new_image(
+                strip = scene.sequence_editor.strips.new_image(
                     name=str(seed) + "_" + context.scene.generate_movie_prompt,
                     frame_start=start_frame,
                     filepath=out_path,
@@ -11144,8 +11218,8 @@ class SEQUENCER_OT_generate_image(Operator):
             clear_cuda_cache()
 
         scene.movie_num_guidance = guidance
-        if input != "input_strips":
-            bpy.ops.renderreminder.pallaidium_play_notification()
+#        if input != "input_strips":
+#            bpy.ops.renderreminder.pallaidium_play_notification()
         scene.frame_current = current_frame
 
         return {"FINISHED"}
@@ -11504,31 +11578,36 @@ class SEQUENCER_OT_generate_text(Operator):
 
         # --- STRIP CREATION ---
         if input == "input_strips" and active_strip:
-            start_frame = int(active_strip.frame_start)
-            end_frame = (
-                start_frame + active_strip.frame_final_duration
-            )
+            # Use 'left_handle' (formerly frame_final_start) for the start position
+            # Use 'duration' (formerly frame_final_duration) for the length
+            start_frame = int(getattr(active_strip, 'left_handle', getattr(active_strip, 'frame_final_start', 1)))
+            duration = int(getattr(active_strip, 'duration', getattr(active_strip, 'frame_final_duration', 100)))
+            
+            # The strip length must be the duration of the source strip
+            strip_length = duration
         else:
             start_frame = int(scene.frame_current)
-            end_frame = (
-                start_frame + 100
-            )
+            strip_length = 100
 
-        empty_channel = find_first_empty_channel(
-            start_frame,
-            end_frame,
-        )
+        empty_channel = find_first_empty_channel(start_frame, start_frame + strip_length)
 
         # Add strip
         if text:
-            strip = scene.sequence_editor.sequences.new_effect(
+            # We use 'length' instead of 'frame_end' for the constructor
+            strip = scene.sequence_editor.strips.new_effect(
                 name=str(text),
                 type="TEXT",
                 frame_start=start_frame,
-                frame_end=end_frame,
+                length=strip_length, # This is the duration in frames
                 channel=empty_channel,
             )
-            strip.frame_final_end = end_frame
+            
+            # If you are in 5.1, right_handle is the absolute end frame
+            if hasattr(strip, 'right_handle'):
+                strip.right_handle = start_frame + strip_length
+            else:
+                strip.frame_final_end = start_frame + strip_length
+                
             strip.text = text
             strip.wrap_width = 0.68
             strip.font_size = 16
@@ -11598,7 +11677,7 @@ def delete_linked_audio(context, movie_strip):
     movie_path = movie_strip.filepath
     movie_start = movie_strip.frame_start
 
-    for s in seq_editor.sequences_all:
+    for s in seq_editor.strips_all:
         if (
             s.type == 'SOUND' and
             getattr(s.sound, "filepath", None) == movie_path and
@@ -11622,7 +11701,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.scene and context.scene.sequence_editor
+        return context.sequencer_scene and context.scene.sequence_editor
 
     def execute(self, context):
         # --- Initialization ---
@@ -11642,10 +11721,10 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
 
         scene = context.scene
         sequencer = bpy.ops.sequencer
-        strips = context.selected_sequences
+        strips = context.selected_strips
         active_strip = context.scene.sequence_editor.active_strip
         
-        if not strips == context.selected_sequences:
+        if not strips == context.selected_strips:
             active_strip.select = True
             
         # STORE BASE PROMPTS HERE - These are our "Clean" copies
@@ -11697,7 +11776,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         
         for count, strip in enumerate(strips):
             # 1. Selection Logic
-            for dsel_strip in bpy.context.scene.sequence_editor.sequences:
+            for dsel_strip in bpy.context.scene.sequence_editor.strips:
                 dsel_strip.select = False
             strip.select = True
             context.scene.sequence_editor.active_strip = strip
@@ -11716,8 +11795,8 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
             should_load_model = is_first_strip or type_has_changed
             should_unload_model = is_last_strip or next_type_is_different
 
-            context.scene["ai_load_state"] = should_load_model
-            context.scene["ai_unload_state"] = should_unload_model
+            context.sequencer_scene["ai_load_state"] = should_load_model
+            context.sequencer_scene["ai_unload_state"] = should_unload_model
             
             print(f"Processing {count+1}/{total_strips} [{strip.type}]. Load: {should_load_model}, Unload: {should_unload_model}")
 
@@ -11726,14 +11805,14 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
             if target_type == "movie" and addon_prefs.movie_model_card == "LTX-2 Multi-Input File":
                 if strip.type == "META":
                     meta_strip = strip
-                    strips_array = strip.sequences
+                    strips_array = strip.strips
                 else:
                     meta_strip = None
                     strips_array = [strip]
                 
                 current_temp_strip = None
                 for child_strip in strips_array: 
-                    for dsel_strip in bpy.context.scene.sequence_editor.sequences:
+                    for dsel_strip in bpy.context.scene.sequence_editor.strips:
                         dsel_strip.select = False
                     child_strip.select = True
                     context.scene.sequence_editor.active_strip = child_strip 
@@ -11757,7 +11836,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     if child_strip.type == "TEXT":
                         #if child_strip.text:
                         if meta_strip and meta_strip.type == 'META':
-                            for child in meta_strip.sequences:
+                            for child in meta_strip.strips:
                                 if child.type == 'TEXT':
                                     print("Found text:", child.text)
                                     current_prompt_text = child.text + ", " + base_prompt
@@ -11772,7 +11851,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                         # Set path
                         if current_temp_strip.type == "IMAGE":
                             strip_dirname = os.path.dirname(current_temp_strip.directory)
-                            file_path = bpy.path.abspath(os.path.join(current_temp_strip, current_temp_strip.elements[0].filename))
+                            file_path = bpy.path.abspath(os.path.join(strip_dirname, current_temp_strip.elements[0].filename))
                             bpy.types.Scene.movie_path = file_path
                         else:
                             if current_temp_strip.type == "MOVIE":
@@ -11803,7 +11882,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                             SEQUENCER_OT_duplicate={},
                             TRANSFORM_OT_seq_slide={"value": (0, 1), "use_restore_handle_selection": False, "snap": False}
                         )
-                        intermediate_strip = bpy.context.selected_sequences[0]
+                        intermediate_strip = bpy.context.selected_strips[0]
                         intermediate_strip.frame_start = strip.frame_start
                         intermediate_strip.frame_offset_start = int(trim_frame)
                         intermediate_strip.frame_final_duration = 1
@@ -11813,7 +11892,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     elif target_type == "text":
                         bpy.ops.sequencer.copy()
                         bpy.ops.sequencer.paste(keep_offset=True)
-                        intermediate_strip = bpy.context.selected_sequences[0]
+                        intermediate_strip = bpy.context.selected_strips[0]
                         intermediate_strip.frame_start = strip.frame_start
                         intermediate_strip.frame_final_duration = strip.frame_final_duration
                         temp_strip = strip = get_render_strip(self, context, intermediate_strip)
@@ -11934,7 +12013,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     if s:
                         try:
                             seq_editor = context.scene.sequence_editor
-                            if seq_editor and s.name in seq_editor.sequences_all:
+                            if seq_editor and s.name in seq_editor.strips_all:
 
                                 if s.type == 'MOVIE':
                                     delete_linked_audio(context, s)
@@ -11956,11 +12035,11 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         context.scene.movie_num_seed = seed
         context.scene.sequence_editor.active_strip = active_strip
 
-        try:
-            addon_prefs.playsound = play_sound
-            bpy.ops.renderreminder.pallaidium_play_notification()
-        except:
-            pass
+#        try:
+#            addon_prefs.playsound = play_sound
+#            bpy.ops.renderreminder.pallaidium_play_notification()
+#        except:
+#            pass
 
         print("Processing finished.")
 
@@ -11992,7 +12071,7 @@ class SEQUENCER_OT_ai_strip_picker(Operator):
             v2d = region.view2d
             mouse_x_view, mouse_y_view = v2d.region_to_view(*mouse_region_coord)
 
-            for strip in context.scene.sequence_editor.sequences_all:
+            for strip in context.scene.sequence_editor.strips_all:
                 # Check if the strip has a transform property before accessing it
                 if hasattr(strip, 'transform'):
                     scale_y = strip.transform.scale_y
@@ -12205,7 +12284,7 @@ class AI_Metadata_PT_Panel(bpy.types.Panel):
     @classmethod
     def poll(cls, context):
         if context.space_data.view_type in {'SEQUENCER', 'PREVIEW'}:
-            if context.scene and context.scene.sequence_editor:
+            if context.sequencer_scene and context.scene.sequence_editor:
                 active_strip = context.scene.sequence_editor.active_strip
                 if active_strip and active_strip.type in {'IMAGE', 'MOVIE'}:
                     return True
