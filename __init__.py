@@ -1622,28 +1622,28 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "API MiniMax (subject2vid)",
                 "Purchased API access needed!",
             ),
-            ("THUDM/CogVideoX-2b", "CogVideoX-2b (720x480x48)", "THUDM/CogVideoX-2b"),
-            ("THUDM/CogVideoX-5b", "CogVideoX-5b (720x480x48)", "THUDM/CogVideoX-5b"),
-            (
-                "hunyuanvideo-community/HunyuanVideo",
-                "Hunyuan Video 960x544x(frames/4+1)",
-                "hunyuanvideo-community/HunyuanVideo",
-            ),
+            #("THUDM/CogVideoX-2b", "CogVideoX-2b (720x480x48)", "THUDM/CogVideoX-2b"),
+            #("THUDM/CogVideoX-5b", "CogVideoX-5b (720x480x48)", "THUDM/CogVideoX-5b"),
+#            (
+#                "hunyuanvideo-community/HunyuanVideo",
+#                "Hunyuan Video 960x544x(frames/4+1)",
+#                "hunyuanvideo-community/HunyuanVideo",
+#            ),
             (
                 "lllyasviel/FramePackI2V_HY",
                 "FramePack 960x544x(frames/4+1)",
                 "lllyasviel/FramePackI2V_HY",
             ),
-            (
-                "Lightricks/LTX-2",
-                "LTX-2",
-                "Lightricks/LTX-2",
-            ), 
-            (
-                "rootonchair/LTX-2-19b-distilled",
-                "LTX-2 19b Distilled",
-                "rootonchair/LTX-2-19b-distilled",
-            ), 
+#            (
+#                "Lightricks/LTX-2",
+#                "LTX-2",
+#                "Lightricks/LTX-2",
+#            ), 
+#            (
+#                "rootonchair/LTX-2-19b-distilled",
+#                "LTX-2 19b Distilled",
+#                "rootonchair/LTX-2-19b-distilled",
+#            ), 
             (
                 "LTX-2 Multi-Input File",
                 "LTX-2 Multi-Input (Txt, Aud & Img in Meta Strips)",
@@ -1687,7 +1687,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Qwen Multi-image Edit 2511",
                 "Text and multiple images as input.",
             ),
-            ("diffusers/FLUX.2-dev-bnb-4bit", "Flux2", "diffusers/FLUX.2-dev-bnb-4bit"),
+            # ("diffusers/FLUX.2-dev-bnb-4bit", "Flux2", "diffusers/FLUX.2-dev-bnb-4bit"),
             ("Runware/BFL-FLUX.2-klein-base-4B", "FLUX.2 klein 4B", "Runware/BFL-FLUX.2-klein-base-4B"),
             ("black-forest-labs/FLUX.2-klein-9b-kv", "FLUX.2 klein 9B", "black-forest-labs/FLUX.2-klein-9b-kv"),
             ("ChuckMcSneed/FLUX.1-dev", "Flux Dev", "ChuckMcSneed/FLUX.1-dev"),
@@ -1702,11 +1702,11 @@ class GeneratorAddonPreferences(AddonPreferences):
 
             ("kontext-community/relighting-kontext-dev-lora-v3", "Flux Kontext Relight", "kontext-community/relighting-kontext-dev-lora-v3"),
 
-            ("fuliucansheng/FLUX.1-Canny-dev-diffusers-lora", "Flux Canny", "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"),
+            # ("fuliucansheng/FLUX.1-Canny-dev-diffusers-lora", "Flux Canny", "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"),
 
             ("romanfratric234/FLUX.1-Depth-dev-lora", "Flux Depth", "romanfratric234/FLUX.1-Depth-dev-lora"),
 
-            ("Runware/FLUX.1-Redux-dev", "Flux Redux", "Runware/FLUX.1-Redux-dev"),
+            # ("Runware/FLUX.1-Redux-dev", "Flux Redux", "Runware/FLUX.1-Redux-dev"),
 
             ("lodestones/Chroma", "Chroma", "Chroma is a 8.9B parameter model based on FLUX.1-schnell"),
             (
@@ -1714,11 +1714,11 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "SDXL 1.0 (1024x1024)",
                 "stabilityai/stable-diffusion-xl-base-1.0",
             ),
-            (
-                "adamo1139/stable-diffusion-3.5-large-ungated",
-                "SDXL 3.5 Large",
-                "adamo1139/stable-diffusion-3.5-large-ungated",
-            ),
+#            (
+#                "adamo1139/stable-diffusion-3.5-large-ungated",
+#                "SDXL 3.5 Large",
+#                "adamo1139/stable-diffusion-3.5-large-ungated",
+#            ),
             (
                 "adamo1139/stable-diffusion-3.5-medium-ungated",
                 "SDXL 3.5 Medium",
@@ -3074,6 +3074,7 @@ def invoke_video_generation(prompt, api_key, image_url, movie_model_card):
     import requests
     import json
     import base64
+    import os
 
     debug_print("-----------------Submit video generation task-----------------")
     url = "https://api.minimaxi.chat/v1/video_generation"
@@ -3337,6 +3338,7 @@ class SEQUENCER_OT_generate_movie(Operator):
     def execute(self, context):
         global _pallaidium_movie_model_cache
         import random
+        import os
         
         scene = context.scene
 
@@ -3483,7 +3485,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         pipe.to("mps")
                     elif low_vram():
                         pipe.enable_sequential_cpu_offload()
-                        # pipe.enable_vae_slicing()
+                        # pipe.vae.enable_slicing()
                         pipe.vae.enable_tiling()
                     else:
                         pipe.enable_model_cpu_offload()
@@ -3540,7 +3542,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         pipe.to("mps")
                     elif low_vram():
                         pipe.enable_sequential_cpu_offload()
-                        # pipe.enable_vae_slicing()
+                        # pipe.vae.enable_slicing()
                         pipe.vae.enable_tiling()
                     else:
                         pipe.enable_model_cpu_offload()
@@ -3891,7 +3893,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     if gfx_device == "mps":
                         pipe.to("mps")
                     elif low_vram():
-                        # pipe.enable_vae_slicing()
+                        # pipe.vae.enable_slicing()
                         pipe.vae.enable_tiling()
                         pipe.enable_model_cpu_offload()
                     else:
@@ -4267,7 +4269,7 @@ class SEQUENCER_OT_generate_movie(Operator):
     #                if gfx_device == "mps":
     #                    pipe.to("mps")
     #                elif low_vram():
-    #                    # pipe.enable_vae_slicing()
+    #                    # pipe.enable_slicing()
     #                    pipe.enable_model_cpu_offload()
     #                else:
     #                    #pipe.enable_sequential_cpu_offload()
@@ -4293,7 +4295,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         pipe.to("mps")
                     elif low_vram():
                         pipe.enable_model_cpu_offload()
-                        # pipe.enable_vae_slicing()
+                        # pipe.vae.enable_slicing()
                     else:
                         pipe.to(gfx_device)
             
@@ -5414,6 +5416,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 elif movie_model_card == "hunyuanvideo-community/HunyuanVideo":
 
                     from diffusers.utils import load_image, export_to_video
+                    import os
                     if scene.movie_path:
                         print("Process: Video Image to Video (Hunyuan-I2V)")
                         if not os.path.isfile(scene.movie_path):
@@ -6935,6 +6938,7 @@ class SEQUENCER_OT_generate_audio(Operator):
 
     def execute(self, context):
         global _pallaidium_audio_model_cache
+        import os
         
         scene = context.scene
         if not scene.sequence_editor:
@@ -8166,6 +8170,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
     def execute(self, context):
         global _pallaidium_model_cache
+        import os
         
         scene = context.scene
         seq_editor = scene.sequence_editor
@@ -8563,7 +8568,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         elif low_vram():
                             converter.enable_sequential_cpu_offload()
                             #converter.enable_model_cpu_offload()
-                            converter.enable_vae_slicing()
+                            converter.vae.enable_slicing()
                             converter.vae.enable_tiling()
                         else:
                             converter.enable_model_cpu_offload()
@@ -8632,12 +8637,12 @@ class SEQUENCER_OT_generate_image(Operator):
                         elif low_vram():
                             #pipe.enable_sequential_cpu_offload()
                             converter.enable_model_cpu_offload()
-                            converter.enable_vae_slicing()
+                            converter.vae.enable_slicing()
                             converter.vae.enable_tiling()
                         else:
                             #pipe.enable_sequential_cpu_offload()
                             converter.enable_model_cpu_offload()
-                            converter.enable_vae_slicing()
+                            converter.vae.enable_slicing()
                             converter.vae.enable_tiling()
 
                         if pipecard == "ChuckMcSneed/FLUX.1-dev":
@@ -8671,12 +8676,12 @@ class SEQUENCER_OT_generate_image(Operator):
                             converter.to("mps")
                         elif low_vram():
                             converter.enable_model_cpu_offload()
-                            converter.enable_vae_slicing()
+                            converter.vae.enable_slicing()
                             converter.vae.enable_tiling()
                         else:
                             converter.enable_sequential_cpu_offload()
                             #converter.enable_model_cpu_offload() # too slow
-                            converter.enable_vae_slicing()
+                            converter.vae.enable_slicing()
                             converter.vae.enable_tiling()
 
                     elif image_model_card == "Qwen/Qwen-Image-2512":
@@ -8734,7 +8739,7 @@ class SEQUENCER_OT_generate_image(Operator):
                             converter.to("mps")
                         elif low_vram():
                             converter.enable_model_cpu_offload()
-                            converter.enable_vae_slicing()
+                            converter.vae.enable_slicing()
                             converter.vae.enable_tiling()
                         else:
                             converter.enable_model_cpu_offload()
@@ -9172,7 +9177,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     elif low_vram():
                         #pipe.enable_sequential_cpu_offload()
                         pipe.enable_model_cpu_offload()
-                        pipe.enable_vae_slicing()
+                        pipe.vae.enable_slicing()
                         pipe.vae.enable_tiling()
                     else:
                         pipe.enable_model_cpu_offload()
@@ -9201,7 +9206,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         pipe.to("mps")
                     elif low_vram():
                         pipe.enable_model_cpu_offload()
-                        pipe.enable_vae_slicing()
+                        pipe.vae.enable_slicing()
                         pipe.vae.enable_tiling()
                     else:
                         pipe.enable_model_cpu_offload()
@@ -9235,7 +9240,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 elif low_vram():
                     converter.enable_sequential_cpu_offload()
                     #converter.enable_model_cpu_offload()
-                    converter.enable_vae_slicing()
+                    converter.vae.enable_slicing()
                     converter.vae.enable_tiling()
                 else:
                     converter.enable_model_cpu_offload()
@@ -9347,7 +9352,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         pipe.to("mps")
                     elif low_vram():
                         pipe.enable_model_cpu_offload()
-                        pipe.enable_vae_slicing()
+                        pipe.vae.enable_slicing()
                         pipe.vae.enable_tiling()
                     else:
                         pipe.enable_model_cpu_offload()
@@ -9388,7 +9393,7 @@ class SEQUENCER_OT_generate_image(Operator):
                             pipe.to("mps")
                         elif low_vram():
                             pipe.enable_model_cpu_offload()
-                            pipe.enable_vae_slicing()
+                            pipe.vae.enable_slicing()
                             pipe.vae.enable_tiling()
                     else:
                         print("Quant: 8-bit")
@@ -9829,7 +9834,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 elif low_vram():
                     refiner.enable_model_cpu_offload()
                     # refiner.enable_vae_tiling()
-                    # refiner.enable_vae_slicing()
+                    # refiner.vae.enable_slicing()
                 else:
                     refiner.to(gfx_device)
             
@@ -11302,6 +11307,7 @@ class SEQUENCER_OT_generate_text(Operator):
 
     def execute(self, context):
         global _pallaidium_text_model_cache
+        import os
         
         scene = context.scene
         input = scene.input_strips
@@ -11706,6 +11712,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         return context.sequencer_scene and context.scene.sequence_editor
 
     def execute(self, context):
+        import os
         # --- Initialization ---
         bpy.types.Scene.movie_path = ""
         bpy.types.Scene.image_path = ""
