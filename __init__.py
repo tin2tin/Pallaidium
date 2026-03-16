@@ -1069,8 +1069,10 @@ class DependencyManager:
     def get_phase_3_git_and_extensions(self):
         reqs = [
             "git+https://github.com/huggingface/diffusers.git", 
-            "git+https://github.com/SWivid/F5-TTS.git",
-            "git+https://github.com/QwenLM/Qwen3-TTS.git",
+            #"git+https://github.com/SWivid/F5-TTS.git",
+            "faster-qwen3-tts",
+            #"git+https://github.com/QwenLM/Qwen3-TTS.git",
+            #"git+https://github.com/huggingface/parler-tts.git",
             "stable-audio-tools", 
             "torcheval", 
             "torchao", 
@@ -1756,25 +1758,25 @@ class GeneratorAddonPreferences(AddonPreferences):
         default="stabilityai/stable-diffusion-xl-base-1.0",
         update=output_strips_updated,
     )
-    if low_vram():
-        parler = (
-            "parler-tts/parler-tts-mini-v1",
-            "Speech: Parler TTS Mini",
-            "parler-tts/parler-tts-mini-v1",
-        )
-    else:
-        parler = (
-            "parler-tts/parler-tts-large-v1",
-            "Speech: Parler TTS Large",
-            "parler-tts/parler-tts-large-v1",
-        )
+#    if low_vram(): # broken by transformers
+#        parler = (
+#            "parler-tts/parler-tts-mini-v1",
+#            "Speech: Parler TTS Mini",
+#            "parler-tts/parler-tts-mini-v1",
+#        )
+#    else:
+#        parler = (
+#            "parler-tts/parler-tts-large-v1",
+#            "Speech: Parler TTS Large",
+#            "parler-tts/parler-tts-large-v1",
+#        )
 
     if os_platform != "Linux":
         items = [
             ("Chatterbox", "Speech: Chatterbox", "Zero shot TTS & voice conversion"),
             ("ChatterboxTurbo", "Speech: ChatterboxTurbo", "Zero shot TTS & voice conversion"),
             ("Qwen/Qwen3-TTS-12Hz-1.7B-Base", "Speech: Qwen3-TTS Clone", "Qwen/Qwen3-TTS-12Hz-1.7B-Base"),
-            ("SWivid/F5-TTS", "Speech: F5-TTS", "Zero shot TTS"),
+            # ("SWivid/F5-TTS", "Speech: F5-TTS", "Zero shot TTS"), Broken dependencies
 #            ("WhisperSpeech", "Speech: WhisperSpeech", "Zero shot TTS"),
             ("MMAudio", "Audio: Video to Audio", "Add sync audio to video"),
             (
@@ -1782,11 +1784,11 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Audio: Stable Audio Open",
                 "Text to sfx",
             ),
-            parler,
+            #parler,
         ]
     else:
         items = [
-            ("SWivid/F5-TTS", "Speech: F5-TTS", "SWivid/F5-TTS"),
+            # ("SWivid/F5-TTS", "Speech: F5-TTS", "SWivid/F5-TTS"), Broken dependencies
             ("Chatterbox", "Chatterbox", "Zero shot txt2speech & voice cloning"),
             ("ChatterboxTurbo", "Speech: ChatterboxTurbo", "Zero shot TTS & voice conversion"),
             ("Qwen/Qwen3-TTS-12Hz-1.7B-Base", "Speech: Qwen3-TTS Clone", "Qwen/Qwen3-TTS-12Hz-1.7B-Base"),
@@ -1796,7 +1798,7 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Stable Audio Open",
                 "Text to sfx",
             ),
-            parler,
+            #parler,
         ]
 
     audio_model_card: bpy.props.EnumProperty(
@@ -1818,16 +1820,16 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Image Captioning: Blip",
                 "Image Captioning",
             ),
-            ( #killed by transformers updates
+            (
                 "florence-community/Florence-2-large",
                 "Image Captioning: Florence-2",
                 "Image Captioning",
             ),
-            (
-                "ZuluVision/MoviiGen1.1_Prompt_Rewriter",
-                "Prompt Enhancer: MoviiGen",
-                "MoviiGen Prompt Rewriter",
-            ),
+#            ( #torchao error
+#                "ZuluVision/MoviiGen1.1_Prompt_Rewriter",
+#                "Prompt Enhancer: MoviiGen",
+#                "MoviiGen Prompt Rewriter",
+#            ),
         ],
         default="Salesforce/blip-image-captioning-large",
         update=output_strips_updated,
@@ -2256,7 +2258,7 @@ def get_render_strip(self, context, strip, meta_strip=None):
         
     if resulting_strip:
         if debug: print(f"[DEBUG] Successfully imported rendered strip: {resulting_strip.name}")
-        resulting_strip.use_proxy = False
+        #resulting_strip.use_proxy = False
         sequencer.active_strip = resulting_strip
              
     if debug: print("[DEBUG] --- get_render_strip Finished ---\n")
@@ -7090,7 +7092,8 @@ class SEQUENCER_OT_generate_audio(Operator):
             try:
                 import torch
                 import soundfile as sf
-                from qwen_tts import Qwen3TTSModel
+                #from qwen_tts import Qwen3TTSModel
+                from faster_qwen3_tts import FasterQwen3TTS
             except ModuleNotFoundError as e:
                 missing_module_name = e.name
                 error_message = (
@@ -7251,12 +7254,12 @@ class SEQUENCER_OT_generate_audio(Operator):
                     device = "cpu"
                 print(f"Using device: {device}")
                 
-                model = Qwen3TTSModel.from_pretrained(
+                model = FasterQwen3TTS.from_pretrained(
                     "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
-                    device_map=device,
+                    #device_map=device,
                     dtype=torch.bfloat16,
-                    attn_implementation="flash_attention_2",
-                )
+                    #attn_implementation="flash_attention_2",
+                )                
 
             # Parler
             elif (
@@ -7538,7 +7541,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                     print("Voice cloning: "+strip.sound.name)
                     # For VC we might need to load a different model, but we try to reuse cached if compatible or load fresh
                     vc_model = ChatterboxVC.from_pretrained(device)
-                    wav = vc_model.generate(audio=AUDIO_PROMPT_PATH,target_voice_path=speaker)
+                    wav = vc_model.generate(audio=AUDIO_PROMPT_PATH)#,target_voice_path=speaker)
                     ta.save(output_audio_path, wav, vc_model.sr)
                 else: # Text-to-Speech
                     try:
@@ -7612,7 +7615,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                     print("Voice cloning: "+strip.sound.name)
                     # For VC we might need to load a different model, but we try to reuse cached if compatible or load fresh
                     vc_model = ChatterboxTurboTTS.from_pretrained(device)
-                    wav = vc_model.generate(audio=AUDIO_PROMPT_PATH,target_voice_path=speaker)
+                    wav = vc_model.generate(audio_prompt_path=AUDIO_PROMPT_PATH)
                     ta.save(output_audio_path, wav, vc_model.sr)
                 else: # Text-to-Speech
                     try:
@@ -7674,11 +7677,12 @@ class SEQUENCER_OT_generate_audio(Operator):
                 try:
                     # Use cached model if available
                     if model is None:
-                        model = Qwen3TTSModel.from_pretrained(
+                        #model = Qwen3TTSModel.from_pretrained(
+                        model = FasterQwen3TTS.from_pretrained(
                             "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
-                            device_map=device,
+                            #device_map=device,
                             dtype=torch.bfloat16,
-                            attn_implementation="flash_attention_2",
+                            #attn_implementation="flash_attention_2",
                         )
                 except Exception as e:
                     print(f"An unexpected error occurred in the TTS process: {e}")
@@ -7699,16 +7703,14 @@ class SEQUENCER_OT_generate_audio(Operator):
                     self.report({"INFO"}, "Reference text file not found.")
                     return {"CANCELLED"}        
 
-                prompt_items = model.create_voice_clone_prompt(
+                wavs = None
+                
+                wavs, sr = model.generate_voice_clone(
+                    text=prompt,
+                    language="English",
+
                     ref_audio=ref_audio,
                     ref_text=ref_text,
-                    x_vector_only_mode=False,
-                )
-                wavs = None
-                wavs, sr = model.generate_voice_clone(
-                    text=[prompt],
-                    language=["English"],
-                    voice_clone_prompt=prompt_items,
                 )
                 if not wavs:
                     print("Audio generation failed")
