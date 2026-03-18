@@ -1075,7 +1075,7 @@ class DependencyManager:
             #"git+https://github.com/huggingface/parler-tts.git",
             "stable-audio-tools", 
             "torcheval", 
-            "torchao", 
+            "torchao==0.12.0", 
             "spacy",
             "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl",
             #"https://huggingface.co/lldacing/flash-attention-windows-wheel/resolve/main/flash_attn-2.7.4.post1%2Bcu128torch2.7.0cxx11abiFALSE-cp311-cp311-win_amd64.whl",
@@ -1088,7 +1088,8 @@ class DependencyManager:
         if self.os_platform == "Windows":
             reqs.extend([
                 "git+https://github.com/hkchengrex/MMAudio.git", 
-                "git+https://github.com/tin2tin/resemble-enhance-windows.git", 
+                "git+https://github.com/tin2tin/resemble-enhance-windows.git",
+                "https://github.com/woct0rdho/triton-windows/releases/download/empty/triton-3.4.0-py3-none-any.whl" 
                 "triton-windows<3.3"
             ])
         else:
@@ -1357,7 +1358,7 @@ def input_strips_updated(self, context):
 
     # Audio Type Handling
     elif scene_type == "audio":
-        if audio_model == "stabilityai/stable-audio-open-1.0":
+        if audio_model == "tintwotin/Foundation-1-Diffusers":
             scene.movie_num_inference_steps = 200
 #        elif addon_prefs.audio_model_card == "MMAudio" and scene.input_strips != "input_strips":
 #            scene.input_strips = "input_strips"
@@ -1461,7 +1462,7 @@ def output_strips_updated(self, context):
 
     # === AUDIO TYPE === #
     elif type == "audio":
-        if audio_model == "stabilityai/stable-audio-open-1.0":
+        if audio_model == "tintwotin/Foundation-1-Diffusers":
             movie_inference = 200
 #        if addon_prefs.audio_model_card == "MMAudio":
 #            scene.input_strips = "input_strips"
@@ -1780,9 +1781,9 @@ class GeneratorAddonPreferences(AddonPreferences):
 #            ("WhisperSpeech", "Speech: WhisperSpeech", "Zero shot TTS"),
             ("MMAudio", "Audio: Video to Audio", "Add sync audio to video"),
             (
-                "stabilityai/stable-audio-open-1.0",
-                "Audio: Stable Audio Open",
-                "Text to sfx",
+                "tintwotin/Foundation-1-Diffusers",
+                "Music Loop: Fountain 1",
+                "Text to Music",
             ),
             #parler,
         ]
@@ -1794,9 +1795,9 @@ class GeneratorAddonPreferences(AddonPreferences):
             ("Qwen/Qwen3-TTS-12Hz-1.7B-Base", "Speech: Qwen3-TTS Clone", "Qwen/Qwen3-TTS-12Hz-1.7B-Base"),
             ("MMAudio", "Audio: Video to Audio", "Add sync audio to video"),
             (
-                "stabilityai/stable-audio-open-1.0",
+                "tintwotin/Foundation-1-Diffusers",
                 "Stable Audio Open",
-                "Text to sfx",
+                "Text to Music",
             ),
             #parler,
         ]
@@ -1804,7 +1805,7 @@ class GeneratorAddonPreferences(AddonPreferences):
     audio_model_card: bpy.props.EnumProperty(
         name="Audio Model",
         items=items,
-        default="stabilityai/stable-audio-open-1.0",
+        default="tintwotin/Foundation-1-Diffusers",
         update=output_strips_updated,
     )
     hugginface_token: bpy.props.StringProperty(
@@ -2633,7 +2634,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 if (
                     (
                         type == "audio"
-                        and audio_model_card == "stabilityai/stable-audio-open-1.0"
+                        and audio_model_card == "tintwotin/Foundation-1-Diffusers"
                     )
                     or (
                         type == "image"
@@ -2763,7 +2764,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
 
                 elif type == "audio" and (
                     addon_prefs.audio_model_card
-                    == "stabilityai/stable-audio-open-1.0"
+                    == "tintwotin/Foundation-1-Diffusers"
                 ):
                     col.prop(
                         context.scene, "movie_num_inference_steps", text="Quality Steps"
@@ -6994,7 +6995,7 @@ class SEQUENCER_OT_generate_audio(Operator):
         from scipy.io.wavfile import write as write_wav
 
         # --- DEPENDENCY CHECKS ---
-        if addon_prefs.audio_model_card == "stabilityai/stable-audio-open-1.0":
+        if addon_prefs.audio_model_card == "tintwotin/Foundation-1-Diffusers":
             try:
                 import scipy
                 import torch
@@ -7178,8 +7179,9 @@ class SEQUENCER_OT_generate_audio(Operator):
             # Load models Audio
             print("Model:  " + addon_prefs.audio_model_card)
 
-            if addon_prefs.audio_model_card == "stabilityai/stable-audio-open-1.0":
-                repo_id = "ylacombe/stable-audio-1.0"
+            if addon_prefs.audio_model_card == "tintwotin/Foundation-1-Diffusers":
+                #repo_id = "ylacombe/stable-audio-1.0"
+                repo_id = "tintwotin/Foundation-1-Diffusers"
                 pipe = StableAudioPipeline.from_pretrained(
                     repo_id, torch_dtype=torch.float16
                 )
@@ -7378,7 +7380,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                     generator = None
 
             # Stable Open Audio
-            if addon_prefs.audio_model_card == "stabilityai/stable-audio-open-1.0":
+            if addon_prefs.audio_model_card == "tintwotin/Foundation-1-Diffusers":
                 import random
                 print("Generate: Stable Open Audio")
                 seed = context.scene.movie_num_seed
@@ -11811,7 +11813,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
 
 
             # 3A. Intermediate META Strip Handling
-            if target_type == "movie" and addon_prefs.movie_model_card == "LTX-2 Multi-Input File":
+            if (target_type == "movie" and addon_prefs.movie_model_card == "LTX-2 Multi-Input File") or (target_type == "image"): # and addon_prefs.image_model_card == "Tongyi-MAI/Z-Image-Turbo" 
                 if strip.type == "META":
                     meta_strip = strip
                     strips_array = strip.strips
@@ -11866,7 +11868,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                             if current_temp_strip.type == "MOVIE":
                                 file_path = bpy.path.abspath(current_temp_strip.filepath)
                                 bpy.types.Scene.movie_path = file_path
-                            elif current_temp_strip.type == "SOUND":
+                            elif current_temp_strip.type == "SOUND" and target_type == "movie":
                                 file_path = bpy.path.abspath(current_temp_strip.sound.filepath)
                                 bpy.types.Scene.sound_path = file_path
                         current_temp_strip = None
