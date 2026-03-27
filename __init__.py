@@ -2024,246 +2024,80 @@ def copy_struct(source, target):
 def get_render_strip(self, context, strip, meta_strip=None):
     """Render selected strip to hard-disk. Returns the new strip object or None."""
     
-    debug = True  # Assuming True for your debugging, adjust as needed
-    
-    if debug: print(f"\n[DEBUG] --- get_render_strip Start ---")
-    if debug: print(f"[DEBUG] Input strip: {getattr(strip, 'name', 'None')}, meta_strip: {getattr(meta_strip, 'name', 'None')}")
-    
-    # --- 1. STRICT INPUT SANITIZATION ---
-    if isinstance(meta_strip, (set, dict, list, tuple)):
-        meta_strip = None
-
-    if isinstance(strip, (set, dict, list, tuple)):
-        if debug: print(f"Error: Invalid strip passed: {strip}")
-        return None
-
-    if not strip:
-        if debug: print("[DEBUG] Strip is None, returning.")
-        return None
-
-    # BLENDER 5.1 API: VSE scene is separate from active window scene
+    # 1. PRE-RENDER PREPARATION: Disable Caching/Prefetching to stop crashes
     vse_scene = getattr(context, 'sequencer_scene', context.scene)
-    active_scene = context.scene
-
-    if not context or not vse_scene or not vse_scene.sequence_editor:
-        if debug: print("[DEBUG] Invalid context or missing sequence_editor, returning.")
-        return None
-
-    sequencer = vse_scene.sequence_editor
+    if not vse_scene or not vse_scene.sequence_editor: return None
     
-    # --- 2. DETERMINE TARGET ---
-    target_to_copy = meta_strip if meta_strip else strip
-    if debug: print(f"[DEBUG] Target to copy: {target_to_copy.name}")
-
-    if not hasattr(target_to_copy, "select"):
-        if debug: print("[DEBUG] target_to_copy lacks 'select' attribute.")
-        return None
-
-    area = next((a for a in context.screen.areas if a.type == "SEQUENCE_EDITOR"), None)
-    region = next((r for r in area.regions if r.type == 'WINDOW'), None) if area else None
-
-    if not area or not region:
-        if debug: print("[DEBUG] No SEQUENCE_EDITOR area/region found.")
-        return None
-
-    # --- 3. COPY OPERATION (From Current Scene) ---
-    if debug: print("[DEBUG] Context override for COPY operation...")
-    # BLENDER 5.1 API: Ensure sequencer_scene is passed into overrides for VSE context
-    with bpy.context.temp_override(window=context.window, area=area, region=region, scene=active_scene, sequencer_scene=vse_scene):
-        bpy.ops.sequencer.select_all(action='DESELECT')
-        target_to_copy.select = True
-        sequencer.active_strip = target_to_copy
-        
-        # BLENDER 5.1 API: frame_final_start is now left_handle 
-        start_frame = int(getattr(target_to_copy, 'left_handle', getattr(target_to_copy, 'frame_final_start', 1)))
-        vse_scene.frame_current = start_frame
-
-        if target_to_copy.type != "SCENE":
-            if debug: print("[DEBUG] Executing copy operator.")
-            bpy.ops.sequencer.copy()
-        else:
-            if debug: print("[DEBUG] Target is SCENE type, skipping copy.")
-
-    # --- 4. CREATE SILENT BACKGROUND SANDBOX SCENE ---
-    if debug: print("[DEBUG] Creating background sandbox scene...")
+    seq = vse_scene.sequence_editor
     
-    new_scene = bpy.data.scenes.new(name="Pallaidium_Sandbox_Render")
-    new_scene.sequence_editor_create()
-    new_scene.render.use_sequencer = True
+    # Snapshot original state
+    orig_prefetch = seq.use_prefetch
+    orig_cache = seq.use_cache_raw
+    orig_mute_states = {s: s.mute for s in seq.strips}
     
-    # Copy Render Settings from the Active Window Scene
-    if debug: print("[DEBUG] Copying render settings...")
-    new_scene.render.resolution_x = active_scene.render.resolution_x
-    new_scene.render.resolution_y = active_scene.render.resolution_y
-    new_scene.render.fps = active_scene.render.fps
-    new_scene.render.fps_base = active_scene.render.fps_base
-
-    # --- 5. PASTE AND UNPACK (Inside Sandbox) ---
-    new_strip = None
-    existing_strips = set(new_scene.sequence_editor.strips)
+    # Disable cache to prevent access violations in give_frame_index
+    seq.use_prefetch = False
+    seq.use_cache_raw = False
     
-    with bpy.context.temp_override(window=context.window, area=area, region=region, scene=new_scene, sequencer_scene=new_scene):
-        if target_to_copy.type == "SCENE":
-            # BLENDER 5.1 API: move_strips=False prevents the operator from hanging
-            bpy.ops.sequencer.scene_strip_add(frame_start=0, channel=8, replace_sel=True, move_strips=False)
-            new_strip = new_scene.sequence_editor.active_strip
-        else:
-            try:
-                bpy.ops.sequencer.paste()
-                
-                current_strips = set(new_scene.sequence_editor.strips)
-                newly_added = list(current_strips - existing_strips)
-                
-                if newly_added:
-                    new_strip = newly_added[0]
-                    new_scene.sequence_editor.active_strip = new_strip
-                else:
-                    if debug: print("[DEBUG] Paste completed but no new strip identified.")
-
-            except RuntimeError as e:
-                if debug: print(f"[DEBUG] Paste failed: {e}")
-                bpy.data.scenes.remove(new_scene, do_unlink=True)
-                return None
-
-            # Handle Meta Unpacking (if needed)
-            if meta_strip and new_strip and new_strip.type == 'META':
-                if debug: print("[DEBUG] Unpacking meta strip...")
-                bpy.ops.sequencer.select_all(action='DESELECT')
-                new_strip.select = True
-                new_scene.sequence_editor.active_strip = new_strip
-                bpy.ops.sequencer.meta_separate()
-                
-                final_candidates = [s for s in new_scene.sequence_editor.strips if s.name == strip.name]
-                if final_candidates:
-                    new_strip = final_candidates[0]
-                    for s in new_scene.sequence_editor.strips:
-                        if s != new_strip:
-                            new_scene.sequence_editor.strips.remove(s)
-            
-    if not new_strip:
-        new_strip = new_scene.sequence_editor.active_strip
-
-    # --- 6. RENDER EXECUTION ---
-    if debug: print(f"[DEBUG] Preparing to render strip {new_strip.name}...")
-    new_strip.select = True
-    new_scene.sequence_editor.active_strip = new_strip
+    # 2. ISOLATE STRIP
+    target = meta_strip if meta_strip else strip
+    render_start = int(target.frame_final_start)
+    render_duration = int(target.frame_final_duration)
+    render_end = render_start + render_duration - 1
     
-    try:
-        copy_struct(strip, new_strip) # External function
-    except NameError:
-        pass
-
-    # BLENDER 5.1 API: Frame boundaries 
-    render_start = int(getattr(new_strip, 'left_handle', getattr(new_strip, 'frame_final_start', 1)))
-    render_duration = int(getattr(new_strip, 'duration', getattr(new_strip, 'frame_final_duration', 1)))
-
-    new_scene.frame_start = render_start
-    new_scene.frame_end = render_start + render_duration - 1
+    # Mute others and set frame range
+    for s in seq.strips:
+        s.mute = (s != target)
     
-    if debug: print(f"[DEBUG] Render Frame Range: {new_scene.frame_start} to {new_scene.frame_end}")
-
+    orig_f_start = vse_scene.frame_start
+    orig_f_end = vse_scene.frame_end
+    vse_scene.frame_start = render_start
+    vse_scene.frame_end = render_end
+    
+    # 3. RENDER LOGIC
     preferences = bpy.context.preferences
-    try:
-        addon_prefs = preferences.addons[__name__].preferences
-    except KeyError:
-        addon_prefs = preferences.addons[__package__.split('.')[0]].preferences
-        
+    addon_prefs = preferences.addons[__name__].preferences
     rendered_dir = os.path.join(addon_prefs.generator_ai, str(date.today()), "Rendered_Strips")
-    
-    if rendered_dir.startswith('//'):
-        rendered_dir = bpy.path.abspath(rendered_dir)
-    rendered_dir = os.path.abspath(rendered_dir)
-
     os.makedirs(rendered_dir, exist_ok=True)
-
-    safe_name = re.sub(r'[<>:"/\\|?*]', '', strip.name)
-    output_path = os.path.join(rendered_dir, safe_name + "_rendered")
     
-    if strip.type == "SOUND":
-        output_path += ".wav"
-        try: output_path = ensure_unique_filename(output_path)
-        except NameError: pass
-            
-        output_path = os.path.abspath(bpy.path.abspath(output_path) if output_path.startswith('//') else output_path)
-        
-        if debug: print(f"[DEBUG] Mixdown FFMPEG audio to: {output_path}")
-        with bpy.context.temp_override(scene=new_scene, sequencer_scene=new_scene):
-            bpy.ops.sound.mixdown(filepath=output_path, relative_path=False, container='WAV', codec='PCM')
-    else:
-        output_path += ".mp4"
-        try: output_path = ensure_unique_filename(output_path)
-        except NameError: pass
-            
-        output_path = os.path.abspath(bpy.path.abspath(output_path) if output_path.startswith('//') else output_path)
-        
-        if debug: print(f"[DEBUG] Render Video to: {output_path}")
-        new_scene.render.filepath = output_path
-        
-        # --- CRITICAL FIX: Blender 5.1 Output API ---
-        # 5.1 groups output by Media Type, replacing the raw 'FFMPEG' file_format selection.
-        if hasattr(new_scene.render.image_settings, "media_type"):
-            new_scene.render.image_settings.media_type = 'VIDEO'
+    safe_name = re.sub(r'[^\w]', '', strip.name)
+    output_path = os.path.abspath(os.path.join(rendered_dir, f"{safe_name}_{render_start:06d}.mp4"))
+    
+    try:
+        if strip.type == "SOUND":
+            wav_path = output_path.replace(".mp4", ".wav")
+            bpy.ops.sound.mixdown(filepath=wav_path, container='WAV', codec='PCM')
+            output_path = wav_path
         else:
-            # Fallback for Blender 5.0 and older
-            new_scene.render.image_settings.file_format = 'FFMPEG'
+            vse_scene.render.filepath = output_path
+            vse_scene.render.use_sequencer = True
+            vse_scene.render.image_settings.file_format = 'FFMPEG'
+            vse_scene.render.ffmpeg.format = 'MPEG4'
+            vse_scene.render.ffmpeg.codec = 'H264'
+            vse_scene.render.ffmpeg.audio_codec = 'AAC'
+            bpy.ops.render.render(animation=True, write_still=False)
             
-        new_scene.render.ffmpeg.format = 'MPEG4'
-        new_scene.render.ffmpeg.codec = 'H264'         
-        new_scene.render.ffmpeg.audio_codec = 'AAC'
+    finally:
+        # 4. RESTORE STATE
+        for s, state in orig_mute_states.items():
+            s.mute = state
+        vse_scene.frame_start = orig_f_start
+        vse_scene.frame_end = orig_f_end
+        seq.use_prefetch = orig_prefetch
+        seq.use_cache_raw = orig_cache
         
-        # Explicitly lock the UI context to the sandbox scene before rendering
-        original_window_scene = context.window.scene
-        context.window.scene = new_scene
-        try:
-            with bpy.context.temp_override(scene=new_scene, sequencer_scene=new_scene):
-                # Pass the scene= parameter natively to bypass override instability
-                bpy.ops.render.render(animation=True, write_still=False, scene=new_scene.name)
-        finally:
-            context.window.scene = original_window_scene
-
-        # FFMPEG Auto-Appends frame boundaries (filename0001-0250.mp4)
-        if not os.path.exists(output_path):
-            base_path_no_ext = os.path.splitext(output_path)[0]
-            possible_files = glob.glob(base_path_no_ext + "*.mp4")
-            if possible_files:
-                possible_files.sort(key=os.path.getmtime, reverse=True)
-                actual_rendered_file = possible_files[0]
-                
-                if actual_rendered_file != output_path:
-                    try:
-                        if os.path.exists(output_path): os.remove(output_path)
-                        os.rename(actual_rendered_file, output_path)
-                    except Exception as e:
-                        if debug: print(f"[DEBUG] Could not rename: {e}")
-                        output_path = actual_rendered_file
-            else:
-                if debug: print(f"[DEBUG] ERROR: Could not find any rendered file starting with {base_path_no_ext}")
-
-    # --- 7. CLEANUP & RETURN ---
-    if debug: print("[DEBUG] Cleanup sandbox scene...")
-    bpy.data.scenes.remove(new_scene, do_unlink=True)
-    
-    insert_channel = max([s.channel for s in sequencer.strips], default=0) + 1
-    if debug: print(f"[DEBUG] Re-importing rendered strip at channel {insert_channel}")
-    
-    if not os.path.exists(output_path):
-        if debug: print(f"[DEBUG] ERROR: Halting re-import because path doesn't exist: {output_path}")
-        return None
+    # 5. IMPORT RESULT
+    if os.path.exists(output_path):
+        channel = max([s.channel for s in seq.strips_all], default=0) + 1
+        if strip.type == "SOUND":
+            new_strip = seq.strips.new_sound(name="rendered_sound", filepath=output_path, channel=channel, frame_start=render_start)
+        else:
+            new_strip = seq.strips.new_movie(name="rendered_movie", filepath=output_path, channel=channel, frame_start=render_start)
         
-    final_start = int(getattr(strip, 'left_handle', getattr(strip, 'frame_final_start', 1)))
-    
-    if strip.type == "SOUND":
-        resulting_strip = sequencer.strips.new_sound(name="rendered_sound", filepath=output_path, channel=insert_channel, frame_start=final_start)
-    else:
-        resulting_strip = sequencer.strips.new_movie(name="rendered_movie", filepath=output_path, channel=insert_channel, frame_start=final_start)
+        seq.active_strip = new_strip
+        return new_strip
         
-    if resulting_strip:
-        if debug: print(f"[DEBUG] Successfully imported rendered strip: {resulting_strip.name}")
-        #resulting_strip.use_proxy = False
-        sequencer.active_strip = resulting_strip
-             
-    if debug: print("[DEBUG] --- get_render_strip Finished ---\n")
-    return resulting_strip
+    return None
 
 
 # LoRA.
