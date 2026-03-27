@@ -1075,7 +1075,7 @@ class DependencyManager:
             #"git+https://github.com/huggingface/parler-tts.git",
             "stable-audio-tools", 
             "torcheval", 
-            "torchao==0.12.0", 
+            #"torchao==0.12.0", broken! 
             "spacy",
             "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl",
             #"https://huggingface.co/lldacing/flash-attention-windows-wheel/resolve/main/flash_attn-2.7.4.post1%2Bcu128torch2.7.0cxx11abiFALSE-cp311-cp311-win_amd64.whl",
@@ -1089,8 +1089,8 @@ class DependencyManager:
             reqs.extend([
                 "git+https://github.com/hkchengrex/MMAudio.git", 
                 "git+https://github.com/tin2tin/resemble-enhance-windows.git",
-                "https://github.com/woct0rdho/triton-windows/releases/download/empty/triton-3.4.0-py3-none-any.whl" 
-                "triton-windows<3.3"
+                #"https://github.com/woct0rdho/triton-windows/releases/download/empty/triton-3.4.0-py3-none-any.whl", 
+                #"triton-windows<3.3",
             ])
         else:
             reqs.extend([
@@ -2021,23 +2021,29 @@ def copy_struct(source, target):
             pass
 
 
+import bpy
+import os
+import re
+from datetime import date
+
 def get_render_strip(self, context, strip, meta_strip=None):
     """Render selected strip to hard-disk. Returns the new strip object or None."""
     
-    # 1. PRE-RENDER PREPARATION: Disable Caching/Prefetching to stop crashes
+    # Access the VSE scene properly for 5.1
     vse_scene = getattr(context, 'sequencer_scene', context.scene)
-    if not vse_scene or not vse_scene.sequence_editor: return None
+    if not vse_scene or not vse_scene.sequence_editor: 
+        return None
     
-    seq = vse_scene.sequence_editor
+    seq_editor = vse_scene.sequence_editor
     
-    # Snapshot original state
-    orig_prefetch = seq.use_prefetch
-    orig_cache = seq.use_cache_raw
-    orig_mute_states = {s: s.mute for s in seq.strips}
+    # 1. PRE-RENDER PREPARATION: Disable Caching/Prefetching to stop crashes
+    # Note: 5.1 uses 'strips' instead of 'sequences'
+    orig_prefetch = seq_editor.use_prefetch
+    orig_cache = seq_editor.use_cache_raw
+    orig_mute_states = {s: s.mute for s in seq_editor.strips}
     
-    # Disable cache to prevent access violations in give_frame_index
-    seq.use_prefetch = False
-    seq.use_cache_raw = False
+    seq_editor.use_prefetch = False
+    seq_editor.use_cache_raw = False
     
     # 2. ISOLATE STRIP
     target = meta_strip if meta_strip else strip
@@ -2045,8 +2051,8 @@ def get_render_strip(self, context, strip, meta_strip=None):
     render_duration = int(target.frame_final_duration)
     render_end = render_start + render_duration - 1
     
-    # Mute others and set frame range
-    for s in seq.strips:
+    # Mute others (using strips collection)
+    for s in seq_editor.strips:
         s.mute = (s != target)
     
     orig_f_start = vse_scene.frame_start
@@ -2055,46 +2061,65 @@ def get_render_strip(self, context, strip, meta_strip=None):
     vse_scene.frame_end = render_end
     
     # 3. RENDER LOGIC
-    preferences = bpy.context.preferences
-    addon_prefs = preferences.addons[__name__].preferences
+    # Corrected lookup using __name__ to avoid KeyError
+    addon_prefs = bpy.context.preferences.addons.get(__name__, bpy.context.preferences.addons.get(__package__.split('.')[0])).preferences
     rendered_dir = os.path.join(addon_prefs.generator_ai, str(date.today()), "Rendered_Strips")
     os.makedirs(rendered_dir, exist_ok=True)
     
     safe_name = re.sub(r'[^\w]', '', strip.name)
-    output_path = os.path.abspath(os.path.join(rendered_dir, f"{safe_name}_{render_start:06d}.mp4"))
     
     try:
         if strip.type == "SOUND":
-            wav_path = output_path.replace(".mp4", ".wav")
-            bpy.ops.sound.mixdown(filepath=wav_path, container='WAV', codec='PCM')
-            output_path = wav_path
+            output_path = os.path.abspath(os.path.join(rendered_dir, f"{safe_name}_{render_start:06d}.wav"))
+            bpy.ops.sound.mixdown(filepath=output_path, container='WAV', codec='PCM')
         else:
+            output_path = os.path.abspath(os.path.join(rendered_dir, f"{safe_name}_{render_start:06d}.mp4"))
             vse_scene.render.filepath = output_path
-            vse_scene.render.use_sequencer = True
-            vse_scene.render.image_settings.file_format = 'FFMPEG'
+            
+            # 5.1 API: Configure video output without setting file_format to FFMPEG
+            # We set the media type to VIDEO, which tells the renderer to use FFMPEG internally
+            if hasattr(vse_scene.render.image_settings, "media_type"):
+                vse_scene.render.image_settings.media_type = 'VIDEO'
+            
+            # Ensure the container is set for video
             vse_scene.render.ffmpeg.format = 'MPEG4'
             vse_scene.render.ffmpeg.codec = 'H264'
             vse_scene.render.ffmpeg.audio_codec = 'AAC'
+            
+            # Force sequencer rendering
+            vse_scene.render.use_sequencer = True
+            
+            # Execute render
             bpy.ops.render.render(animation=True, write_still=False)
+            
+            # Handle FFMPEG automatic output pathing
+            # Blender often appends frame numbers (e.g., .mp40001)
+            # We look for the actual file generated
+            if not os.path.exists(output_path):
+                pattern = os.path.join(rendered_dir, f"{safe_name}_{render_start:06d}*.mp4")
+                files = glob.glob(pattern)
+                if files:
+                    files.sort(key=os.path.getmtime)
+                    output_path = files[-1]
             
     finally:
         # 4. RESTORE STATE
         for s, state in orig_mute_states.items():
-            s.mute = state
+            if s: s.mute = state
         vse_scene.frame_start = orig_f_start
         vse_scene.frame_end = orig_f_end
-        seq.use_prefetch = orig_prefetch
-        seq.use_cache_raw = orig_cache
+        seq_editor.use_prefetch = orig_prefetch
+        seq_editor.use_cache_raw = orig_cache
         
     # 5. IMPORT RESULT
     if os.path.exists(output_path):
-        channel = max([s.channel for s in seq.strips_all], default=0) + 1
+        channel = max([s.channel for s in seq_editor.strips], default=0) + 1
         if strip.type == "SOUND":
-            new_strip = seq.strips.new_sound(name="rendered_sound", filepath=output_path, channel=channel, frame_start=render_start)
+            new_strip = seq_editor.strips.new_sound(name="rendered_sound", filepath=output_path, channel=channel, frame_start=render_start)
         else:
-            new_strip = seq.strips.new_movie(name="rendered_movie", filepath=output_path, channel=channel, frame_start=render_start)
+            new_strip = seq_editor.strips.new_movie(name="rendered_movie", filepath=output_path, channel=channel, frame_start=render_start)
         
-        seq.active_strip = new_strip
+        seq_editor.active_strip = new_strip
         return new_strip
         
     return None
