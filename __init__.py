@@ -392,8 +392,8 @@ def closest_divisible_128(num):
 
 
 def find_first_empty_channel(start_frame, end_frame):
-    for ch in range(1, len(bpy.context.scene.sequence_editor.sequences_all) + 1):
-        for seq in bpy.context.scene.sequence_editor.sequences_all:
+    for ch in range(1, len(bpy.context.scene.sequence_editor.strips_all) + 1):
+        for seq in bpy.context.scene.sequence_editor.strips_all:
             if (
                 seq.channel == ch
                 and seq.frame_final_start < end_frame
@@ -481,16 +481,33 @@ def limit_string(my_string):
 def delete_strip(input_strip):
     if input_strip is None:
         return
-    original_selection = [
-        strip
-        for strip in bpy.context.scene.sequence_editor.sequences_all
-        if strip.select
-    ]
-    bpy.ops.sequencer.select_all(action="DESELECT")
-    input_strip.select = True
-    bpy.ops.sequencer.delete()
-    for strip in original_selection:
-        strip.select = True
+    
+    # Get the sequence editor
+    seq_editor = bpy.context.scene.sequence_editor
+    if seq_editor is None:
+        return
+    
+    # Fail-safe: Delete the strip directly via the data API
+    try:
+        seq_editor.strips.remove(input_strip)
+    except ReferenceError:
+        # The strip was already deleted or is an invalid reference
+        pass
+    except Exception as e:
+        print(f"Failed to remove strip: {e}")
+#def delete_strip(input_strip):
+#    if input_strip is None:
+#        return
+#    original_selection = [
+#        strip
+#        for strip in bpy.context.scene.sequence_editor.strips_all
+#        if strip.select
+#    ]
+#    bpy.ops.sequencer.select_all(action="DESELECT")
+#    input_strip.select = True
+#    #bpy.ops.sequencer.delete() #Crash
+#    for strip in original_selection:
+#        strip.select = True
 
 
 def load_video_as_np_array(video_path):
@@ -691,7 +708,7 @@ def process_image(image_path, frames_nr):
     Image.MAX_IMAGE_PIXELS = None
     import cv2, shutil
 
-    scene = bpy.context.scene
+    scene = bpy.context.sequencer_scene
     movie_x = scene.generate_movie_x
     img = cv2.imread(image_path)
     height, width, layers = img.shape
@@ -796,7 +813,7 @@ def python_exec():
 
 
 def find_strip_by_name(scene, name):
-    for sequence in scene.sequence_editor.sequences:
+    for sequence in scene.sequence_editor.strips:
         if sequence.name == name:
             return sequence
     return None
@@ -1017,7 +1034,7 @@ class DependencyManager:
             "encodec==0.1.1",
             "imhist==0.0.4",
             "julius==0.2.7",
-            "pathtools==0.1.2",
+            #"pathtools==0.1.2",
             "progressbar==2.5",
             "pyloudnorm==0.1.1",
             "pystoi==0.4.1",
@@ -1034,10 +1051,14 @@ class DependencyManager:
     def get_phase_2_torch(self):
         if self.os_platform == "Windows":
             return [
-                "--index-url https://download.pytorch.org/whl/cu124", 
-                "torch==2.6.0+cu124", 
-                "torchvision==0.21.0+cu124", 
-                "torchaudio==2.6.0+cu124", 
+                #"--index-url https://download.pytorch.org/whl/cu124", 
+                "--index-url https://download.pytorch.org/whl/cu128", 
+                #"torch==2.6.0+cu124", 
+                "torch==2.9.1+cu128", #torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1
+                #"torchvision==0.21.0+cu124", 
+                "torchvision==0.24.1+cu128", 
+                #"torchaudio==2.6.0+cu124", 
+                "torchaudio==2.9.1+cu128", 
                 #"xformers"
             ]
         else:
@@ -1048,14 +1069,17 @@ class DependencyManager:
     def get_phase_3_git_and_extensions(self):
         reqs = [
             "git+https://github.com/huggingface/diffusers.git", 
-            "git+https://github.com/SWivid/F5-TTS.git",
-            "git+https://github.com/QwenLM/Qwen3-TTS.git",
+            #"git+https://github.com/SWivid/F5-TTS.git",
+            "faster-qwen3-tts",
+            #"git+https://github.com/QwenLM/Qwen3-TTS.git",
+            #"git+https://github.com/huggingface/parler-tts.git",
             "stable-audio-tools", 
             "torcheval", 
-            "torchao==0.12.0", 
+            #"torchao==0.12.0", broken! 
             "spacy",
             "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl",
-            "https://huggingface.co/lldacing/flash-attention-windows-wheel/resolve/main/flash_attn-2.7.4.post1%2Bcu128torch2.7.0cxx11abiFALSE-cp311-cp311-win_amd64.whl",
+            #"https://huggingface.co/lldacing/flash-attention-windows-wheel/resolve/main/flash_attn-2.7.4.post1%2Bcu128torch2.7.0cxx11abiFALSE-cp311-cp311-win_amd64.whl",
+            "https://github.com/kingbri1/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3+cu128torch2.8.0cxx11abiFALSE-cp313-cp313-win_amd64.whl",
         ]
         
         if self.py_major == 3 and self.py_minor >= 8:
@@ -1064,8 +1088,9 @@ class DependencyManager:
         if self.os_platform == "Windows":
             reqs.extend([
                 "git+https://github.com/hkchengrex/MMAudio.git", 
-                "git+https://github.com/tin2tin/resemble-enhance-windows.git", 
-                "triton-windows<3.3"
+                "git+https://github.com/tin2tin/resemble-enhance-windows.git",
+                #"https://github.com/woct0rdho/triton-windows/releases/download/empty/triton-3.4.0-py3-none-any.whl", 
+                #"triton-windows<3.3",
             ])
         else:
             reqs.extend([
@@ -1333,7 +1358,7 @@ def input_strips_updated(self, context):
 
     # Audio Type Handling
     elif scene_type == "audio":
-        if audio_model == "stabilityai/stable-audio-open-1.0":
+        if audio_model == "tintwotin/Foundation-1-Diffusers":
             scene.movie_num_inference_steps = 200
 #        elif addon_prefs.audio_model_card == "MMAudio" and scene.input_strips != "input_strips":
 #            scene.input_strips = "input_strips"
@@ -1437,7 +1462,7 @@ def output_strips_updated(self, context):
 
     # === AUDIO TYPE === #
     elif type == "audio":
-        if audio_model == "stabilityai/stable-audio-open-1.0":
+        if audio_model == "tintwotin/Foundation-1-Diffusers":
             movie_inference = 200
 #        if addon_prefs.audio_model_card == "MMAudio":
 #            scene.input_strips = "input_strips"
@@ -1598,28 +1623,28 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "API MiniMax (subject2vid)",
                 "Purchased API access needed!",
             ),
-            ("THUDM/CogVideoX-2b", "CogVideoX-2b (720x480x48)", "THUDM/CogVideoX-2b"),
-            ("THUDM/CogVideoX-5b", "CogVideoX-5b (720x480x48)", "THUDM/CogVideoX-5b"),
-            (
-                "hunyuanvideo-community/HunyuanVideo",
-                "Hunyuan Video 960x544x(frames/4+1)",
-                "hunyuanvideo-community/HunyuanVideo",
-            ),
+            #("THUDM/CogVideoX-2b", "CogVideoX-2b (720x480x48)", "THUDM/CogVideoX-2b"),
+            #("THUDM/CogVideoX-5b", "CogVideoX-5b (720x480x48)", "THUDM/CogVideoX-5b"),
+#            (
+#                "hunyuanvideo-community/HunyuanVideo",
+#                "Hunyuan Video 960x544x(frames/4+1)",
+#                "hunyuanvideo-community/HunyuanVideo",
+#            ),
             (
                 "lllyasviel/FramePackI2V_HY",
                 "FramePack 960x544x(frames/4+1)",
                 "lllyasviel/FramePackI2V_HY",
             ),
-            (
-                "Lightricks/LTX-2",
-                "LTX-2",
-                "Lightricks/LTX-2",
-            ), 
-            (
-                "rootonchair/LTX-2-19b-distilled",
-                "LTX-2 19b Distilled",
-                "rootonchair/LTX-2-19b-distilled",
-            ), 
+#            (
+#                "Lightricks/LTX-2",
+#                "LTX-2",
+#                "Lightricks/LTX-2",
+#            ), 
+#            (
+#                "rootonchair/LTX-2-19b-distilled",
+#                "LTX-2 19b Distilled",
+#                "rootonchair/LTX-2-19b-distilled",
+#            ), 
             (
                 "LTX-2 Multi-Input File",
                 "LTX-2 Multi-Input (Txt, Aud & Img in Meta Strips)",
@@ -1663,9 +1688,9 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Qwen Multi-image Edit 2511",
                 "Text and multiple images as input.",
             ),
-            ("diffusers/FLUX.2-dev-bnb-4bit", "Flux2", "diffusers/FLUX.2-dev-bnb-4bit"),
+            # ("diffusers/FLUX.2-dev-bnb-4bit", "Flux2", "diffusers/FLUX.2-dev-bnb-4bit"),
             ("Runware/BFL-FLUX.2-klein-base-4B", "FLUX.2 klein 4B", "Runware/BFL-FLUX.2-klein-base-4B"),
-            ("black-forest-labs/FLUX.2-klein-9b-kv", "FLUX.2 klein 9B", "black-forest-labs/FLUX.2-klein-9b-kv"),
+            ("black-forest-labs/FLUX.2-klein-9b-kv", "FLUX.2 klein 9b kv", "black-forest-labs/FLUX.2-klein-9b-kv"),
             ("ChuckMcSneed/FLUX.1-dev", "Flux Dev", "ChuckMcSneed/FLUX.1-dev"),
             ("Tongyi-MAI/Z-Image", "Z-Image", "Tongyi-MAI/Z-Image"),
             ("Tongyi-MAI/Z-Image-Turbo", "Z-Image Turbo", "Tongyi-MAI/Z-Image-Turbo"),
@@ -1678,11 +1703,11 @@ class GeneratorAddonPreferences(AddonPreferences):
 
             ("kontext-community/relighting-kontext-dev-lora-v3", "Flux Kontext Relight", "kontext-community/relighting-kontext-dev-lora-v3"),
 
-            ("fuliucansheng/FLUX.1-Canny-dev-diffusers-lora", "Flux Canny", "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"),
+            # ("fuliucansheng/FLUX.1-Canny-dev-diffusers-lora", "Flux Canny", "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"),
 
             ("romanfratric234/FLUX.1-Depth-dev-lora", "Flux Depth", "romanfratric234/FLUX.1-Depth-dev-lora"),
 
-            ("Runware/FLUX.1-Redux-dev", "Flux Redux", "Runware/FLUX.1-Redux-dev"),
+            # ("Runware/FLUX.1-Redux-dev", "Flux Redux", "Runware/FLUX.1-Redux-dev"),
 
             ("lodestones/Chroma", "Chroma", "Chroma is a 8.9B parameter model based on FLUX.1-schnell"),
             (
@@ -1690,11 +1715,11 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "SDXL 1.0 (1024x1024)",
                 "stabilityai/stable-diffusion-xl-base-1.0",
             ),
-            (
-                "adamo1139/stable-diffusion-3.5-large-ungated",
-                "SDXL 3.5 Large",
-                "adamo1139/stable-diffusion-3.5-large-ungated",
-            ),
+#            (
+#                "adamo1139/stable-diffusion-3.5-large-ungated",
+#                "SDXL 3.5 Large",
+#                "adamo1139/stable-diffusion-3.5-large-ungated",
+#            ),
             (
                 "adamo1139/stable-diffusion-3.5-medium-ungated",
                 "SDXL 3.5 Medium",
@@ -1734,53 +1759,53 @@ class GeneratorAddonPreferences(AddonPreferences):
         default="stabilityai/stable-diffusion-xl-base-1.0",
         update=output_strips_updated,
     )
-    if low_vram():
-        parler = (
-            "parler-tts/parler-tts-mini-v1",
-            "Speech: Parler TTS Mini",
-            "parler-tts/parler-tts-mini-v1",
-        )
-    else:
-        parler = (
-            "parler-tts/parler-tts-large-v1",
-            "Speech: Parler TTS Large",
-            "parler-tts/parler-tts-large-v1",
-        )
+#    if low_vram(): # broken by transformers
+#        parler = (
+#            "parler-tts/parler-tts-mini-v1",
+#            "Speech: Parler TTS Mini",
+#            "parler-tts/parler-tts-mini-v1",
+#        )
+#    else:
+#        parler = (
+#            "parler-tts/parler-tts-large-v1",
+#            "Speech: Parler TTS Large",
+#            "parler-tts/parler-tts-large-v1",
+#        )
 
     if os_platform != "Linux":
         items = [
             ("Chatterbox", "Speech: Chatterbox", "Zero shot TTS & voice conversion"),
             ("ChatterboxTurbo", "Speech: ChatterboxTurbo", "Zero shot TTS & voice conversion"),
             ("Qwen/Qwen3-TTS-12Hz-1.7B-Base", "Speech: Qwen3-TTS Clone", "Qwen/Qwen3-TTS-12Hz-1.7B-Base"),
-            ("SWivid/F5-TTS", "Speech: F5-TTS", "Zero shot TTS"),
+            # ("SWivid/F5-TTS", "Speech: F5-TTS", "Zero shot TTS"), Broken dependencies
 #            ("WhisperSpeech", "Speech: WhisperSpeech", "Zero shot TTS"),
             ("MMAudio", "Audio: Video to Audio", "Add sync audio to video"),
             (
-                "stabilityai/stable-audio-open-1.0",
-                "Audio: Stable Audio Open",
-                "Text to sfx",
+                "tintwotin/Foundation-1-Diffusers",
+                "Music Loop: Fountain 1",
+                "Text to Music",
             ),
-            parler,
+            #parler,
         ]
     else:
         items = [
-            ("SWivid/F5-TTS", "Speech: F5-TTS", "SWivid/F5-TTS"),
+            # ("SWivid/F5-TTS", "Speech: F5-TTS", "SWivid/F5-TTS"), Broken dependencies
             ("Chatterbox", "Chatterbox", "Zero shot txt2speech & voice cloning"),
             ("ChatterboxTurbo", "Speech: ChatterboxTurbo", "Zero shot TTS & voice conversion"),
             ("Qwen/Qwen3-TTS-12Hz-1.7B-Base", "Speech: Qwen3-TTS Clone", "Qwen/Qwen3-TTS-12Hz-1.7B-Base"),
             ("MMAudio", "Audio: Video to Audio", "Add sync audio to video"),
             (
-                "stabilityai/stable-audio-open-1.0",
+                "tintwotin/Foundation-1-Diffusers",
                 "Stable Audio Open",
-                "Text to sfx",
+                "Text to Music",
             ),
-            parler,
+            #parler,
         ]
 
     audio_model_card: bpy.props.EnumProperty(
         name="Audio Model",
         items=items,
-        default="stabilityai/stable-audio-open-1.0",
+        default="tintwotin/Foundation-1-Diffusers",
         update=output_strips_updated,
     )
     hugginface_token: bpy.props.StringProperty(
@@ -1796,16 +1821,16 @@ class GeneratorAddonPreferences(AddonPreferences):
                 "Image Captioning: Blip",
                 "Image Captioning",
             ),
-            ( #killed by transformers updates
+            (
                 "florence-community/Florence-2-large",
                 "Image Captioning: Florence-2",
                 "Image Captioning",
             ),
-            (
-                "ZuluVision/MoviiGen1.1_Prompt_Rewriter",
-                "Prompt Enhancer: MoviiGen",
-                "MoviiGen Prompt Rewriter",
-            ),
+#            ( #torchao error
+#                "ZuluVision/MoviiGen1.1_Prompt_Rewriter",
+#                "Prompt Enhancer: MoviiGen",
+#                "MoviiGen Prompt Rewriter",
+#            ),
         ],
         default="Salesforce/blip-image-captioning-large",
         update=output_strips_updated,
@@ -1996,201 +2021,108 @@ def copy_struct(source, target):
             pass
 
 
+import bpy
+import os
+import re
+from datetime import date
+
 def get_render_strip(self, context, strip, meta_strip=None):
     """Render selected strip to hard-disk. Returns the new strip object or None."""
     
-    # --- 1. STRICT INPUT SANITIZATION ---
-    if isinstance(meta_strip, (set, dict, list, tuple)):
-        meta_strip = None
-
-    if isinstance(strip, (set, dict, list, tuple)):
-        print(f"Error: Invalid strip passed: {strip}")
+    # Access the VSE scene properly for 5.1
+    vse_scene = getattr(context, 'sequencer_scene', context.scene)
+    if not vse_scene or not vse_scene.sequence_editor: 
         return None
-
-    if not strip:
-        return None
-
-    if not context or not context.scene or not context.scene.sequence_editor:
-        return None
-
-    bpy.context.preferences.system.sequencer_proxy_setup = "MANUAL"
-    current_scene = context.scene
-    sequencer = current_scene.sequence_editor
     
-    # --- 2. DETERMINE TARGET ---
-    target_to_copy = meta_strip if meta_strip else strip
-
-    if not hasattr(target_to_copy, "select"):
-        return None
-
-    area = next((area for area in context.screen.areas if area.type == "SEQUENCE_EDITOR"), None)
-    if not area:
-        return None
-
-    # --- 3. COPY OPERATION ---
-    with bpy.context.temp_override(area=area):
-        bpy.ops.sequencer.select_all(action='DESELECT')
-        target_to_copy.select = True
-        sequencer.active_strip = target_to_copy
-        context.scene.frame_current = int(target_to_copy.frame_start)
-
-        if target_to_copy.type != "SCENE":
-            bpy.ops.sequencer.copy()
-
-    # --- 4. CREATE SANDBOX SCENE ---
-    new_scene = bpy.ops.scene.new(type="EMPTY")
-    new_scene = bpy.context.scene
-    new_scene.sequence_editor_create()
-    context.window.scene = new_scene
-
-    # Copy Render Settings
-    new_scene.render.resolution_x = current_scene.render.resolution_x
-    new_scene.render.resolution_y = current_scene.render.resolution_y
-    new_scene.render.fps = current_scene.render.fps
-    new_scene.render.fps_base = current_scene.render.fps_base
+    seq_editor = vse_scene.sequence_editor
     
-    # --- 5. PASTE AND UNPACK ---
-    new_strip = None
+    # 1. PRE-RENDER PREPARATION: Disable Caching/Prefetching to stop crashes
+    # Note: 5.1 uses 'strips' instead of 'sequences'
+    orig_prefetch = seq_editor.use_prefetch
+    orig_cache = seq_editor.use_cache_raw
+    orig_mute_states = {s: s.mute for s in seq_editor.strips}
     
-    with bpy.context.temp_override(area=area):
-        if target_to_copy.type == "SCENE":
-            bpy.ops.sequencer.scene_strip_add(frame_start=0, channel=8, replace_sel=True)
-            new_strip = new_scene.sequence_editor.active_strip
-        else:
-            try:
-                bpy.ops.sequencer.paste()
-            except RuntimeError:
-                bpy.data.scenes.remove(new_scene, do_unlink=True)
-                context.window.scene = current_scene
-                return None
-
-            if meta_strip:
-                # We need to unpack until the target strip is at the TOP LEVEL
-                # This ensures we can safely delete everything else later.
-                found_at_top_level = False
-                
-                for _ in range(10): # Safety loop
-                    # Check if our strip is at the top level
-                    candidates = [s for s in new_scene.sequence_editor.sequences 
-                                  if s.name == strip.name and s.type == strip.type]
-                    
-                    if candidates:
-                        new_strip = candidates[0]
-                        found_at_top_level = True
-                        break
-                    
-                    # If not at top level, check if it exists deeper
-                    all_candidates = [s for s in new_scene.sequence_editor.sequences_all 
-                                      if s.name == strip.name and s.type == strip.type]
-                    
-                    # If we found it deep, but not top, we must separate all METAs to bring it up
-                    metas = [s for s in new_scene.sequence_editor.sequences if s.type == 'META']
-                    
-                    if not metas:
-                        # No more metas to open, but we haven't found it at top level.
-                        # If we found it deeply, grab it (though cleanup might be messy)
-                        if all_candidates:
-                            new_strip = all_candidates[0]
-                        break
-                    
-                    bpy.ops.sequencer.select_all(action='DESELECT')
-                    for m in metas:
-                        m.select = True
-                        new_scene.sequence_editor.active_strip = m
-                    
-                    bpy.ops.sequencer.meta_separate()
-                
-                # Fallback: if name changed, check by type if it's the only one left
-                if not new_strip:
-                     # Check top level only
-                     matches = [s for s in new_scene.sequence_editor.sequences if s.type == strip.type]
-                     if len(matches) == 1:
-                         new_strip = matches[0]
-
-                # --- FIX FOR "STRIP NOT IN SCENE" ERROR ---
-                # We only remove strips that are at the TOP LEVEL (sequences, not sequences_all)
-                if new_strip:
-                    # If the found strip is inside a meta (not top level), we can't easily clean up
-                    # without deleting the parent. However, the loop above tries to bring it to top.
-                    
-                    # Safe cleanup: Select everything except our strip, then use Operator to delete
-                    bpy.ops.sequencer.select_all(action='SELECT')
-                    new_strip.select = False # Deselect our target
-                    
-                    # If our target is hidden inside a meta, new_strip.select might fail or do nothing useful.
-                    # But if the unpack worked, it is at the top level.
-                    bpy.ops.sequencer.delete()
-            else:
-                # Normal Paste
-                if bpy.context.selected_sequences:
-                    for s in bpy.context.selected_sequences:
-                        if s.type == strip.type:
-                            new_strip = s
-                            break
-                    if not new_strip:
-                        new_strip = bpy.context.selected_sequences[0]
-
-    if not new_strip:
-        print(f"Error: Failed to extract {strip.name}")
-        bpy.data.scenes.remove(new_scene, do_unlink=True)
-        context.window.scene = current_scene
-        return None
-
-    # --- 6. RENDER EXECUTION ---
-    new_strip.select = True
-    new_scene.sequence_editor.active_strip = new_strip
-    copy_struct(strip, new_strip)
-
-    # Frame Range
-    new_scene.frame_start = int(new_strip.frame_final_start)
-    new_scene.frame_end = int(new_strip.frame_final_start + new_strip.frame_final_duration) - 1
-
-    # Render Settings
-    preferences = bpy.context.preferences
-    addon_prefs = preferences.addons[__name__].preferences
+    seq_editor.use_prefetch = False
+    seq_editor.use_cache_raw = False
+    
+    # 2. ISOLATE STRIP
+    target = meta_strip if meta_strip else strip
+    render_start = int(target.frame_final_start)
+    render_duration = int(target.frame_final_duration)
+    render_end = render_start + render_duration - 1
+    
+    # Mute others (using strips collection)
+    for s in seq_editor.strips:
+        s.mute = (s != target)
+    
+    orig_f_start = vse_scene.frame_start
+    orig_f_end = vse_scene.frame_end
+    vse_scene.frame_start = render_start
+    vse_scene.frame_end = render_end
+    
+    # 3. RENDER LOGIC
+    # Corrected lookup using __name__ to avoid KeyError
+    addon_prefs = bpy.context.preferences.addons.get(__name__, bpy.context.preferences.addons.get(__package__.split('.')[0])).preferences
     rendered_dir = os.path.join(addon_prefs.generator_ai, str(date.today()), "Rendered_Strips")
+    os.makedirs(rendered_dir, exist_ok=True)
     
-    if not os.path.exists(rendered_dir):
-        os.makedirs(rendered_dir)
-
-    safe_name = re.sub(r'[<>:"/\\|?*]', '', strip.name)
-    output_path = os.path.join(rendered_dir, safe_name + "_rendered")
+    safe_name = re.sub(r'[^\w]', '', strip.name)
     
-    if strip.type == "SOUND":
-        output_path += ".wav"
-        output_path = ensure_unique_filename(output_path)
-        bpy.ops.sound.mixdown(filepath=output_path, relative_path=True, container='WAV', codec='PCM')
-    else:
-        output_path += ".mp4"
-        output_path = ensure_unique_filename(output_path)
-        new_scene.render.filepath = output_path
-        bpy.context.scene.render.image_settings.file_format = "FFMPEG"
-        bpy.context.scene.render.ffmpeg.format = "MPEG4"
-        bpy.context.scene.render.ffmpeg.audio_codec = "AAC"
-        bpy.ops.render.opengl(animation=True, sequencer=True)
-
-    # --- 7. CLEANUP & RETURN ---
-    bpy.data.scenes.remove(new_scene, do_unlink=True)
-    context.window.scene = current_scene
-    
-    area = [a for a in context.screen.areas if a.type == "SEQUENCE_EDITOR"][0]
-    with bpy.context.temp_override(area=area):
-        insert_channel = 1
-        for s in sequencer.sequences_all:
-             if s.channel >= insert_channel: insert_channel = s.channel + 1
-             
+    try:
         if strip.type == "SOUND":
-            bpy.ops.sequencer.sound_strip_add(channel=insert_channel, filepath=output_path, frame_start=int(strip.frame_final_start), overlap=0)
+            output_path = os.path.abspath(os.path.join(rendered_dir, f"{safe_name}_{render_start:06d}.wav"))
+            bpy.ops.sound.mixdown(filepath=output_path, container='WAV', codec='PCM')
         else:
-            bpy.ops.sequencer.movie_strip_add(channel=insert_channel, filepath=output_path, frame_start=int(strip.frame_final_start), overlap=0, sound=False)
+            output_path = os.path.abspath(os.path.join(rendered_dir, f"{safe_name}_{render_start:06d}.mp4"))
+            vse_scene.render.filepath = output_path
             
-        resulting_strip = sequencer.active_strip
-        if resulting_strip:
-            # SAFETY CHECK: Only set use_proxy if the strip has that attribute
-            if hasattr(resulting_strip, "use_proxy"):
-                resulting_strip.use_proxy = False
-             
-    return resulting_strip
+            # 5.1 API: Configure video output without setting file_format to FFMPEG
+            # We set the media type to VIDEO, which tells the renderer to use FFMPEG internally
+            if hasattr(vse_scene.render.image_settings, "media_type"):
+                vse_scene.render.image_settings.media_type = 'VIDEO'
+            
+            # Ensure the container is set for video
+            vse_scene.render.ffmpeg.format = 'MPEG4'
+            vse_scene.render.ffmpeg.codec = 'H264'
+            vse_scene.render.ffmpeg.audio_codec = 'AAC'
+            
+            # Force sequencer rendering
+            vse_scene.render.use_sequencer = True
+            
+            # Execute render
+            bpy.ops.render.render(animation=True, write_still=False)
+            
+            # Handle FFMPEG automatic output pathing
+            # Blender often appends frame numbers (e.g., .mp40001)
+            # We look for the actual file generated
+            if not os.path.exists(output_path):
+                pattern = os.path.join(rendered_dir, f"{safe_name}_{render_start:06d}*.mp4")
+                files = glob.glob(pattern)
+                if files:
+                    files.sort(key=os.path.getmtime)
+                    output_path = files[-1]
+            
+    finally:
+        # 4. RESTORE STATE
+        for s, state in orig_mute_states.items():
+            if s: s.mute = state
+        vse_scene.frame_start = orig_f_start
+        vse_scene.frame_end = orig_f_end
+        seq_editor.use_prefetch = orig_prefetch
+        seq_editor.use_cache_raw = orig_cache
+        
+    # 5. IMPORT RESULT
+    if os.path.exists(output_path):
+        channel = max([s.channel for s in seq_editor.strips], default=0) + 1
+        if strip.type == "SOUND":
+            new_strip = seq_editor.strips.new_sound(name="rendered_sound", filepath=output_path, channel=channel, frame_start=render_start)
+        else:
+            new_strip = seq_editor.strips.new_movie(name="rendered_movie", filepath=output_path, channel=channel, frame_start=render_start)
+        
+        seq_editor.active_strip = new_strip
+        return new_strip
+        
+    return None
 
 
 # LoRA.
@@ -2318,7 +2250,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 scene,
                 "omnigen_strip_1",
                 scene.sequence_editor,
-                "sequences",
+                "strips",
                 text="",
                 icon="FILE_IMAGE",
             )
@@ -2330,7 +2262,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 scene,
                 "omnigen_strip_2",
                 scene.sequence_editor,
-                "sequences",
+                "strips",
                 text="",
                 icon="FILE_IMAGE",
             )
@@ -2342,7 +2274,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 scene,
                 "omnigen_strip_3",
                 scene.sequence_editor,
-                "sequences",
+                "strips",
                 text="",
                 icon="FILE_IMAGE",
             )
@@ -2360,7 +2292,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 scene,
                 "qwen_strip_1",
                 scene.sequence_editor,
-                "sequences",
+                "strips",
                 text="",
                 icon="FILE_IMAGE",
             )
@@ -2371,7 +2303,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 scene,
                 "qwen_strip_2",
                 scene.sequence_editor,
-                "sequences",
+                "strips",
                 text="",
                 icon="FILE_IMAGE",
             )
@@ -2382,7 +2314,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 scene,
                 "qwen_strip_3",
                 scene.sequence_editor,
-                "sequences",
+                "strips",
                 text="",
                 icon="FILE_IMAGE",
             )
@@ -2397,7 +2329,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     scene,
                     f"flux_strip_{i}",
                     scene.sequence_editor,
-                    "sequences",
+                    "strips",
                     text="",
                     icon="FILE_IMAGE",
                 )
@@ -2432,7 +2364,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                             scene,
                             "minimax_subject",
                             scene.sequence_editor,
-                            "sequences",
+                            "strips",
                             text="Subject",
                             icon="USER",
                         )
@@ -2445,7 +2377,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                             scene,
                             "out_frame",
                             scene.sequence_editor,
-                            "sequences",
+                            "strips",
                             text="End Frame",
                             icon="RENDER_RESULT",
                         )
@@ -2488,7 +2420,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                                 scene,
                                 "inpaint_selected_strip",
                                 scene.sequence_editor,
-                                "sequences",
+                                "strips",
                                 text="Inpaint Mask",
                                 icon="SEQ_STRIP_DUPLICATE",
                             )
@@ -2500,7 +2432,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     scene,
                     "kontext_strip_1",
                     scene.sequence_editor,
-                    "sequences",
+                    "strips",
                     text="Reference Image",
                     icon="FILE_IMAGE",
                 )
@@ -2561,7 +2493,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 if (
                     (
                         type == "audio"
-                        and audio_model_card == "stabilityai/stable-audio-open-1.0"
+                        and audio_model_card == "tintwotin/Foundation-1-Diffusers"
                     )
                     or (
                         type == "image"
@@ -2691,7 +2623,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
 
                 elif type == "audio" and (
                     addon_prefs.audio_model_card
-                    == "stabilityai/stable-audio-open-1.0"
+                    == "tintwotin/Foundation-1-Diffusers"
                 ):
                     col.prop(
                         context.scene, "movie_num_inference_steps", text="Quality Steps"
@@ -3002,6 +2934,7 @@ def invoke_video_generation(prompt, api_key, image_url, movie_model_card):
     import requests
     import json
     import base64
+    import os
 
     debug_print("-----------------Submit video generation task-----------------")
     url = "https://api.minimaxi.chat/v1/video_generation"
@@ -3265,6 +3198,7 @@ class SEQUENCER_OT_generate_movie(Operator):
     def execute(self, context):
         global _pallaidium_movie_model_cache
         import random
+        import os
         
         scene = context.scene
 
@@ -3411,7 +3345,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         pipe.to("mps")
                     elif low_vram():
                         pipe.enable_sequential_cpu_offload()
-                        # pipe.enable_vae_slicing()
+                        # pipe.vae.enable_slicing()
                         pipe.vae.enable_tiling()
                     else:
                         pipe.enable_model_cpu_offload()
@@ -3468,7 +3402,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         pipe.to("mps")
                     elif low_vram():
                         pipe.enable_sequential_cpu_offload()
-                        # pipe.enable_vae_slicing()
+                        # pipe.vae.enable_slicing()
                         pipe.vae.enable_tiling()
                     else:
                         pipe.enable_model_cpu_offload()
@@ -3819,7 +3753,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                     if gfx_device == "mps":
                         pipe.to("mps")
                     elif low_vram():
-                        # pipe.enable_vae_slicing()
+                        # pipe.vae.enable_slicing()
                         pipe.vae.enable_tiling()
                         pipe.enable_model_cpu_offload()
                     else:
@@ -4195,7 +4129,7 @@ class SEQUENCER_OT_generate_movie(Operator):
     #                if gfx_device == "mps":
     #                    pipe.to("mps")
     #                elif low_vram():
-    #                    # pipe.enable_vae_slicing()
+    #                    # pipe.enable_slicing()
     #                    pipe.enable_model_cpu_offload()
     #                else:
     #                    #pipe.enable_sequential_cpu_offload()
@@ -4221,7 +4155,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                         pipe.to("mps")
                     elif low_vram():
                         pipe.enable_model_cpu_offload()
-                        # pipe.enable_vae_slicing()
+                        # pipe.vae.enable_slicing()
                     else:
                         pipe.to(gfx_device)
             
@@ -5342,6 +5276,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 elif movie_model_card == "hunyuanvideo-community/HunyuanVideo":
 
                     from diffusers.utils import load_image, export_to_video
+                    import os
                     if scene.movie_path:
                         print("Process: Video Image to Video (Hunyuan-I2V)")
                         if not os.path.isfile(scene.movie_path):
@@ -6518,7 +6453,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                             if movie_model_card == "rootonchair/LTX-2-19b-distilled" or movie_model_card == "Lightricks/LTX-2" or movie_model_card == "LTX-2 Multi-Input File": 
                                 filepath = dst_path
                                 if os.path.isfile(filepath):
-                                    strip = scene.sequence_editor.sequences.new_sound(
+                                    strip = scene.sequence_editor.strips.new_sound(
                                         name=prompt,
                                         filepath=filepath,
                                         channel=empty_channel,
@@ -6533,27 +6468,31 @@ class SEQUENCER_OT_generate_movie(Operator):
                                 else:
                                     print("No resulting audio-file found!")
                             
-                            bpy.ops.sequencer.movie_strip_add(
+                            scene.sequence_editor.strips.new_movie(
+                                name = str(seed) + "_" + prompt,
                                 filepath=dst_path,
                                 frame_start=start_frame,
                                 channel=empty_channel,
                                 fit_method="FIT",
-                                adjust_playback_rate=True,
-                                sound=sound,
-                                use_framerate=False,
                             )
                             strip = scene.sequence_editor.active_strip
                             scene.sequence_editor.active_strip = strip
-                            strip.name = str(seed) + "_" + prompt
-                            strip.use_proxy = True
-                            bpy.ops.sequencer.rebuild_proxy()
+                            
+                            #strip.use_framerate=False
+                            #strip.use_proxy = True
+                            #scene.sequence_editor.build_proxy()
                             if i > 0:
                                 scene.frame_current = (
                                     scene.sequence_editor.active_strip.frame_final_start
                                 )
-
+                            sound_strip = scene.sequence_editor.strips.new_sound(
+                                name=str(seed) + "_" + prompt,
+                                filepath=dst_path,
+                                channel=empty_channel-1,
+                                frame_start=start_frame,
+                            )
                             # Redraw UI to display the new strip. Remove this if Blender crashes: https://docs.blender.org/api/current/info_gotcha.html#can-i-redraw-during-script-execution
-                            bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
+                            #bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)
                             break
             print_elapsed_time(start_time)
         if old_duration == -1 and input == "input_strips":
@@ -6571,8 +6510,8 @@ class SEQUENCER_OT_generate_movie(Operator):
             clear_cuda_cache()
 
         bpy.types.Scene.movie_path = ""
-        if input != "input_strips":
-            bpy.ops.renderreminder.pallaidium_play_notification()
+#        if input != "input_strips":
+#            bpy.ops.renderreminder.pallaidium_play_notification()
         scene.frame_current = current_frame
         return {"FINISHED"}
     
@@ -6859,6 +6798,7 @@ class SEQUENCER_OT_generate_audio(Operator):
 
     def execute(self, context):
         global _pallaidium_audio_model_cache
+        import os
         
         scene = context.scene
         if not scene.sequence_editor:
@@ -6892,7 +6832,7 @@ class SEQUENCER_OT_generate_audio(Operator):
             print("Audio model card changed. Forcing load.")
             should_load = True
 
-        strips = context.selected_sequences
+        strips = context.selected_strips
         if strip in strips:
             duration = scene.audio_length_in_f = (
                 strip.frame_final_duration + 1
@@ -6914,7 +6854,7 @@ class SEQUENCER_OT_generate_audio(Operator):
         from scipy.io.wavfile import write as write_wav
 
         # --- DEPENDENCY CHECKS ---
-        if addon_prefs.audio_model_card == "stabilityai/stable-audio-open-1.0":
+        if addon_prefs.audio_model_card == "tintwotin/Foundation-1-Diffusers":
             try:
                 import scipy
                 import torch
@@ -7016,7 +6956,8 @@ class SEQUENCER_OT_generate_audio(Operator):
             try:
                 import torch
                 import soundfile as sf
-                from qwen_tts import Qwen3TTSModel
+                #from qwen_tts import Qwen3TTSModel
+                from faster_qwen3_tts import FasterQwen3TTS
             except ModuleNotFoundError as e:
                 missing_module_name = e.name
                 error_message = (
@@ -7097,8 +7038,9 @@ class SEQUENCER_OT_generate_audio(Operator):
             # Load models Audio
             print("Model:  " + addon_prefs.audio_model_card)
 
-            if addon_prefs.audio_model_card == "stabilityai/stable-audio-open-1.0":
-                repo_id = "ylacombe/stable-audio-1.0"
+            if addon_prefs.audio_model_card == "tintwotin/Foundation-1-Diffusers":
+                #repo_id = "ylacombe/stable-audio-1.0"
+                repo_id = "tintwotin/Foundation-1-Diffusers"
                 pipe = StableAudioPipeline.from_pretrained(
                     repo_id, torch_dtype=torch.float16
                 )
@@ -7177,12 +7119,12 @@ class SEQUENCER_OT_generate_audio(Operator):
                     device = "cpu"
                 print(f"Using device: {device}")
                 
-                model = Qwen3TTSModel.from_pretrained(
+                model = FasterQwen3TTS.from_pretrained(
                     "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
-                    device_map=device,
+                    #device_map=device,
                     dtype=torch.bfloat16,
-                    attn_implementation="flash_attention_2",
-                )
+                    #attn_implementation="flash_attention_2",
+                )                
 
             # Parler
             elif (
@@ -7297,7 +7239,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                     generator = None
 
             # Stable Open Audio
-            if addon_prefs.audio_model_card == "stabilityai/stable-audio-open-1.0":
+            if addon_prefs.audio_model_card == "tintwotin/Foundation-1-Diffusers":
                 import random
                 print("Generate: Stable Open Audio")
                 seed = context.scene.movie_num_seed
@@ -7464,7 +7406,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                     print("Voice cloning: "+strip.sound.name)
                     # For VC we might need to load a different model, but we try to reuse cached if compatible or load fresh
                     vc_model = ChatterboxVC.from_pretrained(device)
-                    wav = vc_model.generate(audio=AUDIO_PROMPT_PATH,target_voice_path=speaker)
+                    wav = vc_model.generate(audio=AUDIO_PROMPT_PATH)#,target_voice_path=speaker)
                     ta.save(output_audio_path, wav, vc_model.sr)
                 else: # Text-to-Speech
                     try:
@@ -7538,7 +7480,7 @@ class SEQUENCER_OT_generate_audio(Operator):
                     print("Voice cloning: "+strip.sound.name)
                     # For VC we might need to load a different model, but we try to reuse cached if compatible or load fresh
                     vc_model = ChatterboxTurboTTS.from_pretrained(device)
-                    wav = vc_model.generate(audio=AUDIO_PROMPT_PATH,target_voice_path=speaker)
+                    wav = vc_model.generate(audio_prompt_path=AUDIO_PROMPT_PATH)
                     ta.save(output_audio_path, wav, vc_model.sr)
                 else: # Text-to-Speech
                     try:
@@ -7600,11 +7542,12 @@ class SEQUENCER_OT_generate_audio(Operator):
                 try:
                     # Use cached model if available
                     if model is None:
-                        model = Qwen3TTSModel.from_pretrained(
+                        #model = Qwen3TTSModel.from_pretrained(
+                        model = FasterQwen3TTS.from_pretrained(
                             "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
-                            device_map=device,
+                            #device_map=device,
                             dtype=torch.bfloat16,
-                            attn_implementation="flash_attention_2",
+                            #attn_implementation="flash_attention_2",
                         )
                 except Exception as e:
                     print(f"An unexpected error occurred in the TTS process: {e}")
@@ -7625,16 +7568,14 @@ class SEQUENCER_OT_generate_audio(Operator):
                     self.report({"INFO"}, "Reference text file not found.")
                     return {"CANCELLED"}        
 
-                prompt_items = model.create_voice_clone_prompt(
+                wavs = None
+                
+                wavs, sr = model.generate_voice_clone(
+                    text=prompt,
+                    language="English",
+
                     ref_audio=ref_audio,
                     ref_text=ref_text,
-                    x_vector_only_mode=False,
-                )
-                wavs = None
-                wavs, sr = model.generate_voice_clone(
-                    text=[prompt],
-                    language=["English"],
-                    voice_clone_prompt=prompt_items,
                 )
                 if not wavs:
                     print("Audio generation failed")
@@ -7790,14 +7731,14 @@ class SEQUENCER_OT_generate_audio(Operator):
                     # clear the VRAM
                     clear_cuda_cache()
 
-                    if input != "input_strips":
-                        bpy.ops.renderreminder.pallaidium_play_notification()
+#                    if input != "input_strips":
+#                        bpy.ops.renderreminder.pallaidium_play_notification()
                     return {"CANCELLED"}                   
 
             # Add Audio Strip
             filepath = filename
             if os.path.isfile(filepath):
-                strip = scene.sequence_editor.sequences.new_sound(
+                strip = scene.sequence_editor.strips.new_sound(
                     name=prompt,
                     filepath=filepath,
                     channel=empty_channel,
@@ -7831,8 +7772,8 @@ class SEQUENCER_OT_generate_audio(Operator):
             # clear the VRAM
             clear_cuda_cache()
 
-        if input != "input_strips":
-            bpy.ops.renderreminder.pallaidium_play_notification()
+#        if input != "input_strips":
+#            bpy.ops.renderreminder.pallaidium_play_notification()
         return {"FINISHED"}
 
 #def get_depth_map(image):
@@ -8090,6 +8031,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
     def execute(self, context):
         global _pallaidium_model_cache
+        import os
         
         scene = context.scene
         seq_editor = scene.sequence_editor
@@ -8099,7 +8041,7 @@ class SEQUENCER_OT_generate_image(Operator):
         local_files_only = addon_prefs.local_files_only
         image_model_card = addon_prefs.image_model_card
         image_power = scene.image_power
-        strips = context.selected_sequences
+        strips = context.selected_strips
         type = scene.generatorai_typeselect
 
         inference_parameters = None
@@ -8487,14 +8429,14 @@ class SEQUENCER_OT_generate_image(Operator):
                         elif low_vram():
                             converter.enable_sequential_cpu_offload()
                             #converter.enable_model_cpu_offload()
-                            converter.enable_vae_slicing()
+                            converter.vae.enable_slicing()
                             converter.vae.enable_tiling()
                         else:
                             converter.enable_model_cpu_offload()
 
                     elif (
                         image_model_card == "Runware/BFL-FLUX.2-klein-base-4B"
-                        or image_model_card == "Runware/BFL-FLUX.2-klein-base-4B"
+                        or image_model_card == "black-forest-labs/FLUX.2-klein-9b-kv"
                     ):
                         from diffusers import Flux2KleinPipeline, Flux2Transformer2DModel
                         from transformers import Qwen3ForCausalLM
@@ -8556,12 +8498,12 @@ class SEQUENCER_OT_generate_image(Operator):
                         elif low_vram():
                             #pipe.enable_sequential_cpu_offload()
                             converter.enable_model_cpu_offload()
-                            converter.enable_vae_slicing()
+                            converter.vae.enable_slicing()
                             converter.vae.enable_tiling()
                         else:
                             #pipe.enable_sequential_cpu_offload()
                             converter.enable_model_cpu_offload()
-                            converter.enable_vae_slicing()
+                            converter.vae.enable_slicing()
                             converter.vae.enable_tiling()
 
                         if pipecard == "ChuckMcSneed/FLUX.1-dev":
@@ -8595,12 +8537,12 @@ class SEQUENCER_OT_generate_image(Operator):
                             converter.to("mps")
                         elif low_vram():
                             converter.enable_model_cpu_offload()
-                            converter.enable_vae_slicing()
+                            converter.vae.enable_slicing()
                             converter.vae.enable_tiling()
                         else:
                             converter.enable_sequential_cpu_offload()
                             #converter.enable_model_cpu_offload() # too slow
-                            converter.enable_vae_slicing()
+                            converter.vae.enable_slicing()
                             converter.vae.enable_tiling()
 
                     elif image_model_card == "Qwen/Qwen-Image-2512":
@@ -8658,7 +8600,7 @@ class SEQUENCER_OT_generate_image(Operator):
                             converter.to("mps")
                         elif low_vram():
                             converter.enable_model_cpu_offload()
-                            converter.enable_vae_slicing()
+                            converter.vae.enable_slicing()
                             converter.vae.enable_tiling()
                         else:
                             converter.enable_model_cpu_offload()
@@ -9096,7 +9038,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     elif low_vram():
                         #pipe.enable_sequential_cpu_offload()
                         pipe.enable_model_cpu_offload()
-                        pipe.enable_vae_slicing()
+                        pipe.vae.enable_slicing()
                         pipe.vae.enable_tiling()
                     else:
                         pipe.enable_model_cpu_offload()
@@ -9125,7 +9067,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         pipe.to("mps")
                     elif low_vram():
                         pipe.enable_model_cpu_offload()
-                        pipe.enable_vae_slicing()
+                        pipe.vae.enable_slicing()
                         pipe.vae.enable_tiling()
                     else:
                         pipe.enable_model_cpu_offload()
@@ -9159,7 +9101,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 elif low_vram():
                     converter.enable_sequential_cpu_offload()
                     #converter.enable_model_cpu_offload()
-                    converter.enable_vae_slicing()
+                    converter.vae.enable_slicing()
                     converter.vae.enable_tiling()
                 else:
                     converter.enable_model_cpu_offload()
@@ -9271,7 +9213,7 @@ class SEQUENCER_OT_generate_image(Operator):
                         pipe.to("mps")
                     elif low_vram():
                         pipe.enable_model_cpu_offload()
-                        pipe.enable_vae_slicing()
+                        pipe.vae.enable_slicing()
                         pipe.vae.enable_tiling()
                     else:
                         pipe.enable_model_cpu_offload()
@@ -9312,7 +9254,7 @@ class SEQUENCER_OT_generate_image(Operator):
                             pipe.to("mps")
                         elif low_vram():
                             pipe.enable_model_cpu_offload()
-                            pipe.enable_vae_slicing()
+                            pipe.vae.enable_slicing()
                             pipe.vae.enable_tiling()
                     else:
                         print("Quant: 8-bit")
@@ -9753,7 +9695,7 @@ class SEQUENCER_OT_generate_image(Operator):
                 elif low_vram():
                     refiner.enable_model_cpu_offload()
                     # refiner.enable_vae_tiling()
-                    # refiner.enable_vae_slicing()
+                    # refiner.vae.enable_slicing()
                 else:
                     refiner.to(gfx_device)
             
@@ -10487,10 +10429,12 @@ class SEQUENCER_OT_generate_image(Operator):
                         #prompt_2=None,
                         max_sequence_length=512,
                         image=init_image,
-                        #strength=1.00 - scene.image_power,
+                        # strength=1.00 - scene.image_power,
                         # negative_prompt=negative_prompt,
-                        guidance_scale=1.0,
-                        num_inference_steps=4,
+                        num_inference_steps=image_num_inference_steps,
+                        guidance_scale=image_num_guidance,
+#                        guidance_scale=1.0,
+#                        num_inference_steps=4,
                         height=y,
                         width=x,
                         generator=generator,
@@ -11077,7 +11021,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
             # Add strip
             if os.path.isfile(out_path):
-                strip = scene.sequence_editor.sequences.new_image(
+                strip = scene.sequence_editor.strips.new_image(
                     name=str(seed) + "_" + context.scene.generate_movie_prompt,
                     frame_start=start_frame,
                     filepath=out_path,
@@ -11144,8 +11088,8 @@ class SEQUENCER_OT_generate_image(Operator):
             clear_cuda_cache()
 
         scene.movie_num_guidance = guidance
-        if input != "input_strips":
-            bpy.ops.renderreminder.pallaidium_play_notification()
+#        if input != "input_strips":
+#            bpy.ops.renderreminder.pallaidium_play_notification()
         scene.frame_current = current_frame
 
         return {"FINISHED"}
@@ -11226,6 +11170,7 @@ class SEQUENCER_OT_generate_text(Operator):
 
     def execute(self, context):
         global _pallaidium_text_model_cache
+        import os
         
         scene = context.scene
         input = scene.input_strips
@@ -11504,31 +11449,36 @@ class SEQUENCER_OT_generate_text(Operator):
 
         # --- STRIP CREATION ---
         if input == "input_strips" and active_strip:
-            start_frame = int(active_strip.frame_start)
-            end_frame = (
-                start_frame + active_strip.frame_final_duration
-            )
+            # Use 'left_handle' (formerly frame_final_start) for the start position
+            # Use 'duration' (formerly frame_final_duration) for the length
+            start_frame = int(getattr(active_strip, 'left_handle', getattr(active_strip, 'frame_final_start', 1)))
+            duration = int(getattr(active_strip, 'duration', getattr(active_strip, 'frame_final_duration', 100)))
+            
+            # The strip length must be the duration of the source strip
+            strip_length = duration
         else:
             start_frame = int(scene.frame_current)
-            end_frame = (
-                start_frame + 100
-            )
+            strip_length = 100
 
-        empty_channel = find_first_empty_channel(
-            start_frame,
-            end_frame,
-        )
+        empty_channel = find_first_empty_channel(start_frame, start_frame + strip_length)
 
         # Add strip
         if text:
-            strip = scene.sequence_editor.sequences.new_effect(
+            # We use 'length' instead of 'frame_end' for the constructor
+            strip = scene.sequence_editor.strips.new_effect(
                 name=str(text),
                 type="TEXT",
                 frame_start=start_frame,
-                frame_end=end_frame,
+                length=strip_length, # This is the duration in frames
                 channel=empty_channel,
             )
-            strip.frame_final_end = end_frame
+            
+            # If you are in 5.1, right_handle is the absolute end frame
+            if hasattr(strip, 'right_handle'):
+                strip.right_handle = start_frame + strip_length
+            else:
+                strip.frame_final_end = start_frame + strip_length
+                
             strip.text = text
             strip.wrap_width = 0.68
             strip.font_size = 16
@@ -11598,7 +11548,7 @@ def delete_linked_audio(context, movie_strip):
     movie_path = movie_strip.filepath
     movie_start = movie_strip.frame_start
 
-    for s in seq_editor.sequences_all:
+    for s in seq_editor.strips_all:
         if (
             s.type == 'SOUND' and
             getattr(s.sound, "filepath", None) == movie_path and
@@ -11622,9 +11572,10 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.scene and context.scene.sequence_editor
+        return context.sequencer_scene and context.scene.sequence_editor
 
     def execute(self, context):
+        import os
         # --- Initialization ---
         bpy.types.Scene.movie_path = ""
         bpy.types.Scene.image_path = ""
@@ -11642,10 +11593,10 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
 
         scene = context.scene
         sequencer = bpy.ops.sequencer
-        strips = context.selected_sequences
+        strips = context.selected_strips
         active_strip = context.scene.sequence_editor.active_strip
         
-        if not strips == context.selected_sequences:
+        if not strips == context.selected_strips:
             active_strip.select = True
             
         # STORE BASE PROMPTS HERE - These are our "Clean" copies
@@ -11697,7 +11648,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         
         for count, strip in enumerate(strips):
             # 1. Selection Logic
-            for dsel_strip in bpy.context.scene.sequence_editor.sequences:
+            for dsel_strip in bpy.context.scene.sequence_editor.strips:
                 dsel_strip.select = False
             strip.select = True
             context.scene.sequence_editor.active_strip = strip
@@ -11716,24 +11667,24 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
             should_load_model = is_first_strip or type_has_changed
             should_unload_model = is_last_strip or next_type_is_different
 
-            context.scene["ai_load_state"] = should_load_model
-            context.scene["ai_unload_state"] = should_unload_model
+            context.sequencer_scene["ai_load_state"] = should_load_model
+            context.sequencer_scene["ai_unload_state"] = should_unload_model
             
             print(f"Processing {count+1}/{total_strips} [{strip.type}]. Load: {should_load_model}, Unload: {should_unload_model}")
 
 
             # 3A. Intermediate META Strip Handling
-            if target_type == "movie" and addon_prefs.movie_model_card == "LTX-2 Multi-Input File":
+            if (target_type == "movie" and addon_prefs.movie_model_card == "LTX-2 Multi-Input File") or (target_type == "image"): # and addon_prefs.image_model_card == "Tongyi-MAI/Z-Image-Turbo" 
                 if strip.type == "META":
                     meta_strip = strip
-                    strips_array = strip.sequences
+                    strips_array = strip.strips
                 else:
                     meta_strip = None
                     strips_array = [strip]
                 
                 current_temp_strip = None
                 for child_strip in strips_array: 
-                    for dsel_strip in bpy.context.scene.sequence_editor.sequences:
+                    for dsel_strip in bpy.context.scene.sequence_editor.strips:
                         dsel_strip.select = False
                     child_strip.select = True
                     context.scene.sequence_editor.active_strip = child_strip 
@@ -11757,7 +11708,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     if child_strip.type == "TEXT":
                         #if child_strip.text:
                         if meta_strip and meta_strip.type == 'META':
-                            for child in meta_strip.sequences:
+                            for child in meta_strip.strips:
                                 if child.type == 'TEXT':
                                     print("Found text:", child.text)
                                     current_prompt_text = child.text + ", " + base_prompt
@@ -11772,13 +11723,13 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                         # Set path
                         if current_temp_strip.type == "IMAGE":
                             strip_dirname = os.path.dirname(current_temp_strip.directory)
-                            file_path = bpy.path.abspath(os.path.join(current_temp_strip, current_temp_strip.elements[0].filename))
+                            file_path = bpy.path.abspath(os.path.join(strip_dirname, current_temp_strip.elements[0].filename))
                             bpy.types.Scene.movie_path = file_path
                         else:
                             if current_temp_strip.type == "MOVIE":
                                 file_path = bpy.path.abspath(current_temp_strip.filepath)
                                 bpy.types.Scene.movie_path = file_path
-                            elif current_temp_strip.type == "SOUND":
+                            elif current_temp_strip.type == "SOUND" and target_type == "movie":
                                 file_path = bpy.path.abspath(current_temp_strip.sound.filepath)
                                 bpy.types.Scene.sound_path = file_path
                         current_temp_strip = None
@@ -11803,7 +11754,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                             SEQUENCER_OT_duplicate={},
                             TRANSFORM_OT_seq_slide={"value": (0, 1), "use_restore_handle_selection": False, "snap": False}
                         )
-                        intermediate_strip = bpy.context.selected_sequences[0]
+                        intermediate_strip = bpy.context.selected_strips[0]
                         intermediate_strip.frame_start = strip.frame_start
                         intermediate_strip.frame_offset_start = int(trim_frame)
                         intermediate_strip.frame_final_duration = 1
@@ -11813,7 +11764,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     elif target_type == "text":
                         bpy.ops.sequencer.copy()
                         bpy.ops.sequencer.paste(keep_offset=True)
-                        intermediate_strip = bpy.context.selected_sequences[0]
+                        intermediate_strip = bpy.context.selected_strips[0]
                         intermediate_strip.frame_start = strip.frame_start
                         intermediate_strip.frame_final_duration = strip.frame_final_duration
                         temp_strip = strip = get_render_strip(self, context, intermediate_strip)
@@ -11934,7 +11885,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     if s:
                         try:
                             seq_editor = context.scene.sequence_editor
-                            if seq_editor and s.name in seq_editor.sequences_all:
+                            if seq_editor and s.name in seq_editor.strips_all:
 
                                 if s.type == 'MOVIE':
                                     delete_linked_audio(context, s)
@@ -11946,6 +11897,10 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                 
                 # Clear the list for the next iteration
                 temp_strips.clear()
+                
+                strip = context.scene.sequence_editor.active_strip
+                if not strip.type == "SOUND":
+                    strip.channel = max(1, strip.channel - 1)
                     
         # --- Final Cleanup ---
         scene.frame_current = current_frame
@@ -11956,11 +11911,11 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
         context.scene.movie_num_seed = seed
         context.scene.sequence_editor.active_strip = active_strip
 
-        try:
-            addon_prefs.playsound = play_sound
-            bpy.ops.renderreminder.pallaidium_play_notification()
-        except:
-            pass
+#        try:
+#            addon_prefs.playsound = play_sound
+#            bpy.ops.renderreminder.pallaidium_play_notification()
+#        except:
+#            pass
 
         print("Processing finished.")
 
@@ -11992,7 +11947,7 @@ class SEQUENCER_OT_ai_strip_picker(Operator):
             v2d = region.view2d
             mouse_x_view, mouse_y_view = v2d.region_to_view(*mouse_region_coord)
 
-            for strip in context.scene.sequence_editor.sequences_all:
+            for strip in context.scene.sequence_editor.strips_all:
                 # Check if the strip has a transform property before accessing it
                 if hasattr(strip, 'transform'):
                     scale_y = strip.transform.scale_y
@@ -12205,7 +12160,7 @@ class AI_Metadata_PT_Panel(bpy.types.Panel):
     @classmethod
     def poll(cls, context):
         if context.space_data.view_type in {'SEQUENCER', 'PREVIEW'}:
-            if context.scene and context.scene.sequence_editor:
+            if context.sequencer_scene and context.scene.sequence_editor:
                 active_strip = context.scene.sequence_editor.active_strip
                 if active_strip and active_strip.type in {'IMAGE', 'MOVIE'}:
                     return True
