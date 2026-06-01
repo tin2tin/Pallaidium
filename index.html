@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PALLAIDIUM | Omnimodal AI Movie Studio for Blender</title>
+    <meta name="description" content="Sculpt your film directly in sensory clay. Develop narratives through the visual, vocal, and musical materials that evoke raw emotion - all inside Blender's Video Sequence Editor.">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Inter"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                    colors: {
+                        nordic: {
+                            black:   '#07080a',
+                            charcoal:'#0e1013',
+                            slate:   '#1b1e22',
+                            white:   '#f0f6fc',
+                            blue:    '#44b3ff',
+                            muted:   '#7d8590',
+                            orange:  '#d25d38',
+                            indigo:  '#818cf8',
+                            emerald: '#34d399',
+                            amber:   '#fbbf24',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #07080a; }
+        ::-webkit-scrollbar-thumb { background: #1b1e22; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: #44b3ff; }
+
+        .bg-grid {
+            background-size: 40px 40px;
+            background-image:
+                linear-gradient(to right,  rgba(255,255,255,0.015) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255,255,255,0.015) 1px, transparent 1px);
+        }
+
+        .glass-panel {
+            background: rgba(14,16,19,0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .ai-glow { text-shadow: 0 0 24px rgba(68,179,255,0.35); }
+
+        /* Scroll reveal */
+        .fade-up {
+            opacity: 0;
+            transform: translateY(12px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+        .fade-up.visible { opacity: 1; transform: translateY(0); }
+
+        /* Model filtering transitions */
+        .filter-btn { transition: all 0.2s; }
+        .filter-btn.active {
+            background: rgba(68,179,255,0.1);
+            color: #44b3ff;
+            border-color: rgba(68,179,255,0.3);
+        }
+    </style>
+</head>
+
+<body class="bg-nordic-black text-nordic-white font-sans antialiased overflow-x-hidden selection:bg-nordic-blue selection:text-black">
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- NAVIGATION                                                     -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<nav class="fixed top-4 left-0 right-0 z-50 px-4 pointer-events-none">
+    <div class="max-w-7xl mx-auto flex justify-between items-center pointer-events-auto">
+        <div class="glass-panel px-4 py-2.5 rounded flex items-center gap-3">
+            <span class="font-bold tracking-tight text-sm md:text-base">
+                PALL<span class="text-nordic-blue">AI</span>DIUM
+            </span>
+            <span class="w-px h-3 bg-white/10"></span>
+            <span class="text-[9px] text-nordic-muted font-mono tracking-widest uppercase">OMNIMODAL STUDIO</span>
+        </div>
+
+        <div class="glass-panel px-5 py-2.5 rounded hidden md:flex gap-6 text-[11px] font-mono uppercase tracking-wider text-nordic-muted">
+            <a href="#philosophy" class="hover:text-nordic-blue transition-colors">Method</a>
+            <a href="#matrix" class="hover:text-nordic-blue transition-colors">Tactile Matrix</a>
+            <a href="#loops" class="hover:text-nordic-blue transition-colors">Creative Loops</a>
+            <a href="#models" class="hover:text-nordic-blue transition-colors">Model Stack</a>
+            <a href="#addons" class="hover:text-nordic-blue transition-colors">Ecosystem</a>
+            <a href="#install" class="hover:text-nordic-blue transition-colors">Installation</a>
+        </div>
+
+        <div class="flex items-center gap-2 pointer-events-auto">
+            <div class="glass-panel px-3 py-2 rounded">
+                <a href="https://github.com/tin2tin/Pallaidium" target="_blank" class="flex items-center gap-2 hover:text-white transition group" aria-label="GitHub">
+                    <svg height="16" width="16" viewBox="0 0 16 16" fill="currentColor" class="text-nordic-muted group-hover:text-white transition">
+                        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                    </svg>
+                </a>
+            </div>
+            <a href="#install" class="bg-nordic-blue text-black text-xs font-mono px-3.5 py-2 rounded hover:bg-white transition tracking-wide">
+                Download
+            </a>
+        </div>
+    </div>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- HERO                                                           -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<header class="relative min-h-screen flex flex-col items-center justify-center pt-16 pb-6 bg-grid">
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 m-auto w-[600px] h-[600px] bg-nordic-blue/5 rounded-full blur-[100px] pointer-events-none"></div>
+
+    <div class="relative z-10 text-center max-w-5xl px-6">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded border border-zinc-800 bg-zinc-950/80 mb-3">
+            <span class="w-1.5 h-1.5 rounded-full bg-nordic-blue"></span>
+            <span class="font-mono text-[9px] text-nordic-muted uppercase tracking-widest">Local Engine - Blender 5.2+ - CUDA Native</span>
+        </div>
+
+        <h1 class="text-5xl md:text-[5.5rem] font-extrabold tracking-tighter mb-2 leading-none text-white">
+            PALL<span class="text-nordic-blue ai-glow">AI</span>DIUM
+        </h1>
+        <h2 class="text-lg md:text-2xl text-nordic-white font-semibold tracking-tight mb-2 max-w-2xl mx-auto leading-relaxed">
+            Sculpt narratives in time.
+        </h2>
+        
+        <p class="text-xs md:text-sm font-mono text-zinc-300 mb-6 max-w-2xl mx-auto leading-relaxed">
+            Pallaidium lets you develop narratives directly with the visual and sonic elements that trigger emotion in you right now.
+        </p>
+
+        <div class="flex flex-col sm:flex-row gap-3 justify-center items-center mb-6">
+            <a href="#install" class="bg-white text-black px-6 py-2.5 rounded text-sm font-bold font-mono hover:bg-nordic-blue hover:text-white transition duration-200 m-0 w-full sm:w-auto text-center">
+                Download
+            </a>
+            <a href="https://www.youtube.com/watch?v=jmSZlEV_ZLw" target="_blank" class="px-6 py-2.5 rounded text-sm font-mono border border-zinc-800 bg-zinc-950/50 hover:border-white/20 transition duration-200 m-0 w-full sm:w-auto text-center inline-flex items-center justify-center gap-2">
+                Walkthrough
+            </a>
+        </div>
+    </div>
+
+    <!-- Active Demo Video -->
+    <div class="w-full max-w-5xl px-4 relative z-10 group">
+        <div class="absolute -inset-0.5 bg-gradient-to-r from-nordic-blue/10 to-purple-500/10 rounded-xl blur opacity-20 group-hover:opacity-30 transition duration-1000"></div>
+        <div class="relative rounded border border-zinc-800 bg-nordic-black overflow-hidden shadow-2xl aspect-video">
+            <video autoplay loop muted playsinline poster="images/vse-hero-poster.jpg" class="w-full h-full object-cover opacity-90">
+                <source src="https://github.com/user-attachments/assets/81d30bc1-01f6-4b52-8ce7-abf53d53e854" type="video/mp4">
+            </video>
+            <div class="absolute top-4 right-4 bg-black/80 backdrop-blur px-3 py-1 rounded text-[10px] font-mono text-nordic-muted border border-zinc-800">
+                BLENDER VSE - INTEGRATED WORKFLOW
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- CORE STATEMENT ON CREATIVITY                                   -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section class="py-8 bg-nordic-black border-t border-zinc-900">
+    <div class="max-w-4xl mx-auto px-6 text-center fade-up">
+        <p class="text-sm md:text-base font-mono text-nordic-blue leading-relaxed max-w-2xl mx-auto">
+            Creativity is about combining elements. Pallaidium empowers you to create and combine elements across all media, letting you explore the immediate emotional impact of these combinations as they play together on a single timeline.
+        </p>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- METHODOLOGY: SCULPTING IN SENSORY CLAY                         -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section id="philosophy" class="py-10 border-t border-zinc-900 bg-nordic-charcoal">
+    <div class="max-w-7xl mx-auto px-6">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+            <div class="lg:col-span-4 space-y-3 flex flex-col justify-center">
+                <span class="font-mono text-xs text-nordic-blue uppercase tracking-widest block">The Sculptor's Method</span>
+                <h2 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight leading-tight">
+                    Direct Exploration of the Audio-Visual Material
+                </h2>
+                <p class="text-xs text-nordic-muted leading-relaxed font-sans">
+                    Traditional screenwriting requires you to work in words, projecting how a scene might eventually feel in the cinema. Pallaidium changes this paradigm entirely.
+                </p>
+                <p class="text-xs text-nordic-muted leading-relaxed font-sans">
+                    By placing generative models inside Blender's Video Sequence Editor (VSE), you work directly in the medium itself. Draft visual plates, test dialogue pacing, and adjust musical arrangements side-by-side. You are like a sculptor working directly with clay, discovering the story through the weight, texture, and unexpected details of the physical assets.
+                </p>
+            </div>
+
+            <!-- Core Sculpting Placeholder Image -->
+            <div class="lg:col-span-3 rounded border border-zinc-800 overflow-hidden bg-zinc-950/40 relative min-h-[220px]">
+                <img src="images/sculpting-clay.jpg" class="w-full h-full object-cover opacity-80" alt="Direct sculpting in film clay">
+                <div class="absolute bottom-3 left-3 bg-black/80 backdrop-blur px-2.5 py-1 rounded text-[9px] font-mono border border-zinc-800/80 text-nordic-muted">
+                    SENSORY FRAMEWORK
+                </div>
+            </div>
+
+            <div class="lg:col-span-5 grid grid-cols-1 gap-4 justify-between">
+                <!-- Point 1 -->
+                <div class="border border-zinc-800/80 bg-zinc-950/40 m-0 p-4 rounded">
+                    <div class="font-mono text-xs text-nordic-amber font-bold mb-1.5">● SENSORY IMMEDIACY</div>
+                    <p class="text-[11px] text-zinc-400 leading-relaxed font-sans">
+                        Don't wait for post-production to hear a character's voice. Generate cloned dialogue paths, evaluate performance cadences, and let the voice direct the visual cuts.
+                    </p>
+                </div>
+                <!-- Point 2 -->
+                <div class="border border-zinc-800/80 bg-zinc-950/40 m-0 p-4 rounded">
+                    <div class="font-mono text-xs text-nordic-blue font-bold mb-1.5">● DIRECT FEEDBACK</div>
+                    <p class="text-[11px] text-zinc-400 leading-relaxed font-sans">
+                        Play a musical stem, generate a sequence frame, and observe how they interact on the timeline. Follow the sensory chemistry wherever it leads your narrative.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- THE OMNIMODAL MATRIX (Interactive routing)                      -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section id="matrix" class="py-10 border-t border-zinc-900 bg-nordic-black relative">
+    <div class="absolute inset-0 bg-grid opacity-10 pointer-events-none"></div>
+    
+    <div class="max-w-7xl mx-auto px-6 relative z-10">
+        <div class="mb-6 text-center md:text-left">
+            <span class="font-mono text-xs text-nordic-blue uppercase tracking-widest block mb-1">Direct Sensory Input - Output Matrix</span>
+            <h2 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight">Active Translation Matrix</h2>
+            <p class="text-xs text-nordic-muted mt-1 max-w-xl font-mono">
+                Select a starting asset below. Anything can become anything via text prompts and descriptive layers inside Pallaidium.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+            <!-- Left Panel: Source Selector -->
+            <div class="lg:col-span-4 flex flex-col justify-between space-y-4">
+                <div class="glass-panel p-5 rounded border border-zinc-800/80 m-0 flex flex-col space-y-3">
+                    <span class="font-mono text-[10px] text-nordic-blue uppercase tracking-wider">01 // STARTING ELEMENT</span>
+                    <div class="grid grid-cols-1 gap-2" id="matrix-source-inputs">
+                        <button onclick="updateMatrixRoute('text', this)" class="matrix-btn px-3 py-2.5 border border-nordic-blue/30 bg-nordic-blue/5 text-xs font-mono rounded text-left transition text-white">
+                          ● Screenplay
+                        </button>
+                        <button onclick="updateMatrixRoute('image', this)" class="matrix-btn px-3 py-2.5 border border-zinc-800 bg-zinc-950 text-xs font-mono rounded text-left transition text-nordic-muted hover:border-zinc-700">
+                          ● Emotional Image
+                        </button>
+                        <button onclick="updateMatrixRoute('video', this)" class="matrix-btn px-3 py-2.5 border border-zinc-800 bg-zinc-950 text-xs font-mono rounded text-left transition text-nordic-muted hover:border-zinc-700">
+                          ● Emotional Video
+                        </button>
+                        <button onclick="updateMatrixRoute('audio', this)" class="matrix-btn px-3 py-2.5 border border-zinc-800 bg-zinc-950 text-xs font-mono rounded text-left transition text-nordic-muted hover:border-zinc-700">
+                          ● Soundtrack / Speech
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Middle Panel: The Active Path -->
+            <div class="lg:col-span-5 glass-panel p-6 rounded border border-zinc-800/80 flex flex-col justify-between min-h-[300px]" id="matrix-pathway-card">
+                <div class="flex justify-between items-start border-b border-zinc-900 pb-3">
+                    <div>
+                        <span class="font-mono text-[9px] text-nordic-muted uppercase block">Active Process Routing</span>
+                        <h4 class="text-sm font-bold text-white font-mono mt-0.5" id="active-route-title">TEXT_TO_SENSORY_CHANNELS</h4>
+                    </div>
+                    <span class="font-mono text-[9px] text-nordic-blue bg-nordic-blue/10 border border-nordic-blue/20 px-2 py-0.5 rounded">LATENT SYNC</span>
+                </div>
+
+                <!-- Interactive flow graphic -->
+                <div class="my-4 py-2 flex flex-col items-center justify-center space-y-3 font-mono" id="active-route-schematic">
+                    <div class="text-[10px] border border-zinc-800 bg-zinc-950 px-2.5 py-1 rounded text-white font-mono">
+                        INPUT: Screenplay Markup (Fountain)
+                    </div>
+                    <div class="w-px h-5 bg-zinc-800"></div>
+                    <div class="border border-nordic-amber/20 bg-nordic-amber/5 px-3 py-1.5 rounded text-center max-w-xs">
+                        <div class="text-[10px] text-nordic-amber font-bold">Pallaidium Core Engine</div>
+                        <p class="text-[9px] text-nordic-muted mt-0.5">Translating screenplay descriptions to multi-track layouts</p>
+                    </div>
+                    <div class="w-px h-5 bg-zinc-800"></div>
+                    <div class="text-[10px] border border-zinc-800 bg-zinc-950 px-2.5 py-1 rounded text-nordic-muted">
+                        OUTPUT: Track Media Generations
+                    </div>
+                </div>
+
+                <div class="border-t border-zinc-900 pt-3 flex justify-between items-center text-[9px] font-mono text-nordic-muted">
+                    <span>Guidance: Shared Temporal Clocks</span>
+                    <span>State: Asynchronous</span>
+                </div>
+            </div>
+
+            <!-- Right Panel: Output Channels with Image Previews -->
+            <div class="lg:col-span-3 flex flex-col space-y-2" id="matrix-outputs">
+                <div class="font-mono text-[9px] text-nordic-muted uppercase tracking-wider pl-1">Timeline Strips Generated</div>
+                
+                <!-- Video Plate Box with Film Strip Icon and Thumbnail -->
+				<div class="glass-panel p-3 rounded border border-zinc-800 flex gap-3 items-center transition" id="target-video-channel">
+                    <div class="w-12 h-12 rounded bg-zinc-950 m-0 flex items-center justify-center flex-shrink-0 overflow-hidden relative border border-zinc-800">
+                        <div class="absolute inset-0 border border-dashed border-nordic-blue/20 m-0.5 rounded"></div><svg class="w-6 h-6 text-nordic-blue/40" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z"></path>
+                        </svg>
+                        
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xs font-bold text-white font-mono font-sans truncate">Video Plate [Channel 3]</div>
+                        <span class="text-[9px] font-mono text-nordic-blue block truncate" id="target-video-desc">Wan-2B / LTX-2 Synthesized from screen text</span>
+                    </div>
+                </div>      
+
+                <!-- Audio Score Box with Spectrogram and Thumbnail -->
+                <div class="glass-panel p-3 rounded border border-zinc-800 flex gap-3 items-center transition" id="target-audio-channel">
+                    <div class="w-12 h-12 rounded bg-zinc-950 m-0 flex items-end justify-center flex-shrink-0 p-1 border border-zinc-800 gap-[2px] relative overflow-hidden">
+                        <img src="images/audio-preview-thumbnail.jpg" class="absolute inset-0 w-full h-full object-cover opacity-40" alt="Spectrogram" onerror="this.style.display='none'">
+                        <span class="w-[3px] bg-nordic-emerald/20 h-4 rounded-full z-10"></span>
+                        <span class="w-[3px] bg-nordic-emerald/40 h-8 rounded-full z-10"></span>
+                        <span class="w-[3px] bg-nordic-emerald h-10 rounded-full animate-pulse z-10"></span>
+                        <span class="w-[3px] bg-nordic-emerald/75 h-6 rounded-full z-10"></span>
+                        <span class="w-[3px] bg-nordic-emerald/30 h-3 rounded-full z-10"></span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xs font-bold text-white font-mono font-sans truncate">Audio Score [Channel 1]</div>
+                        <span class="text-[9px] font-mono text-nordic-emerald block truncate" id="target-audio-desc">Foundation Music Stereo Stem in G-Minor</span>
+                    </div>
+                </div>
+
+                <!-- Voice Box with Waveform and Thumbnail -->
+                <div class="glass-panel p-3 rounded border border-zinc-800 flex gap-3 items-center transition" id="target-voice-channel">
+                    <div class="w-12 h-12 rounded bg-zinc-950 m-0 flex items-center justify-center flex-shrink-0 border border-zinc-800 relative overflow-hidden">
+                        <img src="images/voice-preview-thumbnail.jpg" class="absolute inset-0 w-full h-full object-cover opacity-40" alt="Waveform" onerror="this.style.display='none'">
+                        <svg class="w-8 h-8 text-nordic-emerald/60 z-10" viewBox="0 0 100 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M0 20 Q10 5, 20 20 T40 20 T60 20 T80 20 T100 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xs font-bold text-white font-mono font-sans truncate">Voice Track [Channel 2]</div>
+                        <span class="text-[9px] font-mono text-nordic-emerald block truncate" id="target-voice-desc">Chatterbox Vocal Synthesizer Dialogue Node</span>
+                    </div>
+                </div>
+
+                <!-- SFX Box with Ambient Sound Waves and Thumbnail -->
+                <div class="glass-panel p-3 rounded border border-zinc-800 flex gap-3 items-center transition" id="target-sfx-channel">
+                    <div class="w-12 h-12 rounded bg-zinc-950 m-0 flex items-center justify-center flex-shrink-0 border border-zinc-800 relative overflow-hidden">
+                        <img src="images/sfx-preview-thumbnail.jpg" class="absolute inset-0 w-full h-full object-cover opacity-40" alt="Sound effect" onerror="this.style.display='none'">
+                        <svg class="w-6 h-6 text-nordic-indigo/50 z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z"/>
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xs font-bold text-white font-mono font-sans truncate">Foley Design [Channel 1]</div>
+                        <span class="text-[9px] font-mono text-nordic-indigo block truncate" id="target-sfx-desc">ACE Step Ambient Foley Engine</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- FLEXIBLE CREATIVE LOOPS                                        -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section id="loops" class="py-10 border-t border-zinc-900 bg-nordic-charcoal">
+    <div class="max-w-7xl mx-auto px-6">
+        <div class="mb-6 text-center md:text-left">
+            <span class="font-mono text-xs text-nordic-blue uppercase tracking-widest block mb-1">Workflow Patterns</span>
+            <h2 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight">Flexible Creative Loops</h2>
+            <p class="text-xs text-nordic-muted mt-1 max-w-xl font-mono">
+                These diagrams show just two examples of the infinite routes you can explore on the VSE timeline.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 font-mono">
+            <!-- Loop A: Script-to-Screen -->
+            <div class="border border-zinc-800 bg-zinc-950/60 p-6 rounded space-y-4">
+                <span class="text-[10px] text-nordic-amber uppercase tracking-wider block font-bold">● EXAMPLE LOOP A // THE TRADITIONAL PROGRESSION</span>
+                <h3 class="text-sm font-bold text-white font-sans">Drafting the Screenplay First</h3>
+                <p class="text-[11px] text-zinc-500 leading-relaxed font-sans">
+                    You begin with a text concept or screenplay strip, generating visuals, speech tracks, and soundtracks step-by-step to match the timing of your written screenplay.
+                </p>
+                <div class="space-y-2 text-[10px]">
+                    <div class="flex items-center gap-3 bg-zinc-900/50 px-3 py-2 rounded border border-zinc-800">
+                        <span class="text-nordic-amber font-bold">1</span>
+                        <span>Write screenplay strips using <strong>Blender Screenwriter</strong>.</span>
+                    </div>
+                    <div class="flex items-center gap-3 bg-zinc-900/50 px-3 py-2 rounded border border-zinc-800">
+                        <span class="text-nordic-blue font-bold">2</span>
+                        <span>Generate images with consistent style and characters using <strong>FLUX Klein 9b and LoRAs</strong>.</span>
+                    </div>
+                    <div class="flex items-center gap-3 bg-zinc-900/50 px-3 py-2 rounded border border-zinc-800">
+                        <span class="text-nordic-blue font-bold">3</span>
+                        <span>Do coverage of the scenes in various angles using <strong>Qwen</strong>.</span>
+                    </div>
+                    <div class="flex items-center gap-3 bg-zinc-900/50 px-3 py-2 rounded border border-zinc-800">
+                        <span class="text-nordic-emerald font-bold">4</span>
+                        <span>Do speech tracks using <strong>Chatterbox Vocal Clones</strong>.</span>
+                    </div>
+                    <div class="flex items-center gap-3 bg-zinc-900/50 px-3 py-2 rounded border border-zinc-800">
+                        <span class="text-nordic-blue font-bold">5</span>
+                        <span>Animate Images, Prompts and Speech into video using <strong>LTX 2.3</strong>.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loop B: Sound-to-Script -->
+            <div class="border border-zinc-800 bg-zinc-950/60 p-6 rounded space-y-4">
+                <span class="text-[10px] text-nordic-emerald uppercase tracking-wider block font-bold">○ EXAMPLE LOOP B // THE SENSORY PROGRESSION</span>
+                <h3 class="text-sm font-bold text-white font-sans">Sculpting from a Music Track First</h3>
+                <p class="text-[11px] text-zinc-500 leading-relaxed font-sans">
+                    Import or generate a musical score that evokes the correct emotion. Explore images that match its mood, imagine the characters, generate descriptions, and output a screenplay.
+                </p>
+                <div class="space-y-2 text-[10px]">
+                    <div class="flex items-center gap-3 bg-zinc-900/50 px-3 py-2 rounded border border-zinc-800">
+                        <span class="text-nordic-emerald font-bold">1</span>
+                        <span>Import sound files or generate themes with <strong>Foundation or AceStep Music</strong>.</span>
+                    </div>
+                    <div class="flex items-center gap-3 bg-zinc-900/50 px-3 py-2 rounded border border-zinc-800">
+                        <span class="text-nordic-blue font-bold">2</span>
+                        <span>Generate images to discover which characters match the sound.</span>
+                    </div>
+                    <div class="flex items-center gap-3 bg-zinc-900/50 px-3 py-2 rounded border border-zinc-800">
+                        <span class="text-nordic-blue font-bold">3</span>
+                        <span>Extract dynamic movement descriptions and speech to text.</span>
+                    </div>
+                    <div class="flex items-center gap-3 bg-zinc-900/50 px-3 py-2 rounded border border-zinc-800">
+                        <span class="text-nordic-amber font-bold">4</span>
+                        <span>Convert generated descriptions into a screenplay via <strong>Subtitle Editor and Screenwriter</strong>.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- MODELS SHOWCASE                                                -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section id="models" class="py-10 bg-nordic-black border-t border-zinc-900">
+    <div class="max-w-7xl mx-auto px-6">
+        <div class="mb-6 text-center md:text-left">
+            <span class="font-mono text-xs text-nordic-blue uppercase tracking-widest block mb-1">Validated Local Model Layers</span>
+            <h2 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight">System Model Stack</h2>
+        </div>
+
+        <!-- Filter Tabs -->
+        <div class="flex flex-wrap gap-2 mb-6 font-mono text-[10px]">
+            <button onclick="filterModels('all')" data-filter="all" class="filter-btn active px-3 py-1.5 uppercase border border-zinc-800 rounded text-nordic-muted hover:text-white">All Models</button>
+            <button onclick="filterModels('video')" data-filter="video" class="filter-btn px-3 py-1.5 uppercase border border-zinc-800 rounded text-nordic-muted hover:text-white">Video Synthesis</button>
+            <button onclick="filterModels('image')" data-filter="image" class="filter-btn px-3 py-1.5 uppercase border border-zinc-800 rounded text-nordic-muted hover:text-white">Image Synthesis</button>
+            <button onclick="filterModels('audio')" data-filter="audio" class="filter-btn px-3 py-1.5 uppercase border border-zinc-800 rounded text-nordic-muted hover:text-white">Sonic Architecture</button>
+            <button onclick="filterModels('text')" data-filter="text" class="filter-btn px-3 py-1.5 uppercase border border-zinc-800 rounded text-nordic-muted hover:text-white">Text Parsing</button>
+        </div>
+
+        <!-- Model Grid Layout -->
+        <div id="model-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+            <!-- LTX-2 -->
+            <div class="model-card glass-panel rounded p-5 hover:border-zinc-700 transition" data-category="video">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-bold font-mono text-white text-xs leading-tight">LTX-2 & Multi-Input</h3>
+                    <span class="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border border-nordic-blue/30 text-nordic-blue bg-nordic-blue/5">Video</span>
+                </div>
+                <p class="text-[11px] text-nordic-muted leading-relaxed mb-4">
+                    Fast latent video generation using a 3-stage temporal process. The multi-input variant supports custom VSE LoRAs and detail passes.
+                </p>
+                <div class="flex justify-between items-center text-[9px] font-mono text-zinc-500">
+                    <span>Weights: Hugging Face</span>
+                    <a href="https://huggingface.co/Lightricks/LTX-2" target="_blank" class="hover:text-white transition">HuggingFace →</a>
+                </div>
+            </div>
+
+            <!-- Wan -->
+            <div class="model-card glass-panel rounded p-5 hover:border-zinc-700 transition" data-category="video">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-bold font-mono text-white text-xs leading-tight">Wan T2V / I2V</h3>
+                    <span class="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border border-nordic-blue/30 text-nordic-blue bg-nordic-blue/5">Video</span>
+                </div>
+                <p class="text-[11px] text-nordic-muted leading-relaxed mb-4">
+                    Generates fluid sequences with strong physics adherence and temporal rendering characteristics. High motion range accuracy.
+                </p>
+                <div class="flex justify-between items-center text-[9px] font-mono text-zinc-500">
+                    <span>Weights: Wan-AI</span>
+                    <a href="https://huggingface.co/Wan-AI" target="_blank" class="hover:text-white transition">HuggingFace →</a>
+                </div>
+            </div>
+
+            <!-- SkyReels -->
+            <div class="model-card glass-panel rounded p-5 hover:border-zinc-700 transition" data-category="video">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-bold font-mono text-white text-xs leading-tight">SkyReels V1 (Hunyuan)</h3>
+                    <span class="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border border-nordic-blue/30 text-nordic-blue bg-nordic-blue/5">Video</span>
+                </div>
+                <p class="text-[11px] text-nordic-muted leading-relaxed mb-4">
+                    Text-to-video and image-to-video models leveraging Hunyuan DiT. Features a compressed INT4 architecture option for reduced memory allocation.
+                </p>
+                <div class="flex justify-between items-center text-[9px] font-mono text-zinc-500">
+                    <span>Weights: Skywork</span>
+                    <a href="https://huggingface.co/Skywork/SkyReels-V1-Hunyuan-T2V" target="_blank" class="hover:text-white transition">HuggingFace →</a>
+                </div>
+            </div>
+
+            <!-- MiniMax -->
+            <div class="model-card glass-panel rounded p-5 hover:border-zinc-700 transition" data-category="video">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-bold font-mono text-white text-xs leading-tight">MiniMax Cloud Engine</h3>
+                    <span class="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border border-nordic-blue/30 text-nordic-blue bg-nordic-blue/5">Video</span>
+                </div>
+                <p class="text-[11px] text-nordic-muted leading-relaxed mb-4">
+                    Alternative API-steered generation system for rapid draft generation. Requires setting an active personal key.
+                </p>
+                <div class="flex justify-between items-center text-[9px] font-mono text-zinc-500">
+                    <span>Provider: MiniMax API</span>
+                    <a href="https://www.minimaxi.com/" target="_blank" class="hover:text-white transition">minimaxi.com →</a>
+                </div>
+            </div>
+
+            <!-- FLUX.2 Dev -->
+            <div class="model-card glass-panel rounded p-5 hover:border-zinc-700 transition" data-category="image">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-bold font-mono text-white text-xs leading-tight">FLUX.2 Dev (4-Bit Quantized)</h3>
+                    <span class="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border border-nordic-blue/30 text-nordic-blue bg-nordic-blue/5">Image</span>
+                </div>
+                <p class="text-[11px] text-nordic-muted leading-relaxed mb-4">
+                    Optimized text-to-image pipeline for detailed layouts, graphics, and high-fidelity prompt compliance. Fits within 6 GB limits.
+                </p>
+                <div class="flex justify-between items-center text-[9px] font-mono text-zinc-500">
+                    <span>Weights: Hugging Face (BnB)</span>
+                    <a href="https://huggingface.co/diffusers/FLUX.2-dev-bnb-4bit" target="_blank" class="hover:text-white transition">HuggingFace →</a>
+                </div>
+            </div>
+
+            <!-- FLUX.2 Klein -->
+            <div class="model-card glass-panel rounded p-5 hover:border-zinc-700 transition" data-category="image">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-bold font-mono text-white text-xs leading-tight">FLUX.2 Klein (4B & 9B)</h3>
+                    <span class="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border border-nordic-blue/30 text-nordic-blue bg-nordic-blue/5">Image</span>
+                </div>
+                <p class="text-[11px] text-nordic-muted leading-relaxed mb-4">
+                    Lightweight parameter modifications. Intended for fast layout previews and efficient tile upscaling.
+                </p>
+                <div class="flex justify-between items-center text-[9px] font-mono text-zinc-500">
+                    <span>Weights: Black Forest Labs</span>
+                    <a href="https://huggingface.co/BFL-ML" target="_blank" class="hover:text-white transition">HuggingFace →</a>
+                </div>
+            </div>
+
+            <!-- FLUX Kontext -->
+            <div class="model-card glass-panel rounded p-5 hover:border-zinc-700 transition" data-category="image">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-bold font-mono text-white text-xs leading-tight">FLUX Kontext & Relighting</h3>
+                    <span class="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border border-nordic-blue/30 text-nordic-blue bg-nordic-blue/5">Image</span>
+                </div>
+                <p class="text-[11px] text-nordic-muted leading-relaxed mb-4">
+                    Performs instruction-based changes on loaded image strips. Allows you to re-light or edit specific areas without manual masking.
+                </p>
+                <div class="flex justify-between items-center text-[9px] font-mono text-zinc-500">
+                    <span>Weights: Kontext Community</span>
+                    <a href="https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev" target="_blank" class="hover:text-white transition">HuggingFace →</a>
+                </div>
+            </div>
+
+            <!-- OmniGen -->
+            <div class="model-card glass-panel rounded p-5 hover:border-zinc-700 transition" data-category="image">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-bold font-mono text-white text-xs leading-tight">OmniGen V1</h3>
+                    <span class="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border border-nordic-blue/30 text-nordic-blue bg-nordic-blue/5">Image</span>
+                </div>
+                <p class="text-[11px] text-nordic-muted leading-relaxed mb-4">
+                    A unified multi-image model for image editing, generation, and multi-reference image composition.
+                </p>
+                <div class="flex justify-between items-center text-[9px] font-mono text-zinc-500">
+                    <span>Weights: Shitao</span>
+                    <a href="https://huggingface.co/Shitao/OmniGen-v1-diffusers" target="_blank" class="hover:text-white transition">HuggingFace →</a>
+                </div>
+            </div>
+
+            <!-- Lumina 2 -->
+            <div class="model-card glass-panel rounded p-5 hover:border-zinc-700 transition" data-category="image">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-bold font-mono text-white text-xs leading-tight">Lumina Image 2.0</h3>
+                    <span class="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border border-nordic-blue/30 text-nordic-blue bg-nordic-blue/5">Image</span>
+                </div>
+                <p class="text-[11px] text-nordic-muted leading-relaxed mb-4">
+                    Advanced diffusion transformer model designed to process high-density visual details and complex layout conditions.
+                </p>
+                <div class="flex justify-between items-center text-[9px] font-mono text-zinc-500">
+                    <span>Weights: Alpha-VLLM</span>
+                    <a href="https://huggingface.co/Alpha-VLLM/Lumina-Image-2.0" target="_blank" class="hover:text-white transition">HuggingFace →</a>
+                </div>
+            </div>
+
+            <!-- BiRefNet -->
+            <div class="model-card glass-panel rounded p-5 hover:border-zinc-700 transition" data-category="image">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-bold font-mono text-white text-xs leading-tight">BiRefNet-HR</h3>
+                    <span class="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border border-nordic-blue/30 text-nordic-blue bg-nordic-blue/5">Image</span>
+                </div>
+                <p class="text-[11px] text-nordic-muted leading-relaxed mb-4">
+                    High-resolution automated background extraction engine. Isolates subjects directly on VSE layers for fast compositing.
+                </p>
+                <div class="flex justify-between items-center text-[9px] font-mono text-zinc-500">
+                    <span>Weights: ZhengPeng7</span>
+                    <a href="https://huggingface.co/ZhengPeng7/BiRefNet_HR" target="_blank" class="hover:text-white transition">HuggingFace →</a>
+                </div>
+            </div>
+
+            <!-- Chatterbox -->
+            <div class="model-card glass-panel rounded p-5 hover:border-zinc-700 transition" data-category="audio">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-bold font-mono text-white text-xs leading-tight">Chatterbox & Turbo</h3>
+                    <span class="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border border-nordic-emerald/30 text-nordic-emerald bg-nordic-emerald/5">Audio</span>
+                </div>
+                <p class="text-[11px] text-nordic-muted leading-relaxed mb-4">
+                    Clones voice performance details directly from short local reference files. Handles dialogue generation and long formats without processing lag.
+                </p>
+                <div class="flex justify-between items-center text-[9px] font-mono text-zinc-500">
+                    <span>Source: Resemble AI</span>
+                    <a href="https://github.com/resemble-ai/chatterbox" target="_blank" class="hover:text-white transition">GitHub →</a>
+                </div>
+            </div>
+
+            <!-- MMAudio -->
+            <div class="model-card glass-panel rounded p-5 hover:border-zinc-700 transition" data-category="audio">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-bold font-mono text-white text-xs leading-tight">MMAudio Sync Sound</h3>
+                    <span class="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border border-nordic-emerald/30 text-nordic-emerald bg-nordic-emerald/5">Audio</span>
+                </div>
+                <p class="text-[11px] text-nordic-muted leading-relaxed mb-4">
+                    Calculates synchronization coordinates directly from timeline video tracks to generate synchronized sound effects and foley tracks.
+                </p>
+                <div class="flex justify-between items-center text-[9px] font-mono text-zinc-500">
+                    <span>Weights: HK Cheng Rex</span>
+                    <a href="https://huggingface.co/hkchengrex/MMAudio" target="_blank" class="hover:text-white transition">HuggingFace →</a>
+                </div>
+            </div>
+
+            <!-- Foundation Music -->
+            <div class="model-card glass-panel rounded p-5 hover:border-zinc-700 transition" data-category="audio">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-bold font-mono text-white text-xs leading-tight">Foundation Music 1</h3>
+                    <span class="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border border-nordic-emerald/30 text-nordic-emerald bg-nordic-emerald/5">Audio</span>
+                </div>
+                <p class="text-[11px] text-nordic-muted leading-relaxed mb-4">
+                    Generates stereo musical stems and arrangements directly from text directions, BPM cues, and scale settings.
+                </p>
+                <div class="flex justify-between items-center text-[9px] font-mono text-zinc-500">
+                    <span>Weights: tin2tin Diffusers</span>
+                    <a href="https://huggingface.co/tintwotin/Foundation-1-Diffusers" target="_blank" class="hover:text-white transition">HuggingFace →</a>
+                </div>
+            </div>
+
+            <!-- ACE Step -->
+            <div class="model-card glass-panel rounded p-5 hover:border-zinc-700 transition" data-category="audio">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-bold font-mono text-white text-xs leading-tight">ACE Step Audio</h3>
+                    <span class="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border border-nordic-emerald/30 text-nordic-emerald bg-nordic-emerald/5">Audio</span>
+                </div>
+                <p class="text-[11px] text-nordic-muted leading-relaxed mb-4">
+                    Flexible text-to-audio engine designed for sound design, ambient environments, and structural track sound effects.
+                </p>
+                <div class="flex justify-between items-center text-[9px] font-mono text-zinc-500">
+                    <span>Source: ACE-Step Team</span>
+                    <a href="https://github.com/ace-step/ACE-Step" target="_blank" class="hover:text-white transition">GitHub →</a>
+                </div>
+            </div>
+
+            <!-- Florence-2 -->
+            <div class="model-card glass-panel rounded p-5 hover:border-zinc-700 transition" data-category="text">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-bold font-mono text-white text-xs leading-tight">Florence-2 Captioning</h3>
+                    <span class="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border border-nordic-amber/30 text-nordic-amber bg-nordic-amber/5">Text</span>
+                </div>
+                <p class="text-[11px] text-nordic-muted leading-relaxed mb-4">
+                    Analyzes frame layers on the timeline to generate accurate captions, object coordinates, and tracking labels.
+                </p>
+                <div class="flex justify-between items-center text-[9px] font-mono text-zinc-500">
+                    <span>Weights: Microsoft</span>
+                    <a href="https://huggingface.co/microsoft/Florence-2-large" target="_blank" class="hover:text-white transition">HuggingFace →</a>
+                </div>
+            </div>
+
+            <!-- MoviiGen -->
+            <div class="model-card glass-panel rounded p-5 hover:border-zinc-700 transition" data-category="text">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-bold font-mono text-white text-xs leading-tight">MoviiGen Prompt Engine</h3>
+                    <span class="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border border-nordic-amber/30 text-nordic-amber bg-nordic-amber/5">Text</span>
+                </div>
+                <p class="text-[11px] text-nordic-muted leading-relaxed mb-4">
+                    Rewrites simple text inputs into rich, descriptive prompts structured for the temporal constraints of video models.
+                </p>
+                <div class="flex justify-between items-center text-[9px] font-mono text-zinc-500">
+                    <span>Weights: ZuluVision</span>
+                    <a href="https://huggingface.co/ZuluVision/MoviiGen1.1_Prompt_Rewriter" target="_blank" class="hover:text-white transition">HuggingFace →</a>
+                </div>
+            </div>
+
+            <!-- Marlin -->
+            <div class="model-card glass-panel rounded p-5 hover:border-zinc-700 transition" data-category="text">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-bold font-mono text-white text-xs leading-tight">Marlin Video Captions</h3>
+                    <span class="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border border-nordic-amber/30 text-nordic-amber bg-nordic-amber/5">Text</span>
+                </div>
+                <p class="text-[11px] text-nordic-muted leading-relaxed mb-4">
+                    Generates narrative descriptions of motion and visual sequences from video strips, aiding the screenwriter layout.
+                </p>
+                <div class="flex justify-between items-center text-[9px] font-mono text-zinc-500">
+                    <span>Weights: Lunar Labs</span>
+                    <a href="https://huggingface.co/lunahr/Marlin-2B-ungated" target="_blank" class="hover:text-white transition">HuggingFace →</a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- THE ECOSYSTEM TOPOLOGY                                         -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section id="addons" class="py-12 bg-nordic-charcoal border-t border-zinc-900 relative">
+    <div class="absolute inset-0 bg-grid opacity-10 pointer-events-none"></div>
+
+    <div class="max-w-7xl mx-auto px-6 relative z-10">
+        <div class="mb-8 text-center md:text-left">
+            <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded border border-zinc-800 bg-zinc-950 mb-3">
+                <span class="font-mono text-[9px] text-nordic-muted uppercase tracking-widest">Master-Satellite Topology</span>
+                <span class="w-1 h-px bg-zinc-800"></span>
+                <span class="font-mono text-[9px] text-nordic-amber uppercase tracking-widest">7 Synced Nodes</span>
+            </div>
+            <h2 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight">The Sculpting Armature</h2>
+            <p class="text-xs text-nordic-muted mt-1 max-w-xl font-mono">
+                Observe the active data path. Pallaidium sits at the core of your VSE timeline, converting structured inputs from satellite modules into sensory motion, speech, and sound.
+            </p>
+        </div>
+
+        <!-- Ecosystem Grid (Master-Satellite Layout) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+            <!-- MASTER NODE: Pallaidium Core Generative Engine -->
+            <div class="glass-panel p-5 rounded border border-nordic-blue/30 bg-nordic-blue/5 md:col-span-2 lg:col-span-3 flex flex-col md:flex-row justify-between gap-6">
+                <div class="flex-grow">
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="font-mono text-[9px] text-nordic-blue tracking-widest font-bold">CORE CENTRAL NODE</span>
+                        <span class="font-mono text-[9px] text-nordic-blue font-bold">[PALLAIDIUM ENGINE]</span>
+                    </div>
+                    <h3 class="text-base font-bold text-white font-mono mb-1.5">Pallaidium Core Generative Engine</h3>
+                    <p class="text-[11px] text-nordic-muted leading-relaxed mb-4 font-sans">
+                        The master orchestration framework that coordinates localized diffusion passes directly in Blender's Video Sequence Editor (VSE). It ingests structural, directional, and temporal parameters from the satellite nodes and compiles them into sensory sequences using Wan-AI, LTX-2, FLUX, and Chatterbox. All media tracks are coordinated under a shared emotional state.
+                    </p>
+                </div>
+                <div class="md:w-64 flex flex-col justify-between border-t md:border-t-0 md:border-l border-zinc-900 pt-4 md:pt-0 md:pl-6 text-left md:text-right items-start md:items-end">
+                    <div class="w-full">
+                        <div class="text-[9px] font-mono text-nordic-blue mb-1 font-bold">Status: Active Host</div>
+                        <div class="text-[9px] font-mono text-zinc-500 leading-normal">Orchestrates: Wan, FLUX, LTX, Chatterbox, ACE-Step, Foundation Music</div>
+                    </div>
+                    <a href="https://github.com/tin2tin/Pallaidium" target="_blank" class="text-xs font-mono text-nordic-blue hover:text-white transition mt-4 md:mt-0 font-bold">Main Repository →</a>
+                </div>
+            </div>
+
+            <!-- Satellite 1: Blender Screenwriter -->
+            <div class="glass-panel p-5 rounded border border-zinc-800/80 m-0 flex flex-col justify-between">
+                <div>
+                    <div class="w-full h-28 rounded overflow-hidden mb-4 border border-zinc-900 bg-zinc-950">
+                        <img src="images/satellite-mockup-01.jpg" class="w-full h-full object-cover opacity-60" alt="Screenwriter Preview" onerror="this.style.display='none'">
+                    </div>
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="font-mono text-[9px] text-nordic-amber tracking-widest">SATELLITE 01 / ARMATURE</span>
+                        <span class="font-mono text-[9px] text-zinc-600">[WRITER]</span>
+                    </div>
+                    <h3 class="text-base font-bold text-white font-mono mb-1.5">Blender Screenwriter</h3>
+                    <p class="text-[11px] text-nordic-muted leading-relaxed mb-4 font-sans">
+                        Draft screenplays directly in Blender using Fountain markup. Automatically compiles dialogue and heading sections into timed sequence tracks, setting up a template for visual and audio development.
+                    </p>
+                </div>
+                <div class="border-t border-zinc-900 pt-3 flex justify-between items-center">
+                    <span class="font-mono text-[9px] text-nordic-blue">Data Pass: Fountain - Subtitle Tracks</span>
+                    <a href="https://github.com/tin2tin/Blender_Screenwriter" target="_blank" class="text-xs font-mono text-zinc-500 hover:text-white transition">Repo →</a>
+                </div>
+            </div>
+
+            <!-- Satellite 2: GPT4BLENDER -->
+            <div class="glass-panel p-5 rounded border border-zinc-800/80 m-0 flex flex-col justify-between">
+                <div>
+                    <div class="w-full h-28 rounded overflow-hidden mb-4 border border-zinc-900 bg-zinc-950">
+                        <img src="images/satellite-mockup-02.jpg" class="w-full h-full object-cover opacity-60" alt="GPT4Blender Preview" onerror="this.style.display='none'">
+                    </div>
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="font-mono text-[9px] text-nordic-amber tracking-widest">SATELLITE 02 / REASONER</span>
+                        <span class="font-mono text-[9px] text-zinc-600">[GPT4ALL]</span>
+                    </div>
+                    <h3 class="text-base font-bold text-white font-mono mb-1.5">GPT4BLENDER</h3>
+                    <p class="text-[11px] text-nordic-muted leading-relaxed mb-4 font-sans">
+                        Brings local, offline LLMs via GPT4ALL directly into Blender. Generates and refines scene descriptors, narrative setups, and prompts locally to explore different physical textures in your sequence.
+                    </p>
+                </div>
+                <div class="border-t border-zinc-900 pt-3 flex justify-between items-center">
+                    <span class="font-mono text-[9px] text-nordic-blue">Data Pass: LLM Core - Editor Panels</span>
+                    <a href="https://github.com/tin2tin/GPT4BLENDER" target="_blank" class="text-xs font-mono text-zinc-500 hover:text-white transition">Repo →</a>
+                </div>
+            </div>
+
+            <!-- Satellite 3: Text to Strip -->
+            <div class="glass-panel p-5 rounded border border-zinc-800/80 m-0 flex flex-col justify-between">
+                <div>
+                    <div class="w-full h-28 rounded overflow-hidden mb-4 border border-zinc-900 bg-zinc-950">
+                        <img src="images/satellite-mockup-03.jpg" class="w-full h-full object-cover opacity-60" alt="Text to Strip Preview" onerror="this.style.display='none'">
+                    </div>
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="font-mono text-[9px] text-nordic-amber tracking-widest">SATELLITE 03 / COMPILER</span>
+                        <span class="font-mono text-[9px] text-zinc-600">[COMPILER]</span>
+                    </div>
+                    <h3 class="text-base font-bold text-white font-mono mb-1.5">Text to Strip</h3>
+                    <p class="text-[11px] text-nordic-muted leading-relaxed mb-4 font-sans">
+                        Converts active script documents or structured prompt texts from Blender's text editor directly into sequenced subtitle strips, preparing inputs for batch layout down the timeline.
+                    </p>
+                </div>
+                <div class="border-t border-zinc-900 pt-3 flex justify-between items-center">
+                    <span class="font-mono text-[9px] text-nordic-blue">Data Pass: Text Docs - VSE Strip Nodes</span>
+                    <a href="https://github.com/tin2tin/text_to_strip" target="_blank" class="text-xs font-mono text-zinc-500 hover:text-white transition">Repo →</a>
+                </div>
+            </div>
+
+            <!-- Satellite 4: Subtitle Editor -->
+            <div class="glass-panel p-5 rounded border border-zinc-800/80 m-0 flex flex-col justify-between">
+                <div>
+                    <div class="w-full h-28 rounded overflow-hidden mb-4 border border-zinc-900 bg-zinc-950">
+                        <img src="images/satellite-mockup-04.jpg" class="w-full h-full object-cover opacity-60" alt="Subtitle Editor Preview" onerror="this.style.display='none'">
+                    </div>
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="font-mono text-[9px] text-nordic-amber tracking-widest">SATELLITE 04 / SEQUENCE</span>
+                        <span class="font-mono text-[9px] text-zinc-600">[SUBTITLE]</span>
+                    </div>
+                    <h3 class="text-base font-bold text-white font-mono mb-1.5">Subtitle Editor</h3>
+                    <p class="text-[11px] text-nordic-muted leading-relaxed mb-4 font-sans">
+                        Provides visual track navigation, edit synchronization, translation tracks, and formatting tools. Combines with Whisper models to transcribe voice plates and auto-generate text prompts.
+                    </p>
+                </div>
+                <div class="border-t border-zinc-900 pt-3 flex justify-between items-center">
+                    <span class="font-mono text-[9px] text-nordic-blue">Data Pass: Timeline Speech - Transcription</span>
+                    <a href="https://github.com/tin2tin/Subtitle_Editor" target="_blank" class="text-xs font-mono text-zinc-500 hover:text-white transition">Repo →</a>
+                </div>
+            </div>
+
+            <!-- Satellite 5: VSE Masking Tools -->
+            <div class="glass-panel p-5 rounded border border-zinc-800/80 m-0 flex flex-col justify-between">
+                <div>
+                    <div class="w-full h-28 rounded overflow-hidden mb-4 border border-zinc-900 bg-zinc-950">
+                        <img src="images/satellite-mockup-05.jpg" class="w-full h-full object-cover opacity-60" alt="VSE Masking Preview" onerror="this.style.display='none'">
+                    </div>
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="font-mono text-[9px] text-nordic-amber tracking-widest">SATELLITE 05 / SEQUENCE</span>
+                        <span class="font-mono text-[9px] text-zinc-600">[MASK]</span>
+                    </div>
+                    <h3 class="text-base font-bold text-white font-mono mb-1.5">VSE Masking Tools</h3>
+                    <p class="text-[11px] text-nordic-muted leading-relaxed mb-4 font-sans">
+                        Draw masking boundaries on timeline elements using Blender's Clip Editor. Converts selections into timeline strips to target localized inpainting and img2img passes.
+                    </p>
+                </div>
+                <div class="border-t border-zinc-900 pt-3 flex justify-between items-center">
+                    <span class="font-mono text-[9px] text-nordic-blue">Data Pass: Visual Selection - Alpha Masks</span>
+                    <a href="https://github.com/tin2tin/vse_masking_tools" target="_blank" class="text-xs font-mono text-zinc-500 hover:text-white transition">Repo →</a>
+                </div>
+            </div>
+
+            <!-- Satellite 6: Add Rendered Strips -->
+            <div class="glass-panel p-5 rounded border border-zinc-800/80 m-0 flex flex-col justify-between">
+                <div>
+                    <div class="w-full h-28 rounded overflow-hidden mb-4 border border-zinc-900 bg-zinc-950">
+                        <img src="images/satellite-mockup-06.jpg" class="w-full h-full object-cover opacity-60" alt="Add Rendered Strips Preview" onerror="this.style.display='none'">
+                    </div>
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="font-mono text-[9px] text-nordic-amber tracking-widest">SATELLITE 06 / SEQUENCE</span>
+                        <span class="font-mono text-[9px] text-zinc-600">[RENDER]</span>
+                    </div>
+                    <h3 class="text-base font-bold text-white font-mono mb-1.5">Add Rendered Strips</h3>
+                    <p class="text-[11px] text-nordic-muted leading-relaxed mb-4 font-sans">
+                        Renders 3D layouts, grease pencil drafts, or viewport angles directly to movie strips on the timeline. Ensures these tracks are immediately compatible with Pallaidium's image-to-video workflow.
+                    </p>
+                </div>
+                <div class="border-t border-zinc-900 pt-3 flex justify-between items-center">
+                    <span class="font-mono text-[9px] text-nordic-blue">Data Pass: 3D Viewport - MP4 Strip Input</span>
+                    <a href="https://github.com/tin2tin/Add_Rendered_Strips" target="_blank" class="text-xs font-mono text-zinc-500 hover:text-white transition">Repo →</a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- INSTALLATION                                                   -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section id="install" class="py-12 border-t border-zinc-900 bg-nordic-black">
+    <div class="max-w-4xl mx-auto px-6">
+        <div class="flex items-center gap-4 mb-6">
+            <div class="p-2 bg-nordic-blue/10 border border-nordic-blue/20 rounded text-nordic-blue">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+            </div>
+            <div>
+                <h2 class="text-2xl font-bold font-mono text-white">Get Started</h2>
+                <p class="text-xs text-nordic-muted mt-0.5 font-mono">One-time setup - Models download on first use</p>
+            </div>
+        </div>
+
+        <!-- Video Walkthrough -->
+        <div class="mb-6">
+            <span class="text-[10px] font-mono text-nordic-muted uppercase tracking-widest block mb-2">Video Walkthrough</span>
+            <div class="relative rounded border border-zinc-850 bg-nordic-charcoal overflow-hidden shadow-2xl aspect-video">
+                <iframe
+                    src="https://github.com/user-attachments/assets/9897210a-a042-451f-ac34-5364ae9a97b6"
+                    title="How to install Pallaidium"
+                    frameborder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowfullscreen
+                    class="w-full h-full">
+                </iframe>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+            <!-- Requirements -->
+            <div class="space-y-3">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-nordic-muted font-mono border-b border-zinc-900 pb-2">System Requirements</h3>
+                <ul class="space-y-2 text-xs text-nordic-white font-mono">
+                    <li class="flex items-start gap-2.5"><span class="text-nordic-blue">✓</span> Windows 10/11 (preferred platform)</li>
+                    <li class="flex items-start gap-2.5"><span class="text-nordic-blue">✓</span> Blender 5.2 or later</li>
+                    <li class="flex items-start gap-2.5"><span class="text-nordic-blue">✓</span> NVIDIA GPU with 6 GB+ VRAM</li>
+                    <li class="flex items-start gap-2.5"><span class="text-nordic-blue">✓</span> CUDA 12.4</li>
+                    <li class="flex items-start gap-2.5"><span class="text-nordic-blue">✓</span> 20 GB+ free disk space</li>
+                    <li class="flex items-start gap-2.5"><span class="text-nordic-muted">~</span>
+                        <span class="text-nordic-muted">Limited support for
+                            <a href="https://github.com/tin2tin/Pallaidium/issues/105" class="text-nordic-blue hover:underline">Linux</a>
+                        </span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Pre-flight -->
+            <div class="space-y-3">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-nordic-muted font-mono border-b border-zinc-900 pb-2">Before You Begin</h3>
+                <div class="space-y-2 text-xs text-nordic-muted font-mono leading-relaxed">
+                    <p>
+                        1. Install <a href="https://git-scm.com/downloads" class="text-nordic-blue hover:underline">Git</a>
+                        (must be on your system PATH).
+                    </p>
+                    <p>
+                        2. Download <a href="https://www.blender.org/download/" class="text-nordic-blue hover:underline">Blender 5.2+</a>
+                        and unzip it into your Documents folder.
+                    </p>
+                    <p>
+                        3. Download <a href="https://github.com/tin2tin/Pallaidium/archive/refs/heads/main.zip" class="text-nordic-blue hover:underline">Pallaidium .ZIP</a>.
+                    </p>
+                    <p class="text-[10px] text-nordic-muted/60 leading-relaxed italic">
+                        Tip: shorten the Blender folder name - long paths can cause unzip failures on Windows.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Steps -->
+        <div class="glass-panel p-6 rounded m-0 font-mono text-xs border-l-2 border-l-nordic-blue mb-6 space-y-4">
+            <ol class="list-decimal list-inside space-y-3 text-nordic-muted marker:text-nordic-blue marker:font-bold">
+                <li>
+                    <span class="text-white">Run as Administrator:</span> right-click <span class="bg-zinc-900 px-1 rounded text-white border border-zinc-800">blender.exe</span> - "Run as Administrator". Required for write permissions on Windows.
+                </li>
+                <li>
+                    <span class="text-white">Install the add-on:</span> Preferences - Add-ons - Install - select the downloaded Pallaidium ZIP - enable it.
+                </li>
+                <li>
+                    <span class="text-white">Install Dependencies:</span> in Add-on Preferences click <span class="text-white border border-zinc-800 px-1 bg-zinc-950">Install Dependencies</span> and wait for it to finish.
+                </li>
+                <li>
+                    <span class="text-white">Open the studio:</span> restart your computer, launch Blender as Admin, open the Video Sequence Editor - Sidebar (N) - <strong class="text-white">Generative AI</strong>.
+                </li>
+            </ol>
+            <div class="pt-3 border-t border-zinc-900 text-[10px] text-nordic-muted">
+                <strong class="text-white">First run:</strong> the chosen model downloads automatically (5-10 GB). The screen may appear frozen during this. This is normal - do not close Blender.
+            </div>
+        </div>
+
+        <div class="text-center">
+            <a href="https://github.com/tin2tin/Pallaidium" target="_blank"
+               class="inline-block bg-nordic-blue text-black px-8 py-3 rounded font-bold font-mono text-xs hover:bg-white transition duration-200">
+                View Repository on GitHub
+            </a>
+            <p class="text-[10px] text-nordic-muted mt-4 font-mono">
+                If any modules are missing after install, use
+                <a href="https://github.com/tin2tin/blender_pip" class="text-nordic-blue hover:underline">blender_pip</a>
+                to install them manually.
+            </p>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- DIAGNOSTICS MODULE CHECKS                                      -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section class="py-8 bg-nordic-charcoal border-y border-zinc-900">
+    <div class="max-w-4xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <span class="w-2.5 h-2.5 rounded-full bg-nordic-emerald animate-pulse"></span>
+            <div class="font-mono text-xs">
+                <div class="text-white font-bold">Diagnostics Tool Available</div>
+                <p class="text-nordic-muted mt-0.5">Verify your library bindings and local model allocations automatically.</p>
+            </div>
+        </div>
+        <a href="https://github.com/tin2tin/pallaidium_module_checker" target="_blank" class="px-4 py-2 bg-zinc-950 border border-zinc-800 text-nordic-blue hover:text-white transition font-mono text-xs rounded">
+            Run Module Checker →
+        </a>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- COMMUNITY                                                       -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section class="py-12 border-t border-zinc-900" style="background: radial-gradient(ellipse at 50% 0%, rgba(88,80,236,0.04) 0%, transparent 60%), #07080a;">
+    <div class="max-w-4xl mx-auto px-6 text-center">
+        <span class="font-mono text-xs text-nordic-blue uppercase tracking-widest block mb-1">Decentralized Studio Collective</span>
+        <h2 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
+            Build alongside other filmmakers and AI artists.
+        </h2>
+        <p class="text-nordic-muted text-xs leading-relaxed mt-2 mb-6 max-w-xl mx-auto font-sans">
+            Share results, suggest physical layout models, propose plugin structures, and troubleshoot issues directly with developers on the open Discord server.
+        </p>
+        
+        <div class="flex flex-col sm:flex-row gap-3 justify-center mb-8">
+            <a href="https://discord.gg/HMYpnPzbTm" target="_blank"
+               class="flex items-center justify-center gap-2 px-6 py-3 rounded font-mono text-xs font-bold transition text-white"
+               style="background: #4f5bcf;">
+                Join Discord
+            </a>
+            <a href="https://github.com/tin2tin/Pallaidium" target="_blank"
+               class="flex items-center justify-center gap-2 px-6 py-3 rounded font-mono text-xs font-bold border border-zinc-800 bg-zinc-950/40 hover:border-white/20 transition text-white">
+                Star on GitHub
+            </a>
+        </div>
+
+        <div class="glass-panel rounded p-6 max-w-2xl mx-auto text-left border border-zinc-850">
+            <p class="text-nordic-white/80 text-[11px] leading-relaxed italic mb-3 font-mono">
+                "When you have Pallaidium installed, reach out on Discord or leave a note on how it is working for you. It means the world to me to know someone is using it."
+            </p>
+            <div class="flex items-center gap-2">
+                <span class="w-4 h-px bg-nordic-blue"></span>
+                <span class="text-[9px] font-mono text-nordic-blue uppercase tracking-widest">Tin2Tin - Creator of Pallaidium</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- FOOTER                                                         -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<footer class="py-12 border-t border-zinc-900 text-center bg-nordic-black font-mono">
+    <div class="max-w-7xl mx-auto px-6">
+        <h2 class="text-lg font-bold tracking-tight mb-4 text-white">
+            PALL<span class="text-nordic-blue">AI</span>DIUM
+        </h2>
+        <p class="text-nordic-muted text-[11px] mb-8 max-w-md mx-auto leading-relaxed font-sans">
+            Local multi-modal workflow control inside Blender.
+        </p>
+        
+        <div class="flex flex-wrap justify-center gap-6 text-[11px] text-nordic-muted mb-8">
+            <a href="https://github.com/tin2tin/Pallaidium" target="_blank" class="hover:text-white transition">Source</a>
+            <a href="https://github.com/tin2tin/Pallaidium/wiki" target="_blank" class="hover:text-white transition">Wiki</a>
+            <a href="https://discord.gg/HMYpnPzbTm" target="_blank" class="hover:text-white transition">Discord</a>
+            <a href="https://github.com/tin2tin/Pallaidium/issues" target="_blank" class="hover:text-white transition">Issues</a>
+        </div>
+
+        <div class="max-w-3xl mx-auto text-[9px] text-zinc-600 leading-relaxed space-y-2">
+            <p>
+                Pallaidium functions as a local pipeline layout engine wrapper for Hugging Face Diffusers models.
+            </p>
+            <p>
+                Prohibited for harmful, demeaning, or illegal content. Created &amp; maintained by Tin2Tin.
+            </p>
+            <p class="pt-4 opacity-50">© 2026 Pallaidium Project - github.com/tin2tin/Pallaidium</p>
+        </div>
+    </div>
+</footer>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- JAVASCRIPT SYSTEM LOGIC                                        -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<script>
+    // Scroll-triggered reveal animations
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry, i) => {
+            if (entry.isIntersecting) {
+                setTimeout(() => entry.target.classList.add('visible'), i * 60);
+                observer.unobserve(entry.target);
+            }
+        });
+    }, { threshold: 0.05 });
+    document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+
+    // Dynamic model category filtering
+    function filterModels(category) {
+        document.querySelectorAll('.model-card').forEach(card => {
+            const match = category === 'all' || card.dataset.category === category;
+            card.style.display = match ? '' : 'none';
+        });
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.filter === category);
+        });
+    }
+
+    // Dynamic multidirectional routing passes based on filmmaker terms
+    const routes = {
+        text: {
+            title: "TEXT_TO_SENSORY_CHANNELS",
+            schematic: `
+                <div class="text-[10px] border border-zinc-800 bg-zinc-950 px-2.5 py-1 rounded text-white">[IN] Screenplay (Fountain)</div>
+                <div class="w-px h-5 bg-zinc-800"></div>
+                <div class="border border-nordic-amber/20 bg-nordic-amber/5 px-3 py-1.5 rounded text-center max-w-xs">
+                    <div class="text-[10px] text-nordic-amber font-bold">Pallaidium Core Engine</div>
+                    <p class="text-[9px] text-nordic-muted mt-0.5">Translating written screenplay descriptions into video, voice, and soundtrack elements</p>
+                </div>
+                <div class="w-px h-5 bg-zinc-800"></div>
+                <div class="text-[10px] border border-zinc-800 bg-zinc-950 px-2.5 py-1 rounded text-nordic-muted">OUTPUT: Track Media Generations</div>
+            `,
+            outputs: {
+                video: "Wan T2V / LTX-2 Synthesized Visual Plates",
+                audio: "Foundation Music Mood Track (Stereo Node)",
+                voice: "Chatterbox Dialogue Reads (Vocal Sync)",
+                sfx: "ACE Step Ambient Foley Tracks"
+            }
+        },
+        image: {
+            title: "IMAGE_TO_SENSORY_CHANNELS",
+            schematic: `
+                <div class="text-[10px] border border-zinc-800 bg-zinc-950 px-2.5 py-1 rounded text-white">[IN] Emotional Image Plate</div>
+                <div class="w-px h-5 bg-zinc-800"></div>
+                <div class="border border-nordic-blue/20 bg-nordic-blue/5 px-3 py-1.5 rounded text-center max-w-xs">
+                    <div class="text-[10px] text-nordic-blue font-bold">Florence-2 Image Annotation Core</div>
+                    <p class="text-[9px] text-nordic-muted mt-0.5">Analyzing composition metadata to build visual tracking and musical prompts</p>
+                </div>
+                <div class="w-px h-5 bg-zinc-800"></div>
+                <div class="text-[10px] border border-zinc-800 bg-zinc-950 px-2.5 py-1 rounded text-nordic-muted">OUTPUT: Motion Videos & Melodic Themes</div>
+            `,
+            outputs: {
+                video: "Wan I2V Coherent Video Sequences",
+                audio: "Foundation Music score matched to visual environment",
+                voice: "[Inherited / Ready for Dialogue Strip Addition]",
+                sfx: "BiRefNet high-resolution background isolated plates"
+            }
+        },
+        video: {
+            title: "VIDEO_TO_SENSORY_CHANNELS",
+            schematic: `
+                <div class="text-[10px] border border-zinc-800 bg-zinc-950 px-2.5 py-1 rounded text-white">[IN] Emotional Video Sequence</div>
+                <div class="w-px h-5 bg-zinc-800"></div>
+                <div class="border border-nordic-indigo/20 bg-nordic-indigo/5 px-3 py-1.5 rounded text-center max-w-xs">
+                    <div class="text-[10px] text-nordic-indigo font-bold">Marlin Caption Core & Whisper Synthesizer</div>
+                    <p class="text-[9px] text-nordic-muted mt-0.5">Mapping frame-by-frame movement descriptors into linear text data</p>
+                </div>
+                <div class="w-px h-5 bg-zinc-800"></div>
+                <div class="text-[10px] border border-zinc-800 bg-zinc-950 px-2.5 py-1 rounded text-nordic-muted">OUTPUT: Screenplay Layouts & Synced SFX</div>
+            `,
+            outputs: {
+                video: "Outpainted / Relighted alternate scene visual tracks",
+                audio: "MMAudio Synced sound design based on camera movements",
+                voice: "Subtitled scene dialog scripts [Subtitle Editor]",
+                sfx: "Marlin motion-to-text layout subtitles"
+            }
+        },
+        audio: {
+            title: "AUDIO_TO_SENSORY_CHANNELS",
+            schematic: `
+                <div class="text-[10px] border border-zinc-800 bg-zinc-950 px-2.5 py-1 rounded text-white">[IN] Soundtrack / Speech Guide</div>
+                <div class="w-px h-5 bg-zinc-800"></div>
+                <div class="border border-nordic-emerald/20 bg-nordic-emerald/5 px-3 py-1.5 rounded text-center max-w-xs">
+                    <div class="text-[10px] text-nordic-emerald font-bold">Whisper Sync & Spectrogram Parsers</div>
+                    <p class="text-[9px] text-nordic-muted mt-0.5">Analyzing sound rhythms and vocal pitch to generate corresponding image prompts</p>
+                </div>
+                <div class="w-px h-5 bg-zinc-800"></div>
+                <div class="text-[10px] border border-zinc-800 bg-zinc-950 px-2.5 py-1 rounded text-nordic-muted">OUTPUT: Visual Plates & Screenplay Blueprints</div>
+            `,
+            outputs: {
+                video: "FLUX.2 keyframe plates generated from musical descriptions",
+                audio: "[Active Input Strip Layer]",
+                voice: "Chatterbox cloned voice tracks matching performance cadence",
+                sfx: "ACE Step environment noise match details"
+            }
+        }
+    };
+
+    function updateMatrixRoute(sourceKey, btnElement) {
+        // Toggle selected active state class on source buttons
+        const container = document.getElementById("matrix-source-inputs");
+        container.querySelectorAll("button").forEach(btn => {
+            btn.className = "matrix-btn px-3 py-2.5 border border-zinc-800 bg-zinc-950 text-xs font-mono rounded text-left transition text-nordic-muted hover:border-zinc-700";
+        });
+        
+        // Find calling element and set active styles
+        btnElement.className = "matrix-btn px-3 py-2.5 border border-nordic-blue/30 bg-nordic-blue/5 text-xs font-mono rounded text-left transition text-white";
+
+        const route = routes[sourceKey];
+        if (!route) return;
+
+        // Animate out pathway panel
+        const pathway = document.getElementById("matrix-pathway-card");
+        pathway.style.opacity = 0.5;
+
+        setTimeout(() => {
+            document.getElementById("active-route-title").innerText = route.title;
+            document.getElementById("active-route-schematic").innerHTML = route.schematic;
+
+            // Set resolved targets outputs textual descriptions
+            document.getElementById("target-video-desc").innerText = route.outputs.video;
+            document.getElementById("target-audio-desc").innerText = route.outputs.audio;
+            document.getElementById("target-voice-desc").innerText = route.outputs.voice;
+            document.getElementById("target-sfx-desc").innerText = route.outputs.sfx;
+
+            pathway.style.opacity = 1.0;
+        }, 120);
+    }
+</script>
+
+</body>
+</html>
