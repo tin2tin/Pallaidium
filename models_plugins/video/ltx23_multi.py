@@ -9,6 +9,7 @@ from ...utils.helpers import gfx_device, solve_path, clean_filename, load_first_
 
 
 def vae_temporal_decode_streaming(vae, latents_cpu, *, decode_device, temb=None):
+    import torch
     """Streaming temporal decode — faster than spatial tiling on ≥16 GB cards."""
     tile_latent_min    = vae.tile_sample_min_num_frames // vae.temporal_compression_ratio
     n_latent_frames    = latents_cpu.shape[2]
@@ -61,9 +62,6 @@ class LTX2_3MultiPlugin(ModelPlugin):
     def generate(self, pipe_obj, inputs: ModelInputs, scene, prefs) -> str:
         import torch
         os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-        # SDNQ's compiled dequantization kernel requires cluster_dims in KernelMetadata,
-        # which is absent from Blender's bundled Triton. torch._dynamo.config must be
-        # set at runtime (env vars are read at import time, so they arrive too late).
         torch._dynamo.config.disable = True
 
         from diffusers import LTX2VideoTransformer3DModel
@@ -312,6 +310,7 @@ class LTX2_3MultiPlugin(ModelPlugin):
             guidance_scale=1.0, generator=generator,
             output_type="latent", return_dict=False,
             use_cross_timestep=True, # Critical for Audio+Image cross-attention mapping
+            callback_on_step_end=self.step_callback(inputs),
         )
         
         if image_conditions is not None:
@@ -418,6 +417,7 @@ class LTX2_3MultiPlugin(ModelPlugin):
             guidance_scale=1.0, generator=generator,
             output_type="latent", return_dict=False,
             use_cross_timestep=True,
+            callback_on_step_end=self.step_callback(inputs),
         )
         
         if image_conditions is not None:

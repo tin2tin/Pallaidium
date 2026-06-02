@@ -1,1 +1,0 @@
-All poses by: https://civitai.com/user/BlazzzX4

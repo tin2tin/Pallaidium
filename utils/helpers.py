@@ -995,53 +995,63 @@ class DependencyManager:
     def get_phase_2_torch(self):
         if self.os_platform == "Windows":
             return [
-                #"--index-url https://download.pytorch.org/whl/cu124", 
-                "--index-url https://download.pytorch.org/whl/cu128", 
-                #"torch==2.6.0+cu124", 
+                #"--index-url https://download.pytorch.org/whl/cu124",
+                "--index-url https://download.pytorch.org/whl/cu128",
+                #"torch==2.6.0+cu124",
                 "torch==2.9.1+cu128", #torch==2.9.1 torchvision==0.24.1 torchaudio==2.9.1
-                #"torchvision==0.21.0+cu124", 
-                "torchvision==0.24.1+cu128", 
-                #"torchaudio==2.6.0+cu124", 
-                "torchaudio==2.9.1+cu128", 
+                #"torchvision==0.21.0+cu124",
+                "torchvision==0.24.1+cu128",
+                #"torchaudio==2.6.0+cu124",
+                "torchaudio==2.9.1+cu128",
                 #"xformers"
             ]
+        elif self.os_platform == "Linux":
+            return [
+                "--index-url https://download.pytorch.org/whl/cu128",
+                "torch==2.9.1+cu128",
+                "torchvision==0.24.1+cu128",
+                "torchaudio==2.9.1+cu128",
+                "xformers",
+            ]
         else:
-            return ["torch", "torchvision", "torchaudio", "xformers"]
+            # macOS — CPU / MPS builds from PyPI
+            return ["torch", "torchvision", "torchaudio"]
 
     # for installing branch: git+https://github.com/huggingface/diffusers.git@ltx2-i2v-lora-mixin-fix
 
     def get_phase_3_git_and_extensions(self):
         reqs = [
-            "git+https://github.com/huggingface/diffusers.git", 
+            "git+https://github.com/huggingface/diffusers.git",
             #"git+https://github.com/SWivid/F5-TTS.git",
             "faster-qwen3-tts",
             #"git+https://github.com/QwenLM/Qwen3-TTS.git",
             #"git+https://github.com/huggingface/parler-tts.git",
-            "stable-audio-tools", 
-            "torcheval", 
+            "stable-audio-tools",
+            "torcheval",
             "torchao",
             "spacy",
             "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl",
-            #"https://huggingface.co/lldacing/flash-attention-windows-wheel/resolve/main/flash_attn-2.7.4.post1%2Bcu128torch2.7.0cxx11abiFALSE-cp311-cp311-win_amd64.whl",
-            "https://github.com/kingbri1/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3+cu128torch2.8.0cxx11abiFALSE-cp313-cp313-win_amd64.whl",
         ]
-        
+
         if self.py_major == 3 and self.py_minor >= 8:
              reqs.append("git+https://github.com/huggingface/image_gen_aux")
-             
+
         if self.os_platform == "Windows":
             reqs.extend([
-                "git+https://github.com/hkchengrex/MMAudio.git", 
+                #"https://huggingface.co/lldacing/flash-attention-windows-wheel/resolve/main/flash_attn-2.7.4.post1%2Bcu128torch2.7.0cxx11abiFALSE-cp311-cp311-win_amd64.whl",
+                "https://github.com/kingbri1/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3+cu128torch2.8.0cxx11abiFALSE-cp313-cp313-win_amd64.whl",
+                "git+https://github.com/hkchengrex/MMAudio.git",
                 "git+https://github.com/tin2tin/resemble-enhance-windows.git",
-                #"https://github.com/woct0rdho/triton-windows/releases/download/empty/triton-3.4.0-py3-none-any.whl", 
+                #"https://github.com/woct0rdho/triton-windows/releases/download/empty/triton-3.4.0-py3-none-any.whl",
                 #"triton-windows<3.3",
             ])
         else:
             reqs.extend([
-                "resemble-enhance", 
-                #"flash-attn", 
-                "triton", 
-                "sageattention==1.0.6"
+                "flash-attn",
+                "git+https://github.com/hkchengrex/MMAudio.git",
+                "resemble-enhance",
+                "triton",
+                "sageattention==1.0.6",
             ])
         return reqs
 

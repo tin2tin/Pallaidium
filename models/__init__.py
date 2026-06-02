@@ -14,10 +14,19 @@ Usage:
 """
 
 import importlib.util
+import os
 import sys
 import traceback
 import types
 from pathlib import Path
+
+# Blender's embedded Python lacks pyconfig.h, which causes Triton's tcc.exe to
+# fail when it tries to compile cuda_utils.c for GPU capability detection.
+# These two env vars tell SDNQ to skip both the Triton compilation test and the
+# Triton matrix-multiply backend entirely, falling back to PyTorch eager mode.
+# Must be set before any from_pretrained call can trigger SDNQ's first import.
+os.environ.setdefault("SDNQ_USE_TORCH_COMPILE", "0")
+os.environ.setdefault("SDNQ_USE_TRITON_MM", "0")
 
 from .base import ModelPlugin, UISection, InputSpec, ParamSpec
 
