@@ -157,6 +157,9 @@ class RenderQueueJob(PropertyGroup):
     # Resolved strip paths for model-specific inputs (captured at enqueue time)
     kontext_strip_1_path: StringProperty()   # FLUX Kontext reference / fallback image
     inpaint_mask_path:    StringProperty()   # inpaint mask image path
+    qwen_strip_1_path:    StringProperty()   # Qwen Image Edit reference image 1
+    qwen_strip_2_path:    StringProperty()   # Qwen Image Edit reference image 2
+    qwen_strip_3_path:    StringProperty()   # Qwen Image Edit reference image 3
 
     # OmniVoice
     omnivoice_instruct:    StringProperty(default="")
@@ -338,6 +341,9 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             inpaint_selected_strip         = "",
             kontext_strip_1                = "",
             kontext_strip_1_path           = snapshot.get("kontext_strip_1_path", ""),
+            qwen_strip_1_path              = snapshot.get("qwen_strip_1_path", ""),
+            qwen_strip_2_path              = snapshot.get("qwen_strip_2_path", ""),
+            qwen_strip_3_path              = snapshot.get("qwen_strip_3_path", ""),
             music_bpm                      = snapshot["music_bpm"],
             music_lyrics                   = snapshot["music_lyrics"],
             music_key_scale                = snapshot["music_key_scale"],
@@ -721,6 +727,46 @@ class SEQUENCER_OT_add_to_queue(Operator):
         return bpy.path.abspath(path) if path else ""
 
     @staticmethod
+    def _render_named_strip_image(context, scene, strip_name: str) -> str:
+        """Resolve a named strip to an image file path suitable for model input.
+
+        Mirrors load_strip_as_pil()'s decision tree but runs at queue-add time
+        (main thread, bpy available) and returns a file path instead of a PIL image:
+          - IMAGE without transforms → raw source file (no letterboxing)
+          - MOVIE                    → raw source file (load_first_frame will seek)
+          - IMAGE with transforms / SCENE / META / MASK / COLOR → VSE render to PNG
+        """
+        if not strip_name:
+            return ""
+        from ..utils.helpers import find_strip_by_name, get_strip_path, render_strip_to_path
+        strip = find_strip_by_name(scene, strip_name)
+        if strip is None:
+            return ""
+
+        if strip.type == "IMAGE":
+            try:
+                tx = strip.transform
+                has_transform = (
+                    tx.scale_x != 1.0 or tx.scale_y != 1.0
+                    or tx.offset_x != 0.0 or tx.offset_y != 0.0
+                    or getattr(strip, "use_crop", False)
+                )
+            except Exception:
+                has_transform = False
+            if not has_transform:
+                path = get_strip_path(strip)
+                return bpy.path.abspath(path) if path else ""
+
+        if strip.type == "MOVIE":
+            path = get_strip_path(strip)
+            if path:
+                return bpy.path.abspath(path)
+
+        # Complex strips (META, SCENE, IMAGE with transforms, etc.) — render through VSE
+        path = render_strip_to_path(context, strip, image_output=True)
+        return path or ""
+
+    @staticmethod
     def _paths_from_strip(strip):
         """Extract (image_path, movie_path, sound_path) from a VSE strip.
 
@@ -886,6 +932,9 @@ class SEQUENCER_OT_add_to_queue(Operator):
             joyimage_zoom         = getattr(scene, "joyimage_zoom", "unchanged"),
             kontext_strip_1_path  = self._resolve_named_strip_path(scene, getattr(scene, "kontext_strip_1", "")),
             inpaint_mask_path     = self._resolve_named_strip_path(scene, getattr(scene, "inpaint_selected_strip", "")),
+            qwen_strip_1_path     = self._render_named_strip_image(context, scene, getattr(scene, "qwen_strip_1", "")),
+            qwen_strip_2_path     = self._render_named_strip_image(context, scene, getattr(scene, "qwen_strip_2", "")),
+            qwen_strip_3_path     = self._render_named_strip_image(context, scene, getattr(scene, "qwen_strip_3", "")),
             stem_split_model  = getattr(scene, "stem_split_model",  "htdemucs_ft"),
             stem_split_vocals = getattr(scene, "stem_split_vocals", True),
             stem_split_drums  = getattr(scene, "stem_split_drums",  True),
@@ -1111,6 +1160,7 @@ def _queue_start_job(scene, job) -> None:
         "omnivoice_preprocess", "omnivoice_denoise", "omnivoice_postprocess",
         "stem_split_model", "stem_split_vocals", "stem_split_drums",
         "stem_split_bass", "stem_split_other", "stem_split_guitar", "stem_split_piano",
+        "qwen_strip_1_path", "qwen_strip_2_path", "qwen_strip_3_path",
     )}
     _cancel_event.clear()
     _worker_thread = threading.Thread(

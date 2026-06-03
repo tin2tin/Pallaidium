@@ -1519,6 +1519,7 @@ def render_strip_to_path(context, strip, image_output=False):
     orig_mute_states = {s: s.mute for s in seq_editor.strips}
     orig_f_start    = vse_scene.frame_start
     orig_f_end      = vse_scene.frame_end
+    orig_f_current  = vse_scene.frame_current
     orig_filepath   = vse_scene.render.filepath
     orig_format     = vse_scene.render.image_settings.file_format
     orig_media      = getattr(vse_scene.render.image_settings, "media_type", None)
@@ -1592,8 +1593,9 @@ def render_strip_to_path(context, strip, image_output=False):
         for s, state in orig_mute_states.items():
             if s:
                 s.mute = state
-        vse_scene.frame_start = orig_f_start
-        vse_scene.frame_end   = orig_f_end
+        vse_scene.frame_start   = orig_f_start
+        vse_scene.frame_end     = orig_f_end
+        vse_scene.frame_current = orig_f_current
         seq_editor.use_prefetch  = orig_prefetch
         seq_editor.use_cache_raw = orig_cache
         vse_scene.render.filepath = orig_filepath
