@@ -158,6 +158,22 @@ class RenderQueueJob(PropertyGroup):
     kontext_strip_1_path: StringProperty()   # FLUX Kontext reference / fallback image
     inpaint_mask_path:    StringProperty()   # inpaint mask image path
 
+    # OmniVoice
+    omnivoice_instruct:    StringProperty(default="")
+    omnivoice_language:    StringProperty(default="")
+    omnivoice_preprocess:  BoolProperty(default=True)
+    omnivoice_denoise:     BoolProperty(default=True)
+    omnivoice_postprocess: BoolProperty(default=True)
+
+    # Stem Splitter
+    stem_split_model:  StringProperty(default="htdemucs_ft")
+    stem_split_vocals: BoolProperty(default=True)
+    stem_split_drums:  BoolProperty(default=True)
+    stem_split_bass:   BoolProperty(default=True)
+    stem_split_other:  BoolProperty(default=True)
+    stem_split_guitar: BoolProperty(default=False)
+    stem_split_piano:  BoolProperty(default=False)
+
     # VRAM management — set at run-time based on the next queued job
     should_unload: BoolProperty(default=True)
 
@@ -336,6 +352,18 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             render                         = types.SimpleNamespace(
                 fps=round(snapshot.get("fps", 24.0)), fps_base=1.0
             ),
+            stem_split_model  = snapshot.get("stem_split_model",  "htdemucs_ft"),
+            stem_split_vocals = snapshot.get("stem_split_vocals", True),
+            stem_split_drums  = snapshot.get("stem_split_drums",  True),
+            stem_split_bass   = snapshot.get("stem_split_bass",   True),
+            stem_split_other  = snapshot.get("stem_split_other",  True),
+            stem_split_guitar  = snapshot.get("stem_split_guitar",  False),
+            stem_split_piano   = snapshot.get("stem_split_piano",   False),
+            omnivoice_instruct    = snapshot.get("omnivoice_instruct",    ""),
+            omnivoice_language    = snapshot.get("omnivoice_language",    ""),
+            omnivoice_preprocess  = snapshot.get("omnivoice_preprocess",  True),
+            omnivoice_denoise     = snapshot.get("omnivoice_denoise",     True),
+            omnivoice_postprocess = snapshot.get("omnivoice_postprocess", True),
         )
 
         mode = snapshot["mode"]
@@ -603,7 +631,9 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
 
         out_path = None
         text_content = None
-        if isinstance(result, str) and os.path.isfile(result):
+        if isinstance(result, str) and result.startswith("MULTI_STEM:"):
+            out_path = result  # pass through; _queue_insert_strip handles multi-stem
+        elif isinstance(result, str) and os.path.isfile(result):
             out_path = result
         elif isinstance(result, str) and result.strip():
             # Plain text result (caption, rewritten prompt) — save to .txt and
@@ -856,6 +886,18 @@ class SEQUENCER_OT_add_to_queue(Operator):
             joyimage_zoom         = getattr(scene, "joyimage_zoom", "unchanged"),
             kontext_strip_1_path  = self._resolve_named_strip_path(scene, getattr(scene, "kontext_strip_1", "")),
             inpaint_mask_path     = self._resolve_named_strip_path(scene, getattr(scene, "inpaint_selected_strip", "")),
+            stem_split_model  = getattr(scene, "stem_split_model",  "htdemucs_ft"),
+            stem_split_vocals = getattr(scene, "stem_split_vocals", True),
+            stem_split_drums  = getattr(scene, "stem_split_drums",  True),
+            stem_split_bass   = getattr(scene, "stem_split_bass",   True),
+            stem_split_other  = getattr(scene, "stem_split_other",  True),
+            stem_split_guitar  = getattr(scene, "stem_split_guitar",  False),
+            stem_split_piano   = getattr(scene, "stem_split_piano",   False),
+            omnivoice_instruct    = getattr(scene, "omnivoice_instruct",    ""),
+            omnivoice_language    = getattr(scene, "omnivoice_language",    ""),
+            omnivoice_preprocess  = getattr(scene, "omnivoice_preprocess",  True),
+            omnivoice_denoise     = getattr(scene, "omnivoice_denoise",     True),
+            omnivoice_postprocess = getattr(scene, "omnivoice_postprocess", True),
         )
 
         # ---- Decide which strips to iterate over -------------------------
@@ -905,8 +947,10 @@ class SEQUENCER_OT_add_to_queue(Operator):
                 strip_dur = strip.frame_final_duration
                 gen_frames = strip_dur if raw_frames < 0 else max(1, abs(raw_frames))
                 if otype == "audio":
-                    # audio_dur < 0 is the -1 sentinel: match the input strip
-                    insert_dur = strip_dur if audio_dur < 0 else max(1, int(audio_dur))
+                    # audio_dur < 0 is the -1 sentinel: match the input strip.
+                    # Also match when the plugin requires a strip (e.g. Stem Splitter).
+                    _pi_req = _pi is not None and getattr(_pi, "requires_input_strip", False)
+                    insert_dur = strip_dur if (audio_dur < 0 or _pi_req) else max(1, int(audio_dur))
                 else:
                     insert_dur = gen_frames
                 # For SOUND strips generating audio: use the strip file as the
@@ -1007,6 +1051,14 @@ class SEQUENCER_OT_add_to_queue(Operator):
                 if strip_audio_path:
                     job.audio_path = strip_audio_path
 
+                # For strip-input plugins (e.g. Stem Splitter) use the input
+                # filename as the queue job name instead of the text prompt.
+                if strip is not None and _pi is not None and getattr(_pi, "requires_input_strip", False):
+                    input_path = sound_path or movie_path or ""
+                    input_name = os.path.splitext(os.path.basename(input_path))[0]
+                    if input_name:
+                        job.prompt = input_name
+
                 added += 1
 
         if added == 0:
@@ -1055,6 +1107,10 @@ def _queue_start_job(scene, job) -> None:
         "insert_channel", "insert_duration",
         "sequencer_scene_name",
         "should_unload",
+        "omnivoice_instruct", "omnivoice_language",
+        "omnivoice_preprocess", "omnivoice_denoise", "omnivoice_postprocess",
+        "stem_split_model", "stem_split_vocals", "stem_split_drums",
+        "stem_split_bass", "stem_split_other", "stem_split_guitar", "stem_split_piano",
     )}
     _cancel_event.clear()
     _worker_thread = threading.Thread(
@@ -1287,6 +1343,41 @@ def _queue_insert_strip(scene, result: dict) -> None:
     out_path     = result.get("output_path", "")
     otype        = result.get("output_type", "")
     text_content = result.get("text_content", "")
+
+    # Multi-stem output from StemSplitterPlugin: insert one SOUND strip per stem.
+    _MULTI_PREFIX = "MULTI_STEM:"
+    if out_path.startswith(_MULTI_PREFIX):
+        import json as _json
+        stem_paths = _json.loads(out_path[len(_MULTI_PREFIX):])
+        seq_scene_name = result.get("sequencer_scene_name", "")
+        seq_scene = (bpy.data.scenes.get(seq_scene_name) if seq_scene_name else None) or scene
+        if not seq_scene.sequence_editor:
+            seq_scene.sequence_editor_create()
+        ed          = seq_scene.sequence_editor
+        frame_start = result["frame_start"]
+        frame_end   = result["frame_end"]
+        base_ch     = result["channel"]
+        next_ch     = base_ch
+        for stem_name, stem_path in stem_paths.items():
+            if not os.path.isfile(stem_path):
+                print(f"[Queue] Stem file not found: {stem_path!r}")
+                continue
+            ch = _find_free_channel(seq_scene, frame_start, frame_end, next_ch)
+            ch = max(ch, next_ch)
+            next_ch = ch + 1
+            # Derive input filename from the stem file: "{stem}_{orig_base}.wav"
+            file_stem = os.path.splitext(os.path.basename(stem_path))[0]
+            orig_base = file_stem[len(stem_name) + 1:] if file_stem.startswith(stem_name + "_") else file_stem
+            strip_name = f"{stem_name} | {orig_base}"
+            snd = ed.strips.new_sound(
+                name=strip_name,
+                filepath=stem_path,
+                channel=ch,
+                frame_start=frame_start,
+            )
+            snd.frame_final_duration = (result["frame_end"] - result["frame_start"]) - 1
+            print(f"[Queue] Inserted stem '{stem_name}' on channel {ch}")
+        return
 
     # For text-type jobs the content may be carried directly; no file required.
     if otype == "text" and text_content:

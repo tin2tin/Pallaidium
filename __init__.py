@@ -59,6 +59,7 @@ classes = (
     AI_Metadata_PT_Panel,
     OBJECT_OT_FluxAddStrip,
     OBJECT_OT_FluxHideStrip,
+    SEQUENCER_OT_stem_split,
 )
 
 def register():
@@ -359,11 +360,11 @@ def register():
     )
     # The frame audio duration.
     bpy.types.Scene.audio_speed_tts = bpy.props.FloatProperty(
-        name="audio_speed_tts",
+        name="Speed",
         default=1.0,
-        min=0.3,
-        max=1.4,
-        description="Speech speed. 1 is normal speed.",
+        min=0.1,
+        max=3.0,
+        description="Speech speed. 1.0 = normal. >1.0 = faster (shorter audio). <1.0 = slower (longer audio).",
     )
     bpy.types.Scene.ip_adapter_face_folder = bpy.props.StringProperty(
         name="File",
@@ -553,6 +554,57 @@ def register():
         description="Time signature, e.g. '4' for 4/4, '3' for 3/4 (blank = model estimates)"
     )
 
+    # Stem Splitter
+    bpy.types.Scene.stem_split_model = bpy.props.EnumProperty(
+        name="Model",
+        items=[
+            ("htdemucs_ft", "HT-Demucs FT (Best)", "Fine-tuned, best quality — first-run download ~1.26 GB"),
+            ("htdemucs",    "HT-Demucs (Fast)",     "Single model, fastest startup — first-run download 316 MB"),
+            ("htdemucs_6s", "HT-Demucs 6-Stem",     "Adds guitar & piano — first-run download 258 MB"),
+        ],
+        default="htdemucs_ft",
+    )
+    bpy.types.Scene.stem_split_vocals = bpy.props.BoolProperty(name="Vocals", default=True)
+    bpy.types.Scene.stem_split_drums  = bpy.props.BoolProperty(name="Drums",  default=True)
+    bpy.types.Scene.stem_split_bass   = bpy.props.BoolProperty(name="Bass",   default=True)
+    bpy.types.Scene.stem_split_other  = bpy.props.BoolProperty(name="Other",  default=True)
+    bpy.types.Scene.stem_split_guitar = bpy.props.BoolProperty(name="Guitar", default=False)
+    bpy.types.Scene.stem_split_piano  = bpy.props.BoolProperty(name="Piano",  default=False)
+
+    # OmniVoice
+    from .utils.omnivoice_langs import OMNIVOICE_LANG_ITEMS as _OV_LANGS
+    bpy.types.Scene.omnivoice_language = bpy.props.EnumProperty(
+        name="Language",
+        items=_OV_LANGS,
+        default="AUTO",
+        description="Output language. Auto detects from the prompt text; select a language to force it.",
+    )
+    bpy.types.Scene.omnivoice_instruct = bpy.props.StringProperty(
+        name="Instruct",
+        default="",
+        description=(
+            "Describe the speaker voice. Can be combined with a Speaker Ref. "
+            "Examples: 'female, adult, american'  |  'male, elderly, british'  |  'female, child, high pitch'. "
+            "Accents (EN): american british australian canadian indian chinese korean japanese portuguese russian. "
+            "Leave blank for auto-voice selection."
+        ),
+    )
+    bpy.types.Scene.omnivoice_preprocess = bpy.props.BoolProperty(
+        name="Preprocess Ref. Audio",
+        default=True,
+        description="Normalise reference-audio loudness before voice cloning",
+    )
+    bpy.types.Scene.omnivoice_denoise = bpy.props.BoolProperty(
+        name="Denoise",
+        default=True,
+        description="Prepend a denoising token during diffusion (improves quality for noisy conditions)",
+    )
+    bpy.types.Scene.omnivoice_postprocess = bpy.props.BoolProperty(
+        name="Remove Silence",
+        default=True,
+        description="Strip trailing silence from the generated audio output",
+    )
+
     # Fix read-only file attributes pip sometimes leaves on Windows.
     # Runs in a daemon thread so it doesn't slow down Blender startup.
     import threading as _threading
@@ -699,6 +751,15 @@ def unregister():
     del bpy.types.Scene.joyimage_pitch
     del bpy.types.Scene.joyimage_zoom
     for _prop in ("marlin_mode", "marlin_find_query", "marlin_last_query"):
+        if hasattr(bpy.types.Scene, _prop):
+            delattr(bpy.types.Scene, _prop)
+    for _prop in ("stem_split_model", "stem_split_vocals", "stem_split_drums",
+                  "stem_split_bass", "stem_split_other", "stem_split_guitar",
+                  "stem_split_piano"):
+        if hasattr(bpy.types.Scene, _prop):
+            delattr(bpy.types.Scene, _prop)
+    for _prop in ("omnivoice_language", "omnivoice_instruct", "omnivoice_preprocess",
+                  "omnivoice_denoise", "omnivoice_postprocess"):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
 

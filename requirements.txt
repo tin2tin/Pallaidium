@@ -99,6 +99,8 @@ torchsde==0.2.6
 torchcodec==0.8.1
 
 # --- Audio Codecs & Tools ---
+omnivoice
+audioop-lts
 descript-audio-codec==1.0.0
 descript-audiotools==0.7.2
 vocos==0.1.0
@@ -114,6 +116,7 @@ torchlibrosa==0.1.0
 soxr==1.0.0
 sox
 onnxruntime==1.20.1
+demucs-onnx
 wheel
 
 # --- Image & Vision ---

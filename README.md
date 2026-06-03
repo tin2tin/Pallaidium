@@ -453,6 +453,8 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 - [MoviiGen1.1_Prompt_Rewriter](https://huggingface.co/ZuluVision/MoviiGen1.1_Prompt_Rewriter)
 - [Hviske Subtitles (Whisper large-v3-turbo)](https://huggingface.co/openai/whisper-large-v3-turbo)
 - [Marlin Video Captions](https://github.com/HeliosZhao/Marlin)
+- [OmniVoice](https://github.com/k2-fsa/OmniVoice)
+- [Demucs-onnx](https://github.com/StemSplit/demucs-onnx)
 
 ![PallAIdium](https://github.com/tin2tin/Generative_AI/assets/1322593/1b1b232f-00d9-4b0b-86fb-5f0f24136d2c)
 

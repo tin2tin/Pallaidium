@@ -465,12 +465,15 @@ class LTX2_3MultiPlugin(ModelPlugin):
         
         if final_a is not None and hasattr(decode_pipe, "audio_vae") and decode_pipe.audio_vae:
             audio_vae = decode_pipe.audio_vae.to(onload_device)
-            vocoder   = decode_pipe.vocoder.to(onload_device)
+            # BigVGAN v2 has 108 sequential convs; bfloat16 accumulation compounds
+            # to 40-90% spectral degradation. torch.autocast(float32) does NOT upcast
+            # existing bfloat16 tensors — explicit .float() on both weights and mel is required.
+            vocoder   = decode_pipe.vocoder.float().to(onload_device)
             audio_sr  = getattr(vocoder.config, "output_sampling_rate", 24000)
             print(f"[DEBUG] Audio VAE Decode Triggered! Latent shape: {final_a.shape}")
             with torch.inference_mode():
-                mel       = audio_vae.decode(final_a.to(onload_device, dtype=audio_vae.dtype), return_dict=False)[0]
-                audio_out = vocoder(mel).cpu()
+                mel = audio_vae.decode(final_a.to(onload_device, dtype=audio_vae.dtype), return_dict=False)[0]
+                audio_out = vocoder(mel.float()).cpu()
             del audio_vae, vocoder
         else:
             print(f"[DEBUG] Audio decode skipped. (final_a valid: {final_a is not None}, has audio_vae: {hasattr(decode_pipe, 'audio_vae')})")

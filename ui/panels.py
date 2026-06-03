@@ -201,7 +201,10 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         drew_custom = (plugin.draw_custom_ui(col, context) is True) if (plugin and type == "image") else False
         if not drew_custom:
             try:
-                col.prop(context.scene, "input_strips", text="Input")
+                _strip_required = getattr(plugin, "requires_input_strip", False)
+                row = col.row()
+                row.enabled = not _strip_required
+                row.prop(context.scene, "input_strips", text="Input")
             except:
                 pass
 
@@ -301,6 +304,8 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 col.prop(context.scene, "generate_movie_frames", text="Frames")
             if _has(UISection.AUDIO_DURATION):
                 col.prop(context.scene, "audio_length_in_f", text="Frames")
+            if type == "audio" and _has(UISection.SPEED):
+                col.prop(context.scene, "audio_speed_tts", text="Speed")
             if type == "audio" and _has(UISection.AUDIO_REF):
                 row = col.row(align=True)
                 row.prop(context.scene, "audio_path", text="Speaker Ref.")
@@ -337,6 +342,9 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 col.prop(context.scene, "music_key_scale", text="Key")
                 col.prop(context.scene, "music_time_signature", text="Time Sig.")
                 col.textbox(context.scene, "music_lyrics", placeholder="Lyrics")
+
+            if type == "audio" and plugin is not None:
+                plugin.draw_custom_ui(col, context)
 
             if _has(UISection.SEED):
                 row = col.row(align=True)

@@ -972,6 +972,7 @@ class DependencyManager:
             "antlr4-python3-runtime==4.9.3",
             "argbind==0.3.9",
             "chatterbox-tts",
+            "demucs-onnx",
             "dctorch==0.1.2",
             "einx==0.3.0",
             "encodec==0.1.1",
@@ -1130,11 +1131,15 @@ def input_strips_updated(self, context):
             scene.input_strips = "input_strips"
 
     elif scene_type == "audio":
+        if audio_model == "StemSplitter" and scene.input_strips != "input_strips":
+            scene.input_strips = "input_strips"
         try:
             from ..models import get_plugin as _gp
             _p = _gp(audio_model)
             if _p:
                 scene.movie_num_inference_steps = _p.PARAMS.steps
+                if getattr(_p, "requires_input_strip", False) and scene.input_strips != "input_strips":
+                    scene.input_strips = "input_strips"
         except Exception:
             pass
 
@@ -1222,11 +1227,15 @@ def output_strips_updated(self, context):
 
     # === AUDIO TYPE === #
     elif type == "audio":
+        if audio_model == "StemSplitter" and scene.input_strips != "input_strips":
+            scene.input_strips = "input_strips"
         try:
             from ..models import get_plugin as _gp
             _p = _gp(audio_model)
             if _p:
                 scene.movie_num_inference_steps = _p.PARAMS.steps
+                if getattr(_p, "requires_input_strip", False) and scene.input_strips != "input_strips":
+                    scene.input_strips = "input_strips"
         except Exception:
             pass
 
@@ -1597,6 +1606,59 @@ def render_strip_to_path(context, strip, image_output=False):
         _rendered_temp_paths.add(output_path)
         return output_path
     return None
+
+
+def render_strip_to_wav(context, strip):
+    """Render any strip (SOUND or MOVIE-with-audio) to a PCM WAV via sound.mixdown.
+
+    Mutes all other strips and restricts the frame range to the strip's trimmed
+    in/out points, so exactly the audible region is captured regardless of source
+    format, trimming, volume envelopes, or speed effects.
+    Returns the absolute path to the generated WAV, or None on failure.
+    """
+    vse_scene = getattr(context, "sequencer_scene", context.scene)
+    if not vse_scene or not vse_scene.sequence_editor:
+        return None
+
+    seq_editor = vse_scene.sequence_editor
+    orig_prefetch    = seq_editor.use_prefetch
+    orig_cache       = seq_editor.use_cache_raw
+    orig_mute_states = {s: s.mute for s in seq_editor.strips}
+    orig_f_start     = vse_scene.frame_start
+    orig_f_end       = vse_scene.frame_end
+
+    seq_editor.use_prefetch  = False
+    seq_editor.use_cache_raw = False
+
+    render_start = int(strip.frame_final_start)
+    render_end   = int(strip.frame_final_start + strip.frame_final_duration - 1)
+
+    for s in seq_editor.strips:
+        s.mute = (s != strip)
+
+    vse_scene.frame_start = render_start
+    vse_scene.frame_end   = render_end
+
+    addon_prefs  = bpy.context.preferences.addons[ADDON_ID].preferences
+    rendered_dir = os.path.join(addon_prefs.generator_ai, str(date.today()), "Rendered_Strips")
+    os.makedirs(rendered_dir, exist_ok=True)
+
+    safe_name   = re.sub(r"[^\w]", "", strip.name)
+    output_path = os.path.abspath(
+        os.path.join(rendered_dir, f"{safe_name}_{render_start:06d}_stem_input.wav"))
+
+    try:
+        bpy.ops.sound.mixdown(filepath=output_path, container="WAV", codec="PCM")
+    finally:
+        for s, state in orig_mute_states.items():
+            if s:
+                s.mute = state
+        vse_scene.frame_start    = orig_f_start
+        vse_scene.frame_end      = orig_f_end
+        seq_editor.use_prefetch  = orig_prefetch
+        seq_editor.use_cache_raw = orig_cache
+
+    return output_path if os.path.exists(output_path) else None
 
 
 def decompose_meta(context, meta_strip, target_type="video"):

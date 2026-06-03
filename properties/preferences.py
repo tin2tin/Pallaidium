@@ -92,6 +92,14 @@ def _image_model_update(self, context):
 def _audio_model_update(self, context):
     self.audio_model_card_id = self.audio_model_card
     output_strips_updated(self, context)
+    try:
+        from ..models import get_plugin
+        plugin = get_plugin(self.audio_model_card)
+        if plugin is not None and getattr(plugin, "requires_input_strip", False):
+            if context and context.scene:
+                context.scene.input_strips = "input_strips"
+    except Exception:
+        pass
 
 def _text_model_update(self, context):
     self.text_model_card_id = self.text_model_card
