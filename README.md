@@ -134,6 +134,10 @@ The generated media will be saved to the directory specified in the addon prefer
 
 ## Change Log
 
+2026-06-03: Add: OmniVoice — multilingual text-to-speech with broad language support.
+
+2026-06-03: Add: Stem Splitter — separate audio tracks into stems (vocals, drums, bass, etc.) using AI source separation.
+
 2026-05-31: Refactor: Complete plugin architecture — models are auto-discovered from models_plugins/. Drop a single .py file to register any new HuggingFace model. Unsupported models moved to unsupported_models_plugins/.
 
 2026-05-31: Add: Blender 5.2 support.
