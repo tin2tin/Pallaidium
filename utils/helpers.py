@@ -1106,9 +1106,11 @@ def input_strips_updated(self, context):
             if _p:
                 scene.movie_num_inference_steps = _p.PARAMS.steps
                 scene.movie_num_guidance = _p.PARAMS.guidance
+                if getattr(_p, "requires_input_strip", False) and scene.input_strips != "input_strips":
+                    scene.input_strips = "input_strips"
         except Exception:
             pass
-            
+
     # Movie Type Handling
     elif scene_type == "movie":
         try:
@@ -1203,6 +1205,8 @@ def output_strips_updated(self, context):
                 if _p:
                     scene.movie_num_inference_steps = _p.PARAMS.steps
                     scene.movie_num_guidance = _p.PARAMS.guidance
+                    if getattr(_p, "requires_input_strip", False) and scene.input_strips != "input_strips":
+                        scene.input_strips = "input_strips"
             except Exception:
                 pass
 

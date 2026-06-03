@@ -22,8 +22,9 @@ class ErnieTurboPlugin(ModelPlugin):
     ]
     PARAMS            = ParamSpec(steps=8, guidance=1.0)
     REQUIRED_PACKAGES = ["torch", "diffusers", "sdnq"]
-    supports_inpaint  = False
-    supports_img2img  = False
+    supports_inpaint        = False
+    supports_img2img        = False
+    uses_standard_input_strip = False
 
     def load(self, prefs, scene, **kw):
         import torch

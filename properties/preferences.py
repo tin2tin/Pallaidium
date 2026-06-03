@@ -86,6 +86,12 @@ def _image_model_update(self, context):
         if plugin is not None and getattr(plugin, "requires_input_strip", False):
             if context and context.scene:
                 context.scene.input_strips = "input_strips"
+        if plugin is not None and getattr(plugin, "requires_no_style", False):
+            if context and context.scene:
+                context.scene.generatorai_styles = "no_style"
+        if plugin is not None and hasattr(plugin, "on_model_selected"):
+            if context and context.scene:
+                plugin.on_model_selected(context.scene, context)
     except Exception:
         pass
 

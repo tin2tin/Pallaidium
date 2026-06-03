@@ -177,6 +177,10 @@ class RenderQueueJob(PropertyGroup):
     stem_split_guitar: BoolProperty(default=False)
     stem_split_piano:  BoolProperty(default=False)
 
+    # Klein Schematic LoRA plugin
+    klein_schematic_mode:   StringProperty(default="DEPTH")
+    klein_schematic_target: StringProperty(default="person")
+
     # VRAM management — set at run-time based on the next queued job
     should_unload: BoolProperty(default=True)
 
@@ -370,6 +374,8 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             omnivoice_preprocess  = snapshot.get("omnivoice_preprocess",  True),
             omnivoice_denoise     = snapshot.get("omnivoice_denoise",     True),
             omnivoice_postprocess = snapshot.get("omnivoice_postprocess", True),
+            klein_schematic_mode   = snapshot.get("klein_schematic_mode",   "DEPTH"),
+            klein_schematic_target = snapshot.get("klein_schematic_target", "person"),
         )
 
         mode = snapshot["mode"]
@@ -398,22 +404,25 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
         # loads `pipe` for txt2img but `converter` for img2img — never both).
         # A cache built for one mode cannot serve another mode of the same
         # model, so we include `last_mode` in the hit check.
-        _cache_skip = {"last_model_card", "last_mode"}
+        _schematic_mode = snapshot.get("klein_schematic_mode", "")
+        _cache_skip = {"last_model_card", "last_mode", "last_schematic_mode"}
         cache_hit = (
             model_cache is not None
             and model_cache.get("last_model_card") == model_card
             and model_cache.get("last_mode") == mode
+            and model_cache.get("last_schematic_mode", "") == _schematic_mode
             and any(v is not None for k, v in model_cache.items() if k not in _cache_skip)
         )
 
         if cache_hit:
             pipe_obj = model_cache
-            print(f"[Queue] Reusing cached model: {model_card} ({mode})")
+            print(f"[Queue] Reusing cached model: {model_card} ({mode}) schematic={_schematic_mode or '-'}")
         else:
             # Release a different model (or same model with incompatible mode)
             if (model_cache is not None
                     and (model_cache.get("last_model_card") != model_card
-                         or model_cache.get("last_mode") != mode)):
+                         or model_cache.get("last_mode") != mode
+                         or model_cache.get("last_schematic_mode", "") != _schematic_mode)):
                 release_model_cache(model_cache)
             clear_cuda_cache()
             if prefs_proxy.hf_cache_dir:
@@ -538,6 +547,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
                 model_cache.update(loaded)
                 model_cache["last_model_card"] = model_card
                 model_cache["last_mode"] = mode
+                model_cache["last_schematic_mode"] = _schematic_mode
                 pipe_obj = model_cache
             else:
                 pipe_obj = loaded
@@ -549,16 +559,18 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
         # ---- Build inputs -----------------------------------------------
         progress_store[job_id] = {"progress": 0.10, "phase": "Preparing", "step": 0, "total": 0}
 
+        _preserve_dims = getattr(plugin, "preserve_image_dimensions", False)
+
         init_image = None
         img_path = snapshot.get("image_path", "")
         vid_path = snapshot.get("movie_path", "")
         if img_path and os.path.isfile(img_path):
             init_image = load_first_frame(img_path)
-            if init_image:
+            if init_image and not _preserve_dims:
                 init_image = init_image.resize((snapshot["width"], snapshot["height"]))
         if init_image is None and vid_path and os.path.isfile(vid_path):
             init_image = load_first_frame(vid_path)
-            if init_image:
+            if init_image and not _preserve_dims:
                 init_image = init_image.resize((snapshot["width"], snapshot["height"]))
 
         inpaint_mask = None
@@ -588,14 +600,18 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
         _fps = snapshot.get("fps", 24.0) or 24.0
         _audio_length_in_s = snapshot["audio_length"] / _fps
 
+        _infer_w, _infer_h = snapshot["width"], snapshot["height"]
+        if _preserve_dims and init_image is not None:
+            _infer_w, _infer_h = init_image.size
+
         inputs = ModelInputs(
             prompt         = snapshot["prompt"],
             neg_prompt     = snapshot["neg_prompt"],
             mode           = mode,
             image          = init_image,
             inpaint_mask   = inpaint_mask,
-            width          = snapshot["width"],
-            height         = snapshot["height"],
+            width          = _infer_w,
+            height         = _infer_h,
             frames         = snapshot["frames"],
             fps            = snapshot.get("fps", 24.0),
             steps          = snapshot["steps"],
@@ -947,6 +963,8 @@ class SEQUENCER_OT_add_to_queue(Operator):
             omnivoice_preprocess  = getattr(scene, "omnivoice_preprocess",  True),
             omnivoice_denoise     = getattr(scene, "omnivoice_denoise",     True),
             omnivoice_postprocess = getattr(scene, "omnivoice_postprocess", True),
+            klein_schematic_mode   = getattr(scene, "klein_schematic_mode",   "DEPTH"),
+            klein_schematic_target = getattr(scene, "klein_schematic_target", "person"),
         )
 
         # ---- Decide which strips to iterate over -------------------------
@@ -1161,6 +1179,7 @@ def _queue_start_job(scene, job) -> None:
         "stem_split_model", "stem_split_vocals", "stem_split_drums",
         "stem_split_bass", "stem_split_other", "stem_split_guitar", "stem_split_piano",
         "qwen_strip_1_path", "qwen_strip_2_path", "qwen_strip_3_path",
+        "klein_schematic_mode", "klein_schematic_target",
     )}
     _cancel_event.clear()
     _worker_thread = threading.Thread(
@@ -1224,20 +1243,23 @@ def _run_job_main_thread(scene, job) -> None:
             os.environ["HF_HUB_CACHE"] = prefs.hf_cache_dir
 
         # Load model (or reuse cache)
-        _cache_skip = {"last_model_card", "last_mode"}
+        _schematic_mode_mt = getattr(job, "klein_schematic_mode", "")
+        _cache_skip = {"last_model_card", "last_mode", "last_schematic_mode"}
         cache_hit = (
             model_cache is not None
             and model_cache.get("last_model_card") == job.model_card
             and model_cache.get("last_mode") == mode
+            and model_cache.get("last_schematic_mode", "") == _schematic_mode_mt
             and any(v is not None for k, v in model_cache.items() if k not in _cache_skip)
         )
         if cache_hit:
             pipe_obj = model_cache
-            print(f"[Queue] Reusing cached model: {job.model_card} ({mode})")
+            print(f"[Queue] Reusing cached model: {job.model_card} ({mode}) schematic={_schematic_mode_mt or '-'}")
         else:
             if (model_cache is not None
                     and (model_cache.get("last_model_card") != job.model_card
-                         or model_cache.get("last_mode") != mode)):
+                         or model_cache.get("last_mode") != mode
+                         or model_cache.get("last_schematic_mode", "") != _schematic_mode_mt)):
                 release_model_cache(model_cache)
             clear_cuda_cache()
             show_system_console(True)
@@ -1303,6 +1325,7 @@ def _run_job_main_thread(scene, job) -> None:
                 model_cache.update(loaded)
                 model_cache["last_model_card"] = job.model_card
                 model_cache["last_mode"] = mode
+                model_cache["last_schematic_mode"] = _schematic_mode_mt
                 pipe_obj = model_cache
             else:
                 pipe_obj = loaded

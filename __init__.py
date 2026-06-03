@@ -62,6 +62,42 @@ classes = (
     SEQUENCER_OT_stem_split,
 )
 
+_SCHEMATIC_TRIGGER_PROMPTS = {
+    "DEPTH":      "Generate a relative depth map of the input image.",
+    "NORMAL":     "Generate a surface normal map of the input image.",
+    "BODY_POSE":  "Generate a body pose map of all visible people in the input image.",
+    "FULL_POSE":  "Generate a full pose map of all visible people in the input image.",
+    "BINARY_SEG": "Generate a binary segmentation mask of {target} in the input image.",
+    "AMODAL_SEG": "Generate an amodal segmentation mask of {target} in the input image.",
+}
+
+
+def _schematic_mode_update(self, context):
+    scene = context.scene
+    mode   = scene.klein_schematic_mode
+    target = (getattr(scene, "klein_schematic_target", "person") or "person").strip()
+    new_trigger = _SCHEMATIC_TRIGGER_PROMPTS[mode].format(target=target)
+    current = scene.generate_movie_prompt or ""
+    for tmpl in _SCHEMATIC_TRIGGER_PROMPTS.values():
+        prefix = tmpl.split("{")[0]
+        if current.startswith(prefix):
+            dot_idx = current.find(".", len(prefix))
+            if dot_idx != -1:
+                current = current[dot_idx + 1:].lstrip()
+            else:
+                current = ""
+            break
+    scene.generate_movie_prompt = new_trigger + (" " + current if current else "")
+    if hasattr(scene, "generatorai_styles"):
+        scene.generatorai_styles = "no_style"
+
+
+def _schematic_target_update(self, context):
+    scene = context.scene
+    if getattr(scene, "klein_schematic_mode", "DEPTH") in ("BINARY_SEG", "AMODAL_SEG"):
+        _schematic_mode_update(scene, context)
+
+
 def register():
     bpy.types.Scene.generate_movie_prompt = bpy.props.StringProperty(
         name="generate_movie_prompt",
@@ -441,6 +477,34 @@ def register():
         name="klein_strip_3", options={"TEXTEDIT_UPDATE"}, default=""
     )
 
+    # Klein Schematic LoRA plugin
+    bpy.types.Scene.klein_schematic_mode = bpy.props.EnumProperty(
+        name="Schematic Mode",
+        items=[
+            ("DEPTH",      "Relative Depth",
+             "Generates a grayscale depth map — closer objects are brighter. Recommended: 20 steps, CFG 5.0"),
+            ("NORMAL",     "Surface Normal",
+             "Generates an RGB surface normal map (X=red, Y=green, Z=blue). Recommended: 20 steps, CFG 5.0"),
+            ("BODY_POSE",  "Body Pose",
+             "Generates a skeleton overlay for torso and limbs only. Recommended: 20 steps, CFG 5.0"),
+            ("FULL_POSE",  "Full Pose",
+             "Generates a full skeleton including hands and face. Use 1024px for best results. Recommended: 20 steps, CFG 5.0"),
+            ("BINARY_SEG", "Binary Segmentation",
+             "Generates a binary mask for the target class. Set the Target field to the object class, e.g. 'person' or 'car'"),
+            ("AMODAL_SEG", "Amodal Segmentation",
+             "Generates a mask including occluded/hidden regions of the target. Set the Target field."),
+        ],
+        default="DEPTH",
+        update=_schematic_mode_update,
+    )
+    bpy.types.Scene.klein_schematic_target = bpy.props.StringProperty(
+        name="Target",
+        description="Object or class to segment, e.g. 'person' or 'car'. Used only in Binary/Amodal Segmentation modes.",
+        default="person",
+        options={"TEXTEDIT_UPDATE"},
+        update=_schematic_target_update,
+    )
+
     # JoyAI Image Edit
     bpy.types.Scene.joyimage_spatial_mode = bpy.props.EnumProperty(
         name="Spatial Mode",
@@ -750,6 +814,9 @@ def unregister():
     del bpy.types.Scene.joyimage_yaw
     del bpy.types.Scene.joyimage_pitch
     del bpy.types.Scene.joyimage_zoom
+    for _prop in ("klein_schematic_mode", "klein_schematic_target"):
+        if hasattr(bpy.types.Scene, _prop):
+            delattr(bpy.types.Scene, _prop)
     for _prop in ("marlin_mode", "marlin_find_query", "marlin_last_query"):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)

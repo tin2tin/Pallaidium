@@ -134,6 +134,8 @@ The generated media will be saved to the directory specified in the addon prefer
 
 ## Change Log
 
+2026-06-03: Add: FLUX.2 Klein 9B Schematic — transform images into depth, normal, pose, and segmentation maps via nomadoor schematic LoRAs.
+
 2026-06-03: Add: OmniVoice — multilingual text-to-speech with broad language support.
 
 2026-06-03: Add: Stem Splitter — separate audio tracks into stems (vocals, drums, bass, etc.) using AI source separation.
@@ -439,7 +441,8 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 - [Qwen Image Edit](https://huggingface.co/Qwen)
 - [Ernie / Ernie Turbo](https://huggingface.co/baidu)
 - [Nucleus MOE](https://huggingface.co/NucleusAI)
-- [ZImage](https://huggingface.co/opendalle)
+- [ZImage](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo)
+- [Schematic](https://huggingface.co/nomadoor/flux-2-klein-9B-schematic-lora)
 
 ### Audio:
 - [Qwen/Qwen3-TTS](https://huggingface.co/Qwen/Qwen3-TTS)
