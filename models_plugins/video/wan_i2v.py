@@ -1,12 +1,12 @@
 """Image-to-video via Wan2.2-I2V-A14B (dual NF4 transformers + Lightx2v LoRA)."""
 
 import shutil
-from PIL import Image
 from ...models.base import ModelPlugin, InputSpec, UISection, ParamSpec, ModelInputs
 from ...utils.helpers import gfx_device, low_vram, solve_path, clean_filename, load_first_frame
 
 
-def _resize_for_wan(image: Image.Image, max_dim: int = 832) -> Image.Image:
+def _resize_for_wan(image, max_dim: int = 832):
+    from PIL import Image
     w, h = image.size
     scale = max_dim / max(w, h)
     new_w = (int(w * scale) // 16) * 16

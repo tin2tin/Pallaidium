@@ -50,6 +50,7 @@ classes = (
     GENERATOR_OT_uninstall,
     GENERATOR_OT_cancel_dep_op,
     GENERATOR_OT_copy_install_report,
+    GENERATOR_OT_dismiss_install_errors,
     GENERATOR_OT_export_requirements,
     SequencerOpenAudioFile,
     IPAdapterFaceProperties,
@@ -700,6 +701,9 @@ def _reset_dep_state(_=None):
     SKIP_SAVE should prevent dep_needs_restart from persisting, but Blender
     sometimes writes AddonPreferences to userpref.blend regardless.  Resetting
     here guarantees the UI is never locked after a restart.
+
+    If a _install_failures.json file exists from a previous failed install,
+    the error state is restored so the user sees the error banner again.
     """
     try:
         prefs = bpy.context.preferences.addons[__package__].preferences
@@ -710,7 +714,16 @@ def _reset_dep_state(_=None):
     prefs.dep_progress      = 0.0
     prefs.dep_phase         = ""
     prefs.dep_status_line   = ""
-    prefs.dep_has_errors    = False
+
+    # Restore error state from disk if a previous install failed
+    from .operators.system import load_install_errors_from_disk
+    saved = load_install_errors_from_disk()
+    if saved:
+        prefs.dep_has_errors     = True
+        prefs.dep_failure_report = saved.get("report", "")
+    else:
+        prefs.dep_has_errors     = False
+        prefs.dep_failure_report = ""
 
 def _restore_model_selections(_=None):
     """Sync each model-card EnumProperty from its string backing field.

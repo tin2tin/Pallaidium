@@ -51,6 +51,29 @@ _dep_was_running = False         # sentinel for running→done transition
 
 _DEP_TIMER_INTERVAL = 0.2
 
+# File written on disk so errors survive a Blender restart.
+_ADDON_DIR = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+_INSTALL_ERRORS_FILE = os.path.join(_ADDON_DIR, "_install_failures.json")
+
+
+def load_install_errors_from_disk() -> dict | None:
+    """Return the saved failure dict, or None if there is no failure file."""
+    import json
+    try:
+        with open(_INSTALL_ERRORS_FILE, "r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        return None
+
+
+def clear_install_errors_file():
+    """Delete the on-disk failure file (called after a clean install or user dismiss)."""
+    try:
+        if os.path.exists(_INSTALL_ERRORS_FILE):
+            os.remove(_INSTALL_ERRORS_FILE)
+    except Exception:
+        pass
+
 
 def _fix_site_packages_permissions(target_dir: str):
     """Recursively ensure all files in target_dir are readable/writable.
@@ -94,7 +117,7 @@ def _build_failure_report() -> str:
             f"**Phase**: {f['phase']}",
             f"**Packages**: {f['packages']}",
             "```",
-            f['output'][:2000],
+            f['output'][-3000:],
             "```",
             "",
         ]
@@ -118,6 +141,50 @@ def _dep_tick() -> float | None:
             txt = bpy.data.texts.get("Pallaidium Install Errors") or bpy.data.texts.new("Pallaidium Install Errors")
             txt.clear()
             txt.write(report)
+        except Exception:
+            pass
+        # Persist errors to disk so they survive a Blender restart
+        import json
+        try:
+            payload = {
+                "report": report,
+                "summary": [f['packages'] for f in _dep_failed_batches],
+                "batches": [
+                    {"phase": f["phase"], "packages": f["packages"],
+                     "output_tail": "\n".join(f["output"].splitlines()[-30:])}
+                    for f in _dep_failed_batches
+                ],
+            }
+            with open(_INSTALL_ERRORS_FILE, "w", encoding="utf-8") as fh:
+                json.dump(payload, fh, indent=2)
+        except Exception:
+            pass
+        # Print summary to the Blender system console so it's always visible
+        import sys
+        print("\n" + "=" * 60, file=sys.stderr, flush=True)
+        print("PALLAIDIUM: Dependency installation errors:", file=sys.stderr, flush=True)
+        for f in _dep_failed_batches:
+            print(f"  Phase   : {f['phase']}", file=sys.stderr, flush=True)
+            print(f"  Packages: {f['packages']}", file=sys.stderr, flush=True)
+            tail = "\n".join(f['output'].splitlines()[-8:])
+            for ln in tail.splitlines():
+                print(f"    {ln}", file=sys.stderr, flush=True)
+        print("  Full report: open the Text Editor and select 'Pallaidium Install Errors'", file=sys.stderr, flush=True)
+        print("=" * 60 + "\n", file=sys.stderr, flush=True)
+        # Show a popup so the user is notified even if Preferences is not open
+        failed_names = [f['packages'] for f in _dep_failed_batches]
+        def _draw_error_popup(self, context):
+            layout = self.layout
+            layout.label(text=f"{len(_dep_failed_batches)} package batch(es) failed to install.", icon='ERROR')
+            for name in failed_names[:4]:
+                layout.label(text=f"  • {name[:60]}")
+            layout.separator()
+            layout.label(text="Open Add-on Preferences → copy the error report,")
+            layout.label(text="or check the Text Editor block 'Pallaidium Install Errors'.")
+        try:
+            bpy.context.window_manager.popup_menu(
+                _draw_error_popup, title="Pallaidium: Install Failed", icon='ERROR'
+            )
         except Exception:
             pass
     _dep_was_running = currently_running
@@ -146,6 +213,7 @@ def _dep_tick() -> float | None:
 
 
 def _run_install(snapshot: dict, cancel_event: threading.Event):
+    import sys, traceback
     state     = _dep_state
     pybin     = snapshot["pybin"]
     addon_dir = snapshot["addon_dir"]
@@ -155,72 +223,97 @@ def _run_install(snapshot: dict, cancel_event: threading.Event):
     batch_output_lines: list = []
 
     def on_line(line):
+        print(line, flush=True)
         state["status_line"] = line
         batch_output_lines.append(line)
 
-    # pip self-upgrade
-    run_pip_streaming(
-        [pybin, "-m", "pip", "install", "--upgrade", "pip", "--disable-pip-version-check"],
-        on_line=on_line, cancel_event=cancel_event,
-    )
-    if cancel_event.is_set():
+    try:
+        # pip self-upgrade
+        run_pip_streaming(
+            [pybin, "-m", "pip", "install", "--upgrade", "pip", "--disable-pip-version-check"],
+            on_line=on_line, cancel_event=cancel_event,
+        )
+        if cancel_event.is_set():
+            return
+
+        for phase_name, only_binary, lines in batches:
+            BATCH_SIZE = 5
+            for i in range(0, len(lines), BATCH_SIZE):
+                if cancel_event.is_set():
+                    return
+                batch = lines[i: i + BATCH_SIZE]
+                batch_num   = (i // BATCH_SIZE) + 1
+                total_batch = (len(lines) + BATCH_SIZE - 1) // BATCH_SIZE
+                names = [SmartSkipManager.extract_package_name(x) or x for x in batch]
+                state["phase"] = f"[{phase_name}] Batch {batch_num}/{total_batch}: {', '.join(names)}"
+
+                batch_output_lines.clear()
+                temp_req = os.path.join(addon_dir, f"_temp_dep_{phase_name}_{batch_num}.txt")
+                write_requirements_file(temp_req, batch)
+
+                cmd = [
+                    pybin, "-m", "pip", "install",
+                    "--upgrade",
+                    "--disable-pip-version-check",
+                    "--no-warn-script-location",
+                    "--no-user",
+                    "--no-deps",
+                    "--target", site_packages_dir,
+                    "-r", temp_req,
+                ]
+                if only_binary:
+                    cmd.insert(-2, "--only-binary=:all:")
+
+                success = run_pip_streaming(cmd, on_line=on_line, cancel_event=cancel_event)
+                if os.path.exists(temp_req):
+                    os.remove(temp_req)
+
+                # Fix read-only attributes pip sometimes sets on Windows
+                if success and site_packages_dir:
+                    _fix_site_packages_permissions(site_packages_dir)
+
+                if not success and not cancel_event.is_set():
+                    print(f"\nPALLAIDIUM pip FAILED — {phase_name} batch {batch_num}/{total_batch}: {', '.join(names)}", file=sys.stderr, flush=True)
+                    for ln in batch_output_lines[-15:]:
+                        print(f"  {ln}", file=sys.stderr, flush=True)
+                    _dep_failed_batches.append({
+                        "phase":    f"{phase_name} batch {batch_num}/{total_batch}",
+                        "packages": ", ".join(names),
+                        "output":   "\n".join(batch_output_lines),
+                    })
+
+                done_pkgs += len(batch)
+                state["progress"] = min(done_pkgs / max(1, total_pkgs), 1.0)
+
+        print("\n" + "=" * 60, flush=True)
+        if _dep_failed_batches:
+            state["phase"] = f"Done with {len(_dep_failed_batches)} error(s) — see report"
+            print(f"PALLAIDIUM: Installation finished with {len(_dep_failed_batches)} failed batch(es):", flush=True)
+            for f in _dep_failed_batches:
+                print(f"  FAILED  [{f['phase']}]  {f['packages']}", flush=True)
+            print("  Open Add-on Preferences and click 'Copy Error Report'.", flush=True)
+        else:
+            state["phase"] = "Installation complete — please restart Blender"
+            clear_install_errors_file()
+            print(f"PALLAIDIUM: Installation complete ({total_pkgs} package(s)). Please restart Blender.", flush=True)
+        print("=" * 60 + "\n", flush=True)
+        if total_pkgs > 0:
+            state["needs_restart"] = True
+        state["progress"] = 1.0
+
+    except Exception:
+        tb = traceback.format_exc()
+        print(f"\nPALLAIDIUM install thread crashed:\n{tb}", file=sys.stderr, flush=True)
+        _dep_failed_batches.append({
+            "phase":    state.get("phase", "unknown"),
+            "packages": "(internal error — see traceback)",
+            "output":   tb,
+        })
+        state["phase"]    = "Install crashed — see error report"
+        state["progress"] = 1.0
+
+    finally:
         state["running"] = False
-        return
-
-    for phase_name, only_binary, lines in batches:
-        BATCH_SIZE = 5
-        for i in range(0, len(lines), BATCH_SIZE):
-            if cancel_event.is_set():
-                state["running"] = False
-                return
-            batch = lines[i: i + BATCH_SIZE]
-            batch_num   = (i // BATCH_SIZE) + 1
-            total_batch = (len(lines) + BATCH_SIZE - 1) // BATCH_SIZE
-            names = [SmartSkipManager.extract_package_name(x) or x for x in batch]
-            state["phase"] = f"[{phase_name}] Batch {batch_num}/{total_batch}: {', '.join(names)}"
-
-            batch_output_lines.clear()
-            temp_req = os.path.join(addon_dir, f"_temp_dep_{phase_name}_{batch_num}.txt")
-            write_requirements_file(temp_req, batch)
-
-            cmd = [
-                pybin, "-m", "pip", "install",
-                "--disable-pip-version-check",
-                "--no-warn-script-location",
-                "--no-user",
-                "--no-deps",
-                "--target", site_packages_dir,
-                "-r", temp_req,
-            ]
-            if only_binary:
-                cmd.insert(-2, "--only-binary=:all:")
-
-            success = run_pip_streaming(cmd, on_line=on_line, cancel_event=cancel_event)
-            if os.path.exists(temp_req):
-                os.remove(temp_req)
-
-            # Fix read-only attributes pip sometimes sets on Windows
-            if success and site_packages_dir:
-                _fix_site_packages_permissions(site_packages_dir)
-
-            if not success and not cancel_event.is_set():
-                _dep_failed_batches.append({
-                    "phase":    f"{phase_name} batch {batch_num}/{total_batch}",
-                    "packages": ", ".join(names),
-                    "output":   "\n".join(batch_output_lines),
-                })
-
-            done_pkgs += len(batch)
-            state["progress"] = min(done_pkgs / max(1, total_pkgs), 1.0)
-
-    if _dep_failed_batches:
-        state["phase"] = f"Done with {len(_dep_failed_batches)} error(s) — see report"
-    else:
-        state["phase"] = "Installation complete — please restart Blender"
-    if total_pkgs > 0:
-        state["needs_restart"] = True
-    state["progress"] = 1.0
-    state["running"]  = False
 
 
 def _run_uninstall(snapshot: dict, cancel_event: threading.Event):
@@ -427,6 +520,29 @@ class GENERATOR_OT_copy_install_report(Operator):
             self.report({"INFO"}, "Error report copied to clipboard.")
         else:
             self.report({"WARNING"}, "No error report available.")
+        return {"FINISHED"}
+
+
+class GENERATOR_OT_dismiss_install_errors(Operator):
+    bl_idname = "sequencer.dismiss_install_errors"
+    bl_label = "Dismiss"
+    bl_description = "Clear the install error banner and delete the saved error report"
+    bl_options = {"REGISTER"}
+
+    def execute(self, context):
+        clear_install_errors_file()
+        _dep_state["failure_report"] = ""
+        _dep_failed_batches.clear()
+        try:
+            prefs = _get_dep_prefs()
+            if prefs:
+                prefs.dep_has_errors     = False
+                prefs.dep_failure_report = ""
+        except Exception:
+            pass
+        for area in context.screen.areas:
+            area.tag_redraw()
+        self.report({"INFO"}, "Install error report cleared.")
         return {"FINISHED"}
 
 

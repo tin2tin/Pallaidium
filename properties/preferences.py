@@ -235,12 +235,32 @@ class GeneratorAddonPreferences(AddonPreferences):
 
         if self.dep_has_errors:
             err_box = layout.box()
-            err_box.label(text="Some packages failed to install.", icon="ERROR")
-            err_row = err_box.row()
-            err_row.operator("sequencer.copy_install_report", icon="COPYDOWN")
-            err_row.label(text='Full report in Text Editor: "Pallaidium Install Errors"')
-            for hint_line in self.dep_failure_report.splitlines()[:6]:
-                err_box.label(text=hint_line[:80])
+            # Header row: icon + title + dismiss button
+            hdr = err_box.row()
+            hdr.label(text="Dependency installation incomplete — some packages failed.", icon="ERROR")
+            hdr.operator("sequencer.dismiss_install_errors", text="", icon="X")
+            # Action row: copy button + text-editor hint
+            act = err_box.row()
+            act.operator("sequencer.copy_install_report", icon="COPYDOWN", text="Copy Error Report")
+            act.label(text='Full log: Text Editor > "Pallaidium Install Errors"')
+            # Show the actual failure content — skip the markdown header boilerplate
+            lines = self.dep_failure_report.splitlines()
+            start = 0
+            for i, ln in enumerate(lines):
+                if ln.startswith("### Failed batches"):
+                    start = i + 1
+                    break
+            shown = 0
+            for ln in lines[start:]:
+                if shown >= 10:
+                    break
+                text = ln.strip()
+                if not text or text.startswith("---") or text.startswith("_Please"):
+                    continue
+                if text == "```":
+                    continue
+                err_box.label(text=text[:110])
+                shown += 1
 
         row = box.row()
         row.operator("sequencer.install_generator")

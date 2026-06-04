@@ -799,6 +799,7 @@ def install_requirements_binary_only(requirements_file):
         "--no-warn-script-location",
         "--no-user",
         "--no-deps",
+        "--upgrade",
         "--only-binary=:all:",
         "--target", site_packages_dir,
         "-r", requirements_file,
@@ -824,6 +825,7 @@ def install_requirements_allow_source(requirements_file):
         "--no-warn-script-location",
         "--no-user",
         "--no-deps",
+        "--upgrade",
         "--target", site_packages_dir,
         "-r", requirements_file,
     ]
@@ -915,14 +917,54 @@ class SmartSkipManager:
             return True
 
         if req_version:
-            if installed_version == req_version:
-                print(f"  [SKIP] {name} {installed_version} is already installed.")
-                return True
-            else:
+            if installed_version != req_version:
                 print(f"  [UPDATE] {name}: Installed {installed_version} != Required {req_version}")
-                return False 
-        
-        print(f"  [SKIP] {name} is already installed.")
+                return False
+
+        # Guard against broken installs where dist-info exists but the actual
+        # module file was deleted (e.g. interrupted pip run on Windows).
+        try:
+            dist = importlib.metadata.Distribution.from_name(name)
+            record_text = dist.read_text("RECORD")
+            if record_text:
+                dist_info_dir = getattr(dist, "_path", None)
+                if dist_info_dir is not None:
+                    site_dir = os.path.dirname(str(dist_info_dir))
+                    for rec_line in record_text.splitlines():
+                        file_rel = rec_line.split(",")[0].strip()
+                        if not file_rel:
+                            continue
+                        if file_rel.startswith("__pycache__") or ".dist-info" in file_rel:
+                            continue
+                        # Skip console-script entries — Blender's Python has no bin/ or Scripts/
+                        norm = file_rel.replace("\\", "/")
+                        if "/bin/" in norm or "/Scripts/" in norm or norm.startswith("../"):
+                            continue
+                        full_path = os.path.normpath(os.path.join(site_dir, file_rel))
+                        if not os.path.exists(full_path):
+                            print(f"  [BROKEN] {name} {installed_version}: {file_rel} missing, will reinstall")
+                            return False
+                        break
+                    # Extra guard: if the package directory exists but has no __init__.py
+                    # it acts as a hollow namespace package that shadows the real install.
+                    # This catches partial pip installs where subdirs were written but the
+                    # root __init__.py was never extracted (e.g. interrupted --target install).
+                    # Only applied to simple (non-namespace) package names.
+                    pkg_dir_name = name.replace("-", "_")
+                    if "." not in pkg_dir_name:
+                        pkg_dir = os.path.join(site_dir, pkg_dir_name)
+                        if os.path.isdir(pkg_dir) and not os.path.exists(
+                            os.path.join(pkg_dir, "__init__.py")
+                        ):
+                            print(
+                                f"  [BROKEN] {name} {installed_version}: "
+                                f"{pkg_dir_name}/__init__.py missing, will reinstall"
+                            )
+                            return False
+        except Exception:
+            pass
+
+        print(f"  [SKIP] {name} {installed_version} is already installed.")
         return True
 
     @staticmethod
