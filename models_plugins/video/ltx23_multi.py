@@ -64,6 +64,17 @@ class LTX2_3MultiPlugin(ModelPlugin):
         os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
         torch._dynamo.config.disable = True
 
+        print("=" * 60)
+        print("[LTX23Multi] generate() received inputs:")
+        print(f"  inputs.prompt     = {inputs.prompt!r}")
+        print(f"  inputs.neg_prompt = {inputs.neg_prompt!r}")
+        print(f"  inputs.image      = {'<PIL Image>' if inputs.image is not None else None}")
+        print(f"  inputs.video_path = {inputs.video_path!r}")
+        print(f"  inputs.audio_ref  = {inputs.audio_ref!r}")
+        print(f"  inputs.width      = {inputs.width}, inputs.height = {inputs.height}")
+        print(f"  inputs.frames     = {inputs.frames}, inputs.seed = {inputs.seed}")
+        print("=" * 60)
+
         from diffusers import LTX2VideoTransformer3DModel
         from diffusers.pipelines.ltx2.export_utils import encode_video
         from diffusers.pipelines.ltx2.latent_upsampler import LTX2LatentUpsamplerModel
@@ -285,14 +296,20 @@ class LTX2_3MultiPlugin(ModelPlugin):
 
         # Parse Audio Conditions
         audio_conditions = None
+        print(f"[DEBUG] Audio VAE check: sound_path={sound_path!r}, "
+              f"has audio_vae attr={hasattr(pipe, 'audio_vae')}, "
+              f"audio_vae value={getattr(pipe, 'audio_vae', 'ATTR_MISSING')!r}")
         if sound_path and hasattr(pipe, "audio_vae") and pipe.audio_vae:
             target_sr = pipe.audio_vae.config.sample_rate
             try:
                 waveform = load_audio(sound_path, target_sample_rate=target_sr, seconds=dur_s)
                 audio_conditions =[LTX2AudioCondition(audio=waveform, strength=1.0)]
-                print(f"[DEBUG] Audio Condition successfully loaded and resampled to {target_sr}Hz.")
+                print(f"[DEBUG] Audio Condition successfully loaded and resampled to {target_sr}Hz. Waveform shape: {waveform.shape}")
             except Exception as e:
-                print(f"[DEBUG] Warning: Failed to load audio condition in pipeline: {e}")
+                print(f"[DEBUG] WARNING: Failed to load audio condition in pipeline: {e}")
+                import traceback; traceback.print_exc()
+        elif sound_path:
+            print(f"[DEBUG] WARNING: Audio path provided but audio_vae is None/missing — audio condition NOT applied!")
 
         pipe.enable_group_offload(
             onload_device=onload_device,
@@ -473,10 +490,23 @@ class LTX2_3MultiPlugin(ModelPlugin):
             print(f"[DEBUG] Audio VAE Decode Triggered! Latent shape: {final_a.shape}")
             with torch.inference_mode():
                 mel = audio_vae.decode(final_a.to(onload_device, dtype=audio_vae.dtype), return_dict=False)[0]
+                print(f"[DEBUG] Decoded mel shape: {mel.shape}, dtype: {mel.dtype}")
                 audio_out = vocoder(mel.float()).cpu()
+            print(f"[DEBUG] Vocoder output shape: {audio_out.shape}, dtype: {audio_out.dtype}")
+            print(f"[DEBUG] Audio amplitude stats: min={audio_out.min():.4f}, max={audio_out.max():.4f}, "
+                  f"mean={audio_out.mean():.4f}, std={audio_out.std():.4f}")
+            # _write_audio clips to [-1,1] before int16 conversion; if values are out of range, audio
+            # sounds distorted. Normalize if needed.
+            peak = audio_out.abs().max()
+            if peak > 1.0:
+                print(f"[DEBUG] WARNING: Audio peak {peak:.4f} > 1.0 — normalizing to prevent clipping distortion.")
+                audio_out = audio_out / peak
             del audio_vae, vocoder
         else:
-            print(f"[DEBUG] Audio decode skipped. (final_a valid: {final_a is not None}, has audio_vae: {hasattr(decode_pipe, 'audio_vae')})")
+            _avae = getattr(decode_pipe, "audio_vae", "ATTR_MISSING")
+            print(f"[DEBUG] Audio decode skipped. final_a valid={final_a is not None}, "
+                  f"has audio_vae attr={hasattr(decode_pipe, 'audio_vae')}, "
+                  f"audio_vae value={_avae!r}")
 
         del decode_pipe, vae, final_v, final_a
         _flush()

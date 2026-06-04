@@ -1147,6 +1147,10 @@ def input_strips_updated(self, context):
         except Exception:
             pass
 
+    # Reset style for output types that don't use image styles
+    if scene_type in {"text", "audio"} and hasattr(scene, "generatorai_styles"):
+        scene.generatorai_styles = "no_style"
+
     # Common Handling for Selected Strip
     if scene_type in {"movie", "audio"} or image_model == "xinsir/controlnet-scribble-sdxl-1.0":
         scene.inpaint_selected_strip = ""
@@ -1690,18 +1694,29 @@ def decompose_meta(context, meta_strip, target_type="video"):
 
     # target_type == "video": decompose children by type
     images, videos, audio, texts = [], [], None, []
+    print(f"[decompose_meta] META strip '{meta_strip.name}' has {len(list(meta_strip.strips))} children:")
     for child in meta_strip.strips:
+        print(f"  child type={child.type!r} name={child.name!r}")
         if child.type == "TEXT":
-            if child.text:
-                texts.append(child.text)
+            if child.text and child.text.strip():
+                texts.append(child.text.strip())
+                print(f"    -> TEXT accepted: {child.text.strip()!r}")
+            else:
+                print(f"    -> TEXT empty, skipped")
         elif child.type == "IMAGE":
             path = get_strip_path(child)
             if path and os.path.isfile(path):
                 images.append(path)
+                print(f"    -> IMAGE accepted: {path!r}")
+            else:
+                print(f"    -> IMAGE path missing or not found: {path!r}")
         elif child.type == "MOVIE":
             path = get_strip_path(child)
             if path and os.path.isfile(path):
                 videos.append(path)
+                print(f"    -> MOVIE accepted: {path!r}")
+            else:
+                print(f"    -> MOVIE path missing or not found: {path!r}")
         elif child.type == "SOUND":
             try:
                 path = bpy.path.abspath(child.sound.filepath)
@@ -1709,7 +1724,14 @@ def decompose_meta(context, meta_strip, target_type="video"):
                 path = get_strip_path(child)
             if path and os.path.isfile(path):
                 audio = path
-    return {"images": images, "videos": videos, "audio": audio, "text": ", ".join(texts)}
+                print(f"    -> SOUND accepted: {path!r}")
+            else:
+                print(f"    -> SOUND path missing or not found: {path!r}")
+        else:
+            print(f"    -> type {child.type!r} not handled, skipped")
+    result = {"images": images, "videos": videos, "audio": audio, "text": ", ".join(texts)}
+    print(f"[decompose_meta] result: images={images}, videos={videos}, audio={audio!r}, text={result['text']!r}")
+    return result
 
 
 def load_strip_as_pil(strip, context=None):

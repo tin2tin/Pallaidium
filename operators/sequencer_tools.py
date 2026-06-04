@@ -27,7 +27,7 @@ class SequencerOpenAudioFile(Operator, ImportHelper):
             filename, extension = os.path.splitext(self.filepath)
             if extension.lower() in valid_extensions:
                 print("Selected audio file:", self.filepath)
-                scene.audio_path = bpy.path.abspath(self.filepath)
+                scene.ref_audio_path = bpy.path.abspath(self.filepath)
             else:
                 print("Info: Only wav is allowed.")
         else:

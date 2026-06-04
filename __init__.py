@@ -374,16 +374,16 @@ def register():
         default="",
         update=update_folder_callback,
     )
-    bpy.types.Scene.audio_path = bpy.props.StringProperty(
-        name="audio_path",
+    bpy.types.Scene.ref_audio_path = bpy.props.StringProperty(
+        name="ref_audio_path",
         default="",
-        description="Path to speaker voice",
+        description="Path to speaker reference audio (TTS/VC models)",
         options={"TEXTEDIT_UPDATE"},
     )
-    bpy.types.Scene.audio_text = bpy.props.StringProperty(
-        name="audio_text",
+    bpy.types.Scene.ref_text = bpy.props.StringProperty(
+        name="ref_text",
         default="",
-        description="Path to speaker voice",
+        description="Reference transcription text (TTS models)",
         options={"TEXTEDIT_UPDATE"},
     )
     # The frame audio duration.

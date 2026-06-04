@@ -145,9 +145,9 @@ class OmniVoicePlugin(ModelPlugin):
         col.prop(scene, "omnivoice_language")
         col.separator()
         row = col.row(align=True)
-        row.prop(scene, "audio_path", text="Speaker Ref.")
+        row.prop(scene, "ref_audio_path", text="Speaker Ref.")
         row.operator("sequencer.open_audio_filebrowser", text="", icon="FILEBROWSER")
-        col.prop(scene, "audio_text", text="Ref. Text")
+        col.prop(scene, "ref_text", text="Ref. Text")
         col.prop(scene, "omnivoice_preprocess")
         col.separator()
 

@@ -30,7 +30,15 @@ class _ZImageBase(ModelPlugin):
 
     def _build_pipe(self, model_id, prefs, turbo=False):
         import torch
-        from diffusers import ZImagePipeline
+        try:
+            from diffusers import ZImagePipeline
+        except ImportError as _e:
+            if "huggingface-hub" in str(_e):
+                raise RuntimeError(
+                    "Z-Image requires huggingface-hub>=1.5.0 but an older version is installed. "
+                    "Upgrade with: pip install \"huggingface_hub>=1.5.0\" -U"
+                ) from _e
+            raise
 
         _cache_dir = prefs.hf_cache_dir or None
         if turbo:
@@ -58,7 +66,15 @@ class _ZImageBase(ModelPlugin):
 
     def _build_img2img(self, model_id, prefs, turbo=False):
         import torch
-        from diffusers import ZImageImg2ImgPipeline
+        try:
+            from diffusers import ZImageImg2ImgPipeline
+        except ImportError as _e:
+            if "huggingface-hub" in str(_e):
+                raise RuntimeError(
+                    "Z-Image requires huggingface-hub>=1.5.0 but an older version is installed. "
+                    "Upgrade with: pip install \"huggingface_hub>=1.5.0\" -U"
+                ) from _e
+            raise
 
         _cache_dir = prefs.hf_cache_dir or None
         if turbo:

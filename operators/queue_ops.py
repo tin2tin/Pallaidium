@@ -133,8 +133,8 @@ class RenderQueueJob(PropertyGroup):
     image_path:  StringProperty()
     movie_path:  StringProperty()
     sound_path:  StringProperty()
-    audio_path:  StringProperty()
-    audio_text:  StringProperty()
+    ref_audio_path: StringProperty()
+    ref_text:       StringProperty()
 
     # Prefs snapshot
     hugginface_token: StringProperty()
@@ -343,8 +343,8 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             image_path                     = snapshot.get("image_path", ""),
             movie_path                     = snapshot.get("movie_path", ""),
             sound_path                     = snapshot.get("sound_path", ""),
-            audio_path                     = snapshot.get("audio_path", ""),
-            audio_text                     = snapshot.get("audio_text", ""),
+            ref_audio_path                 = snapshot.get("ref_audio_path", ""),
+            ref_text                       = snapshot.get("ref_text", ""),
             inpaint_selected_strip         = "",
             kontext_strip_1                = "",
             kontext_strip_1_path           = snapshot.get("kontext_strip_1_path", ""),
@@ -624,8 +624,8 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             guidance       = snapshot["guidance"],
             strength       = snapshot["image_power"],
             seed           = snapshot["seed"],
-            audio_ref      = snapshot.get("audio_path") or snapshot.get("sound_path") or None,
-            text_ref       = snapshot.get("audio_text", ""),
+            audio_ref      = snapshot.get("ref_audio_path") or snapshot.get("sound_path") or None,
+            text_ref       = snapshot.get("ref_text", ""),
             video_path     = vid_path or None,
             audio_length   = _audio_length_in_s,
             speed          = snapshot["audio_speed_tts"],
@@ -935,8 +935,8 @@ class SEQUENCER_OT_add_to_queue(Operator):
             music_lyrics      = getattr(scene, "music_lyrics", ""),
             music_key_scale   = getattr(scene, "music_key_scale", ""),
             music_time_signature = getattr(scene, "music_time_signature", ""),
-            audio_path        = bpy.path.abspath(getattr(scene, "audio_path", "") or ""),
-            audio_text        = getattr(scene, "audio_text", ""),
+            ref_audio_path    = bpy.path.abspath(getattr(scene, "ref_audio_path", "") or ""),
+            ref_text          = getattr(scene, "ref_text", ""),
             hugginface_token  = getattr(prefs, "hugginface_token", ""),
             local_files_only  = getattr(prefs, "local_files_only", False),
             generator_ai      = getattr(prefs, "generator_ai", "") or os.path.join(
@@ -1123,9 +1123,9 @@ class SEQUENCER_OT_add_to_queue(Operator):
                         meta_text = ", ".join(meta_texts)
                         job.prompt = (meta_text + ", " + job.prompt) if job.prompt else meta_text
 
-                # Override audio_path from a SOUND strip (wins over scene-level value)
+                # Override ref_audio_path from a SOUND strip (wins over scene-level value)
                 if strip_audio_path:
-                    job.audio_path = strip_audio_path
+                    job.ref_audio_path = strip_audio_path
 
                 # For strip-input plugins (e.g. Stem Splitter) use the input
                 # filename as the queue job name instead of the text prompt.
@@ -1176,8 +1176,8 @@ def _queue_start_job(scene, job) -> None:
         "audio_speed_tts", "chat_exaggeration", "chat_pace",
         "chat_temperature", "fps", "music_bpm", "music_lyrics",
         "music_key_scale", "music_time_signature",
-        "image_path", "movie_path", "sound_path", "audio_path",
-        "audio_text", "hugginface_token", "local_files_only",
+        "image_path", "movie_path", "sound_path", "ref_audio_path",
+        "ref_text", "hugginface_token", "local_files_only",
         "generator_ai", "hf_cache_dir", "lora_files_json", "lora_folder",
         "insert_frame_start", "insert_frame_end",
         "insert_channel", "insert_duration",
@@ -1365,7 +1365,7 @@ def _run_job_main_thread(scene, job) -> None:
             guidance            = job.guidance,
             strength            = job.image_power,
             seed                = job.seed,
-            audio_ref           = job.audio_path or job.sound_path or None,
+            audio_ref           = job.ref_audio_path or job.sound_path or None,
             video_path          = job.movie_path or None,
             insert_channel      = job.insert_channel,
             insert_frame_start  = job.insert_frame_start,

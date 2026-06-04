@@ -276,6 +276,18 @@ class SEQUENCER_OT_generate_movie(Operator):
                 seed        = seed,
             )
 
+            print("=" * 60)
+            print("[VIDEO GENERATE] ModelInputs summary:")
+            print(f"  prompt      = {inputs.prompt!r}")
+            print(f"  mode        = {inputs.mode!r}")
+            print(f"  image       = {'<PIL Image>' if inputs.image is not None else None}")
+            print(f"  video_path  = {inputs.video_path!r}")
+            print(f"  audio_ref   = {inputs.audio_ref!r}")
+            print(f"  width/height= {inputs.width} x {inputs.height}")
+            print(f"  frames      = {inputs.frames}")
+            print(f"  seed        = {inputs.seed}")
+            print("=" * 60)
+
             t_gen = bench_print(f"[{plugin.MODEL_ID}] generate start")
             try:
                 dst_path = plugin.generate(pipe_obj, inputs, scene, addon_prefs)
@@ -473,12 +485,12 @@ class SEQUENCER_OT_generate_audio(Operator):
             )
             if is_vc:
                 audio_ref = os.path.join(bpy.path.abspath(strip.sound.filepath))
-            elif getattr(scene, "audio_path", None):
-                audio_ref = bpy.path.abspath(scene.audio_path)
+            elif getattr(scene, "ref_audio_path", None):
+                audio_ref = bpy.path.abspath(scene.ref_audio_path)
             else:
                 audio_ref = None
 
-            text_ref   = bpy.path.abspath(scene.audio_text) if getattr(scene, "audio_text",  None) else ""
+            text_ref   = bpy.path.abspath(scene.ref_text) if getattr(scene, "ref_text", None) else ""
             if input_mode == "input_strips" and strip is not None and strip.type == "MOVIE":
                 video_path = bpy.path.abspath(strip.filepath)
             else:
@@ -1228,7 +1240,8 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                 if _multi_input_video and meta_strip:
                     for _c in meta_strip.strips:
                         if _c.type == "TEXT" and _c.text:
-                            current_prompt_text = (_c.text + ", " + base_prompt) if base_prompt else _c.text
+                            _stripped = _c.text.strip()
+                            current_prompt_text = (_stripped + ", " + base_prompt) if base_prompt else _stripped
                             print(f"LTX Multi: text strip prompt: {current_prompt_text!r}")
                             break
 
@@ -1251,7 +1264,8 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                             else:
                                 # Standalone TEXT strip: use as prompt for text-to-video
                                 if child_strip.text:
-                                    current_prompt_text = (child_strip.text + ", " + base_prompt) if base_prompt else child_strip.text
+                                    _stripped = child_strip.text.strip()
+                                    current_prompt_text = (_stripped + ", " + base_prompt) if base_prompt else _stripped
                                     print(f"LTX Multi: standalone text strip prompt: {current_prompt_text!r}")
                                 _multi_text_only = True
                         elif meta_strip and meta_strip.type == 'META':
@@ -1268,24 +1282,39 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                         # LTX multi-input with META: decompose once (first child triggers it),
                         # then skip subsequent children — decompose_meta() handles all types.
                         if child_strip == meta_strip.strips[0]:
+                            # Clear all media paths before decomposing so no stale values
+                            # from other plugins (e.g. voice-clone reference audio) bleed in.
+                            scene.movie_path = ""
+                            scene.image_path = ""
+                            scene.sound_path = ""
                             _decomp = decompose_meta(context, meta_strip, target_type="video")
-                            if _decomp["text"] and not scene.generate_movie_prompt.startswith(_decomp["text"]):
+                            print(f"[LTX Multi META] decompose_meta raw result: {_decomp}")
+                            _decomp_text = _decomp["text"].strip() if _decomp.get("text") else ""
+                            if _decomp_text and not scene.generate_movie_prompt.startswith(_decomp_text):
                                 current_prompt_text = (
-                                    (_decomp["text"] + ", " + base_prompt) if base_prompt
-                                    else _decomp["text"]
+                                    (_decomp_text + ", " + base_prompt) if base_prompt
+                                    else _decomp_text
                                 )
+                                print(f"[LTX Multi META] prompt from TEXT strip: {current_prompt_text!r}")
+                            else:
+                                print(f"[LTX Multi META] no text strip found (or matches base), using base_prompt: {base_prompt!r}")
                             if _decomp["videos"]:
                                 scene.movie_path = _decomp["videos"][0]
-                                print(f"LTX Multi META: video → {_decomp['videos'][0]!r}")
+                                print(f"[LTX Multi META] video → scene.movie_path={scene.movie_path!r}")
                                 if _decomp["images"]:
                                     scene.image_path = _decomp["images"][0]
-                                    print(f"LTX Multi META: image (supplement) → {_decomp['images'][0]!r}")
+                                    print(f"[LTX Multi META] image (supplement) → scene.image_path={scene.image_path!r}")
                             elif _decomp["images"]:
                                 scene.movie_path = _decomp["images"][0]
-                                print(f"LTX Multi META: image (as movie_path) → {_decomp['images'][0]!r}")
-                            if _decomp["audio"]:
-                                scene.sound_path = _decomp["audio"]
-                                print(f"LTX Multi META: audio → {_decomp['audio']!r}")
+                                print(f"[LTX Multi META] image (as movie_path) → scene.movie_path={scene.movie_path!r}")
+                            else:
+                                print(f"[LTX Multi META] no video or image found in meta strip")
+                            # Always assign — clears stale voice-plugin paths when meta has no audio.
+                            scene.sound_path = _decomp["audio"] or ""
+                            if scene.sound_path:
+                                print(f"[LTX Multi META] audio → scene.sound_path={scene.sound_path!r}")
+                            else:
+                                print(f"[LTX Multi META] no audio found in meta strip (sound_path cleared)")
 
                     else:
                         # Standard render pipeline for image generation or non-meta strips

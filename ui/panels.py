@@ -313,13 +313,13 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 col.prop(context.scene, "audio_speed_tts", text="Speed")
             if type == "audio" and _has(UISection.AUDIO_REF):
                 row = col.row(align=True)
-                row.prop(context.scene, "audio_path", text="Speaker Ref.")
+                row.prop(context.scene, "ref_audio_path", text="Speaker Ref.")
                 row.operator(
                     "sequencer.open_audio_filebrowser", text="", icon="FILEBROWSER"
                 )
             if type == "audio" and _has(UISection.TEXT_REF):
                 row = col.row(align=True)
-                row.prop(context.scene, "audio_text", text="Text Ref.")
+                row.prop(context.scene, "ref_text", text="Text Ref.")
             if type == "audio" and _has(UISection.CHAT_PARAMS):
                 col.prop(context.scene, "chat_exaggeration")
                 col.prop(context.scene, "chat_pace")
