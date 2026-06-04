@@ -160,6 +160,9 @@ class RenderQueueJob(PropertyGroup):
     qwen_strip_1_path:    StringProperty()   # Qwen Image Edit reference image 1
     qwen_strip_2_path:    StringProperty()   # Qwen Image Edit reference image 2
     qwen_strip_3_path:    StringProperty()   # Qwen Image Edit reference image 3
+    klein_strip_1_path:   StringProperty()   # Klein reference image 1
+    klein_strip_2_path:   StringProperty()   # Klein reference image 2
+    klein_strip_3_path:   StringProperty()   # Klein reference image 3
 
     # OmniVoice
     omnivoice_instruct:    StringProperty(default="")
@@ -376,6 +379,9 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             omnivoice_postprocess = snapshot.get("omnivoice_postprocess", True),
             klein_schematic_mode   = snapshot.get("klein_schematic_mode",   "DEPTH"),
             klein_schematic_target = snapshot.get("klein_schematic_target", "person"),
+            klein_strip_1_path     = snapshot.get("klein_strip_1_path",     ""),
+            klein_strip_2_path     = snapshot.get("klein_strip_2_path",     ""),
+            klein_strip_3_path     = snapshot.get("klein_strip_3_path",     ""),
         )
 
         mode = snapshot["mode"]
@@ -951,6 +957,9 @@ class SEQUENCER_OT_add_to_queue(Operator):
             qwen_strip_1_path     = self._render_named_strip_image(context, scene, getattr(scene, "qwen_strip_1", "")),
             qwen_strip_2_path     = self._render_named_strip_image(context, scene, getattr(scene, "qwen_strip_2", "")),
             qwen_strip_3_path     = self._render_named_strip_image(context, scene, getattr(scene, "qwen_strip_3", "")),
+            klein_strip_1_path    = self._render_named_strip_image(context, scene, getattr(scene, "klein_strip_1", "")),
+            klein_strip_2_path    = self._render_named_strip_image(context, scene, getattr(scene, "klein_strip_2", "")),
+            klein_strip_3_path    = self._render_named_strip_image(context, scene, getattr(scene, "klein_strip_3", "")),
             stem_split_model  = getattr(scene, "stem_split_model",  "htdemucs_ft"),
             stem_split_vocals = getattr(scene, "stem_split_vocals", True),
             stem_split_drums  = getattr(scene, "stem_split_drums",  True),
@@ -1179,6 +1188,7 @@ def _queue_start_job(scene, job) -> None:
         "stem_split_model", "stem_split_vocals", "stem_split_drums",
         "stem_split_bass", "stem_split_other", "stem_split_guitar", "stem_split_piano",
         "qwen_strip_1_path", "qwen_strip_2_path", "qwen_strip_3_path",
+        "klein_strip_1_path", "klein_strip_2_path", "klein_strip_3_path",
         "klein_schematic_mode", "klein_schematic_target",
     )}
     _cancel_event.clear()

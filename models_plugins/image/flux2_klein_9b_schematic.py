@@ -40,7 +40,7 @@ class Flux2Klein9BSchematicPlugin(ModelPlugin):
     requires_no_style          = True
     preserve_image_dimensions  = True
 
-    _BASE_PIPELINE = "black-forest-labs/FLUX.2-klein-9b"
+    _BASE_PIPELINE = "ModelsLab/FLUX.2-klein-9B"
     _TRANSFORMER   = "OzzyGT/flux2_klein_9B_bnb_4bit_transformer"
     _TEXT_ENCODER  = "OzzyGT/flux2_klein_9B_bnb_4bit_text_encoder"
 

@@ -144,24 +144,28 @@ class Flux2Klein9BKVPlugin(ModelPlugin):
         ref_images = []
         for attr in ["klein_strip_1", "klein_strip_2", "klein_strip_3"]:
             strip_name = getattr(scene, attr, None)
-            if strip_name:
+            if strip_name and scene.sequence_editor is not None:
                 strip = find_strip_by_name(scene, strip_name)
                 if strip:
                     img = load_strip_as_pil(strip)
                     if img is not None:
-                        ref_images.append(img.resize((inputs.width, inputs.height)))
+                        ref_images.append(img.convert("RGB"))
 
         self.set_phase(inputs, "Generating")
         if inputs.mode == "inpaint":
             if inputs.inpaint_mask is None:
                 print("Inpaint: no valid mask image — check that inpaint_selected_strip points to a valid image strip.")
                 raise RuntimeError("Inpaint mask not available. Check inpaint_selected_strip.")
+            if len(ref_images) > 1:
+                print(f"Inpaint: {len(ref_images)} reference images set; only the first is supported by the inpaint pipeline.")
             src  = inputs.image.convert("RGB").resize((inputs.width, inputs.height))
             mask = inputs.inpaint_mask.convert("L").resize((inputs.width, inputs.height))
             result = pipe_obj["pipe"](
                 prompt=inputs.prompt,
                 image=src,
                 mask_image=mask,
+                image_reference=ref_images[0] if ref_images else None,
+                max_sequence_length=512,
                 num_inference_steps=inputs.steps,
                 guidance_scale=inputs.guidance,
                 generator=generator,
@@ -173,7 +177,9 @@ class Flux2Klein9BKVPlugin(ModelPlugin):
                 result = result.resize((inputs.width, inputs.height), _PILImage.LANCZOS)
             return result
         if inputs.mode == "img2img" and inputs.image is not None:
-            img = [inputs.image] + ref_images if ref_images else inputs.image
+            # When explicit ref slots are set, use only those as conditioning (T=10, 20, 30…).
+            # Prepending inputs.image would place it at T=10 and suppress the explicit refs.
+            img = ref_images if ref_images else [inputs.image.convert("RGB")]
             return pipe_obj["converter"](**common, image=img,
                                          callback_on_step_end=self.step_callback(inputs)).images[0]
         if ref_images:

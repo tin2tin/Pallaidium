@@ -215,7 +215,12 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     plugin.draw_custom_ui(col, context)
 
                 elif (type == "movie") or (type == "image" and (plugin is None or plugin.uses_standard_input_strip)):
-                    if input == "input_strips" and (not scene.inpaint_selected_strip or image_model_card == "yuvraj108c/FLUX.1-Kontext-dev"):
+                    _show_strength = (
+                        not scene.inpaint_selected_strip
+                        or image_model_card == "yuvraj108c/FLUX.1-Kontext-dev"
+                        or (plugin is not None and getattr(plugin, "inpaint_uses_strength", False))
+                    )
+                    if input == "input_strips" and _show_strength:
                         col = col.column(heading="Use", align=True)
                         col.prop(context.scene, "image_power", text="Strip Power")
 

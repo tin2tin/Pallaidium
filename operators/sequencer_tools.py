@@ -121,9 +121,9 @@ class SEQUENCER_OT_ai_strip_picker(Operator):
                 context.scene.qwen_strip_3 = strip.name
 
         if self.action == "klein_select1":
-            self.report({"INFO"}, f"Picked: {strip.name}")
+            self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):
-                scene.klein_strip_1 = strip.name
+                context.scene.klein_strip_1 = strip.name
         elif self.action == "klein_select2":
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):

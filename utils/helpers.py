@@ -729,6 +729,8 @@ def python_exec():
     return sys.executable
 
 def find_strip_by_name(scene, name):
+    if scene.sequence_editor is None:
+        return None
     for sequence in scene.sequence_editor.strips:
         if sequence.name == name:
             return sequence
