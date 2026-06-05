@@ -130,11 +130,12 @@ class RenderQueueJob(PropertyGroup):
     music_time_signature: StringProperty()
 
     # Resolved input file paths (resolved from strips at add-time)
-    image_path:  StringProperty()
-    movie_path:  StringProperty()
-    sound_path:  StringProperty()
-    ref_audio_path: StringProperty()
-    ref_text:       StringProperty()
+    image_path:      StringProperty()
+    movie_path:      StringProperty()
+    sound_path:      StringProperty()
+    last_image_path: StringProperty()   # FLF/LFO last-frame image (LTX Multi)
+    ref_audio_path:  StringProperty()
+    ref_text:        StringProperty()
 
     # Prefs snapshot
     hugginface_token: StringProperty()
@@ -566,6 +567,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
         progress_store[job_id] = {"progress": 0.10, "phase": "Preparing", "step": 0, "total": 0}
 
         _preserve_dims = getattr(plugin, "preserve_image_dimensions", False)
+        _IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif", ".exr", ".webp", ".hdr"}
 
         init_image = None
         img_path = snapshot.get("image_path", "")
@@ -578,6 +580,18 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             init_image = load_first_frame(vid_path)
             if init_image and not _preserve_dims:
                 init_image = init_image.resize((snapshot["width"], snapshot["height"]))
+
+        # FLF/LFO last-frame image (LTX Multi)
+        _last_image_path = snapshot.get("last_image_path", "")
+        _flf_last_image = None
+        if _last_image_path and os.path.isfile(_last_image_path):
+            _flf_last_image = load_first_frame(_last_image_path)
+            if _flf_last_image and not _preserve_dims:
+                _flf_last_image = _flf_last_image.resize((snapshot["width"], snapshot["height"]))
+            # FLF: movie_path holds the first frame as an image file, not a real video;
+            # suppress video_path so the plugin doesn't try to open it with av.
+            if os.path.splitext(vid_path)[1].lower() in _IMAGE_EXTS:
+                vid_path = ""
 
         inpaint_mask = None
         mask_path = snapshot.get("inpaint_mask_path", "")
@@ -615,6 +629,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             neg_prompt     = snapshot["neg_prompt"],
             mode           = mode,
             image          = init_image,
+            last_image     = _flf_last_image,
             inpaint_mask   = inpaint_mask,
             width          = _infer_w,
             height         = _infer_h,
@@ -790,16 +805,25 @@ class SEQUENCER_OT_add_to_queue(Operator):
 
     @staticmethod
     def _paths_from_strip(strip):
-        """Extract (image_path, movie_path, sound_path) from a VSE strip.
+        """Extract (image_path, movie_path, sound_path, last_image_path) from a VSE strip.
 
         Returns empty strings for strip types that carry no media (TEXT, COLOR,
         ADJUSTMENT, META, effect strips, …).  The caller uses these to drive
         mode detection: empty paths → txt2* mode, but frame alignment still
         follows the strip's timing.
+
+        last_image_path is non-empty only for LTX Multi FLF/LFO patterns inside
+        a META strip:
+          FLF  (2 images, different frame_starts, no MOVIE):
+              movie_path      = first image (lower frame_start)
+              last_image_path = second image (higher frame_start)
+          LFO  (1 image whose frame_start > all other children, no MOVIE):
+              movie_path      = ""
+              last_image_path = that image
         """
-        image_path = movie_path = sound_path = ""
+        image_path = movie_path = sound_path = last_image_path = ""
         if strip is None:
-            return image_path, movie_path, sound_path
+            return image_path, movie_path, sound_path, last_image_path
         if strip.type == "IMAGE":
             dirname = os.path.dirname(bpy.path.abspath(strip.directory))
             try:
@@ -819,14 +843,15 @@ class SEQUENCER_OT_add_to_queue(Operator):
         elif strip.type == "META":
             # Decompose META children into typed paths so the job gets real
             # media references rather than empty strings.
+            _meta_images = []   # (path, frame_start) for IMAGE children
             for child in strip.strips:
-                if child.type == "IMAGE" and not image_path:
+                if child.type == "IMAGE":
                     try:
                         dirname = os.path.dirname(bpy.path.abspath(child.directory))
                         fname = child.elements[0].filename
                         candidate = os.path.join(dirname, fname)
                         if fname and os.path.isfile(candidate):
-                            image_path = candidate
+                            _meta_images.append((candidate, child.frame_start))
                     except (IndexError, AttributeError):
                         pass
                 elif child.type == "MOVIE" and not movie_path:
@@ -843,9 +868,26 @@ class SEQUENCER_OT_add_to_queue(Operator):
                             sound_path = sp
                     except AttributeError:
                         pass
+
+            if not movie_path and len(_meta_images) == 2 and _meta_images[0][1] != _meta_images[1][1]:
+                # FLF: 2 images with different frame_starts → first → movie_path, second → last_image_path
+                _sorted = sorted(_meta_images, key=lambda x: x[1])
+                movie_path      = _sorted[0][0]
+                last_image_path = _sorted[1][0]
+            elif not movie_path and len(_meta_images) == 1:
+                # Check LFO: image's frame_start > all other children's frame_start
+                _other_starts = [c.frame_start for c in strip.strips if c.type != "IMAGE"]
+                if _other_starts and _meta_images[0][1] > max(_other_starts):
+                    # LFO: image is the last strip → last-frame-only
+                    last_image_path = _meta_images[0][0]
+                else:
+                    image_path = _meta_images[0][0]
+            elif _meta_images:
+                image_path = _meta_images[0][0]
+
         # TEXT, COLOR, ADJUSTMENT, SCENE, effect strips, etc.:
         # return empty strings → mode detection falls through to txt2* path.
-        return image_path, movie_path, sound_path
+        return image_path, movie_path, sound_path, last_image_path
 
     @staticmethod
     def _detect_mode(otype, image_path, movie_path, inpaint_strip):
@@ -1015,7 +1057,23 @@ class SEQUENCER_OT_add_to_queue(Operator):
 
         for strip in strip_list:
             if strip is not None:
-                image_path, movie_path, sound_path = self._paths_from_strip(strip)
+                image_path, movie_path, sound_path, last_image_path = self._paths_from_strip(strip)
+
+                # For META strips: render the SOUND child at its trimmed in/out points
+                # so the job stores a short WAV rather than the full source audio file.
+                # Loading a full multi-minute audio file later causes CUDA OOM because
+                # the frame count is derived from the audio duration.
+                if strip.type == "META" and sound_path:
+                    from ..utils.helpers import render_meta_child_to_path
+                    for _c in strip.strips:
+                        if _c.type == "SOUND":
+                            _trimmed = render_meta_child_to_path(context, strip, _c, image_output=False)
+                            if _trimmed:
+                                sound_path = _trimmed
+                                print(f"[Queue] META SOUND trimmed → {_trimmed!r}")
+                            else:
+                                print(f"[Queue] META SOUND trim failed, keeping raw: {sound_path!r}")
+                            break
 
                 # Align output to the input strip's in-point
                 strip_frame_start = strip.frame_final_start
@@ -1033,9 +1091,10 @@ class SEQUENCER_OT_add_to_queue(Operator):
                 # audio reference (overrides scene-level audio_path in common).
                 strip_audio_path = sound_path if (otype == "audio" and sound_path) else ""
             else:
-                image_path = bpy.path.abspath(getattr(scene, "image_path", "") or "")
-                movie_path = bpy.path.abspath(getattr(scene, "movie_path", "") or "")
-                sound_path = bpy.path.abspath(getattr(scene, "sound_path", "") or "")
+                image_path      = bpy.path.abspath(getattr(scene, "image_path", "") or "")
+                movie_path      = bpy.path.abspath(getattr(scene, "movie_path", "") or "")
+                sound_path      = bpy.path.abspath(getattr(scene, "sound_path", "") or "")
+                last_image_path = ""
                 strip_audio_path = ""
 
                 # Negative raw_frames = "auto" sentinel. In prompt mode there is no
@@ -1099,9 +1158,10 @@ class SEQUENCER_OT_add_to_queue(Operator):
                 job.insert_channel     = channel
                 job.insert_duration    = insert_dur
 
-                job.image_path = image_path
-                job.movie_path = movie_path
-                job.sound_path = sound_path
+                job.image_path      = image_path
+                job.movie_path      = movie_path
+                job.sound_path      = sound_path
+                job.last_image_path = last_image_path
 
                 for attr, val in common.items():
                     setattr(job, attr, val)
@@ -1176,7 +1236,7 @@ def _queue_start_job(scene, job) -> None:
         "audio_speed_tts", "chat_exaggeration", "chat_pace",
         "chat_temperature", "fps", "music_bpm", "music_lyrics",
         "music_key_scale", "music_time_signature",
-        "image_path", "movie_path", "sound_path", "ref_audio_path",
+        "image_path", "movie_path", "sound_path", "last_image_path", "ref_audio_path",
         "ref_text", "hugginface_token", "local_files_only",
         "generator_ai", "hf_cache_dir", "lora_files_json", "lora_folder",
         "insert_frame_start", "insert_frame_end",
@@ -1357,6 +1417,11 @@ def _run_job_main_thread(scene, job) -> None:
                 "total":    total,
             }
 
+        _mt_last_image = None
+        _mt_last_path  = getattr(job, "last_image_path", "")
+        if _mt_last_path and os.path.isfile(_mt_last_path):
+            _mt_last_image = load_first_frame(_mt_last_path)
+
         inputs = ModelInputs(
             prompt              = job.prompt,
             neg_prompt          = job.neg_prompt,
@@ -1367,6 +1432,7 @@ def _run_job_main_thread(scene, job) -> None:
             seed                = job.seed,
             audio_ref           = job.ref_audio_path or job.sound_path or None,
             video_path          = job.movie_path or None,
+            last_image          = _mt_last_image,
             insert_channel      = job.insert_channel,
             insert_frame_start  = job.insert_frame_start,
             progress_fn         = _progress_fn,

@@ -375,6 +375,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     icon_only=True
                 )
 
+            _col_pre_enhance = col
             if type == "image" and (plugin is None or plugin.UI_SECTIONS) and getattr(plugin, "show_enhance", True):
                 col = col.column(heading="Enhance", align=True)
                 row = col.row()
@@ -393,6 +394,9 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     row.prop(context.scene, "adetailer", text="Faces")
 
                 row.prop(context.scene, "aurasr", text="Upscale 4x")
+
+            if type == "image" and plugin is not None:
+                plugin.draw_post_enhance_ui(_col_pre_enhance, context)
 
             if type == "movie" and movie_model_card == "stable-diffusion-xl/frame2frame":
                 col = layout.column(heading="Upscale", align=True)

@@ -64,16 +64,16 @@ class LTX2_3MultiPlugin(ModelPlugin):
         os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
         torch._dynamo.config.disable = True
 
-        print("=" * 60)
-        print("[LTX23Multi] generate() received inputs:")
-        print(f"  inputs.prompt     = {inputs.prompt!r}")
-        print(f"  inputs.neg_prompt = {inputs.neg_prompt!r}")
-        print(f"  inputs.image      = {'<PIL Image>' if inputs.image is not None else None}")
-        print(f"  inputs.video_path = {inputs.video_path!r}")
-        print(f"  inputs.audio_ref  = {inputs.audio_ref!r}")
-        print(f"  inputs.width      = {inputs.width}, inputs.height = {inputs.height}")
-        print(f"  inputs.frames     = {inputs.frames}, inputs.seed = {inputs.seed}")
-        print("=" * 60)
+        # print("=" * 60)
+        # print("[LTX23Multi] generate() received inputs:")
+        # print(f"  inputs.prompt     = {inputs.prompt!r}")
+        # print(f"  inputs.neg_prompt = {inputs.neg_prompt!r}")
+        # print(f"  inputs.image      = {'<PIL Image>' if inputs.image is not None else None}")
+        # print(f"  inputs.video_path = {inputs.video_path!r}")
+        # print(f"  inputs.audio_ref  = {inputs.audio_ref!r}")
+        # print(f"  inputs.width      = {inputs.width}, inputs.height = {inputs.height}")
+        # print(f"  inputs.frames     = {inputs.frames}, inputs.seed = {inputs.seed}")
+        # print("=" * 60)
 
         from diffusers import LTX2VideoTransformer3DModel
         from diffusers.pipelines.ltx2.export_utils import encode_video
@@ -147,29 +147,30 @@ class LTX2_3MultiPlugin(ModelPlugin):
                     
                     if has_video and image_input is None:
                         image_input = load_first_frame(vid_path)
-                        print("[DEBUG] Extracted video track for Image Condition.")
-                    
+                        # print("[DEBUG] Extracted video track for Image Condition.")
+
                     if has_audio:
                         if explicit_audio:
-                            print(f"[DEBUG] Video contains audio, but overriding with explicitly provided Sound Strip audio.")
+                            # print(f"[DEBUG] Video contains audio, but overriding with explicitly provided Sound Strip audio.")
+                            pass
                         else:
                             sound_path = vid_path
-                            print("[DEBUG] Extracted audio track from video for Audio Condition.")
+                            # print("[DEBUG] Extracted audio track from video for Audio Condition.")
             except Exception as e:
-                print(f"[DEBUG] Could not probe video_path with av ({e}). Falling back to simple frame extraction.")
+                # print(f"[DEBUG] Could not probe video_path with av ({e}). Falling back to simple frame extraction.")
                 if image_input is None:
                     try:
                         image_input = load_first_frame(vid_path)
                     except Exception:
                         pass
 
-        print("="*50)
-        print("[DEBUG] LTX-2.3 Multimodal Media Detection:")
-        print(f"  -> Image Input Provided: {'YES' if image_input is not None else 'NO'}")
-        print(f"  -> Audio Input Provided: {'YES' if sound_path is not None else 'NO'}")
-        if sound_path:
-            print(f"  -> Active Audio Path: {sound_path}")
-        print("="*50)
+        # print("="*50)
+        # print("[DEBUG] LTX-2.3 Multimodal Media Detection:")
+        # print(f"  -> Image Input Provided: {'YES' if image_input is not None else 'NO'}")
+        # print(f"  -> Audio Input Provided: {'YES' if sound_path is not None else 'NO'}")
+        # if sound_path:
+        #     print(f"  -> Active Audio Path: {sound_path}")
+        # print("="*50)
 
         # ── Frame Count Calculation ─────────────────────────────────────────
         if sound_path:
@@ -179,7 +180,7 @@ class LTX2_3MultiPlugin(ModelPlugin):
                 import soundfile as sf
                 info = sf.info(sound_path)
                 dur_s = info.frames / info.samplerate
-                print(f"[DEBUG] Audio duration calculated via soundfile: {dur_s:.2f}s")
+                # print(f"[DEBUG] Audio duration calculated via soundfile: {dur_s:.2f}s")
             except Exception as e1:
                 try:
                     # Fallback to PyAV (works for MP4/WebM video containers)
@@ -188,36 +189,78 @@ class LTX2_3MultiPlugin(ModelPlugin):
                         audio_stream = next((s for s in container.streams if s.type == 'audio'), None)
                         if audio_stream and audio_stream.duration:
                             dur_s = float(audio_stream.duration * audio_stream.time_base)
-                            print(f"[DEBUG] Audio duration calculated via av: {dur_s:.2f}s")
+                            # print(f"[DEBUG] Audio duration calculated via av: {dur_s:.2f}s")
                 except Exception as e2:
-                    print(f"[DEBUG] Failed to read audio duration (sf: {e1}, av: {e2}).")
+                    pass  # print(f"[DEBUG] Failed to read audio duration (sf: {e1}, av: {e2}).")
 
             if dur_s is None:
-                print("[DEBUG] Falling back to requested frames for duration.")
+                # print("[DEBUG] Falling back to requested frames for duration.")
                 dur_s = inputs.frames / fps
 
             raw = dur_s * fps
             num_frames = int(((raw + 7) // 8) * 8) + 1
             num_frames = max(9, num_frames)
-            print(f"[DEBUG] Overriding frame count based on audio: {num_frames} frames.")
+            # Safety: if audio duration is implausibly longer than the requested strip
+            # frames (e.g. untrimmed source file was used), clamp to requested count.
+            if inputs.frames > 0:
+                _req = max(9, ((inputs.frames - 1) // 8) * 8 + 1)
+                if num_frames > _req * 4:
+                    print(f"[LTX23Multi] WARN audio num_frames={num_frames} >> requested={_req} (likely untrimmed audio) — clamping")
+                    num_frames = _req
+                    dur_s = num_frames / fps
         else:
             target = inputs.frames
             num_frames = max(9, ((target - 1) // 8) * 8 + 1)
             dur_s = num_frames / fps
             
-        print(f"[DEBUG] Final Target Number of frames: {num_frames}")
+        # print(f"[DEBUG] Final Target Number of frames: {num_frames}")
         _flush()
 
-        # Parse Image Conditions
+        # ── Parse Image Conditions (FLF / last-frame-only / single-frame) ─────
+        print("[LTX23Multi] ── Image condition debug ──────────────────────────────")
+        print(f"[LTX23Multi]   inputs.image     = {'<PIL ' + str(getattr(inputs.image, 'size', '?')) + '>' if inputs.image is not None else None}")
+        print(f"[LTX23Multi]   inputs.last_image= {'<PIL ' + str(getattr(getattr(inputs, 'last_image', None), 'size', '?')) + '>' if getattr(inputs, 'last_image', None) is not None else None}")
+        print(f"[LTX23Multi]   inputs.video_path= {getattr(inputs, 'video_path', None)!r}")
+        print(f"[LTX23Multi]   inputs.audio_ref = {getattr(inputs, 'audio_ref', None)!r}")
+
         image_conditions = None
+        last_input = getattr(inputs, "last_image", None)
+
+        if last_input is not None:
+            if isinstance(last_input, str):
+                from diffusers.utils import load_image
+                last_input = load_image(last_input).convert("RGB")
+            elif hasattr(last_input, "convert"):
+                last_input = last_input.convert("RGB")
+            print(f"[LTX23Multi]   last_input PIL size={last_input.size}")
+
         if image_input is not None:
             if isinstance(image_input, str):
                 from diffusers.utils import load_image
                 image_input = load_image(image_input).convert("RGB")
             elif hasattr(image_input, "convert"):
                 image_input = image_input.convert("RGB")
-            image_conditions =[LTX2ImageCondition(image=image_input, frame=0, strength=1.0)]
-            print("[DEBUG] Image Condition successfully prepared.")
+            print(f"[LTX23Multi]   image_input PIL size={image_input.size}")
+
+        if image_input is not None and last_input is not None:
+            # Mode A: FLF — hard anchor image 1 at start, soft keyframe image 2 at end
+            image_conditions = [
+                LTX2ImageCondition(image=image_input, frame=0,  strength=1.0),
+                LTX2ImageCondition(image=last_input,  frame=-1, strength=1.0),
+            ]
+            print(f"[LTX23Multi]   MODE: FLF — img1@0 + img2@{num_frames-1} — num_frames={num_frames}")
+        elif last_input is not None:
+            # Mode B: last-frame-only — soft keyframe image 2 at end
+            image_conditions = [LTX2ImageCondition(image=last_input, frame=-1, strength=1.0)]
+            print(f"[LTX23Multi]   MODE: last-frame-only — img2@{num_frames-1} — num_frames={num_frames}")
+        elif image_input is not None:
+            # Existing: single first-frame condition
+            image_conditions = [LTX2ImageCondition(image=image_input, frame=0, strength=1.0)]
+            print("[LTX23Multi]   MODE: single first-frame (frame=0)")
+        else:
+            print("[LTX23Multi]   MODE: no image conditions (text-to-video)")
+        print(f"[LTX23Multi]   image_conditions count={len(image_conditions) if image_conditions else 0}")
+        print("[LTX23Multi] ────────────────────────────────────────────────────────")
 
         # ── Step 0: Text encoding ───────────────────────────────────────────
         self.set_phase(inputs, "Text encoding")
@@ -296,20 +339,20 @@ class LTX2_3MultiPlugin(ModelPlugin):
 
         # Parse Audio Conditions
         audio_conditions = None
-        print(f"[DEBUG] Audio VAE check: sound_path={sound_path!r}, "
-              f"has audio_vae attr={hasattr(pipe, 'audio_vae')}, "
-              f"audio_vae value={getattr(pipe, 'audio_vae', 'ATTR_MISSING')!r}")
+        # print(f"[DEBUG] Audio VAE check: sound_path={sound_path!r}, "
+        #       f"has audio_vae attr={hasattr(pipe, 'audio_vae')}, "
+        #       f"audio_vae value={getattr(pipe, 'audio_vae', 'ATTR_MISSING')!r}")
         if sound_path and hasattr(pipe, "audio_vae") and pipe.audio_vae:
             target_sr = pipe.audio_vae.config.sample_rate
             try:
                 waveform = load_audio(sound_path, target_sample_rate=target_sr, seconds=dur_s)
                 audio_conditions =[LTX2AudioCondition(audio=waveform, strength=1.0)]
-                print(f"[DEBUG] Audio Condition successfully loaded and resampled to {target_sr}Hz. Waveform shape: {waveform.shape}")
+                # print(f"[DEBUG] Audio Condition successfully loaded and resampled to {target_sr}Hz. Waveform shape: {waveform.shape}")
             except Exception as e:
-                print(f"[DEBUG] WARNING: Failed to load audio condition in pipeline: {e}")
+                # print(f"[DEBUG] WARNING: Failed to load audio condition in pipeline: {e}")
                 import traceback; traceback.print_exc()
         elif sound_path:
-            print(f"[DEBUG] WARNING: Audio path provided but audio_vae is None/missing — audio condition NOT applied!")
+            pass  # print(f"[DEBUG] WARNING: Audio path provided but audio_vae is None/missing — audio condition NOT applied!")
 
         pipe.enable_group_offload(
             onload_device=onload_device,
@@ -337,7 +380,7 @@ class LTX2_3MultiPlugin(ModelPlugin):
 
         # Gentle Guidance overrides. Excludes destructive audio modalities overrides
         if image_conditions is not None and audio_conditions is not None:
-            print("[DEBUG] Image + Audio detected: Applying gentle alignment STG guidance.")
+            # print("[DEBUG] Image + Audio detected: Applying gentle alignment STG guidance.")
             stage1_kw["stg_scale"] = 1.0
             stage1_kw["spatio_temporal_guidance_blocks"] = [28]
             stage1_kw["guidance_rescale"] = 0.7
@@ -353,9 +396,9 @@ class LTX2_3MultiPlugin(ModelPlugin):
             video_latent = outputs.detach().to(offload_device, copy=True)
             audio_latent = None
             
-        print(f"[DEBUG] Stage 1 Results:")
-        print(f"  -> Video Latent Generated: {'YES' if video_latent is not None else 'NO'}")
-        print(f"  -> Audio Latent Generated: {'YES' if audio_latent is not None else 'NO (Failed or ignored by pipeline)'}")
+        # print(f"[DEBUG] Stage 1 Results:")
+        # print(f"  -> Video Latent Generated: {'YES' if video_latent is not None else 'NO'}")
+        # print(f"  -> Audio Latent Generated: {'YES' if audio_latent is not None else 'NO (Failed or ignored by pipeline)'}")
 
         del pipe, transformer
         _flush()
@@ -453,14 +496,14 @@ class LTX2_3MultiPlugin(ModelPlugin):
             final_v = outputs2[0].detach().to(offload_device, copy=True)
             if len(outputs2) > 1 and outputs2[1] is not None:
                 final_a = outputs2[1].detach().to(offload_device, copy=True)
-                print("[DEBUG] Stage 2 Results: Audio Latent was refined.")
+                # print("[DEBUG] Stage 2 Results: Audio Latent was refined.")
             else:
                 final_a = audio_latent
-                print("[DEBUG] Stage 2 Results: No refined audio returned. Falling back to Stage 1 audio latent.")
+                # print("[DEBUG] Stage 2 Results: No refined audio returned. Falling back to Stage 1 audio latent.")
         else:
             final_v = outputs2.detach().to(offload_device, copy=True)
             final_a = audio_latent
-            print("[DEBUG] Stage 2 Results: Pipeline returned singular output. Falling back to Stage 1 audio latent.")
+            # print("[DEBUG] Stage 2 Results: Pipeline returned singular output. Falling back to Stage 1 audio latent.")
             
         del refine_pipe, transformer2, up_latent, prompt_embeds, prompt_attention_mask
         _flush()
@@ -487,26 +530,27 @@ class LTX2_3MultiPlugin(ModelPlugin):
             # existing bfloat16 tensors — explicit .float() on both weights and mel is required.
             vocoder   = decode_pipe.vocoder.float().to(onload_device)
             audio_sr  = getattr(vocoder.config, "output_sampling_rate", 24000)
-            print(f"[DEBUG] Audio VAE Decode Triggered! Latent shape: {final_a.shape}")
+            # print(f"[DEBUG] Audio VAE Decode Triggered! Latent shape: {final_a.shape}")
             with torch.inference_mode():
                 mel = audio_vae.decode(final_a.to(onload_device, dtype=audio_vae.dtype), return_dict=False)[0]
-                print(f"[DEBUG] Decoded mel shape: {mel.shape}, dtype: {mel.dtype}")
+                # print(f"[DEBUG] Decoded mel shape: {mel.shape}, dtype: {mel.dtype}")
                 audio_out = vocoder(mel.float()).cpu()
-            print(f"[DEBUG] Vocoder output shape: {audio_out.shape}, dtype: {audio_out.dtype}")
-            print(f"[DEBUG] Audio amplitude stats: min={audio_out.min():.4f}, max={audio_out.max():.4f}, "
-                  f"mean={audio_out.mean():.4f}, std={audio_out.std():.4f}")
+            # print(f"[DEBUG] Vocoder output shape: {audio_out.shape}, dtype: {audio_out.dtype}")
+            # print(f"[DEBUG] Audio amplitude stats: min={audio_out.min():.4f}, max={audio_out.max():.4f}, "
+            #       f"mean={audio_out.mean():.4f}, std={audio_out.std():.4f}")
             # _write_audio clips to [-1,1] before int16 conversion; if values are out of range, audio
             # sounds distorted. Normalize if needed.
             peak = audio_out.abs().max()
             if peak > 1.0:
-                print(f"[DEBUG] WARNING: Audio peak {peak:.4f} > 1.0 — normalizing to prevent clipping distortion.")
+                # print(f"[DEBUG] WARNING: Audio peak {peak:.4f} > 1.0 — normalizing to prevent clipping distortion.")
                 audio_out = audio_out / peak
             del audio_vae, vocoder
         else:
-            _avae = getattr(decode_pipe, "audio_vae", "ATTR_MISSING")
-            print(f"[DEBUG] Audio decode skipped. final_a valid={final_a is not None}, "
-                  f"has audio_vae attr={hasattr(decode_pipe, 'audio_vae')}, "
-                  f"audio_vae value={_avae!r}")
+            pass
+            # _avae = getattr(decode_pipe, "audio_vae", "ATTR_MISSING")
+            # print(f"[DEBUG] Audio decode skipped. final_a valid={final_a is not None}, "
+            #       f"has audio_vae attr={hasattr(decode_pipe, 'audio_vae')}, "
+            #       f"audio_vae value={_avae!r}")
 
         del decode_pipe, vae, final_v, final_a
         _flush()
@@ -520,13 +564,13 @@ class LTX2_3MultiPlugin(ModelPlugin):
                 fps=fps, audio=audio_out[0].float().cpu(),
                 audio_sample_rate=audio_sr, output_path=dst_path,
             )
-            print("[DEBUG] Muxed MP4 Output generated WITH AUDIO.")
+            # print("[DEBUG] Muxed MP4 Output generated WITH AUDIO.")
         else:
             encode_video(
                 torch.from_numpy((video[0] * 255).round().astype("uint8")),
                 fps=fps, output_path=dst_path,
             )
-            print("[DEBUG] Muxed MP4 Output generated WITHOUT AUDIO (video only).")
+            # print("[DEBUG] Muxed MP4 Output generated WITHOUT AUDIO (video only).")
             
         print(f"LTX-2.3 saved: {dst_path}")
         return dst_path

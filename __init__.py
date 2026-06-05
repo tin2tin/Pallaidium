@@ -25,8 +25,8 @@ from .operators import *
 bl_info = {
     "name": "Pallaidium - Generative AI",
     "author": "tintwotin",
-    "version": (2, 1),
-    "blender": (4, 5, 0),
+    "version": (3, 0),
+    "blender": (5, 2, 0),
     "location": "Video Sequence Editor > Sidebar > Generative AI",
     "description": "AI Generate media in the VSE",
     "category": "Sequencer",
@@ -468,6 +468,18 @@ def register():
         name="qwen_strip_3", options={"TEXTEDIT_UPDATE"}, default=""
     )
 
+    # Ideogram 4
+    bpy.types.Scene.ideogram_prompt_upsampling = bpy.props.BoolProperty(
+        name="ideogram_prompt_upsampling",
+        description=(
+            "Rewrite the prompt into Ideogram 4's native JSON caption on-device "
+            "using the shared Qwen3-VL text encoder. Install 'outlines' for "
+            "schema-constrained captions. Expect a quality decrease vs. remote "
+            "upsampling. Requires a fresh model load when toggled."
+        ),
+        default=False,
+    )
+
     bpy.types.Scene.klein_strip_1 = bpy.props.StringProperty(
         name="klein_strip_1", options={"TEXTEDIT_UPDATE"}, default=""
     )
@@ -827,6 +839,9 @@ def unregister():
     del bpy.types.Scene.joyimage_yaw
     del bpy.types.Scene.joyimage_pitch
     del bpy.types.Scene.joyimage_zoom
+    for _prop in ("ideogram_prompt_upsampling",):
+        if hasattr(bpy.types.Scene, _prop):
+            delattr(bpy.types.Scene, _prop)
     for _prop in ("klein_schematic_mode", "klein_schematic_target"):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)

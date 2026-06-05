@@ -72,8 +72,6 @@ For Linux, we'll have to rely on contributor support. Post your issues here: htt
 
 **Video walkthrough:** https://www.youtube.com/watch?v=jmSZlEV_ZLw
 
-https://github.com/user-attachments/assets/9897210a-a042-451f-ac34-5364ae9a97b6
-
 * First, download and install git (must be on PATH): https://git-scm.com/downloads
 
 * Download Blender 5.2 or later: https://www.blender.org/download/ and unzip it into the Documents folder (avoid paths with spaces or special characters on Windows).  

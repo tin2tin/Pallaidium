@@ -247,12 +247,36 @@ class SEQUENCER_OT_generate_movie(Operator):
                         from PIL import Image as _PIL_Image
                         init_image = _PIL_Image.open(img_path).convert("RGB")
 
+            # Detect FLF / last-frame-only modes for LTX Multi plugin
+            _IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif", ".exr", ".webp", ".hdr"}
+            _is_ltx_multi = getattr(plugin, "MODEL_ID", "") in {
+                "LTX-2 Multi-Input File", "LTX-2.3 Multi-Input File"
+            }
+            _last_img_raw = bpy.path.abspath(getattr(scene, "image_path", "") or "")
+            _last_img_is_image = (
+                bool(_last_img_raw)
+                and os.path.splitext(_last_img_raw)[1].lower() in _IMAGE_EXTS
+                and os.path.isfile(_last_img_raw)
+            )
+            _movie_ext = os.path.splitext(getattr(scene, "movie_path", ""))[1].lower()
+            _flf_mode = _is_ltx_multi and _movie_ext in _IMAGE_EXTS and _last_img_is_image
+            _lfo_mode = _is_ltx_multi and not getattr(scene, "movie_path", "") and _last_img_is_image
+            _flf_last_image = None
+
             if has_video:
                 vp = bpy.path.abspath(scene.movie_path)
                 if os.path.isfile(vp):
-                    video_path = vp
-                    if init_image is None:
-                        init_image = load_first_frame(vp)
+                    if _flf_mode:
+                        init_image      = load_first_frame(vp)
+                        video_path      = None
+                        _flf_last_image = load_first_frame(_last_img_raw)
+                    else:
+                        video_path = vp
+                        if init_image is None:
+                            init_image = load_first_frame(vp)
+
+            if _lfo_mode:
+                _flf_last_image = load_first_frame(_last_img_raw)
 
             if getattr(scene, "sound_path", ""):
                 sp = bpy.path.abspath(scene.sound_path)
@@ -264,6 +288,7 @@ class SEQUENCER_OT_generate_movie(Operator):
                 neg_prompt  = negative_prompt,
                 mode        = mode,
                 image       = init_image,
+                last_image  = _flf_last_image,
                 video_path  = video_path,
                 audio_ref   = audio_ref,
                 width       = x,
@@ -1279,42 +1304,161 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                             run_generation = True
 
                     elif _multi_input_video and meta_strip:
-                        # LTX multi-input with META: decompose once (first child triggers it),
-                        # then skip subsequent children — decompose_meta() handles all types.
+                        # LTX multi-input with META: render all children once (triggered by
+                        # first child), then skip subsequent children.
                         if child_strip == meta_strip.strips[0]:
-                            # Clear all media paths before decomposing so no stale values
-                            # from other plugins (e.g. voice-clone reference audio) bleed in.
+                            # Clear stale paths from prior runs / other plugins
                             scene.movie_path = ""
                             scene.image_path = ""
                             scene.sound_path = ""
-                            _decomp = decompose_meta(context, meta_strip, target_type="video")
-                            print(f"[LTX Multi META] decompose_meta raw result: {_decomp}")
-                            _decomp_text = _decomp["text"].strip() if _decomp.get("text") else ""
-                            if _decomp_text and not scene.generate_movie_prompt.startswith(_decomp_text):
-                                current_prompt_text = (
-                                    (_decomp_text + ", " + base_prompt) if base_prompt
-                                    else _decomp_text
-                                )
-                                print(f"[LTX Multi META] prompt from TEXT strip: {current_prompt_text!r}")
+
+                            print(f"[LTX Multi META] ── BEGIN META decompose ──────────────────────")
+                            print(f"[LTX Multi META] meta='{meta_strip.name}'  children={len(list(meta_strip.strips))}")
+
+                            # Render every child through the META compositor so trims/
+                            # transforms/color corrections are respected.
+                            _images_wf  = []   # (rendered_path, frame_start, child_strip)
+                            _video_path = None
+                            _audio_path = None
+                            _text_parts = []
+
+                            for _c in meta_strip.strips:
+                                print(f"[LTX Multi META]   child type={_c.type!r} name={_c.name!r}"
+                                      f"  frame_start={_c.frame_start}"
+                                      f"  frame_final_start={_c.frame_final_start}"
+                                      f"  frame_final_duration={_c.frame_final_duration}")
+
+                                if _c.type == "TEXT":
+                                    if _c.text and _c.text.strip():
+                                        _text_parts.append(_c.text.strip())
+                                        print(f"[LTX Multi META]     TEXT accepted: {_c.text.strip()!r}")
+                                    else:
+                                        print(f"[LTX Multi META]     TEXT empty, skipped")
+
+                                elif _c.type == "IMAGE":
+                                    print(f"[LTX Multi META]     IMAGE: rendering through META compositor...")
+                                    _rpath = render_meta_child_to_path(context, meta_strip, _c, image_output=True)
+                                    if _rpath:
+                                        _images_wf.append((_rpath, _c.frame_start, _c))
+                                        print(f"[LTX Multi META]     IMAGE OK → {_rpath!r}")
+                                    else:
+                                        _raw = get_strip_path(_c)
+                                        if _raw and os.path.isfile(_raw):
+                                            _images_wf.append((_raw, _c.frame_start, _c))
+                                            print(f"[LTX Multi META]     IMAGE fallback (raw) → {_raw!r}")
+                                        else:
+                                            print(f"[LTX Multi META]     IMAGE WARN: no path found, skipped")
+
+                                elif _c.type == "MOVIE":
+                                    print(f"[LTX Multi META]     MOVIE: rendering through META compositor...")
+                                    _rpath = render_meta_child_to_path(context, meta_strip, _c, image_output=False)
+                                    if _rpath:
+                                        _video_path = _rpath
+                                        print(f"[LTX Multi META]     MOVIE OK → {_rpath!r}")
+                                    else:
+                                        _raw = get_strip_path(_c)
+                                        if _raw and os.path.isfile(_raw):
+                                            _video_path = _raw
+                                            print(f"[LTX Multi META]     MOVIE fallback (raw) → {_raw!r}")
+                                        else:
+                                            print(f"[LTX Multi META]     MOVIE WARN: no path found, skipped")
+
+                                elif _c.type == "SOUND":
+                                    print(f"[LTX Multi META]     SOUND: rendering trimmed audio through META...")
+                                    _rpath = render_meta_child_to_path(context, meta_strip, _c, image_output=False)
+                                    if _rpath:
+                                        _audio_path = _rpath
+                                        print(f"[LTX Multi META]     SOUND OK → {_rpath!r}")
+                                    else:
+                                        try:
+                                            _raw = bpy.path.abspath(_c.sound.filepath)
+                                            if _raw and os.path.isfile(_raw):
+                                                _audio_path = _raw
+                                                print(f"[LTX Multi META]     SOUND fallback (raw) → {_raw!r}")
+                                            else:
+                                                print(f"[LTX Multi META]     SOUND WARN: no path found, skipped")
+                                        except Exception as _se:
+                                            print(f"[LTX Multi META]     SOUND WARN: error getting path: {_se}")
+
+                                else:
+                                    print(f"[LTX Multi META]     type {_c.type!r} not handled, skipped")
+
+                            # Apply text prompt
+                            if _text_parts:
+                                _decomp_text = ", ".join(_text_parts)
+                                if not scene.generate_movie_prompt.startswith(_decomp_text):
+                                    current_prompt_text = (
+                                        (_decomp_text + ", " + base_prompt) if base_prompt
+                                        else _decomp_text
+                                    )
+                                    print(f"[LTX Multi META] prompt from TEXT: {current_prompt_text!r}")
                             else:
-                                print(f"[LTX Multi META] no text strip found (or matches base), using base_prompt: {base_prompt!r}")
-                            if _decomp["videos"]:
-                                scene.movie_path = _decomp["videos"][0]
-                                print(f"[LTX Multi META] video → scene.movie_path={scene.movie_path!r}")
-                                if _decomp["images"]:
-                                    scene.image_path = _decomp["images"][0]
-                                    print(f"[LTX Multi META] image (supplement) → scene.image_path={scene.image_path!r}")
-                            elif _decomp["images"]:
-                                scene.movie_path = _decomp["images"][0]
-                                print(f"[LTX Multi META] image (as movie_path) → scene.movie_path={scene.movie_path!r}")
+                                print(f"[LTX Multi META] no TEXT strip, using base_prompt: {base_prompt!r}")
+
+                            print(f"[LTX Multi META] collected images_wf={[(p, fs) for p, fs, _ in _images_wf]}")
+                            print(f"[LTX Multi META] collected video_path={_video_path!r}")
+                            print(f"[LTX Multi META] collected audio_path={_audio_path!r}")
+
+                            # ── Mode detection ────────────────────────────────────────────
+                            # Mode A: exactly 2 images with different frame_start, no video
+                            _flf_mode = (
+                                not _video_path
+                                and len(_images_wf) == 2
+                                and _images_wf[0][1] != _images_wf[1][1]
+                            )
+                            # Mode B: 1 image whose frame_start > every other child's frame_start
+                            _other_starts = (
+                                [_oc.frame_start for _oc in meta_strip.strips
+                                 if _oc is not _images_wf[0][2]]
+                                if len(_images_wf) == 1 else []
+                            )
+                            _lfo_mode = (
+                                not _video_path
+                                and len(_images_wf) == 1
+                                and bool(_other_starts)
+                                and _images_wf[0][1] > max(_other_starts)
+                            )
+
+                            print(f"[LTX Multi META] mode: FLF={_flf_mode}  LFO={_lfo_mode}")
+
+                            if _flf_mode:
+                                _sorted_wf = sorted(_images_wf, key=lambda x: x[1])
+                                scene.movie_path = _sorted_wf[0][0]   # lower frame_start → first frame
+                                scene.image_path = _sorted_wf[1][0]   # higher frame_start → last frame
+                                print(f"[LTX Multi META] FLF → first={scene.movie_path!r}")
+                                print(f"[LTX Multi META] FLF → last ={scene.image_path!r}")
+
+                            elif _lfo_mode:
+                                scene.movie_path = ""
+                                scene.image_path = _images_wf[0][0]
+                                print(f"[LTX Multi META] LFO → last ={scene.image_path!r}")
+
+                            elif _video_path:
+                                scene.movie_path = _video_path
+                                if _images_wf:
+                                    scene.image_path = _images_wf[0][0]
+                                    print(f"[LTX Multi META] video+supplement → movie={scene.movie_path!r}  image={scene.image_path!r}")
+                                else:
+                                    print(f"[LTX Multi META] video only → movie={scene.movie_path!r}")
+
+                            elif _images_wf:
+                                scene.movie_path = _images_wf[0][0]
+                                print(f"[LTX Multi META] single image → movie={scene.movie_path!r}")
+
                             else:
-                                print(f"[LTX Multi META] no video or image found in meta strip")
-                            # Always assign — clears stale voice-plugin paths when meta has no audio.
-                            scene.sound_path = _decomp["audio"] or ""
+                                print(f"[LTX Multi META] WARN: no video or image found in meta strip")
+
+                            # Audio — always assign to clear stale voice-plugin paths
+                            scene.sound_path = _audio_path or ""
                             if scene.sound_path:
-                                print(f"[LTX Multi META] audio → scene.sound_path={scene.sound_path!r}")
+                                print(f"[LTX Multi META] audio → {scene.sound_path!r}")
                             else:
-                                print(f"[LTX Multi META] no audio found in meta strip (sound_path cleared)")
+                                print(f"[LTX Multi META] no audio (sound_path cleared)")
+
+                            print(f"[LTX Multi META] ── END META decompose ────────────────────────")
+                            print(f"[LTX Multi META] scene.movie_path={scene.movie_path!r}")
+                            print(f"[LTX Multi META] scene.image_path={scene.image_path!r}")
+                            print(f"[LTX Multi META] scene.sound_path={scene.sound_path!r}")
 
                     else:
                         # Standard render pipeline for image generation or non-meta strips
@@ -1348,7 +1492,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                 # collected (even if TEXT was the last child) OR if a standalone TEXT strip
                 # was the sole input (prompt-only / text-to-video mode).
                 # Use scene.movie_path (instance) not bpy.types.Scene.movie_path (always-truthy class descriptor).
-                if _multi_input_video and (scene.movie_path or scene.sound_path or _multi_text_only):
+                if _multi_input_video and (scene.movie_path or scene.sound_path or scene.image_path or _multi_text_only):
                     run_generation = True
 
             # 3B. Intermediate Strip Handling

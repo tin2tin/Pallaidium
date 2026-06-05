@@ -135,6 +135,7 @@ class ModelInputs:
     inpaint_mask: Optional[Any] = None           # PIL.Image — inpaint mask (white = paint here)
     images:       list = field(default_factory=list)   # list of PIL.Image
     image_prompts: list = field(default_factory=list)  # per-image prompts (OmniGen)
+    last_image:   Optional[Any] = None           # PIL.Image — last-frame condition (FLF / last-frame-only mode)
 
     # Audio / video paths
     audio_ref:    Optional[str] = None           # path to speaker reference .wav/.mp3
@@ -313,6 +314,10 @@ class ModelPlugin:
         Return False → either added extra controls, or did nothing.
         """
         return False
+
+    def draw_post_enhance_ui(self, col, context) -> None:
+        """Optional: draw model-specific UI after the Enhance row."""
+        pass
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} id={self.MODEL_ID!r} type={self.MODEL_TYPE!r}>"

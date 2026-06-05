@@ -1662,6 +1662,160 @@ def render_strip_to_path(context, strip, image_output=False):
     return None
 
 
+def render_meta_child_to_path(context, meta_strip, child_strip, image_output=False):
+    """Render one child strip inside a META through the VSE compositor.
+
+    Unlike render_strip_to_path(), this keeps the META unmuted (so the child's
+    content is composited correctly) while muting all other top-level strips.
+    The frame range is restricted to the child's trimmed in/out points so that
+    audio exports are correctly trimmed and don't load the entire source file.
+
+    image_output=True              → single-frame PNG at child.frame_final_start
+    child.type == 'SOUND'          → PCM WAV for the child's trimmed duration
+    otherwise                      → MP4 for the child's trimmed duration
+    Returns the absolute output path, or None on failure.
+    """
+    vse_scene = getattr(context, 'sequencer_scene', context.scene)
+    if not vse_scene or not vse_scene.sequence_editor:
+        return None
+
+    seq_editor = vse_scene.sequence_editor
+    orig_prefetch    = seq_editor.use_prefetch
+    orig_cache       = seq_editor.use_cache_raw
+    orig_mute_states = {s: s.mute for s in seq_editor.strips}
+    orig_f_start     = vse_scene.frame_start
+    orig_f_end       = vse_scene.frame_end
+    orig_f_current   = vse_scene.frame_current
+    orig_filepath    = getattr(vse_scene.render, 'filepath', '')
+    orig_format      = vse_scene.render.image_settings.file_format
+    orig_media       = getattr(vse_scene.render.image_settings, 'media_type', None)
+    orig_use_seq     = vse_scene.render.use_sequencer
+
+    seq_editor.use_prefetch  = False
+    seq_editor.use_cache_raw = False
+
+    render_start = int(child_strip.frame_final_start)
+    render_end   = int(child_strip.frame_final_start + child_strip.frame_final_duration - 1)
+
+    # Keep META unmuted so children composite correctly; mute everything else
+    for s in seq_editor.strips:
+        s.mute = (s != meta_strip)
+
+    vse_scene.frame_start = render_start
+    vse_scene.frame_end   = render_end
+
+    addon_prefs  = bpy.context.preferences.addons[ADDON_ID].preferences
+    rendered_dir = os.path.join(addon_prefs.generator_ai, str(date.today()), "Rendered_Strips")
+    os.makedirs(rendered_dir, exist_ok=True)
+    safe_name   = re.sub(r'[^\w]', '', child_strip.name) or "strip"
+    output_path = None
+
+    try:
+        if child_strip.type == "SOUND":
+            output_path = os.path.abspath(
+                os.path.join(rendered_dir, f"{safe_name}_{render_start:06d}_meta_audio.wav"))
+            try:
+                result = bpy.ops.sound.mixdown(
+                    'EXEC_DEFAULT', filepath=output_path, container='WAV', codec='PCM',
+                    relative_path=False)
+                print(f"[render_meta_child_to_path] mixdown result: {result}")
+            except Exception as _mix_err:
+                print(f"[render_meta_child_to_path] mixdown exception: {_mix_err}")
+            # PyAV fallback — used when mixdown returns CANCELLED or doesn't write the file
+            if not os.path.exists(output_path):
+                print("[render_meta_child_to_path] mixdown produced no file — trying PyAV trim")
+                try:
+                    import av as _av
+                    _fps = vse_scene.render.fps / max(1.0, getattr(vse_scene.render, 'fps_base', 1.0))
+                    _src = bpy.path.abspath(child_strip.sound.filepath)
+                    _start_s = child_strip.frame_offset_start / _fps
+                    _dur_s   = child_strip.frame_final_duration / _fps
+                    print(f"[render_meta_child_to_path] av trim: src={_src!r} start={_start_s:.3f}s dur={_dur_s:.3f}s")
+                    with _av.open(_src) as _inp:
+                        _aud = next((s for s in _inp.streams if s.type == 'audio'), None)
+                        if _aud is not None:
+                            _inp.seek(int(_start_s * 1_000_000))
+                            with _av.open(output_path, 'w', format='wav') as _out:
+                                _ostream = _out.add_stream('pcm_s16le',
+                                    rate=_aud.codec_context.sample_rate)
+                                _written_s = 0.0
+                                for _frame in _inp.decode(_aud):
+                                    if _written_s >= _dur_s:
+                                        break
+                                    _written_s += _frame.samples / _frame.sample_rate
+                                    _frame.pts = None
+                                    for _pkt in _ostream.encode(_frame):
+                                        _out.mux(_pkt)
+                                for _pkt in _ostream.encode(None):
+                                    _out.mux(_pkt)
+                    if os.path.exists(output_path):
+                        print(f"[render_meta_child_to_path] av trim OK → {output_path!r}")
+                    else:
+                        print("[render_meta_child_to_path] av trim produced no file")
+                except Exception as _av_err:
+                    print(f"[render_meta_child_to_path] av trim failed: {_av_err}")
+                    import traceback as _tb; _tb.print_exc()
+
+        elif image_output:
+            base = os.path.abspath(
+                os.path.join(rendered_dir, f"{safe_name}_{render_start:06d}_meta_img"))
+            vse_scene.render.filepath = base
+            if orig_media is not None:
+                vse_scene.render.image_settings.media_type = 'IMAGE'
+            vse_scene.render.image_settings.file_format = 'PNG'
+            vse_scene.render.use_sequencer = True
+            vse_scene.frame_current = render_start
+            bpy.ops.render.render(animation=False, write_still=True)
+            for pad in (4, 5, 6):
+                candidate = f"{base}{render_start:0{pad}d}.png"
+                if os.path.exists(candidate):
+                    output_path = candidate
+                    break
+            if not output_path:
+                files = sorted(glob.glob(f"{base}*.png"), key=os.path.getmtime)
+                if files:
+                    output_path = files[-1]
+
+        else:
+            output_path = os.path.abspath(
+                os.path.join(rendered_dir, f"{safe_name}_{render_start:06d}_meta_vid.mp4"))
+            vse_scene.render.filepath = output_path
+            if orig_media is not None:
+                vse_scene.render.image_settings.media_type = 'VIDEO'
+            vse_scene.render.ffmpeg.format      = 'MPEG4'
+            vse_scene.render.ffmpeg.codec       = 'H264'
+            vse_scene.render.ffmpeg.audio_codec = 'AAC'
+            vse_scene.render.use_sequencer = True
+            bpy.ops.render.render(animation=True, write_still=False)
+            if not os.path.exists(output_path):
+                files = sorted(
+                    glob.glob(os.path.join(rendered_dir,
+                                           f"{safe_name}_{render_start:06d}_meta_vid*.mp4")),
+                    key=os.path.getmtime)
+                if files:
+                    output_path = files[-1]
+
+    finally:
+        for s, state in orig_mute_states.items():
+            if s:
+                s.mute = state
+        vse_scene.frame_start    = orig_f_start
+        vse_scene.frame_end      = orig_f_end
+        vse_scene.frame_current  = orig_f_current
+        seq_editor.use_prefetch  = orig_prefetch
+        seq_editor.use_cache_raw = orig_cache
+        vse_scene.render.filepath = orig_filepath
+        if orig_media is not None:
+            vse_scene.render.image_settings.media_type = orig_media
+        vse_scene.render.image_settings.file_format = orig_format
+        vse_scene.render.use_sequencer = orig_use_seq
+
+    if output_path and os.path.exists(output_path):
+        _rendered_temp_paths.add(output_path)
+        return output_path
+    return None
+
+
 def render_strip_to_wav(context, strip):
     """Render any strip (SOUND or MOVIE-with-audio) to a PCM WAV via sound.mixdown.
 
@@ -1736,6 +1890,7 @@ def decompose_meta(context, meta_strip, target_type="video"):
 
     # target_type == "video": decompose children by type
     images, videos, audio, texts = [], [], None, []
+    images_with_frames = []   # (raw_path, frame_start, child_strip) triples for FLF routing
     print(f"[decompose_meta] META strip '{meta_strip.name}' has {len(list(meta_strip.strips))} children:")
     for child in meta_strip.strips:
         print(f"  child type={child.type!r} name={child.name!r}")
@@ -1749,6 +1904,7 @@ def decompose_meta(context, meta_strip, target_type="video"):
             path = get_strip_path(child)
             if path and os.path.isfile(path):
                 images.append(path)
+                images_with_frames.append((path, child.frame_start, child))
                 print(f"    -> IMAGE accepted: {path!r}")
             else:
                 print(f"    -> IMAGE path missing or not found: {path!r}")
@@ -1771,7 +1927,7 @@ def decompose_meta(context, meta_strip, target_type="video"):
                 print(f"    -> SOUND path missing or not found: {path!r}")
         else:
             print(f"    -> type {child.type!r} not handled, skipped")
-    result = {"images": images, "videos": videos, "audio": audio, "text": ", ".join(texts)}
+    result = {"images": images, "images_with_frames": images_with_frames, "videos": videos, "audio": audio, "text": ", ".join(texts)}
     print(f"[decompose_meta] result: images={images}, videos={videos}, audio={audio!r}, text={result['text']!r}")
     return result
 
