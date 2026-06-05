@@ -142,6 +142,8 @@ The generated media will be saved to the directory specified in the addon prefer
 
 2026-05-31: Add: Blender 5.2 support.
 
+2026-06-05: Add: LTX-2.3 Multi-Input First Frame + Last Frame (FLF) mode — place two Image strips inside a Meta strip to anchor the first and last frames of the generated video. A single Image strip placed after all other children acts as a last-frame-only keyframe.
+
 2026-06-03: Fix: Qwen Image Edit — reference images from pickers now correctly rendered through the VSE pipeline at queue time (handles video, meta, and transformed strips). Switched to SDNQ uint4 pre-quantized weights (Disty0/Qwen-Image-Edit-2511-SDNQ-uint4-svd-r32) for better quality. Removed Lightning LoRA, raised default steps to 50. Exposed resolution controls. Fixed black bars on reference images. Fixed playhead not moving when queuing. Fixed width/height passed to inference.
 
 2026-05-31: Add: Render Queue — async batch generation with per-job status tracking (PENDING / RUNNING / COMPLETED / FAILED). Start / Stop / Cancel controls.
