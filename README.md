@@ -142,6 +142,8 @@ The generated media will be saved to the directory specified in the addon prefer
 
 2026-05-31: Add: Blender 5.2 support.
 
+2026-06-06: Add: Faster Whisper Transcription — multilingual speech-to-text with word-level timestamps directly into VSE subtitle strips. Select a SOUND strip, choose model size (tiny → large-v3) and language (or auto-detect), click Generate.
+
 2026-06-06: Add: Redo buttons — a Redo button (↺) on each Render Queue job reloads its generation settings (prompt, model, steps, guidance, seed, dimensions, toggles) back into the Pallaidium panel. A matching Redo button in the AI Metadata panel does the same from any completed strip's stored metadata.
 
 2026-06-05: Add: LTX-2.3 Multi-Input First Frame + Last Frame (FLF) mode — place two Image strips inside a Meta strip to anchor the first and last frames of the generated video. A single Image strip placed after all other children acts as a last-frame-only keyframe.
@@ -423,7 +425,6 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 ### Video:
 - [Lightricks/LTX-2](https://huggingface.co/Lightricks/LTX-2)
 - [Lightricks/LTX-2 Multi-Input](https://huggingface.co/Lightricks/LTX-2)
-- [THUDM/CogVideoX-5b](https://huggingface.co/THUDM/CogVideoX-5b)
 - [Wan-AI/Wan2.1-T2V](https://huggingface.co/Wan-AI)
 - [Wan-AI/Wan2.1-I2V](https://huggingface.co/Wan-AI)
 - [SkyReels-V1-Hunyuan-I2V/T2V](https://huggingface.co/Skywork/SkyReels-V1-Hunyuan-I2V)
@@ -444,16 +445,15 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 - [Nucleus MOE](https://huggingface.co/NucleusAI)
 - [ZImage](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo)
 - [Schematic](https://huggingface.co/nomadoor/flux-2-klein-9B-schematic-lora)
+- [Anima](https://huggingface.co/mrfatso/anima-preview3-diffusers)
 
 ### Audio:
-- [Qwen/Qwen3-TTS](https://huggingface.co/Qwen/Qwen3-TTS)
 - [Chatterbox / Chatterbox Turbo](https://github.com/resemble-ai/chatterbox)
-- [F5-TTS](https://github.com/SWivid/F5-TTS)
-- [Parler TTS](https://huggingface.co/parler-tts/parler-tts-large-v1)
+- [OmniVoice](https://github.com/k2-fsa/OmniVoice)
 - [MMAudio](https://github.com/hkchengrex/MMAudio)
 - [ACE Step](https://github.com/ace-step/ACE-Step)
-- [facebook/musicgen-stereo-medium](https://huggingface.co/facebook/musicgen-stereo-medium)
 - [stabilityai/stable-audio-open-1.0](https://huggingface.co/stabilityai/stable-audio-open-1.0)
+- [Stem Splitter (demucs-onnx)](https://github.com/StemSplit/demucs-onnx)
 
 ### Background Removal:
 - [BiRefNet_HR](https://huggingface.co/ZhengPeng7/BiRefNet_HR)
@@ -461,10 +461,8 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 ### Captions, Subtitles & Prompt Enhancement:
 - [Florence-2-large-PromptGen](https://huggingface.co/MiaoshouAI/Florence-2-large-PromptGen-v2.0)
 - [MoviiGen1.1_Prompt_Rewriter](https://huggingface.co/ZuluVision/MoviiGen1.1_Prompt_Rewriter)
-- [Hviske Subtitles (Whisper large-v3-turbo)](https://huggingface.co/openai/whisper-large-v3-turbo)
+- [Faster Whisper (multilingual ASR)](https://github.com/SYSTRAN/faster-whisper)
 - [Marlin Video Captions](https://github.com/HeliosZhao/Marlin)
-- [OmniVoice](https://github.com/k2-fsa/OmniVoice)
-- [Demucs-onnx](https://github.com/StemSplit/demucs-onnx)
 
 ![PallAIdium](https://github.com/tin2tin/Generative_AI/assets/1322593/1b1b232f-00d9-4b0b-86fb-5f0f24136d2c)
 

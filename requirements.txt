@@ -38,6 +38,7 @@ zipp==3.23.0
 six==1.17.0
 tqdm==4.67.1
 standard-aifc
+standard-chunk
 standard-sunau
 
 # --- ML Framework Dependencies & Extensions ---
@@ -99,6 +100,7 @@ torchsde==0.2.6
 torchcodec==0.8.1
 
 # --- Audio Codecs & Tools ---
+faster-whisper
 omnivoice
 audioop-lts
 descript-audio-codec==1.0.0

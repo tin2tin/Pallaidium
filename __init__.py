@@ -632,6 +632,27 @@ def register():
         description="Time signature, e.g. '4' for 4/4, '3' for 3/4 (blank = model estimates)"
     )
 
+    # Faster Whisper Transcription
+    bpy.types.Scene.whisper_model_size = bpy.props.EnumProperty(
+        name="Model Size",
+        items=[
+            ("tiny",           "Tiny",           "Fastest, least accurate (~39 MB)"),
+            ("base",           "Base",           "Fast, decent accuracy (~74 MB)"),
+            ("small",          "Small",          "Good balance (~244 MB)"),
+            ("medium",         "Medium",         "High accuracy (~769 MB)"),
+            ("large-v3-turbo", "Large-v3-turbo", "High accuracy, fast — recommended (~809 MB)"),
+            ("large-v3",       "Large-v3",       "Best accuracy, slowest (~3.1 GB)"),
+        ],
+        default="large-v3-turbo",
+    )
+    from .utils.whisper_langs import WHISPER_LANG_ITEMS as _WL
+    bpy.types.Scene.whisper_language = bpy.props.EnumProperty(
+        name="Language",
+        items=_WL,
+        default="auto",
+        description="Spoken language. 'Auto-detect' lets Whisper identify it automatically.",
+    )
+
     # Stem Splitter
     bpy.types.Scene.stem_split_model = bpy.props.EnumProperty(
         name="Model",
@@ -847,6 +868,9 @@ def unregister():
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
     for _prop in ("marlin_mode", "marlin_find_query", "marlin_last_query"):
+        if hasattr(bpy.types.Scene, _prop):
+            delattr(bpy.types.Scene, _prop)
+    for _prop in ("whisper_model_size", "whisper_language"):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
     for _prop in ("stem_split_model", "stem_split_vocals", "stem_split_drums",

@@ -165,6 +165,10 @@ class RenderQueueJob(PropertyGroup):
     klein_strip_2_path:   StringProperty()   # Klein reference image 2
     klein_strip_3_path:   StringProperty()   # Klein reference image 3
 
+    # Faster Whisper Transcription
+    whisper_model_size: StringProperty(default="large-v3-turbo")
+    whisper_language:   StringProperty(default="auto")
+
     # OmniVoice
     omnivoice_instruct:    StringProperty(default="")
     omnivoice_language:    StringProperty(default="")
@@ -379,6 +383,8 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             render                         = types.SimpleNamespace(
                 fps=round(snapshot.get("fps", 24.0)), fps_base=1.0
             ),
+            whisper_model_size = snapshot.get("whisper_model_size", "large-v3-turbo"),
+            whisper_language   = snapshot.get("whisper_language",   ""),
             stem_split_model  = snapshot.get("stem_split_model",  "htdemucs_ft"),
             stem_split_vocals = snapshot.get("stem_split_vocals", True),
             stem_split_drums  = snapshot.get("stem_split_drums",  True),
@@ -1024,6 +1030,8 @@ class SEQUENCER_OT_add_to_queue(Operator):
             klein_strip_1_path    = self._render_named_strip_image(context, scene, getattr(scene, "klein_strip_1", "")),
             klein_strip_2_path    = self._render_named_strip_image(context, scene, getattr(scene, "klein_strip_2", "")),
             klein_strip_3_path    = self._render_named_strip_image(context, scene, getattr(scene, "klein_strip_3", "")),
+            whisper_model_size = getattr(scene, "whisper_model_size", "large-v3-turbo"),
+            whisper_language   = getattr(scene, "whisper_language",   ""),
             stem_split_model  = getattr(scene, "stem_split_model",  "htdemucs_ft"),
             stem_split_vocals = getattr(scene, "stem_split_vocals", True),
             stem_split_drums  = getattr(scene, "stem_split_drums",  True),
@@ -1116,9 +1124,14 @@ class SEQUENCER_OT_add_to_queue(Operator):
                     insert_dur = strip_dur if (audio_dur < 0 or _pi_req) else max(1, int(audio_dur))
                 else:
                     insert_dur = gen_frames
-                # For SOUND strips generating audio: use the strip file as the
-                # audio reference (overrides scene-level audio_path in common).
-                strip_audio_path = sound_path if (otype == "audio" and sound_path) else ""
+                # For SOUND strips generating audio or text (e.g. transcription):
+                # store the strip's file as the audio reference so it overrides
+                # the scene-level ref_audio_path and each queued job uses its
+                # own strip rather than the same (first) strip for all jobs.
+                _pi_strip_input = _pi is not None and getattr(_pi, "requires_input_strip", False)
+                strip_audio_path = sound_path if (
+                    sound_path and (otype == "audio" or _pi_strip_input)
+                ) else ""
             else:
                 image_path      = bpy.path.abspath(getattr(scene, "image_path", "") or "")
                 movie_path      = bpy.path.abspath(getattr(scene, "movie_path", "") or "")
@@ -1278,6 +1291,7 @@ def _queue_start_job(scene, job) -> None:
         "insert_channel", "insert_duration",
         "sequencer_scene_name",
         "should_unload",
+        "whisper_model_size", "whisper_language",
         "omnivoice_instruct", "omnivoice_language",
         "omnivoice_preprocess", "omnivoice_denoise", "omnivoice_postprocess",
         "stem_split_model", "stem_split_vocals", "stem_split_drums",
@@ -1986,6 +2000,10 @@ class SEQUENCER_OT_redo_from_job(Operator):
             scene.openpose_use_bones         = job.openpose_use_bones
         if hasattr(scene, "use_scribble_image"):
             scene.use_scribble_image         = job.use_scribble_image
+        if hasattr(scene, "whisper_model_size") and job.whisper_model_size:
+            scene.whisper_model_size         = job.whisper_model_size
+        if hasattr(scene, "whisper_language") and job.whisper_language:
+            scene.whisper_language           = job.whisper_language
 
         # Restore LoRA: scan full folder so all files appear in the UIList,
         # then apply saved enabled state and weights from the job snapshot.
