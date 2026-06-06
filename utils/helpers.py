@@ -2807,6 +2807,22 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
             except TypeError:
                 pass
 
+        lora_folder = _get("lora_folder")
+        if lora_folder:
+            scene.lora_folder = str(lora_folder)
+        lora_json = _get("lora_files_json")
+        if lora_json:
+            try:
+                lora_raw = json.loads(str(lora_json))
+            except (json.JSONDecodeError, ValueError):
+                lora_raw = []
+            scene.lora_files.clear()
+            for item in lora_raw:
+                entry = scene.lora_files.add()
+                entry.name         = item.get("name", "")
+                entry.weight_value = item.get("weight", 1.0)
+                entry.enabled      = item.get("enabled", True)
+
         self.report({'INFO'}, "Settings loaded from strip metadata")
         return {'FINISHED'}
 
@@ -2849,6 +2865,7 @@ class AI_Metadata_PT_Panel(bpy.types.Panel):
             col.label(text="to add data.")
             return
 
+        _SKIP = {"lora_files_json", "lora_folder"}
         _ORDER = [
             "model", "mode", "prompt", "negative_prompt",
             "seed", "width", "height", "frames", "steps", "guidance",
@@ -2863,9 +2880,30 @@ class AI_Metadata_PT_Panel(bpy.types.Panel):
 
         for prop_key in ai_prop_keys:
             param_name = prop_key[len(AI_METADATA_PREFIX):]
+            if param_name in _SKIP:
+                continue
             label_text = param_name.replace('_', ' ').title()
             col.prop(strip, f'["{prop_key}"]', text=label_text)
             displayed_anything = True
+
+        # LoRA section
+        lora_folder_key = AI_METADATA_PREFIX + "lora_folder"
+        lora_json_key   = AI_METADATA_PREFIX + "lora_files_json"
+        lora_json_str   = strip.get(lora_json_key, "[]")
+        try:
+            lora_items = json.loads(str(lora_json_str)) if lora_json_str else []
+        except (json.JSONDecodeError, ValueError):
+            lora_items = []
+
+        if lora_folder_key in strip.keys() or lora_items:
+            col.separator()
+            col.prop(strip, f'["{lora_folder_key}"]', text="LoRA Path")
+            for item in lora_items:
+                name   = os.path.basename(item.get("name", ""))
+                weight = item.get("weight", 1.0)
+                row = col.row()
+                row.label(text=name, icon="BLANK1")
+                row.label(text=f"{weight:.2f}")
 
         row = col.row()
         row.alignment = 'RIGHT'

@@ -703,16 +703,18 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             "channel":              snapshot["insert_channel"],
             "duration":             snapshot["insert_duration"],
             "sequencer_scene_name": snapshot.get("sequencer_scene_name", ""),
-            "prompt":      snapshot["prompt"],
-            "neg_prompt":  snapshot["neg_prompt"],
-            "seed":        snapshot["seed"],
-            "model_card":  snapshot["model_card"],
-            "mode":        snapshot["mode"],
-            "steps":       snapshot["steps"],
-            "guidance":    snapshot["guidance"],
-            "width":       snapshot["width"],
-            "height":      snapshot["height"],
-            "frames":      snapshot["frames"],
+            "prompt":          snapshot["prompt"],
+            "neg_prompt":      snapshot["neg_prompt"],
+            "seed":            snapshot["seed"],
+            "model_card":      snapshot["model_card"],
+            "mode":            snapshot["mode"],
+            "steps":           snapshot["steps"],
+            "guidance":        snapshot["guidance"],
+            "width":           snapshot["width"],
+            "height":          snapshot["height"],
+            "frames":          snapshot["frames"],
+            "lora_files_json": snapshot.get("lora_files_json", "[]"),
+            "lora_folder":     snapshot.get("lora_folder", ""),
         })
 
     except KeyboardInterrupt:
@@ -1648,6 +1650,8 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 "frames":          result.get("frames", 0),
                 "steps":           result.get("steps", 0),
                 "guidance":        result.get("guidance", 0.0),
+                "lora_files_json": result.get("lora_files_json", "[]"),
+                "lora_folder":     result.get("lora_folder", ""),
             })
             new_strip.select = False
             ed.active_strip = new_strip
