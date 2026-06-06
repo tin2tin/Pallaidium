@@ -2770,6 +2770,21 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
         def _get(key):
             return strip.get(AI_METADATA_PREFIX + key)
 
+        # Set typeselect + model first — input_strips_updated fires here and
+        # overwrites x/y/frames with model defaults.  All explicit values
+        # are written afterwards so they win over those defaults.
+        output_type = "movie" if strip.type == 'MOVIE' else "image"
+        scene.generatorai_typeselect = output_type
+
+        model = _get("model")
+        model_attr = "movie_model_card" if output_type == "movie" else "image_model_card"
+        if model:
+            try:
+                setattr(prefs, model_attr, str(model))
+            except TypeError:
+                pass
+
+        # Now set all generation params — these override any callback defaults.
         v = _get("prompt")
         if v is not None:
             scene.generate_movie_prompt = str(v)
@@ -2795,17 +2810,6 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
         v = _get("frames")
         if v is not None:
             scene.generate_movie_frames = int(v)
-
-        output_type = "movie" if strip.type == 'MOVIE' else "image"
-        scene.generatorai_typeselect = output_type
-
-        model = _get("model")
-        model_attr = "movie_model_card" if output_type == "movie" else "image_model_card"
-        if model:
-            try:
-                setattr(prefs, model_attr, str(model))
-            except TypeError:
-                pass
 
         lora_folder = _get("lora_folder")
         if lora_folder:

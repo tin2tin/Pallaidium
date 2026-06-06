@@ -950,9 +950,8 @@ class SEQUENCER_OT_add_to_queue(Operator):
             + ", " + styled[1]
         )
         lora_json  = json.dumps([
-            {"name": f.name, "weight": getattr(f, "weight_value", 1.0), "enabled": True}
+            {"name": f.name, "weight": getattr(f, "weight_value", 1.0), "enabled": f.enabled}
             for f in getattr(scene, "lora_files", [])
-            if f.enabled
         ])
         # 'frames' and 'audio_length' are per-strip — omitted from common
         common = dict(
@@ -1659,6 +1658,15 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 job.width  = actual_w
                 job.height = actual_h
 
+            # Strip metadata stores only the enabled LoRAs for clean display.
+            try:
+                lora_all = json.loads(result.get("lora_files_json", "[]") or "[]")
+            except (json.JSONDecodeError, ValueError):
+                lora_all = []
+            lora_enabled_json = json.dumps(
+                [item for item in lora_all if item.get("enabled", True)]
+            )
+
             set_ai_metadata_from_dict(new_strip, {
                 "model":           result.get("model_card", ""),
                 "mode":            result.get("mode", ""),
@@ -1670,7 +1678,7 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 "frames":          result.get("frames", 0),
                 "steps":           result.get("steps", 0),
                 "guidance":        result.get("guidance", 0.0),
-                "lora_files_json": result.get("lora_files_json", "[]"),
+                "lora_files_json": lora_enabled_json,
                 "lora_folder":     result.get("lora_folder", ""),
             })
             new_strip.select = False
@@ -1868,6 +1876,24 @@ class SEQUENCER_OT_redo_from_job(Operator):
         scene = context.scene
         prefs = context.preferences.addons[ADDON_ID].preferences
 
+        # Set typeselect + model first — input_strips_updated fires here and
+        # overwrites x/y/frames with model defaults.  All explicit values
+        # are written afterwards so they win over those defaults.
+        scene.generatorai_typeselect = job.output_type
+
+        model_attr = {
+            "image": "image_model_card",
+            "movie": "movie_model_card",
+            "audio": "audio_model_card",
+            "text":  "text_model_card",
+        }.get(job.output_type)
+        if model_attr and job.model_card:
+            try:
+                setattr(prefs, model_attr, job.model_card)
+            except TypeError:
+                pass
+
+        # Now set all generation params — these override any callback defaults.
         scene.generate_movie_prompt          = job.prompt
         scene.generate_movie_negative_prompt = job.neg_prompt
         scene.movie_num_inference_steps      = job.steps
@@ -1892,21 +1918,8 @@ class SEQUENCER_OT_redo_from_job(Operator):
         scene.music_lyrics                   = job.music_lyrics
         scene.music_key_scale                = job.music_key_scale
         scene.music_time_signature           = job.music_time_signature
-        scene.generatorai_typeselect         = job.output_type
 
-        model_attr = {
-            "image": "image_model_card",
-            "movie": "movie_model_card",
-            "audio": "audio_model_card",
-            "text":  "text_model_card",
-        }.get(job.output_type)
-        if model_attr and job.model_card:
-            try:
-                setattr(prefs, model_attr, job.model_card)
-            except TypeError:
-                pass
-
-        # Restore LoRA folder and file list
+        # Restore full LoRA list (all files with their enabled state)
         if job.lora_folder:
             scene.lora_folder = job.lora_folder
         try:
