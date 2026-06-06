@@ -2785,6 +2785,7 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
         v = _get("seed")
         if v is not None:
             scene.movie_num_seed = int(v)
+            scene.movie_use_random = False
         v = _get("width")
         if v is not None:
             scene.generate_movie_x = int(v)

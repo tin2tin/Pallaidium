@@ -1858,6 +1858,16 @@ class SEQUENCER_OT_redo_from_job(Operator):
         scene.refine_sd                      = job.refine_sd
         scene.adetailer                      = job.adetailer
         scene.aurasr                         = job.aurasr
+        scene.remove_silence                 = job.remove_silence
+        scene.audio_length_in_f              = int(job.audio_length)
+        scene.audio_speed_tts                = job.audio_speed_tts
+        scene.chat_exaggeration              = job.chat_exaggeration
+        scene.chat_pace                      = job.chat_pace
+        scene.chat_temperature               = job.chat_temperature
+        scene.music_bpm                      = job.music_bpm
+        scene.music_lyrics                   = job.music_lyrics
+        scene.music_key_scale                = job.music_key_scale
+        scene.music_time_signature           = job.music_time_signature
         scene.generatorai_typeselect         = job.output_type
 
         model_attr = {
@@ -1871,6 +1881,20 @@ class SEQUENCER_OT_redo_from_job(Operator):
                 setattr(prefs, model_attr, job.model_card)
             except TypeError:
                 pass
+
+        # Restore LoRA folder and file list
+        if job.lora_folder:
+            scene.lora_folder = job.lora_folder
+        try:
+            lora_raw = json.loads(job.lora_files_json) if job.lora_files_json else []
+        except (json.JSONDecodeError, ValueError):
+            lora_raw = []
+        scene.lora_files.clear()
+        for item in lora_raw:
+            entry = scene.lora_files.add()
+            entry.name         = item.get("name", "")
+            entry.weight_value = item.get("weight", 1.0)
+            entry.enabled      = item.get("enabled", True)
 
         self.report({'INFO'}, "Settings loaded from job")
         return {"FINISHED"}
