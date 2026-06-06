@@ -62,8 +62,8 @@ This matrix provides a quick overview of the core generative capabilities, mappi
 ## Requirements
 * [Windows](https://github.com/tin2tin/Pallaidium/wiki/Windows-Model-Status). Limited support for [Linux](https://github.com/tin2tin/Pallaidium/issues/105).
 * Blender 5.2 or later
-* A CUDA-supported Nvidia card with at least 6 GB VRAM.
-* CUDA: 12.4
+* A CUDA-supported Nvidia card with at least 6-16 GB VRAM.
+* CUDA: 12.8
 * 20+ GB HDD. (Each model is 6+ GB).
 
 For Linux, we'll have to rely on contributor support. Post your issues here: https://github.com/tin2tin/Pallaidium/issues/105
@@ -88,7 +88,7 @@ For Linux, we'll have to rely on contributor support. Post your issues here: htt
 
 * Open the add-on UI in the Sequencer > Sidebar > Generative AI.
 
-* 5-10 GB must be downloaded first the first time any model is executed.
+* 5-30 GB must be downloaded first the first time any model is executed.
 
 * When you have Pallaidium installed, reach out on Discord: https://discord.gg/HMYpnPzbTm or leave a note on how it is working for you. It means the world to me to know someone is using it! 
 
@@ -146,6 +146,9 @@ The generated media will be saved to the directory specified in the addon prefer
 
 2026-06-05: Add: LTX-2.3 Multi-Input First Frame + Last Frame (FLF) mode — place two Image strips inside a Meta strip to anchor the first and last frames of the generated video. A single Image strip placed after all other children acts as a last-frame-only keyframe.
 
+<details>
+<summary><strong>Older Changes</strong></summary>
+
 2026-06-03: Fix: Qwen Image Edit — reference images from pickers now correctly rendered through the VSE pipeline at queue time (handles video, meta, and transformed strips). Switched to SDNQ uint4 pre-quantized weights (Disty0/Qwen-Image-Edit-2511-SDNQ-uint4-svd-r32) for better quality. Removed Lightning LoRA, raised default steps to 50. Exposed resolution controls. Fixed black bars on reference images. Fixed playhead not moving when queuing. Fixed width/height passed to inference.
 
 2026-05-31: Add: Render Queue — async batch generation with per-job status tracking (PENDING / RUNNING / COMPLETED / FAILED). Start / Stop / Cancel controls.
@@ -165,9 +168,6 @@ The generated media will be saved to the directory specified in the addon prefer
 2026-02-22: Add: LTX-2 Video as Distilled or Multi-Input (via Meta Strips).
 
 2026-01-23: Add: BFL-FLUX.2 Klein 4B and 9B.
-
-<details>
-<summary><strong>Older Changes</strong></summary>
 
 2025-11-28: Add: FLUX.2 & Z-Image & Optimized model-loading.
 
@@ -266,6 +266,8 @@ Remove: Corcelio/mobius
 
 ## Location
 
+<details>
+
 Install Dependencies, and set Sound Notification in the add-on preferences:
 
 ![image](https://github.com/tin2tin/Generative_AI/assets/1322593/49ba0182-f8a0-4a1d-b24f-caca9741d033)
@@ -280,24 +282,21 @@ Video Sequence Editor > Sidebar > Generative AI:
 
 See SDXL handling most of the styles here: https://stable-diffusion-art.com/sdxl-styles/
 
+</details>
+
 ## Tips:
-- If the image of your renders breaks, use the resolution from the Model Card in the Preferences.
-- If the image of your playback stutters, then select a strip > Menu > Strip > Movie Strip > Set Render Size.
-- If you get the message that CUDA is out of memory, restart Blender to free up memory and make it stable again.
+- If your playback stutters, then select a Movie strip > Menu > Strip > Movie Strip > Set Render Size.
+- If you get the message that CUDA is out of memory, restart Blender to free up memory and make it stable again - and try with another model.
 - New to Blender? Watch this tutorial: https://youtu.be/4_MIaxzjh5Y?feature=shared
 
 ![image](https://github.com/user-attachments/assets/a5c44a7e-c670-49ef-941f-86e521568637)
 
 ## Batch Processing
 
-Select multiple strips and hit Generate. When doing this, the file name, and if found, also the seed value, are automatically inserted into the prompt and seed value. However, in the add-on preferences, this behavior can be switched off.
+Select multiple strips and hit Generate. 
 
 https://github.com/tin2tin/Pallaidium/assets/1322593/28098eb6-3a93-4bcb-bd6f-53b71faabd8d
 
-## Text to Audio
-
-### Voices for Parler TTS: 
-Laura, Gary, Jon, Lea, Karen, Rick, Brenda, David, Eileen, Jordan, Mike, Yann, Joy, James, Eric, Lauren, Rose, Will, Jason, Aaron, Naomie, Alisa, Patrick, Jerry, Tina, Jenna, Bill, Tom, Carol, Barbara, Rebecca, Anna, Bruce, Emily
 
 ## Useful add-ons
 
