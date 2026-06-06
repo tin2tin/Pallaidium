@@ -950,8 +950,9 @@ class SEQUENCER_OT_add_to_queue(Operator):
             + ", " + styled[1]
         )
         lora_json  = json.dumps([
-            {"name": f.name, "weight": getattr(f, "weight_value", 1.0), "enabled": f.enabled}
+            {"name": f.name, "weight": getattr(f, "weight_value", 1.0), "enabled": True}
             for f in getattr(scene, "lora_files", [])
+            if f.enabled
         ])
         # 'frames' and 'audio_length' are per-strip — omitted from common
         common = dict(
