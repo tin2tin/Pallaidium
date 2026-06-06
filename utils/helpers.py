@@ -2811,21 +2811,39 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
         if v is not None:
             scene.generate_movie_frames = int(v)
 
+        # Restore LoRA: scan full folder so all files appear in the UIList,
+        # then mark the saved (enabled) ones and restore their weights.
         lora_folder = _get("lora_folder")
         if lora_folder:
             scene.lora_folder = str(lora_folder)
         lora_json = _get("lora_files_json")
-        if lora_json:
-            try:
-                lora_raw = json.loads(str(lora_json))
-            except (json.JSONDecodeError, ValueError):
-                lora_raw = []
-            scene.lora_files.clear()
+        try:
+            lora_raw = json.loads(str(lora_json)) if lora_json else []
+        except (json.JSONDecodeError, ValueError):
+            lora_raw = []
+        # Metadata only stores enabled LoRAs; map name -> weight.
+        saved_loras = {item.get("name", ""): item.get("weight", 1.0) for item in lora_raw}
+        scene.lora_files.clear()
+        directory = bpy.path.abspath(scene.lora_folder) if scene.lora_folder else ""
+        if directory and os.path.isdir(directory):
+            for filename in sorted(os.listdir(directory)):
+                if filename.endswith(".safetensors"):
+                    stem  = filename.replace(".safetensors", "")
+                    entry = scene.lora_files.add()
+                    entry.name = stem
+                    if stem in saved_loras:
+                        entry.enabled      = True
+                        entry.weight_value = saved_loras[stem]
+                    else:
+                        entry.enabled      = False
+                        entry.weight_value = 1.0
+        elif lora_raw:
+            # Folder not accessible — fall back to just the saved entries.
             for item in lora_raw:
                 entry = scene.lora_files.add()
                 entry.name         = item.get("name", "")
                 entry.weight_value = item.get("weight", 1.0)
-                entry.enabled      = item.get("enabled", True)
+                entry.enabled      = True
 
         self.report({'INFO'}, "Settings loaded from strip metadata")
         return {'FINISHED'}

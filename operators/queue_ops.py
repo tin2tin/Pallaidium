@@ -1926,19 +1926,39 @@ class SEQUENCER_OT_redo_from_job(Operator):
         scene.music_key_scale                = job.music_key_scale
         scene.music_time_signature           = job.music_time_signature
 
-        # Restore full LoRA list (all files with their enabled state)
+        # Restore LoRA: scan full folder so all files appear in the UIList,
+        # then apply saved enabled state and weights from the job snapshot.
         if job.lora_folder:
             scene.lora_folder = job.lora_folder
         try:
             lora_raw = json.loads(job.lora_files_json) if job.lora_files_json else []
         except (json.JSONDecodeError, ValueError):
             lora_raw = []
+        saved_loras = {
+            item.get("name", ""): {"weight": item.get("weight", 1.0), "enabled": item.get("enabled", True)}
+            for item in lora_raw
+        }
         scene.lora_files.clear()
-        for item in lora_raw:
-            entry = scene.lora_files.add()
-            entry.name         = item.get("name", "")
-            entry.weight_value = item.get("weight", 1.0)
-            entry.enabled      = item.get("enabled", True)
+        directory = bpy.path.abspath(scene.lora_folder) if scene.lora_folder else ""
+        if directory and os.path.isdir(directory):
+            for filename in sorted(os.listdir(directory)):
+                if filename.endswith(".safetensors"):
+                    stem  = filename.replace(".safetensors", "")
+                    entry = scene.lora_files.add()
+                    entry.name = stem
+                    if stem in saved_loras:
+                        entry.enabled      = saved_loras[stem]["enabled"]
+                        entry.weight_value = saved_loras[stem]["weight"]
+                    else:
+                        entry.enabled      = False
+                        entry.weight_value = 1.0
+        elif lora_raw:
+            # Folder not accessible — fall back to just the saved entries.
+            for item in lora_raw:
+                entry = scene.lora_files.add()
+                entry.name         = item.get("name", "")
+                entry.weight_value = item.get("weight", 1.0)
+                entry.enabled      = item.get("enabled", True)
 
         self.report({'INFO'}, "Settings loaded from job")
         return {"FINISHED"}
