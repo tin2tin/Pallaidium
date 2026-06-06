@@ -213,7 +213,7 @@ def _dep_tick() -> float | None:
 
 
 def _run_install(snapshot: dict, cancel_event: threading.Event):
-    import sys, traceback
+    import sys, traceback, platform as _plat
     state     = _dep_state
     pybin     = snapshot["pybin"]
     addon_dir = snapshot["addon_dir"]
@@ -276,6 +276,8 @@ def _run_install(snapshot: dict, cancel_event: threading.Event):
                     print(f"\nPALLAIDIUM pip FAILED — {phase_name} batch {batch_num}/{total_batch}: {', '.join(names)}", file=sys.stderr, flush=True)
                     for ln in batch_output_lines[-15:]:
                         print(f"  {ln}", file=sys.stderr, flush=True)
+                    _req_filename = "requirements_linux.txt" if _plat.system() == "Linux" else "requirements.txt"
+                    print(f"  → To skip, add '#' before each name in {_req_filename} and click Install Dependencies again.", file=sys.stderr, flush=True)
                     _dep_failed_batches.append({
                         "phase":    f"{phase_name} batch {batch_num}/{total_batch}",
                         "packages": ", ".join(names),
@@ -381,20 +383,24 @@ class GENERATOR_OT_install(Operator):
             self.report({"WARNING"}, "Dependency operation already running.")
             return {"CANCELLED"}
 
+        import platform as _plat
         pybin     = python_exec()
         addon_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-        local_req = os.path.join(addon_dir, "requirements.txt")
+        _linux_req = os.path.join(addon_dir, "requirements_linux.txt")
+        local_req = _linux_req if _plat.system() == "Linux" and os.path.exists(_linux_req) \
+                    else os.path.join(addon_dir, "requirements.txt")
         mgr       = DependencyManager()
 
         # Build batch list on main thread (fast — file reads + importlib checks only)
         batches = []
+        _use_binary_only = _plat.system() == "Windows"
         if os.path.exists(local_req):
             with open(local_req, 'r') as f:
                 raw = f.read().splitlines()
             safe = BlenderInternalManager.filter_list(raw)
             lines = safe if self.force_reinstall else SmartSkipManager.filter_existing(safe)
             if lines:
-                batches.append(("Base", True, lines))
+                batches.append(("Base", _use_binary_only, lines))
 
         for phase_name, phase_lines in [
             ("SourceLibs", mgr.get_phase_1_5_source_libs()),
@@ -445,10 +451,13 @@ class GENERATOR_OT_uninstall(Operator):
             self.report({"WARNING"}, "Dependency operation already running.")
             return {"CANCELLED"}
 
+        import platform as _plat
         pybin     = python_exec()
         mgr       = DependencyManager()
         addon_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-        local_req = os.path.join(addon_dir, "requirements.txt")
+        _linux_req = os.path.join(addon_dir, "requirements_linux.txt")
+        local_req = _linux_req if _plat.system() == "Linux" and os.path.exists(_linux_req) \
+                    else os.path.join(addon_dir, "requirements.txt")
 
         all_targets: set = set()
         if os.path.exists(local_req):
