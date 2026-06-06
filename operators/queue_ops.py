@@ -1639,14 +1639,33 @@ def _queue_insert_strip(scene, result: dict) -> None:
 
     if new_strip is not None:
         try:
+            # Use the actual output dimensions from the strip element rather than
+            # the snapshot values, which may differ due to model-specific rounding.
+            actual_w = result.get("width", 0)
+            actual_h = result.get("height", 0)
+            if new_strip.type in ('IMAGE', 'MOVIE'):
+                try:
+                    elem = new_strip.elements[0]
+                    if elem.orig_width and elem.orig_height:
+                        actual_w = elem.orig_width
+                        actual_h = elem.orig_height
+                except Exception:
+                    pass
+
+            # Write actual resolution back into the job so Redo restores it correctly.
+            job = _find_job(scene, result.get("job_id", ""))
+            if job is not None:
+                job.width  = actual_w
+                job.height = actual_h
+
             set_ai_metadata_from_dict(new_strip, {
                 "model":           result.get("model_card", ""),
                 "mode":            result.get("mode", ""),
                 "prompt":          result.get("prompt", ""),
                 "negative_prompt": result.get("neg_prompt", ""),
                 "seed":            result.get("seed", 0),
-                "width":           result.get("width", 0),
-                "height":          result.get("height", 0),
+                "width":           actual_w,
+                "height":          actual_h,
                 "frames":          result.get("frames", 0),
                 "steps":           result.get("steps", 0),
                 "guidance":        result.get("guidance", 0.0),
