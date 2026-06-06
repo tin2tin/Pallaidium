@@ -2869,15 +2869,16 @@ class AI_Metadata_PT_Panel(bpy.types.Panel):
             col.label(text="to add data.")
             return
 
-        _SKIP = {"lora_files_json", "lora_folder"}
+        _SKIP = {"lora_files_json"}
         _ORDER = [
             "model", "mode", "prompt", "negative_prompt",
             "seed", "width", "height", "frames", "steps", "guidance",
+            "lora_folder",
         ]
         _order_map = {f"{AI_METADATA_PREFIX}{k}": i for i, k in enumerate(_ORDER)}
         ai_prop_keys = sorted(
             ai_prop_keys,
-            key=lambda k: _order_map.get(k, len(_ORDER))
+            key=lambda k: (_order_map.get(k, len(_ORDER)), k)
         )
 
         col.prop(strip, "name", text="Name")
@@ -2889,25 +2890,6 @@ class AI_Metadata_PT_Panel(bpy.types.Panel):
             label_text = param_name.replace('_', ' ').title()
             col.prop(strip, f'["{prop_key}"]', text=label_text)
             displayed_anything = True
-
-        # LoRA section
-        lora_folder_key = AI_METADATA_PREFIX + "lora_folder"
-        lora_json_key   = AI_METADATA_PREFIX + "lora_files_json"
-        lora_json_str   = strip.get(lora_json_key, "[]")
-        try:
-            lora_items = json.loads(str(lora_json_str)) if lora_json_str else []
-        except (json.JSONDecodeError, ValueError):
-            lora_items = []
-
-        if lora_folder_key in strip.keys() or lora_items:
-            col.separator()
-            col.prop(strip, f'["{lora_folder_key}"]', text="LoRA Path")
-            for item in lora_items:
-                name   = os.path.basename(item.get("name", ""))
-                weight = item.get("weight", 1.0)
-                row = col.row()
-                row.label(text=name, icon="BLANK1")
-                row.label(text=f"{weight:.2f}")
 
         row = col.row()
         row.alignment = 'RIGHT'

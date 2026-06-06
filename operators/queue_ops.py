@@ -1658,14 +1658,21 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 job.width  = actual_w
                 job.height = actual_h
 
-            # Strip metadata stores only the enabled LoRAs for clean display.
+            # Build enabled-only LoRA list for metadata display.
             try:
                 lora_all = json.loads(result.get("lora_files_json", "[]") or "[]")
             except (json.JSONDecodeError, ValueError):
                 lora_all = []
-            lora_enabled_json = json.dumps(
-                [item for item in lora_all if item.get("enabled", True)]
-            )
+            lora_enabled = [item for item in lora_all if item.get("enabled", True)]
+            lora_enabled_json = json.dumps(lora_enabled)
+
+            # Individual per-LoRA props for string-box display in the panel.
+            lora_meta = {}
+            if lora_enabled:
+                lora_meta["lora_folder"] = result.get("lora_folder", "")
+                for i, item in enumerate(lora_enabled, 1):
+                    lora_meta[f"lora_{i}"]        = os.path.basename(item.get("name", ""))
+                    lora_meta[f"lora_{i}_weight"]  = f"{item.get('weight', 1.0):.2f}"
 
             set_ai_metadata_from_dict(new_strip, {
                 "model":           result.get("model_card", ""),
@@ -1679,7 +1686,7 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 "steps":           result.get("steps", 0),
                 "guidance":        result.get("guidance", 0.0),
                 "lora_files_json": lora_enabled_json,
-                "lora_folder":     result.get("lora_folder", ""),
+                **lora_meta,
             })
             new_strip.select = False
             ed.active_strip = new_strip
