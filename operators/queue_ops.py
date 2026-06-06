@@ -185,6 +185,15 @@ class RenderQueueJob(PropertyGroup):
     klein_schematic_mode:   StringProperty(default="DEPTH")
     klein_schematic_target: StringProperty(default="person")
 
+    # Extra UI properties
+    img_guidance_scale:    FloatProperty(default=1.6)
+    illumination_style:    StringProperty(default="")
+    light_direction:       StringProperty(default="")
+    ip_adapter_face_folder:  StringProperty(default="")
+    ip_adapter_style_folder: StringProperty(default="")
+    openpose_use_bones:    BoolProperty(default=False)
+    use_scribble_image:    BoolProperty(default=False)
+
     # VRAM management — set at run-time based on the next queued job
     should_unload: BoolProperty(default=True)
 
@@ -356,11 +365,15 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             music_lyrics                   = snapshot["music_lyrics"],
             music_key_scale                = snapshot["music_key_scale"],
             music_time_signature           = snapshot["music_time_signature"],
-            ip_adapter_face_folder         = "",
-            ip_adapter_style_folder        = "",
+            ip_adapter_face_folder         = snapshot.get("ip_adapter_face_folder", ""),
+            ip_adapter_style_folder        = snapshot.get("ip_adapter_style_folder", ""),
             svd_decode_chunk_size          = 2,
             svd_motion_bucket_id           = 1,
-            img_guidance_scale             = 1.6,
+            img_guidance_scale             = snapshot.get("img_guidance_scale", 1.6),
+            illumination_style             = snapshot.get("illumination_style", ""),
+            light_direction                = snapshot.get("light_direction", ""),
+            openpose_use_bones             = snapshot.get("openpose_use_bones", False),
+            use_scribble_image             = snapshot.get("use_scribble_image", False),
             lora_files                     = enabled_items,
             lora_folder                    = snapshot.get("lora_folder", ""),
             render                         = types.SimpleNamespace(
@@ -502,8 +515,8 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
                             mode=mode, enabled_items=enabled_items,
                             use_lcm=snapshot["use_lcm"],
                             use_refine=snapshot["refine_sd"],
-                            ip_adapter_face_folder="",
-                            ip_adapter_style_folder="",
+                            ip_adapter_face_folder=snapshot.get("ip_adapter_face_folder", ""),
+                            ip_adapter_style_folder=snapshot.get("ip_adapter_style_folder", ""),
                             local_files_only=snapshot["local_files_only"],
                         )
                     except Exception as _exc:
@@ -531,8 +544,8 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
                         enabled_items=enabled_items,
                         use_lcm=snapshot["use_lcm"],
                         use_refine=snapshot["refine_sd"],
-                        ip_adapter_face_folder="",
-                        ip_adapter_style_folder="",
+                        ip_adapter_face_folder=snapshot.get("ip_adapter_face_folder", ""),
+                        ip_adapter_style_folder=snapshot.get("ip_adapter_style_folder", ""),
                         local_files_only=snapshot["local_files_only"],
                     )
                 finally:
@@ -713,8 +726,15 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             "width":           snapshot["width"],
             "height":          snapshot["height"],
             "frames":          snapshot["frames"],
-            "lora_files_json": snapshot.get("lora_files_json", "[]"),
-            "lora_folder":     snapshot.get("lora_folder", ""),
+            "lora_files_json":        snapshot.get("lora_files_json", "[]"),
+            "lora_folder":            snapshot.get("lora_folder", ""),
+            "img_guidance_scale":     snapshot.get("img_guidance_scale", 1.6),
+            "illumination_style":     snapshot.get("illumination_style", ""),
+            "light_direction":        snapshot.get("light_direction", ""),
+            "ip_adapter_face_folder":  snapshot.get("ip_adapter_face_folder", ""),
+            "ip_adapter_style_folder": snapshot.get("ip_adapter_style_folder", ""),
+            "openpose_use_bones":     snapshot.get("openpose_use_bones", False),
+            "use_scribble_image":     snapshot.get("use_scribble_image", False),
         })
 
     except KeyboardInterrupt:
@@ -1018,6 +1038,13 @@ class SEQUENCER_OT_add_to_queue(Operator):
             omnivoice_postprocess = getattr(scene, "omnivoice_postprocess", True),
             klein_schematic_mode   = getattr(scene, "klein_schematic_mode",   "DEPTH"),
             klein_schematic_target = getattr(scene, "klein_schematic_target", "person"),
+            img_guidance_scale     = getattr(scene, "img_guidance_scale",     1.6),
+            illumination_style     = getattr(scene, "illumination_style",     ""),
+            light_direction        = getattr(scene, "light_direction",        ""),
+            ip_adapter_face_folder  = bpy.path.abspath(getattr(scene, "ip_adapter_face_folder",  "") or ""),
+            ip_adapter_style_folder = bpy.path.abspath(getattr(scene, "ip_adapter_style_folder", "") or ""),
+            openpose_use_bones     = getattr(scene, "openpose_use_bones",     False),
+            use_scribble_image     = getattr(scene, "use_scribble_image",     False),
         )
 
         # ---- Decide which strips to iterate over -------------------------
@@ -1258,6 +1285,9 @@ def _queue_start_job(scene, job) -> None:
         "qwen_strip_1_path", "qwen_strip_2_path", "qwen_strip_3_path",
         "klein_strip_1_path", "klein_strip_2_path", "klein_strip_3_path",
         "klein_schematic_mode", "klein_schematic_target",
+        "img_guidance_scale", "illumination_style", "light_direction",
+        "ip_adapter_face_folder", "ip_adapter_style_folder",
+        "openpose_use_bones", "use_scribble_image",
     )}
     _cancel_event.clear()
     _worker_thread = threading.Thread(
@@ -1674,6 +1704,22 @@ def _queue_insert_strip(scene, result: dict) -> None:
                     lora_meta[f"lora_{i}"]        = os.path.basename(item.get("name", ""))
                     lora_meta[f"lora_{i}_weight"]  = f"{item.get('weight', 1.0):.2f}"
 
+            extra_meta = {}
+            if result.get("img_guidance_scale", 1.6) != 1.6:
+                extra_meta["img_guidance_scale"] = result.get("img_guidance_scale", 1.6)
+            if result.get("illumination_style"):
+                extra_meta["illumination_style"] = result.get("illumination_style", "")
+            if result.get("light_direction"):
+                extra_meta["light_direction"] = result.get("light_direction", "")
+            if result.get("ip_adapter_face_folder"):
+                extra_meta["ip_adapter_face_folder"] = result.get("ip_adapter_face_folder", "")
+            if result.get("ip_adapter_style_folder"):
+                extra_meta["ip_adapter_style_folder"] = result.get("ip_adapter_style_folder", "")
+            if result.get("openpose_use_bones"):
+                extra_meta["openpose_use_bones"] = result.get("openpose_use_bones", False)
+            if result.get("use_scribble_image"):
+                extra_meta["use_scribble_image"] = result.get("use_scribble_image", False)
+
             set_ai_metadata_from_dict(new_strip, {
                 "model":           result.get("model_card", ""),
                 "mode":            result.get("mode", ""),
@@ -1687,6 +1733,7 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 "guidance":        result.get("guidance", 0.0),
                 "lora_files_json": lora_enabled_json,
                 **lora_meta,
+                **extra_meta,
             })
             new_strip.select = False
             ed.active_strip = new_strip
@@ -1925,6 +1972,20 @@ class SEQUENCER_OT_redo_from_job(Operator):
         scene.music_lyrics                   = job.music_lyrics
         scene.music_key_scale                = job.music_key_scale
         scene.music_time_signature           = job.music_time_signature
+        if hasattr(scene, "img_guidance_scale"):
+            scene.img_guidance_scale         = job.img_guidance_scale
+        if hasattr(scene, "illumination_style") and job.illumination_style:
+            scene.illumination_style         = job.illumination_style
+        if hasattr(scene, "light_direction") and job.light_direction:
+            scene.light_direction            = job.light_direction
+        if hasattr(scene, "ip_adapter_face_folder") and job.ip_adapter_face_folder:
+            scene.ip_adapter_face_folder     = job.ip_adapter_face_folder
+        if hasattr(scene, "ip_adapter_style_folder") and job.ip_adapter_style_folder:
+            scene.ip_adapter_style_folder    = job.ip_adapter_style_folder
+        if hasattr(scene, "openpose_use_bones"):
+            scene.openpose_use_bones         = job.openpose_use_bones
+        if hasattr(scene, "use_scribble_image"):
+            scene.use_scribble_image         = job.use_scribble_image
 
         # Restore LoRA: scan full folder so all files appear in the UIList,
         # then apply saved enabled state and weights from the job snapshot.

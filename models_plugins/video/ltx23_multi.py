@@ -217,11 +217,11 @@ class LTX2_3MultiPlugin(ModelPlugin):
         _flush()
 
         # ── Parse Image Conditions (FLF / last-frame-only / single-frame) ─────
-        print("[LTX23Multi] ── Image condition debug ──────────────────────────────")
-        print(f"[LTX23Multi]   inputs.image     = {'<PIL ' + str(getattr(inputs.image, 'size', '?')) + '>' if inputs.image is not None else None}")
-        print(f"[LTX23Multi]   inputs.last_image= {'<PIL ' + str(getattr(getattr(inputs, 'last_image', None), 'size', '?')) + '>' if getattr(inputs, 'last_image', None) is not None else None}")
-        print(f"[LTX23Multi]   inputs.video_path= {getattr(inputs, 'video_path', None)!r}")
-        print(f"[LTX23Multi]   inputs.audio_ref = {getattr(inputs, 'audio_ref', None)!r}")
+        # print("[LTX23Multi] ── Image condition debug ──────────────────────────────")
+        # print(f"[LTX23Multi]   inputs.image     = {'<PIL ' + str(getattr(inputs.image, 'size', '?')) + '>' if inputs.image is not None else None}")
+        # print(f"[LTX23Multi]   inputs.last_image= {'<PIL ' + str(getattr(getattr(inputs, 'last_image', None), 'size', '?')) + '>' if getattr(inputs, 'last_image', None) is not None else None}")
+        # print(f"[LTX23Multi]   inputs.video_path= {getattr(inputs, 'video_path', None)!r}")
+        # print(f"[LTX23Multi]   inputs.audio_ref = {getattr(inputs, 'audio_ref', None)!r}")
 
         image_conditions = None
         last_input = getattr(inputs, "last_image", None)
@@ -232,7 +232,7 @@ class LTX2_3MultiPlugin(ModelPlugin):
                 last_input = load_image(last_input).convert("RGB")
             elif hasattr(last_input, "convert"):
                 last_input = last_input.convert("RGB")
-            print(f"[LTX23Multi]   last_input PIL size={last_input.size}")
+            # print(f"[LTX23Multi]   last_input PIL size={last_input.size}")
 
         if image_input is not None:
             if isinstance(image_input, str):
@@ -240,7 +240,7 @@ class LTX2_3MultiPlugin(ModelPlugin):
                 image_input = load_image(image_input).convert("RGB")
             elif hasattr(image_input, "convert"):
                 image_input = image_input.convert("RGB")
-            print(f"[LTX23Multi]   image_input PIL size={image_input.size}")
+            # print(f"[LTX23Multi]   image_input PIL size={image_input.size}")
 
         if image_input is not None and last_input is not None:
             # Mode A: FLF — hard anchor image 1 at start, soft keyframe image 2 at end
@@ -248,19 +248,19 @@ class LTX2_3MultiPlugin(ModelPlugin):
                 LTX2ImageCondition(image=image_input, frame=0,  strength=1.0),
                 LTX2ImageCondition(image=last_input,  frame=-1, strength=1.0),
             ]
-            print(f"[LTX23Multi]   MODE: FLF — img1@0 + img2@{num_frames-1} — num_frames={num_frames}")
+            # print(f"[LTX23Multi]   MODE: FLF — img1@0 + img2@{num_frames-1} — num_frames={num_frames}")
         elif last_input is not None:
             # Mode B: last-frame-only — soft keyframe image 2 at end
             image_conditions = [LTX2ImageCondition(image=last_input, frame=-1, strength=1.0)]
-            print(f"[LTX23Multi]   MODE: last-frame-only — img2@{num_frames-1} — num_frames={num_frames}")
+            # print(f"[LTX23Multi]   MODE: last-frame-only — img2@{num_frames-1} — num_frames={num_frames}")
         elif image_input is not None:
             # Existing: single first-frame condition
             image_conditions = [LTX2ImageCondition(image=image_input, frame=0, strength=1.0)]
-            print("[LTX23Multi]   MODE: single first-frame (frame=0)")
-        else:
-            print("[LTX23Multi]   MODE: no image conditions (text-to-video)")
-        print(f"[LTX23Multi]   image_conditions count={len(image_conditions) if image_conditions else 0}")
-        print("[LTX23Multi] ────────────────────────────────────────────────────────")
+            # print("[LTX23Multi]   MODE: single first-frame (frame=0)")
+        # else:
+            # print("[LTX23Multi]   MODE: no image conditions (text-to-video)")
+        # print(f"[LTX23Multi]   image_conditions count={len(image_conditions) if image_conditions else 0}")
+        # print("[LTX23Multi] ────────────────────────────────────────────────────────")
 
         # ── Step 0: Text encoding ───────────────────────────────────────────
         self.set_phase(inputs, "Text encoding")

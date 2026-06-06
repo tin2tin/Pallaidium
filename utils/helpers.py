@@ -2811,6 +2811,29 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
         if v is not None:
             scene.generate_movie_frames = int(v)
 
+        # Extra UI properties
+        v = _get("img_guidance_scale")
+        if v is not None and hasattr(scene, "img_guidance_scale"):
+            scene.img_guidance_scale = float(v)
+        v = _get("illumination_style")
+        if v is not None and hasattr(scene, "illumination_style"):
+            scene.illumination_style = str(v)
+        v = _get("light_direction")
+        if v is not None and hasattr(scene, "light_direction"):
+            scene.light_direction = str(v)
+        v = _get("ip_adapter_face_folder")
+        if v is not None and hasattr(scene, "ip_adapter_face_folder"):
+            scene.ip_adapter_face_folder = str(v)
+        v = _get("ip_adapter_style_folder")
+        if v is not None and hasattr(scene, "ip_adapter_style_folder"):
+            scene.ip_adapter_style_folder = str(v)
+        v = _get("openpose_use_bones")
+        if v is not None and hasattr(scene, "openpose_use_bones"):
+            scene.openpose_use_bones = str(v).lower() in ("true", "1", "yes")
+        v = _get("use_scribble_image")
+        if v is not None and hasattr(scene, "use_scribble_image"):
+            scene.use_scribble_image = str(v).lower() in ("true", "1", "yes")
+
         # Restore LoRA: scan full folder so all files appear in the UIList,
         # then mark the saved (enabled) ones and restore their weights.
         lora_folder = _get("lora_folder")
