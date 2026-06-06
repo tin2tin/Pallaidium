@@ -2747,6 +2747,69 @@ def set_ai_metadata_from_dict(strip: bpy.types.Strip, params_dict: dict):
     print(f"Finished setting {set_count} metadata properties.")
     return True
 
+class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
+    """Reload this strip's AI generation settings into the Pallaidium panel"""
+
+    bl_idname = "sequencer.redo_from_metadata"
+    bl_label  = "Redo from Metadata"
+    bl_description = "Reload this strip's AI generation settings into the Pallaidium panel"
+
+    def execute(self, context):
+        seq_scene = getattr(context, 'sequencer_scene', None) or context.scene
+        if not (seq_scene and seq_scene.sequence_editor):
+            self.report({'WARNING'}, "No sequence editor")
+            return {'CANCELLED'}
+        strip = seq_scene.sequence_editor.active_strip
+        if not strip:
+            self.report({'WARNING'}, "No active strip")
+            return {'CANCELLED'}
+
+        scene = context.scene
+        prefs = context.preferences.addons[ADDON_ID].preferences
+
+        def _get(key):
+            return strip.get(AI_METADATA_PREFIX + key)
+
+        v = _get("prompt")
+        if v is not None:
+            scene.generate_movie_prompt = str(v)
+        v = _get("negative_prompt")
+        if v is not None:
+            scene.generate_movie_negative_prompt = str(v)
+        v = _get("steps")
+        if v is not None:
+            scene.movie_num_inference_steps = int(v)
+        v = _get("guidance")
+        if v is not None:
+            scene.movie_num_guidance = float(v)
+        v = _get("seed")
+        if v is not None:
+            scene.movie_num_seed = int(v)
+        v = _get("width")
+        if v is not None:
+            scene.generate_movie_x = int(v)
+        v = _get("height")
+        if v is not None:
+            scene.generate_movie_y = int(v)
+        v = _get("frames")
+        if v is not None:
+            scene.generate_movie_frames = int(v)
+
+        output_type = "movie" if strip.type == 'MOVIE' else "image"
+        scene.generatorai_typeselect = output_type
+
+        model = _get("model")
+        model_attr = "movie_model_card" if output_type == "movie" else "image_model_card"
+        if model:
+            try:
+                setattr(prefs, model_attr, str(model))
+            except TypeError:
+                pass
+
+        self.report({'INFO'}, "Settings loaded from strip metadata")
+        return {'FINISHED'}
+
+
 class AI_Metadata_PT_Panel(bpy.types.Panel):
     """Displays AI Generation Metadata stored as custom properties"""
     bl_label = "AI Metadata"
@@ -2795,13 +2858,17 @@ class AI_Metadata_PT_Panel(bpy.types.Panel):
             key=lambda k: _order_map.get(k, len(_ORDER))
         )
 
-        col.label(text="Name:  " + strip.name)
+        col.prop(strip, "name", text="Name")
 
         for prop_key in ai_prop_keys:
             param_name = prop_key[len(AI_METADATA_PREFIX):]
             label_text = param_name.replace('_', ' ').title()
             col.prop(strip, f'["{prop_key}"]', text=label_text)
             displayed_anything = True
+
+        row = col.row()
+        row.alignment = 'RIGHT'
+        row.operator("sequencer.redo_from_metadata", text="", icon="LOOP_BACK")
 
 def get_enum_items(options_dict):
     """Converts a dictionary to the format required by bpy.props.EnumProperty."""

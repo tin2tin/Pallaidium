@@ -57,6 +57,7 @@ classes = (
     IPAdapterFaceFileBrowserOperator,
     IPAdapterStyleProperties,
     IPAdapterStyleFileBrowserOperator,
+    SEQUENCER_OT_redo_from_metadata,
     AI_Metadata_PT_Panel,
     OBJECT_OT_FluxAddStrip,
     OBJECT_OT_FluxHideStrip,
@@ -120,17 +121,17 @@ def register():
     )
     bpy.types.Scene.generate_movie_x = bpy.props.IntProperty(
         name="generate_movie_x",
-        default=1024,
+        default=1920,
         step=32,
-        min=224,
+        min=64,
         max=4096,
         description="Use the power of 64",
     )
     bpy.types.Scene.generate_movie_y = bpy.props.IntProperty(
         name="generate_movie_y",
-        default=576,
+        default=1080,
         step=32,
-        min=224,
+        min=64,
         max=4096,
         description="Use the power of 64",
     )
@@ -138,7 +139,7 @@ def register():
     # The number of frames to be generated.
     bpy.types.Scene.generate_movie_frames = bpy.props.IntProperty(
         name="generate_movie_frames",
-        default=6,
+        default=100,
         min=-1,
         max=500,
         description="Number of frames to generate. NB. some models have fixed values.",

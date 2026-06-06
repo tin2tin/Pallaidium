@@ -102,6 +102,9 @@ def _draw_queue(layout, context):
         label = (job.prompt[:36] + "…") if len(job.prompt) > 38 else job.prompt
         top.label(text=label)
 
+        op_redo = top.operator("sequencer.redo_from_job", text="", icon="LOOP_BACK")
+        op_redo.job_id = job.job_id
+
         if job.status == "PENDING" or (job.status == "RUNNING" and job.phase != "Downloading model"):
             op = top.operator("sequencer.cancel_queue_job", text="", icon="X")
             op.job_id = job.job_id

@@ -1214,8 +1214,14 @@ _TIMER_INTERVAL = 0.2
 
 
 def _queue_get_scene():
-    """Return the scene being processed (direct reference — no bpy.data lookup)."""
-    return _active_scene
+    """Return the scene being processed, or None if the RNA pointer has been freed."""
+    try:
+        if _active_scene is None:
+            return None
+        _active_scene.name  # validate the RNA pointer is still live
+        return _active_scene
+    except ReferenceError:
+        return None
 
 
 def _queue_start_job(scene, job) -> None:
@@ -1758,6 +1764,10 @@ def _queue_tick() -> float | None:
 
         return _TIMER_INTERVAL
 
+    except ReferenceError:
+        # Scene was freed mid-tick (file reload, scene deletion, etc.) — stop cleanly.
+        _queue_stop()
+        return None
     except BaseException:
         traceback.print_exc()
         _queue_stop()
@@ -1809,6 +1819,60 @@ class SEQUENCER_OT_cancel_queue_job(Operator):
             # Signal the worker; it will stop at the next cancellation checkpoint
             _cancel_event.set()
             job.status = "CANCELLING"
+        return {"FINISHED"}
+
+
+# ---------------------------------------------------------------------------
+# Operator: Redo — reload a job's settings back into the Pallaidium UI
+# ---------------------------------------------------------------------------
+
+class SEQUENCER_OT_redo_from_job(Operator):
+    """Reload this job's generation settings into the Pallaidium panel"""
+
+    bl_idname = "sequencer.redo_from_job"
+    bl_label  = "Redo Job Settings"
+    bl_description = "Reload this job's generation settings into the Pallaidium panel"
+
+    job_id: StringProperty()
+
+    def execute(self, context):
+        job = _find_job(context.scene, self.job_id)
+        if job is None:
+            self.report({'WARNING'}, "Job not found")
+            return {"CANCELLED"}
+
+        scene = context.scene
+        prefs = context.preferences.addons[ADDON_ID].preferences
+
+        scene.generate_movie_prompt          = job.prompt
+        scene.generate_movie_negative_prompt = job.neg_prompt
+        scene.movie_num_inference_steps      = job.steps
+        scene.movie_num_guidance             = job.guidance
+        scene.movie_num_seed                 = job.seed
+        scene.movie_use_random               = job.use_random
+        scene.generate_movie_x               = job.width
+        scene.generate_movie_y               = job.height
+        scene.generate_movie_frames          = job.frames
+        scene.image_power                    = job.image_power
+        scene.use_lcm                        = job.use_lcm
+        scene.refine_sd                      = job.refine_sd
+        scene.adetailer                      = job.adetailer
+        scene.aurasr                         = job.aurasr
+        scene.generatorai_typeselect         = job.output_type
+
+        model_attr = {
+            "image": "image_model_card",
+            "movie": "movie_model_card",
+            "audio": "audio_model_card",
+            "text":  "text_model_card",
+        }.get(job.output_type)
+        if model_attr and job.model_card:
+            try:
+                setattr(prefs, model_attr, job.model_card)
+            except TypeError:
+                pass
+
+        self.report({'INFO'}, "Settings loaded from job")
         return {"FINISHED"}
 
 
@@ -1934,6 +1998,7 @@ queue_classes = (
     SEQUENCER_OT_queue_runner,
     SEQUENCER_OT_stop_queue,
     SEQUENCER_OT_cancel_queue_job,
+    SEQUENCER_OT_redo_from_job,
     SEQUENCER_OT_remove_queue_job,
     SEQUENCER_OT_clear_queue,
     SEQUENCER_OT_show_queue_error,
