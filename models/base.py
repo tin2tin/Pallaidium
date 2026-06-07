@@ -136,6 +136,7 @@ class ModelInputs:
     images:       list = field(default_factory=list)   # list of PIL.Image
     image_prompts: list = field(default_factory=list)  # per-image prompts (OmniGen)
     last_image:   Optional[Any] = None           # PIL.Image — last-frame condition (FLF / last-frame-only mode)
+    middle_images_paths: list = field(default_factory=list)  # [(path_str, fraction_float), ...] for N-anchor (LTX Multi)
 
     # Audio / video paths
     audio_ref:    Optional[str] = None           # path to speaker reference .wav/.mp3

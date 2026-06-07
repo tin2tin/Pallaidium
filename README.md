@@ -132,6 +132,8 @@ The generated media will be saved to the directory specified in the addon prefer
 
 ## Change Log
 
+2026-06-07: Add: LTX-2.3 Multi-Input N-Anchor mode — place **3 or more** Image strips inside a Meta strip to pin the generated video at multiple points in time. Each image's position within the Meta strip determines its frame anchor: the first image locks frame 0, the last image locks the final frame, and every image in between is mapped proportionally to the corresponding frame index. Works with the interactive generator and the Render Queue.
+
 2026-06-07: Add: Display System Console preference — a new checkbox in add-on preferences (after "Use Local Files Only") controls whether the Windows system console is shown when generation starts. Unchecking it suppresses `show_system_console` and `set_system_console_topmost` across all four interactive operators (video, audio, image, text) and both queue execution paths.
 
 2026-06-07: Fix: Local Files Only — `local_files_only` is now consistently applied to every `from_pretrained` and `hf_hub_download` call across all model plugins. When the setting is enabled and weights are not cached, a clear error is shown: "Weights missing. Uncheck 'Use Local Files Only' in Preferences to download."
@@ -429,6 +431,7 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 ### Video:
 - [Lightricks/LTX-2](https://huggingface.co/Lightricks/LTX-2)
 - [Lightricks/LTX-2 Multi-Input](https://huggingface.co/Lightricks/LTX-2)
+- [OzzyGT/LTX-2.3 Distilled (9B) — Multimodal Multi-Anchor](https://huggingface.co/OzzyGT/LTX-2.3-Distilled)
 - [Wan-AI/Wan2.1-T2V](https://huggingface.co/Wan-AI)
 - [Wan-AI/Wan2.1-I2V](https://huggingface.co/Wan-AI)
 - [SkyReels-V1-Hunyuan-I2V/T2V](https://huggingface.co/Skywork/SkyReels-V1-Hunyuan-I2V)

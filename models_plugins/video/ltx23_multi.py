@@ -88,6 +88,7 @@ class LTX2_3MultiPlugin(ModelPlugin):
             from _pipeline_ltx2_multimodal import LTX2MultiModalPipeline, LTX2AudioCondition, LTX2ImageCondition, load_audio
 
         _cache_dir     = prefs.hf_cache_dir or None
+        _lfo           = prefs.local_files_only
         MODEL_PATH     = "OzzyGT/LTX-2.3-Distilled"
         SDNQ_PATH      = "OzzyGT/LTX-2.3-Distilled-sdnq-dynamic-int4"
         UPSAMPLER_PATH = "OzzyGT/LTX-2.3-upsampler-x2"
@@ -242,7 +243,25 @@ class LTX2_3MultiPlugin(ModelPlugin):
                 image_input = image_input.convert("RGB")
             # print(f"[LTX23Multi]   image_input PIL size={image_input.size}")
 
-        if image_input is not None and last_input is not None:
+        _middle_paths = getattr(inputs, "middle_images_paths", [])
+
+        if image_input is not None and last_input is not None and _middle_paths:
+            # Mode MA: multi-anchor — first + N intermediate anchors + last
+            from diffusers.utils import load_image as _load_image
+            image_conditions = [
+                LTX2ImageCondition(image=image_input, frame=0, strength=1.0),
+            ]
+            for _mp, _frac in _middle_paths:
+                _frame_idx = round(_frac * (num_frames - 1))
+                _frame_idx = max(1, min(num_frames - 2, _frame_idx))
+                try:
+                    _mid_pil = _load_image(_mp).convert("RGB").resize((inputs.width, inputs.height))
+                    image_conditions.append(LTX2ImageCondition(image=_mid_pil, frame=_frame_idx, strength=1.0))
+                except Exception as _e:
+                    print(f"[LTX23Multi] WARNING: skipping middle anchor {_mp!r}: {_e}")
+            image_conditions.append(LTX2ImageCondition(image=last_input, frame=-1, strength=1.0))
+            print(f"[LTX23Multi] MODE: MULTI-ANCHOR — {len(image_conditions)} conditions, num_frames={num_frames}")
+        elif image_input is not None and last_input is not None:
             # Mode A: FLF — hard anchor image 1 at start, soft keyframe image 2 at end
             image_conditions = [
                 LTX2ImageCondition(image=image_input, frame=0,  strength=1.0),
@@ -266,13 +285,14 @@ class LTX2_3MultiPlugin(ModelPlugin):
         self.set_phase(inputs, "Text encoding")
         text_encoder = Gemma3ForConditionalGeneration.from_pretrained(
             SDNQ_PATH, subfolder="text_encoder", torch_dtype=torch_dtype, cache_dir=_cache_dir,
+            local_files_only=_lfo,
         )
         embeds_pipe = LTX2MultiModalPipeline.from_pretrained(
             MODEL_PATH,
             text_encoder=text_encoder,
             transformer=None, vae=None, audio_vae=None, vocoder=None,
             scheduler=None,
-            torch_dtype=torch_dtype, cache_dir=_cache_dir,
+            torch_dtype=torch_dtype, cache_dir=_cache_dir, local_files_only=_lfo,
         )
         embeds_pipe.to(onload_device)
         with torch.inference_mode():
@@ -290,13 +310,13 @@ class LTX2_3MultiPlugin(ModelPlugin):
         self.set_phase(inputs, f"Stage 1: generating {stage1_w}×{stage1_h}")
         transformer = LTX2VideoTransformer3DModel.from_pretrained(
             SDNQ_PATH, subfolder="transformer", torch_dtype=torch_dtype, device_map="cpu",
-            cache_dir=_cache_dir,
+            cache_dir=_cache_dir, local_files_only=_lfo,
         )
         pipe = LTX2MultiModalPipeline.from_pretrained(
             MODEL_PATH,
             transformer=transformer,
             text_encoder=None, tokenizer=None,
-            torch_dtype=torch_dtype, cache_dir=_cache_dir,
+            torch_dtype=torch_dtype, cache_dir=_cache_dir, local_files_only=_lfo,
         )
         pipe.scheduler = FlowMatchEulerDiscreteScheduler.from_config(
             pipe.scheduler.config, use_dynamic_shifting=False, shift_terminal=None,
@@ -406,7 +426,7 @@ class LTX2_3MultiPlugin(ModelPlugin):
         # ── Latent upsampling (2×) ──────────────────────────────────────────
         self.set_phase(inputs, "Stage 1.5: latent upsampling ×2")
         upsampler = LTX2LatentUpsamplerModel.from_pretrained(
-            UPSAMPLER_PATH, torch_dtype=torch_dtype, cache_dir=_cache_dir,
+            UPSAMPLER_PATH, torch_dtype=torch_dtype, cache_dir=_cache_dir, local_files_only=_lfo,
         ).to(onload_device)
         with torch.inference_mode():
             up_latent = upsampler(video_latent.to(onload_device, dtype=torch_dtype))
@@ -418,13 +438,13 @@ class LTX2_3MultiPlugin(ModelPlugin):
         self.set_phase(inputs, f"Stage 2: refinement {w}×{h}")
         transformer2 = LTX2VideoTransformer3DModel.from_pretrained(
             SDNQ_PATH, subfolder="transformer", torch_dtype=torch_dtype, device_map="cpu",
-            cache_dir=_cache_dir,
+            cache_dir=_cache_dir, local_files_only=_lfo,
         )
         refine_pipe = LTX2MultiModalPipeline.from_pretrained(
             MODEL_PATH,
             transformer=transformer2,
             text_encoder=None, tokenizer=None,
-            torch_dtype=torch_dtype, cache_dir=_cache_dir,
+            torch_dtype=torch_dtype, cache_dir=_cache_dir, local_files_only=_lfo,
         )
         refine_pipe.scheduler = FlowMatchEulerDiscreteScheduler.from_config(
             refine_pipe.scheduler.config, use_dynamic_shifting=False, shift_terminal=None,
@@ -513,7 +533,7 @@ class LTX2_3MultiPlugin(ModelPlugin):
         decode_pipe = LTX2MultiModalPipeline.from_pretrained(
             MODEL_PATH,
             transformer=None, text_encoder=None, tokenizer=None, scheduler=None,
-            torch_dtype=torch_dtype, cache_dir=_cache_dir,
+            torch_dtype=torch_dtype, cache_dir=_cache_dir, local_files_only=_lfo,
         )
         vae = decode_pipe.vae.to(onload_device)
         with torch.inference_mode():

@@ -283,14 +283,29 @@ class SEQUENCER_OT_generate_movie(Operator):
                 if os.path.isfile(sp):
                     audio_ref = sp
 
+            # LTX Multi N-anchor: parse middle image paths+fractions from scene property
+            _middle_images_paths = []
+            if _is_ltx_multi:
+                _middle_json = getattr(scene, "ltx_middle_images_json", "") or ""
+                if _middle_json:
+                    try:
+                        import json as _json_mi
+                        _middle_images_paths = [
+                            (str(p), float(f)) for p, f in _json_mi.loads(_middle_json)
+                            if p and os.path.isfile(str(p))
+                        ]
+                    except Exception as _e:
+                        print(f"[LTX Multi] middle_images_json parse error: {_e}")
+
             inputs = ModelInputs(
-                prompt      = prompt,
-                neg_prompt  = negative_prompt,
-                mode        = mode,
-                image       = init_image,
-                last_image  = _flf_last_image,
-                video_path  = video_path,
-                audio_ref   = audio_ref,
+                prompt               = prompt,
+                neg_prompt           = negative_prompt,
+                mode                 = mode,
+                image                = init_image,
+                last_image           = _flf_last_image,
+                middle_images_paths  = _middle_images_paths,
+                video_path           = video_path,
+                audio_ref            = audio_ref,
                 width       = x,
                 height      = y,
                 frames      = abs(duration),
@@ -1324,6 +1339,7 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                             scene.movie_path = ""
                             scene.image_path = ""
                             scene.sound_path = ""
+                            scene.ltx_middle_images_json = ""
 
                             print(f"[LTX Multi META] ── BEGIN META decompose ──────────────────────")
                             print(f"[LTX Multi META] meta='{meta_strip.name}'  children={len(list(meta_strip.strips))}")
@@ -1413,6 +1429,8 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                             print(f"[LTX Multi META] collected audio_path={_audio_path!r}")
 
                             # ── Mode detection ────────────────────────────────────────────
+                            # Mode MA: 3+ images with no video → multi-anchor
+                            _multi_anchor_mode = not _video_path and len(_images_wf) >= 3
                             # Mode A: exactly 2 images with different frame_start, no video
                             _flf_mode = (
                                 not _video_path
@@ -1432,9 +1450,26 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                                 and _images_wf[0][1] > max(_other_starts)
                             )
 
-                            print(f"[LTX Multi META] mode: FLF={_flf_mode}  LFO={_lfo_mode}")
+                            print(f"[LTX Multi META] mode: MULTI_ANCHOR={_multi_anchor_mode}  FLF={_flf_mode}  LFO={_lfo_mode}")
 
-                            if _flf_mode:
+                            if _multi_anchor_mode:
+                                import json as _json
+                                _sorted_wf = sorted(_images_wf, key=lambda x: x[1])
+                                scene.movie_path = _sorted_wf[0][0]   # first image → start anchor
+                                scene.image_path = _sorted_wf[-1][0]  # last image → end anchor
+                                _meta_fs  = meta_strip.frame_final_start
+                                _meta_dur = max(1, meta_strip.frame_final_duration)
+                                _middle = []
+                                for _path, _fstart, _mstrip in _sorted_wf[1:-1]:
+                                    _frac = (_mstrip.frame_final_start - _meta_fs) / _meta_dur
+                                    _frac = max(0.001, min(0.999, _frac))
+                                    _middle.append([_path, _frac])
+                                scene.ltx_middle_images_json = _json.dumps(_middle)
+                                print(f"[LTX Multi META] MULTI-ANCHOR → first={scene.movie_path!r}")
+                                print(f"[LTX Multi META] MULTI-ANCHOR → last ={scene.image_path!r}")
+                                print(f"[LTX Multi META] MULTI-ANCHOR → middle={_middle}")
+
+                            elif _flf_mode:
                                 _sorted_wf = sorted(_images_wf, key=lambda x: x[1])
                                 scene.movie_path = _sorted_wf[0][0]   # lower frame_start → first frame
                                 scene.image_path = _sorted_wf[1][0]   # higher frame_start → last frame

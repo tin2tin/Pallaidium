@@ -37,7 +37,7 @@ class FluxCannyPlugin(ModelPlugin):
         model_nf4 = FluxTransformer2DModel.from_pretrained(
             pipecard, subfolder="transformer",
             quantization_config=nf4_config, torch_dtype=torch.bfloat16,
-            cache_dir=_cache_dir,
+            cache_dir=_cache_dir, local_files_only=prefs.local_files_only,
         )
         pipe = FluxControlPipeline.from_pretrained(
             pipecard, transformer=model_nf4, torch_dtype=torch.bfloat16,

@@ -28,7 +28,8 @@ class FoundationMusicPlugin(ModelPlugin):
         print("Loading Foundation-1 StableAudio…")
         _cache_dir = prefs.hf_cache_dir or None
         pipe = StableAudioPipeline.from_pretrained(
-            self.MODEL_ID, torch_dtype=torch.float16, cache_dir=_cache_dir
+            self.MODEL_ID, torch_dtype=torch.float16, cache_dir=_cache_dir,
+            local_files_only=prefs.local_files_only,
         )
         if gfx_device == "mps":
             pipe.to("mps")

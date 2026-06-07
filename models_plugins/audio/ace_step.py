@@ -30,7 +30,8 @@ class AceStepPlugin(ModelPlugin):
         _cache_dir = prefs.hf_cache_dir or None
         print(f"Loading {self.MODEL_ID}…")
         pipe = AceStepPipeline.from_pretrained(
-            self.MODEL_ID, torch_dtype=torch.bfloat16, cache_dir=_cache_dir
+            self.MODEL_ID, torch_dtype=torch.bfloat16, cache_dir=_cache_dir,
+            local_files_only=prefs.local_files_only,
         )
         if gfx_device == "mps":
             pipe.to("mps")

@@ -46,7 +46,8 @@ class Ideogram4Plugin(ModelPlugin):
         dtype      = torch.bfloat16
         print(f"Loading {self.MODEL_ID}…")
 
-        load_kwargs = dict(torch_dtype=dtype, cache_dir=_cache_dir)
+        _lfo = prefs.local_files_only
+        load_kwargs = dict(torch_dtype=dtype, cache_dir=_cache_dir, local_files_only=_lfo)
 
         prompt_upsampling = getattr(scene, "ideogram_prompt_upsampling", False)
         if prompt_upsampling:
@@ -54,7 +55,7 @@ class Ideogram4Plugin(ModelPlugin):
                 from diffusers import Ideogram4PromptEnhancerHead
                 print("Ideogram4: loading prompt enhancer head…")
                 enhancer_head = Ideogram4PromptEnhancerHead.from_pretrained(
-                    self._ENHANCER, torch_dtype=dtype, cache_dir=_cache_dir,
+                    self._ENHANCER, torch_dtype=dtype, cache_dir=_cache_dir, local_files_only=_lfo,
                 )
                 load_kwargs["prompt_enhancer_head"] = enhancer_head
                 print("Ideogram4: prompt enhancer head attached")

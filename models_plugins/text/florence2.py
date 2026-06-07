@@ -24,8 +24,9 @@ class Florence2Plugin(ModelPlugin):
             self.MODEL_ID,
             device_map="auto",
             cache_dir=_cache_dir,
+            local_files_only=prefs.local_files_only,
         )
-        processor = AutoProcessor.from_pretrained(self.MODEL_ID, cache_dir=_cache_dir)
+        processor = AutoProcessor.from_pretrained(self.MODEL_ID, cache_dir=_cache_dir, local_files_only=prefs.local_files_only)
         return {"model": model, "processor": processor, "tokenizer": None}
 
     def generate(self, pipe, inputs: ModelInputs, scene, prefs) -> str:

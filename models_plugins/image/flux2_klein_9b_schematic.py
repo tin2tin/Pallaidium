@@ -64,22 +64,26 @@ class Flux2Klein9BSchematicPlugin(ModelPlugin):
         mode = getattr(scene, "klein_schematic_mode", "DEPTH")
         print(f"Loading {self.MODEL_ID} (schematic mode: {mode})…")
 
+        _lfo = prefs.local_files_only
         transformer = Flux2Transformer2DModel.from_pretrained(
             self._TRANSFORMER, torch_dtype=torch.bfloat16, device_map="cpu", cache_dir=_cache_dir,
+            local_files_only=_lfo,
         )
         text_encoder = Qwen3ForCausalLM.from_pretrained(
             self._TEXT_ENCODER, torch_dtype=torch.bfloat16, device_map="cpu", cache_dir=_cache_dir,
+            local_files_only=_lfo,
         )
         pipe = Flux2KleinPipeline.from_pretrained(
             self._BASE_PIPELINE,
             transformer=transformer, text_encoder=text_encoder,
-            torch_dtype=torch.bfloat16, cache_dir=_cache_dir,
+            torch_dtype=torch.bfloat16, cache_dir=_cache_dir, local_files_only=_lfo,
         )
         from huggingface_hub import hf_hub_download
         lora_path = hf_hub_download(
             repo_id=_LORA_REPO,
             filename=_LORA_FILES[mode],
             cache_dir=_cache_dir,
+            local_files_only=_lfo,
         )
         pipe.load_lora_weights(lora_path, adapter_name="schematic")
         pipe.set_adapters(["schematic"], adapter_weights=[1.0])

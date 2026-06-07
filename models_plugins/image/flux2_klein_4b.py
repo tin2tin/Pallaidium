@@ -31,11 +31,13 @@ class Flux2Klein4BPlugin(ModelPlugin):
         mode = kw.get("mode", "txt2img")
         print(f"Loading {self.MODEL_ID} ({mode})…")
 
+        _lfo = prefs.local_files_only
         if mode == "inpaint":
             from diffusers import Flux2KleinInpaintPipeline
 
             pipe = Flux2KleinInpaintPipeline.from_pretrained(
                 self._BASE_PIPELINE, torch_dtype=torch.bfloat16, cache_dir=_cache_dir,
+                local_files_only=_lfo,
             )
             if gfx_device == "mps":
                 pipe.to("mps")
@@ -47,7 +49,7 @@ class Flux2Klein4BPlugin(ModelPlugin):
 
         dtype = torch.bfloat16
         pipe = Flux2KleinPipeline.from_pretrained(
-            self._BASE_PIPELINE, torch_dtype=dtype, cache_dir=_cache_dir,
+            self._BASE_PIPELINE, torch_dtype=dtype, cache_dir=_cache_dir, local_files_only=_lfo,
         )
 
         enabled_items = kw.get("enabled_items", [])

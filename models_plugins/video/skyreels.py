@@ -33,27 +33,32 @@ class SkyReelsPlugin(ModelPlugin):
         mode = kw.get("mode", "txt2vid")
         print(f"Loading {self.MODEL_ID} ({mode})…")
 
+        _lfo = prefs.local_files_only
         if mode in ("img2vid", "vid2vid"):
             from diffusers import HunyuanSkyreelsImageToVideoPipeline
             model_id = "hunyuanvideo-community/HunyuanVideo"
             transformer = HunyuanVideoTransformer3DModel.from_pretrained(
                 "newgenai79/SkyReels-V1-Hunyuan-I2V-int4",
                 subfolder="transformer", torch_dtype=torch.bfloat16, cache_dir=_cache_dir,
+                local_files_only=_lfo,
             )
             pipe = HunyuanSkyreelsImageToVideoPipeline.from_pretrained(
                 model_id, transformer=transformer, torch_dtype=torch.float16, cache_dir=_cache_dir,
+                local_files_only=_lfo,
             )
         else:
             from diffusers import HunyuanVideoPipeline
             transformer = HunyuanVideoTransformer3DModel.from_pretrained(
                 "newgenai79/SkyReels-V1-Hunyuan-T2V-int4",
                 subfolder="transformer", torch_dtype=torch.bfloat16, cache_dir=_cache_dir,
+                local_files_only=_lfo,
             )
             transformer.enable_layerwise_casting(
                 storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16
             )
             pipe = HunyuanVideoPipeline.from_pretrained(
-                "newgenai79/HunyuanVideo-int4", transformer=transformer, torch_dtype=torch.float16, cache_dir=_cache_dir,
+                "newgenai79/HunyuanVideo-int4", transformer=transformer, torch_dtype=torch.float16,
+                cache_dir=_cache_dir, local_files_only=_lfo,
             )
 
         if gfx_device == "mps":

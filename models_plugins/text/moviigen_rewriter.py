@@ -36,8 +36,9 @@ class MoviiGenRewriterPlugin(ModelPlugin):
             device_map="auto",
             quantization_config=quantization_config,
             cache_dir=_cache_dir,
+            local_files_only=prefs.local_files_only,
         )
-        tokenizer = AutoTokenizer.from_pretrained(self.MODEL_ID, cache_dir=_cache_dir)
+        tokenizer = AutoTokenizer.from_pretrained(self.MODEL_ID, cache_dir=_cache_dir, local_files_only=prefs.local_files_only)
         return {"model": model, "processor": None, "tokenizer": tokenizer}
 
     def generate(self, pipe, inputs: ModelInputs, scene, prefs) -> str:

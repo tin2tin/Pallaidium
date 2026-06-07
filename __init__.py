@@ -302,7 +302,13 @@ def register():
         default="",
         options={"TEXTEDIT_UPDATE"},
     )
-    
+
+    # LTX Multi N-anchor middle images (JSON list of [path, fraction] pairs)
+    bpy.types.Scene.ltx_middle_images_json = bpy.props.StringProperty(
+        name="ltx_middle_images_json",
+        default="",
+    )
+
     bpy.types.Scene.input_strips = bpy.props.EnumProperty(
         items=[
             ("input_prompt", "Prompts", "Prompts"),
@@ -838,6 +844,7 @@ def unregister():
     del bpy.types.Scene.movie_path
     del bpy.types.Scene.image_path
     del bpy.types.Scene.sound_path
+    del bpy.types.Scene.ltx_middle_images_json
     del bpy.types.Scene.refine_sd
     del bpy.types.Scene.aurasr
     del bpy.types.Scene.adetailer

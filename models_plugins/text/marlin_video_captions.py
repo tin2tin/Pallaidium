@@ -226,6 +226,12 @@ class MarlinVideoCaptionsPlugin(ModelPlugin):
                 used = f"{'FA2' if fa2_used else 'SDPA'}+{'4-bit' if bnb_used else 'bf16'}"
                 print(f"Marlin: loaded ({used})")
                 return {"model": marlin}
+            except OSError as e:
+                if local:
+                    raise OSError(
+                        "Weights missing. Uncheck 'Use Local Files Only' in Preferences to download."
+                    ) from e
+                print(f"Marlin: load attempt failed ({e}), trying next config…")
             except Exception as e:
                 print(f"Marlin: load attempt failed ({e}), trying next config…")
 

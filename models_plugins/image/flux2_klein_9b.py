@@ -34,19 +34,22 @@ class Flux2Klein9BPlugin(ModelPlugin):
         mode = kw.get("mode", "txt2img")
         print(f"Loading {self.MODEL_ID} ({mode})…")
 
+        _lfo = prefs.local_files_only
         if mode == "inpaint":
             from diffusers import Flux2KleinInpaintPipeline, Flux2Transformer2DModel
 
             transformer = Flux2Transformer2DModel.from_pretrained(
                 self._TRANSFORMER, torch_dtype=torch.bfloat16, device_map="cpu", cache_dir=_cache_dir,
+                local_files_only=_lfo,
             )
             text_encoder = Qwen3ForCausalLM.from_pretrained(
                 self._TEXT_ENCODER, torch_dtype=torch.bfloat16, device_map="cpu", cache_dir=_cache_dir,
+                local_files_only=_lfo,
             )
             pipe = Flux2KleinInpaintPipeline.from_pretrained(
                 self._BASE_PIPELINE,
                 transformer=transformer, text_encoder=text_encoder,
-                torch_dtype=torch.bfloat16, cache_dir=_cache_dir,
+                torch_dtype=torch.bfloat16, cache_dir=_cache_dir, local_files_only=_lfo,
             )
             if gfx_device == "mps":
                 pipe.to("mps")
@@ -59,14 +62,16 @@ class Flux2Klein9BPlugin(ModelPlugin):
         dtype = torch.bfloat16
         transformer = Flux2Transformer2DModel.from_pretrained(
             self._TRANSFORMER, torch_dtype=dtype, device_map="cpu", cache_dir=_cache_dir,
+            local_files_only=_lfo,
         )
         text_encoder = Qwen3ForCausalLM.from_pretrained(
             self._TEXT_ENCODER, torch_dtype=dtype, device_map="cpu", cache_dir=_cache_dir,
+            local_files_only=_lfo,
         )
         pipe = Flux2KleinPipeline.from_pretrained(
             self._BASE_PIPELINE,
             transformer=transformer, text_encoder=text_encoder, torch_dtype=dtype,
-            cache_dir=_cache_dir,
+            cache_dir=_cache_dir, local_files_only=_lfo,
         )
 
         enabled_items = kw.get("enabled_items", [])

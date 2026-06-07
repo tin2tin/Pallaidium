@@ -50,18 +50,22 @@ class ErnieTurboPlugin(ModelPlugin):
         # Do NOT use device_map="cpu" — enable_model_cpu_offload() manages
         # devices automatically and device_map="cpu" causes a device mismatch
         # warning with newer Transformers/Accelerate versions.
+        _lfo = prefs.local_files_only
         print("Loading transformer...")
         transformer = ErnieImageTransformer2DModel.from_pretrained(
             sdnq_path, subfolder="transformer", torch_dtype=dtype, cache_dir=_cache_dir,
+            local_files_only=_lfo,
         )
         print("Loading text encoder...")
         text_encoder = Mistral3Model.from_pretrained(
             sdnq_path, subfolder="text_encoder", torch_dtype=dtype, cache_dir=_cache_dir,
+            local_files_only=_lfo,
         )
         if self.USE_PROMPT_ENHANCER:
             print("Loading prompt enhancer...")
             prompt_enhancer = Ministral3ForCausalLM.from_pretrained(
                 sdnq_path, subfolder="pe", torch_dtype=dtype, cache_dir=_cache_dir,
+                local_files_only=_lfo,
             )
         else:
             prompt_enhancer = None
@@ -74,6 +78,7 @@ class ErnieTurboPlugin(ModelPlugin):
             pe=prompt_enhancer,
             torch_dtype=dtype,
             cache_dir=_cache_dir,
+            local_files_only=_lfo,
         )
 
         if triton_is_available and (torch.cuda.is_available() or torch.xpu.is_available()):

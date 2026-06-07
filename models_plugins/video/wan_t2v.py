@@ -34,21 +34,22 @@ class WanT2VPlugin(ModelPlugin):
         nf4 = BitsAndBytesConfig(
             load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=torch.bfloat16,
         )
+        _lfo = prefs.local_files_only
         transformer_high = WanTransformer3DModel.from_pretrained(
             self.MODEL_ID, subfolder="transformer",
             quantization_config=nf4, torch_dtype=torch.bfloat16, low_cpu_mem_usage=True,
-            cache_dir=_cache_dir,
+            cache_dir=_cache_dir, local_files_only=_lfo,
         )
         transformer_low = WanTransformer3DModel.from_pretrained(
             self.MODEL_ID, subfolder="transformer_2",
             quantization_config=nf4, torch_dtype=torch.bfloat16, low_cpu_mem_usage=True,
-            cache_dir=_cache_dir,
+            cache_dir=_cache_dir, local_files_only=_lfo,
         )
         pipe = WanPipeline.from_pretrained(
             self.MODEL_ID,
             transformer=transformer_high, transformer_2=transformer_low,
             torch_dtype=torch.bfloat16, low_cpu_mem_usage=True,
-            cache_dir=_cache_dir,
+            cache_dir=_cache_dir, local_files_only=_lfo,
         )
 
         # Lightx2v turbo LoRA

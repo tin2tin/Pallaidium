@@ -32,9 +32,11 @@ class FluxReduxPlugin(ModelPlugin):
             text_encoder=None, text_encoder_2=None,
             torch_dtype=torch.bfloat16,
             cache_dir=_cache_dir,
+            local_files_only=prefs.local_files_only,
         )
         pipe_prior = FluxPriorReduxPipeline.from_pretrained(
-            self.MODEL_ID, torch_dtype=torch.bfloat16, cache_dir=_cache_dir
+            self.MODEL_ID, torch_dtype=torch.bfloat16, cache_dir=_cache_dir,
+            local_files_only=prefs.local_files_only,
         ).to("cuda")
 
         if gfx_device == "mps":

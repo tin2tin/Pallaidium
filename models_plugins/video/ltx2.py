@@ -24,7 +24,7 @@ class LTX2Plugin(ModelPlugin):
 
         _cache_dir = prefs.hf_cache_dir or None
         print(f"Loading {self.MODEL_ID}…")
-        pipe = LTX2ImageToVideoPipeline.from_pretrained(self.MODEL_ID, torch_dtype=torch.bfloat16, cache_dir=_cache_dir)
+        pipe = LTX2ImageToVideoPipeline.from_pretrained(self.MODEL_ID, torch_dtype=torch.bfloat16, cache_dir=_cache_dir, local_files_only=prefs.local_files_only)
 
         if gfx_device == "mps":
             pipe.to("mps")
@@ -85,7 +85,7 @@ class LTX2Plugin(ModelPlugin):
         _cache_dir = prefs.hf_cache_dir or None
         latent_upsampler = LTX2LatentUpsamplerModel.from_pretrained(
             self.MODEL_ID, subfolder="latent_upsampler", torch_dtype=torch.bfloat16,
-            cache_dir=_cache_dir,
+            cache_dir=_cache_dir, local_files_only=prefs.local_files_only,
         )
         upsample_pipe = LTX2LatentUpsamplePipeline(vae=pipe.vae, latent_upsampler=latent_upsampler)
         upsample_pipe.enable_model_cpu_offload(device=gfx_device)

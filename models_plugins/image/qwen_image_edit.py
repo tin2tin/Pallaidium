@@ -44,12 +44,14 @@ class QwenImageEditPlugin(ModelPlugin):
         except ImportError:
             pass
 
+        _lfo = prefs.local_files_only
         text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
             self.QUANT_ID,
             subfolder="text_encoder",
             dtype=dtype,
             device_map="cpu",
             cache_dir=_cache_dir,
+            local_files_only=_lfo,
         )
         transformer = QwenImageTransformer2DModel.from_pretrained(
             self.QUANT_ID,
@@ -57,6 +59,7 @@ class QwenImageEditPlugin(ModelPlugin):
             torch_dtype=dtype,
             device_map="cpu",
             cache_dir=_cache_dir,
+            local_files_only=_lfo,
         )
 
         pipe = QwenImageEditPlusPipeline.from_pretrained(
@@ -65,6 +68,7 @@ class QwenImageEditPlugin(ModelPlugin):
             text_encoder=text_encoder,
             torch_dtype=dtype,
             cache_dir=_cache_dir,
+            local_files_only=_lfo,
         )
 
         if _apply_sdnq and _triton_ok:

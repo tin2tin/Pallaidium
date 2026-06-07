@@ -133,7 +133,8 @@ class RenderQueueJob(PropertyGroup):
     image_path:      StringProperty()
     movie_path:      StringProperty()
     sound_path:      StringProperty()
-    last_image_path: StringProperty()   # FLF/LFO last-frame image (LTX Multi)
+    last_image_path:   StringProperty()   # FLF/LFO last-frame image (LTX Multi)
+    middle_images_json: StringProperty(default="")  # N-anchor middle images: JSON [[path, fraction], ...] (LTX Multi)
     ref_audio_path:  StringProperty()
     ref_text:        StringProperty()
 
@@ -614,6 +615,19 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             if os.path.splitext(vid_path)[1].lower() in _IMAGE_EXTS:
                 vid_path = ""
 
+        # N-anchor middle images (LTX Multi)
+        _middle_images_paths = []
+        _middle_json = snapshot.get("middle_images_json", "") or ""
+        if _middle_json:
+            try:
+                _middle_raw = json.loads(_middle_json)
+                _middle_images_paths = [
+                    (str(p), float(f)) for p, f in _middle_raw
+                    if p and os.path.isfile(str(p))
+                ]
+            except Exception as _e:
+                print(f"[Queue] middle_images_json parse error: {_e}")
+
         inpaint_mask = None
         mask_path = snapshot.get("inpaint_mask_path", "")
         if mask_path and os.path.isfile(mask_path):
@@ -646,12 +660,13 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             _infer_w, _infer_h = init_image.size
 
         inputs = ModelInputs(
-            prompt         = snapshot["prompt"],
-            neg_prompt     = snapshot["neg_prompt"],
-            mode           = mode,
-            image          = init_image,
-            last_image     = _flf_last_image,
-            inpaint_mask   = inpaint_mask,
+            prompt               = snapshot["prompt"],
+            neg_prompt           = snapshot["neg_prompt"],
+            mode                 = mode,
+            image                = init_image,
+            last_image           = _flf_last_image,
+            middle_images_paths  = _middle_images_paths,
+            inpaint_mask         = inpaint_mask,
             width          = _infer_w,
             height         = _infer_h,
             frames         = snapshot["frames"],
@@ -856,9 +871,9 @@ class SEQUENCER_OT_add_to_queue(Operator):
               movie_path      = ""
               last_image_path = that image
         """
-        image_path = movie_path = sound_path = last_image_path = ""
+        image_path = movie_path = sound_path = last_image_path = middle_images_json = ""
         if strip is None:
-            return image_path, movie_path, sound_path, last_image_path
+            return image_path, movie_path, sound_path, last_image_path, middle_images_json
         if strip.type == "IMAGE":
             dirname = os.path.dirname(bpy.path.abspath(strip.directory))
             try:
@@ -878,7 +893,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
         elif strip.type == "META":
             # Decompose META children into typed paths so the job gets real
             # media references rather than empty strings.
-            _meta_images = []   # (path, frame_start) for IMAGE children
+            _meta_images = []   # (path, frame_start, child_strip) for IMAGE children
             for child in strip.strips:
                 if child.type == "IMAGE":
                     try:
@@ -886,7 +901,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
                         fname = child.elements[0].filename
                         candidate = os.path.join(dirname, fname)
                         if fname and os.path.isfile(candidate):
-                            _meta_images.append((candidate, child.frame_start))
+                            _meta_images.append((candidate, child.frame_start, child))
                     except (IndexError, AttributeError):
                         pass
                 elif child.type == "MOVIE" and not movie_path:
@@ -904,7 +919,21 @@ class SEQUENCER_OT_add_to_queue(Operator):
                     except AttributeError:
                         pass
 
-            if not movie_path and len(_meta_images) == 2 and _meta_images[0][1] != _meta_images[1][1]:
+            if not movie_path and len(_meta_images) >= 3:
+                # Multi-anchor: 3+ images → first=start anchor, last=end anchor, rest=middle
+                _sorted = sorted(_meta_images, key=lambda x: x[1])
+                movie_path      = _sorted[0][0]
+                last_image_path = _sorted[-1][0]
+                _meta_fs  = strip.frame_final_start
+                _meta_dur = max(1, strip.frame_final_duration)
+                _middle = []
+                for _mp, _, _mchild in _sorted[1:-1]:
+                    _frac = (_mchild.frame_final_start - _meta_fs) / _meta_dur
+                    _frac = max(0.001, min(0.999, _frac))
+                    _middle.append([_mp, _frac])
+                import json as _json_q
+                middle_images_json = _json_q.dumps(_middle)
+            elif not movie_path and len(_meta_images) == 2 and _meta_images[0][1] != _meta_images[1][1]:
                 # FLF: 2 images with different frame_starts → first → movie_path, second → last_image_path
                 _sorted = sorted(_meta_images, key=lambda x: x[1])
                 movie_path      = _sorted[0][0]
@@ -922,7 +951,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
 
         # TEXT, COLOR, ADJUSTMENT, SCENE, effect strips, etc.:
         # return empty strings → mode detection falls through to txt2* path.
-        return image_path, movie_path, sound_path, last_image_path
+        return image_path, movie_path, sound_path, last_image_path, middle_images_json
 
     @staticmethod
     def _detect_mode(otype, image_path, movie_path, inpaint_strip):
@@ -1102,7 +1131,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
 
         for strip in strip_list:
             if strip is not None:
-                image_path, movie_path, sound_path, last_image_path = self._paths_from_strip(strip)
+                image_path, movie_path, sound_path, last_image_path, middle_images_json = self._paths_from_strip(strip)
 
                 # For META strips: render the SOUND child at its trimmed in/out points
                 # so the job stores a short WAV rather than the full source audio file.
@@ -1141,10 +1170,11 @@ class SEQUENCER_OT_add_to_queue(Operator):
                     sound_path and (otype == "audio" or _pi_strip_input)
                 ) else ""
             else:
-                image_path      = bpy.path.abspath(getattr(scene, "image_path", "") or "")
-                movie_path      = bpy.path.abspath(getattr(scene, "movie_path", "") or "")
-                sound_path      = bpy.path.abspath(getattr(scene, "sound_path", "") or "")
-                last_image_path = ""
+                image_path         = bpy.path.abspath(getattr(scene, "image_path", "") or "")
+                movie_path         = bpy.path.abspath(getattr(scene, "movie_path", "") or "")
+                sound_path         = bpy.path.abspath(getattr(scene, "sound_path", "") or "")
+                last_image_path    = ""
+                middle_images_json = ""
                 strip_audio_path = ""
 
                 # Negative raw_frames = "auto" sentinel. In prompt mode there is no
@@ -1208,10 +1238,11 @@ class SEQUENCER_OT_add_to_queue(Operator):
                 job.insert_channel     = channel
                 job.insert_duration    = insert_dur
 
-                job.image_path      = image_path
-                job.movie_path      = movie_path
-                job.sound_path      = sound_path
-                job.last_image_path = last_image_path
+                job.image_path         = image_path
+                job.movie_path         = movie_path
+                job.sound_path         = sound_path
+                job.last_image_path    = last_image_path
+                job.middle_images_json = middle_images_json
 
                 for attr, val in common.items():
                     setattr(job, attr, val)
@@ -1292,7 +1323,7 @@ def _queue_start_job(scene, job) -> None:
         "audio_speed_tts", "chat_exaggeration", "chat_pace",
         "chat_temperature", "fps", "music_bpm", "music_lyrics",
         "music_key_scale", "music_time_signature",
-        "image_path", "movie_path", "sound_path", "last_image_path", "ref_audio_path",
+        "image_path", "movie_path", "sound_path", "last_image_path", "middle_images_json", "ref_audio_path",
         "ref_text", "hugginface_token", "local_files_only", "display_console",
         "generator_ai", "hf_cache_dir", "lora_files_json", "lora_folder",
         "insert_frame_start", "insert_frame_end",
@@ -1483,17 +1514,30 @@ def _run_job_main_thread(scene, job) -> None:
         if _mt_last_path and os.path.isfile(_mt_last_path):
             _mt_last_image = load_first_frame(_mt_last_path)
 
+        _mt_middle_paths = []
+        _mt_middle_json = getattr(job, "middle_images_json", "") or ""
+        if _mt_middle_json:
+            try:
+                _mt_middle_raw = json.loads(_mt_middle_json)
+                _mt_middle_paths = [
+                    (str(p), float(f)) for p, f in _mt_middle_raw
+                    if p and os.path.isfile(str(p))
+                ]
+            except Exception as _e:
+                print(f"[Queue] middle_images_json parse error (main thread): {_e}")
+
         inputs = ModelInputs(
-            prompt              = job.prompt,
-            neg_prompt          = job.neg_prompt,
-            mode                = mode,
-            steps               = job.steps,
-            guidance            = job.guidance,
-            strength            = job.image_power,
-            seed                = job.seed,
-            audio_ref           = job.ref_audio_path or job.sound_path or None,
-            video_path          = job.movie_path or None,
-            last_image          = _mt_last_image,
+            prompt               = job.prompt,
+            neg_prompt           = job.neg_prompt,
+            mode                 = mode,
+            steps                = job.steps,
+            guidance             = job.guidance,
+            strength             = job.image_power,
+            seed                 = job.seed,
+            audio_ref            = job.ref_audio_path or job.sound_path or None,
+            video_path           = job.movie_path or None,
+            last_image           = _mt_last_image,
+            middle_images_paths  = _mt_middle_paths,
             insert_channel      = job.insert_channel,
             insert_frame_start  = job.insert_frame_start,
             progress_fn         = _progress_fn,

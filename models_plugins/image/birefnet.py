@@ -34,7 +34,7 @@ class BiRefNetPlugin(ModelPlugin):
         print("Loading BiRefNet-HR…")
         pipe = AutoModelForImageSegmentation.from_pretrained(
             self.MODEL_ID, trust_remote_code=True, cache_dir=_cache_dir,
-            dtype=torch.float32,
+            dtype=torch.float32, local_files_only=prefs.local_files_only,
         )
         pipe.eval()
         if gfx_device == "mps":

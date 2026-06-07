@@ -34,17 +34,18 @@ class Flux2DevPlugin(ModelPlugin):
             raise RuntimeError(f"HuggingFace login failed: {e}")
 
         dtype = torch.bfloat16
+        _lfo = prefs.local_files_only
         transformer = Flux2Transformer2DModel.from_pretrained(
             self.MODEL_ID, subfolder="transformer", torch_dtype=dtype, device_map="cpu",
-            cache_dir=_cache_dir,
+            cache_dir=_cache_dir, local_files_only=_lfo,
         )
         text_encoder = Mistral3ForConditionalGeneration.from_pretrained(
             self.MODEL_ID, subfolder="text_encoder", dtype=dtype, device_map="cpu",
-            cache_dir=_cache_dir,
+            cache_dir=_cache_dir, local_files_only=_lfo,
         )
         pipe = Flux2Pipeline.from_pretrained(
             self.MODEL_ID, transformer=transformer, text_encoder=text_encoder, torch_dtype=dtype,
-            cache_dir=_cache_dir,
+            cache_dir=_cache_dir, local_files_only=_lfo,
         )
         pipe.load_lora_weights(
             "fal/FLUX.2-dev-Turbo", weight_name="flux.2-turbo-lora.safetensors"

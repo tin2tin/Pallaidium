@@ -31,6 +31,7 @@ class QwenImagePlugin(ModelPlugin):
         mode = kw.get("mode", "txt2img")
         print(f"Loading {model_id} ({mode})…")
 
+        _lfo = prefs.local_files_only
         if mode == "img2img":
             from diffusers import QwenImageImg2ImgPipeline, QwenImageTransformer2DModel
             q_t = DBnB(load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=dtype,
@@ -38,29 +39,29 @@ class QwenImagePlugin(ModelPlugin):
             q_e = TBnB(load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=dtype)
             transformer = QwenImageTransformer2DModel.from_pretrained(
                 model_id, subfolder="transformer", quantization_config=q_t, torch_dtype=dtype,
-                cache_dir=_cache_dir,
+                cache_dir=_cache_dir, local_files_only=_lfo,
             ).to("cpu")
             text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
                 model_id, subfolder="text_encoder", quantization_config=q_e, torch_dtype=dtype,
-                cache_dir=_cache_dir,
+                cache_dir=_cache_dir, local_files_only=_lfo,
             ).to("cpu")
             pipe = QwenImageImg2ImgPipeline.from_pretrained(
                 model_id, transformer=transformer, text_encoder=text_encoder, torch_dtype=dtype,
-                cache_dir=_cache_dir,
+                cache_dir=_cache_dir, local_files_only=_lfo,
             )
         else:
             from diffusers import QwenImagePipeline, QwenImageTransformer2DModel
             transformer = QwenImageTransformer2DModel.from_pretrained(
                 "OzzyGT/Qwen-Image-2512-bnb-4bit-transformer", torch_dtype=dtype, device_map="cpu",
-                cache_dir=_cache_dir,
+                cache_dir=_cache_dir, local_files_only=_lfo,
             )
             text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
                 "OzzyGT/Qwen-Image-2512-bnb-4bit-text-encoder", torch_dtype=dtype, device_map="cpu",
-                cache_dir=_cache_dir,
+                cache_dir=_cache_dir, local_files_only=_lfo,
             )
             pipe = QwenImagePipeline.from_pretrained(
                 model_id, transformer=transformer, text_encoder=text_encoder, torch_dtype=dtype,
-                cache_dir=_cache_dir,
+                cache_dir=_cache_dir, local_files_only=_lfo,
             )
 
         pipe.load_lora_weights(

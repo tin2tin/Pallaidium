@@ -26,7 +26,7 @@ class Lumina2Plugin(ModelPlugin):
 
         _cache_dir = prefs.hf_cache_dir or None
         print("Loading Lumina-Image-2.0…")
-        pipe = Lumina2Pipeline.from_pretrained(self.MODEL_ID, torch_dtype=torch.bfloat16, cache_dir=_cache_dir)
+        pipe = Lumina2Pipeline.from_pretrained(self.MODEL_ID, torch_dtype=torch.bfloat16, cache_dir=_cache_dir, local_files_only=prefs.local_files_only)
         if gfx_device == "mps":
             pipe.to("mps")
         elif low_vram():

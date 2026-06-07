@@ -271,6 +271,11 @@ class FasterWhisperTranscribePlugin(ModelPlugin):
             phase_label = f"Step 1: Loading {model_size} from cache"
             print(f"Whisper Transcribe: Loading {model_size!r} from local cache …")
         else:
+            if prefs.local_files_only:
+                raise OSError(
+                    f"Whisper model '{model_size}' not found in local cache. "
+                    "Uncheck 'Use Local Files Only' in Add-on Preferences to download it."
+                )
             phase_label = f"Step 1: Downloading {model_size} ({size_str}) — first run"
             print(
                 f"Whisper Transcribe: Downloading {model_size!r} ({size_str}) from "

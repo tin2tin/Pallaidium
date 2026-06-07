@@ -41,17 +41,21 @@ class _ZImageBase(ModelPlugin):
             raise
 
         _cache_dir = prefs.hf_cache_dir or None
+        _lfo = prefs.local_files_only
         if turbo:
             from diffusers import ZImageTransformer2DModel
             transformer = ZImageTransformer2DModel.from_pretrained(
                 self._TURBO_TRANSFORMER, torch_dtype=torch.bfloat16, cache_dir=_cache_dir,
+                local_files_only=_lfo,
             )
             pipe = ZImagePipeline.from_pretrained(
                 model_id, transformer=transformer, torch_dtype=torch.bfloat16, cache_dir=_cache_dir,
+                local_files_only=_lfo,
             )
         else:
             pipe = ZImagePipeline.from_pretrained(
                 model_id, torch_dtype=torch.bfloat16, low_cpu_mem_usage=False, cache_dir=_cache_dir,
+                local_files_only=_lfo,
             )
 
         if gfx_device == "mps":
@@ -77,17 +81,21 @@ class _ZImageBase(ModelPlugin):
             raise
 
         _cache_dir = prefs.hf_cache_dir or None
+        _lfo = prefs.local_files_only
         if turbo:
             from diffusers import ZImageTransformer2DModel
             transformer = ZImageTransformer2DModel.from_pretrained(
                 self._TURBO_TRANSFORMER, torch_dtype=torch.bfloat16, cache_dir=_cache_dir,
+                local_files_only=_lfo,
             )
             conv = ZImageImg2ImgPipeline.from_pretrained(
                 model_id, transformer=transformer, torch_dtype=torch.bfloat16, cache_dir=_cache_dir,
+                local_files_only=_lfo,
             )
         else:
             conv = ZImageImg2ImgPipeline.from_pretrained(
                 model_id, torch_dtype=torch.bfloat16, low_cpu_mem_usage=False, cache_dir=_cache_dir,
+                local_files_only=_lfo,
             )
 
         if gfx_device == "mps":

@@ -37,7 +37,7 @@ class FluxDepthPlugin(ModelPlugin):
         model_nf4 = FluxTransformer2DModel.from_pretrained(
             pipecard, subfolder="transformer",
             quantization_config=nf4_config, torch_dtype=torch.bfloat16,
-            cache_dir=_cache_dir,
+            cache_dir=_cache_dir, local_files_only=prefs.local_files_only,
         )
         pipe = FluxControlPipeline.from_pretrained(
             pipecard, transformer=model_nf4, torch_dtype=torch.bfloat16,
@@ -75,7 +75,7 @@ class FluxDepthPlugin(ModelPlugin):
             pipe.vae.enable_slicing()
             pipe.vae.enable_tiling()
 
-        processor = DepthPreprocessor.from_pretrained("LiheYoung/depth-anything-large-hf", cache_dir=_cache_dir)
+        processor = DepthPreprocessor.from_pretrained("LiheYoung/depth-anything-large-hf", cache_dir=_cache_dir, local_files_only=prefs.local_files_only)
         return {"pipe": pipe, "converter": None, "refiner": None, "preprocessor": processor}
 
     def generate(self, pipe_obj, inputs: ModelInputs, scene, prefs):

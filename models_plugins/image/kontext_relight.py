@@ -37,11 +37,11 @@ class KontextRelightPlugin(ModelPlugin):
         transformer = FluxTransformer2DModel.from_pretrained(
             self._BASE_MODEL, subfolder="transformer",
             quantization_config=nf4, torch_dtype=torch.bfloat16,
-            cache_dir=_cache_dir,
+            cache_dir=_cache_dir, local_files_only=prefs.local_files_only,
         )
         pipe = FluxKontextPipeline.from_pretrained(
             self._BASE_MODEL, transformer=transformer, torch_dtype=torch.bfloat16,
-            cache_dir=_cache_dir,
+            cache_dir=_cache_dir, local_files_only=prefs.local_files_only,
         )
         pipe.load_lora_weights(
             "kontext-community/relighting-kontext-dev-lora-v3",

@@ -19,7 +19,7 @@ class FluxKontextPlugin(ModelPlugin):
     PARAMS       = ParamSpec(steps=28, guidance=3.5)
     REQUIRED_PACKAGES = ["torch", "diffusers"]
 
-    def _build_nf4_transformer(self, cache_dir=None):
+    def _build_nf4_transformer(self, cache_dir=None, local_files_only=False):
         import torch
         from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
 
@@ -30,7 +30,7 @@ class FluxKontextPlugin(ModelPlugin):
         return FluxTransformer2DModel.from_pretrained(
             self.MODEL_ID, subfolder="transformer",
             quantization_config=nf4, torch_dtype=torch.bfloat16,
-            cache_dir=cache_dir,
+            cache_dir=cache_dir, local_files_only=local_files_only,
         )
 
     def _apply_user_loras(self, pipe, kw, scene):
@@ -55,16 +55,17 @@ class FluxKontextPlugin(ModelPlugin):
         import torch
 
         _cache_dir = prefs.hf_cache_dir or None
+        _lfo = prefs.local_files_only
         mode = kw.get("mode", "img2img")
         print(f"Loading {self.MODEL_ID} ({mode})…")
 
         if mode == "inpaint":
             from diffusers import FluxKontextInpaintPipeline
 
-            transformer = self._build_nf4_transformer(cache_dir=_cache_dir)
+            transformer = self._build_nf4_transformer(cache_dir=_cache_dir, local_files_only=_lfo)
             pipe = FluxKontextInpaintPipeline.from_pretrained(
                 self.MODEL_ID, transformer=transformer, torch_dtype=torch.bfloat16,
-                cache_dir=_cache_dir,
+                cache_dir=_cache_dir, local_files_only=_lfo,
             )
             self._apply_user_loras(pipe, kw, scene)
             if gfx_device == "mps":
@@ -77,10 +78,10 @@ class FluxKontextPlugin(ModelPlugin):
 
         from diffusers import FluxKontextPipeline
 
-        transformer = self._build_nf4_transformer(cache_dir=_cache_dir)
+        transformer = self._build_nf4_transformer(cache_dir=_cache_dir, local_files_only=_lfo)
         converter = FluxKontextPipeline.from_pretrained(
             self.MODEL_ID, transformer=transformer, torch_dtype=torch.bfloat16,
-            cache_dir=_cache_dir,
+            cache_dir=_cache_dir, local_files_only=_lfo,
         )
         self._apply_user_loras(converter, kw, scene)
         if gfx_device == "mps":

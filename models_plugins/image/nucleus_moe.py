@@ -30,9 +30,10 @@ class NucleusMoEPlugin(ModelPlugin):
         _cache_dir = prefs.hf_cache_dir or None
         print(f"Loading {self.MODEL_ID} with FP8 weights from {self.FP8_REPO}…")
 
-        patch_py = hf_hub_download(self.FP8_REPO, "moe_fp8_patch.py", cache_dir=_cache_dir)
-        weights  = hf_hub_download(self.FP8_REPO, "Nucleus-Image-FP8.safetensors", cache_dir=_cache_dir)
-        hf_hub_download(self.FP8_REPO, "config.json", cache_dir=_cache_dir)
+        _lfo = prefs.local_files_only
+        patch_py = hf_hub_download(self.FP8_REPO, "moe_fp8_patch.py", cache_dir=_cache_dir, local_files_only=_lfo)
+        weights  = hf_hub_download(self.FP8_REPO, "Nucleus-Image-FP8.safetensors", cache_dir=_cache_dir, local_files_only=_lfo)
+        hf_hub_download(self.FP8_REPO, "config.json", cache_dir=_cache_dir, local_files_only=_lfo)
 
         spec = importlib.util.spec_from_file_location("moe_fp8_patch", patch_py)
         patch = importlib.util.module_from_spec(spec)
@@ -46,6 +47,7 @@ class NucleusMoEPlugin(ModelPlugin):
             transformer=transformer,
             torch_dtype=torch.bfloat16,
             cache_dir=_cache_dir,
+            local_files_only=_lfo,
         )
 
         if gfx_device == "mps":

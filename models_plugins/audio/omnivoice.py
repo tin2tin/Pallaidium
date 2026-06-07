@@ -46,6 +46,13 @@ class OmniVoicePlugin(ModelPlugin):
                 device_map=device_map,
                 dtype=dtype,
             )
+        except OSError as e:
+            if prefs.local_files_only:
+                raise OSError(
+                    "Weights missing. Uncheck 'Use Local Files Only' in Preferences to download."
+                ) from e
+            print(f"OmniVoice preload failed ({e}), will load on first generate.")
+            model = None
         except Exception as e:
             print(f"OmniVoice preload failed ({e}), will load on first generate.")
             model = None
@@ -65,6 +72,10 @@ class OmniVoicePlugin(ModelPlugin):
         dtype = torch.float16 if use_cuda else torch.float32
 
         if model is None:
+            if prefs.local_files_only:
+                raise OSError(
+                    "Weights missing. Uncheck 'Use Local Files Only' in Preferences to download."
+                )
             model = OmniVoice.from_pretrained(
                 "k2-fsa/OmniVoice",
                 device_map=device_map,
