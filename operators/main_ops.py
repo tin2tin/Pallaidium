@@ -103,11 +103,11 @@ class SEQUENCER_OT_generate_movie(Operator):
             self.report({"INFO"}, "In the add-on preferences, install dependencies.")
             return {"CANCELLED"}
 
-        show_system_console(True)
-        set_system_console_topmost(True)
-
         preferences   = context.preferences
         addon_prefs   = preferences.addons[ADDON_ID].preferences
+        if addon_prefs.display_console:
+            show_system_console(True)
+            set_system_console_topmost(True)
         movie_model_card = addon_prefs.movie_model_card
 
         from ..models import get_plugin
@@ -439,8 +439,9 @@ class SEQUENCER_OT_generate_audio(Operator):
             print("Audio model changed. Forcing load.")
             should_load = True
 
-        show_system_console(True)
-        set_system_console_topmost(True)
+        if addon_prefs.display_console:
+            show_system_console(True)
+            set_system_console_topmost(True)
 
         if should_load:
             clear_cuda_cache()
@@ -597,8 +598,9 @@ class SEQUENCER_OT_generate_image(Operator):
         image_model_card = addon_prefs.image_model_card
         strips = context.selected_strips
 
-        show_system_console(True)
-        set_system_console_topmost(True)
+        if addon_prefs.display_console:
+            show_system_console(True)
+            set_system_console_topmost(True)
 
         if not seq_editor:
             scene.sequence_editor_create()
@@ -709,16 +711,25 @@ class SEQUENCER_OT_generate_image(Operator):
                 os.environ["HF_HUB_CACHE"] = addon_prefs.hf_cache_dir
             print("Loading: " + image_model_card + " (" + mode + ")")
             t_load = bench_print(f"[{plugin.MODEL_ID}] load start")
-            pipe_obj = plugin.load(
-                addon_prefs, scene,
-                mode=mode,
-                enabled_items=enabled_items,
-                use_lcm=getattr(scene, "use_lcm", False),
-                use_refine=do_refine,
-                ip_adapter_face_folder=getattr(scene, "ip_adapter_face_folder", ""),
-                ip_adapter_style_folder=getattr(scene, "ip_adapter_style_folder", ""),
-                local_files_only=local_files_only,
-            )
+            try:
+                pipe_obj = plugin.load(
+                    addon_prefs, scene,
+                    mode=mode,
+                    enabled_items=enabled_items,
+                    use_lcm=getattr(scene, "use_lcm", False),
+                    use_refine=do_refine,
+                    ip_adapter_face_folder=getattr(scene, "ip_adapter_face_folder", ""),
+                    ip_adapter_style_folder=getattr(scene, "ip_adapter_style_folder", ""),
+                    local_files_only=local_files_only,
+                )
+            except OSError as _load_err:
+                if local_files_only:
+                    self.report({"ERROR"}, (
+                        "Weights missing. Uncheck 'Use Local Files Only' in Preferences to download."
+                    ))
+                else:
+                    self.report({"ERROR"}, f"Failed to load model: {_load_err}")
+                return {"CANCELLED"}
             bench_print(f"[{plugin.MODEL_ID}] load done", t_load)
             _pallaidium_model_cache.update(pipe_obj)
             _pallaidium_model_cache["last_model_card"] = image_model_card
@@ -853,6 +864,7 @@ class SEQUENCER_OT_generate_image(Operator):
                     ad_base = StableDiffusionXLPipeline.from_pretrained(
                         "stabilityai/stable-diffusion-xl-base-1.0",
                         vae=vae, variant="fp16", torch_dtype=torch.float16,
+                        local_files_only=local_files_only,
                     )
                     if gfx_device == "mps":
                         ad_base.to("mps")
@@ -997,8 +1009,9 @@ class SEQUENCER_OT_generate_text(Operator):
 
         render = bpy.context.scene.render
         fps = render.fps / render.fps_base
-        show_system_console(True)
-        set_system_console_topmost(True)
+        if addon_prefs.display_console:
+            show_system_console(True)
+            set_system_console_topmost(True)
 
         if not seq_editor:
             scene.sequence_editor_create()

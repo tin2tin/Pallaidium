@@ -140,6 +140,7 @@ class RenderQueueJob(PropertyGroup):
     # Prefs snapshot
     hugginface_token: StringProperty()
     local_files_only: BoolProperty()
+    display_console:  BoolProperty()
     generator_ai:     StringProperty()
     hf_cache_dir:     StringProperty()
 
@@ -412,8 +413,9 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
 
         # ---- Load model (or reuse from cache) ---------------------------
         progress_store[job_id] = {"progress": 0.02, "phase": "Loading model", "step": 0, "total": 0}
-        show_system_console(True)
-        set_system_console_topmost(True)
+        if snapshot.get("display_console", True):
+            show_system_console(True)
+            set_system_console_topmost(True)
 
         # Ensure self-registering packages (e.g. sdnq) are imported before
         # generate() so their side-effects (registering quantization backends,
@@ -750,10 +752,15 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             "status":    "CANCELLED",
         })
     except Exception as exc:
+        _err_str = str(exc)
+        if snapshot.get("local_files_only") and isinstance(exc, OSError):
+            _err_str = (
+                "Weights missing. Uncheck 'Use Local Files Only' in Preferences to download."
+            )
         result_queue.put({
             "job_id":    job_id,
             "status":    "FAILED",
-            "error":     str(exc),
+            "error":     _err_str,
             "traceback": traceback.format_exc(),
         })
     finally:
@@ -1009,6 +1016,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
             ref_text          = getattr(scene, "ref_text", ""),
             hugginface_token  = getattr(prefs, "hugginface_token", ""),
             local_files_only  = getattr(prefs, "local_files_only", False),
+            display_console   = getattr(prefs, "display_console", True),
             generator_ai      = getattr(prefs, "generator_ai", "") or os.path.join(
                 bpy.utils.user_resource("DATAFILES"), "Pallaidium Media"
             ),
@@ -1285,7 +1293,7 @@ def _queue_start_job(scene, job) -> None:
         "chat_temperature", "fps", "music_bpm", "music_lyrics",
         "music_key_scale", "music_time_signature",
         "image_path", "movie_path", "sound_path", "last_image_path", "ref_audio_path",
-        "ref_text", "hugginface_token", "local_files_only",
+        "ref_text", "hugginface_token", "local_files_only", "display_console",
         "generator_ai", "hf_cache_dir", "lora_files_json", "lora_folder",
         "insert_frame_start", "insert_frame_end",
         "insert_channel", "insert_duration",
@@ -1384,8 +1392,9 @@ def _run_job_main_thread(scene, job) -> None:
                          or model_cache.get("last_schematic_mode", "") != _schematic_mode_mt)):
                 release_model_cache(model_cache)
             clear_cuda_cache()
-            show_system_console(True)
-            set_system_console_topmost(True)
+            if job.display_console:
+                show_system_console(True)
+                set_system_console_topmost(True)
 
             _progress_store[job_id] = {
                 "progress": 0.0,
@@ -1501,9 +1510,14 @@ def _run_job_main_thread(scene, job) -> None:
         _progress_store.pop(job_id, None)
 
     except Exception as exc:
+        _err_str = str(exc)
+        if job.local_files_only and isinstance(exc, OSError):
+            _err_str = (
+                "Weights missing. Uncheck 'Use Local Files Only' in Preferences to download."
+            )
         job.status          = "FAILED"
         job.progress        = 0.0
-        job.error_message   = str(exc)[:200]
+        job.error_message   = _err_str[:200]
         job.error_traceback = traceback.format_exc()[:4000]
         print("=== Pallaidium Queue Error (main-thread job) ===")
         print(traceback.format_exc())

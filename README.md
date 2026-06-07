@@ -132,6 +132,10 @@ The generated media will be saved to the directory specified in the addon prefer
 
 ## Change Log
 
+2026-06-07: Add: Display System Console preference — a new checkbox in add-on preferences (after "Use Local Files Only") controls whether the Windows system console is shown when generation starts. Unchecking it suppresses `show_system_console` and `set_system_console_topmost` across all four interactive operators (video, audio, image, text) and both queue execution paths.
+
+2026-06-07: Fix: Local Files Only — `local_files_only` is now consistently applied to every `from_pretrained` and `hf_hub_download` call across all model plugins. When the setting is enabled and weights are not cached, a clear error is shown: "Weights missing. Uncheck 'Use Local Files Only' in Preferences to download."
+
 2026-06-03: Add: FLUX.2 Klein 9B Schematic — transform images into depth, normal, pose, and segmentation maps via nomadoor schematic LoRAs.
 
 2026-06-03: Add: OmniVoice — multilingual text-to-speech with broad language support.

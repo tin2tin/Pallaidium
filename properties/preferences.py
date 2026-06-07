@@ -199,6 +199,10 @@ class GeneratorAddonPreferences(AddonPreferences):
         name="Use Local Files Only",
         default=False,
     )
+    display_console: BoolProperty(
+        name="Display System Console",
+        default=True,
+    )
 
     # --- Async dependency operation state (SKIP_SAVE — reset on restart) ---
     dep_is_running:     BoolProperty(default=False,  options={'SKIP_SAVE'})
@@ -305,6 +309,12 @@ class GeneratorAddonPreferences(AddonPreferences):
         row_row = box.row(align=True)
         row_row.label(text="Use Local Files Only:")
         row_row.prop(self, "local_files_only", text="")
+        row_row.label(text="")
+        row_row.label(text="")
+        row_row.label(text="")
+        row_row = box.row(align=True)
+        row_row.label(text="Display System Console:")
+        row_row.prop(self, "display_console", text="")
         row_row.label(text="")
         row_row.label(text="")
         row_row.label(text="")
