@@ -212,6 +212,125 @@ def _dep_tick() -> float | None:
     return _DEP_TIMER_INTERVAL if currently_running else None
 
 
+def _ensure_python_headers_linux(on_line):
+    """Copy Python C headers into Blender's embedded Python include dir on Linux.
+
+    Portable Blender builds ship without Python.h, which causes any package that
+    compiles a C/Cython/CUDA extension (sageattention, thinc from source, etc.) to
+    fail immediately.  We fix this automatically:
+
+      1. If Python.h already exists — nothing to do.
+      2. Static headers (Include/*.h) — extracted directly from the python.org source
+         tarball using only urllib + tarfile; no compiler needed.
+      3. pyconfig.h — try the system Python include dir first (same version = same
+         ABI); fall back to running ./configure in the extracted source tree if
+         autotools are present.
+
+    Prints progress through on_line().  Never raises — logs a warning and returns
+    False if headers could not be installed so the caller can print manual steps.
+    """
+    import sys, sysconfig, tarfile, shutil, urllib.request, subprocess, re, tempfile
+
+    include_dir = sysconfig.get_path("include")   # e.g. .../5.2/python/include/python3.13
+    if not include_dir:
+        on_line("PALLAIDIUM headers: could not determine Python include path — skipping")
+        return False
+
+    python_h = os.path.join(include_dir, "Python.h")
+    if os.path.exists(python_h):
+        return True  # already present, nothing to do
+
+    ver = sys.version_info
+    ver_str   = f"{ver.major}.{ver.minor}.{ver.micro}"
+    ver_tag   = f"python{ver.major}.{ver.minor}"
+    tarball   = f"Python-{ver_str}.tar.xz"
+    url       = f"https://www.python.org/ftp/python/{ver_str}/{tarball}"
+
+    on_line(f"PALLAIDIUM headers: Python.h missing in {include_dir}")
+    on_line(f"PALLAIDIUM headers: downloading {url} ...")
+
+    try:
+        os.makedirs(include_dir, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="pallaidium_pyhdr_") as tmp:
+            tarball_path = os.path.join(tmp, tarball)
+
+            # --- download ---
+            def _reporthook(count, block, total):
+                if total > 0 and count % 200 == 0:
+                    mb = count * block / 1_048_576
+                    on_line(f"PALLAIDIUM headers: downloaded {mb:.1f} MB / {total/1_048_576:.1f} MB")
+            urllib.request.urlretrieve(url, tarball_path, reporthook=_reporthook)
+            on_line("PALLAIDIUM headers: download complete, extracting headers ...")
+
+            # --- extract Include/ and the root-level cpython/ sub-dir ---
+            src_root = os.path.join(tmp, f"Python-{ver_str}")
+            with tarfile.open(tarball_path, "r:xz") as tf:
+                members = [
+                    m for m in tf.getmembers()
+                    if re.match(
+                        rf"Python-{re.escape(ver_str)}/(Include/|Modules/_io/|PC/pyconfig\.h)",
+                        m.name,
+                    )
+                ]
+                tf.extractall(tmp, members=members)
+
+            src_include = os.path.join(src_root, "Include")
+            if not os.path.isdir(src_include):
+                on_line("PALLAIDIUM headers: Include/ not found in tarball — aborting")
+                return False
+
+            # copy all .h files from Include/ (flat, ignore cpython/ sub-dir for now)
+            copied = 0
+            for fname in os.listdir(src_include):
+                if fname.endswith(".h"):
+                    shutil.copy2(os.path.join(src_include, fname), include_dir)
+                    copied += 1
+            # copy cpython/ sub-directory
+            cpython_src = os.path.join(src_include, "cpython")
+            if os.path.isdir(cpython_src):
+                cpython_dst = os.path.join(include_dir, "cpython")
+                if os.path.isdir(cpython_dst):
+                    shutil.rmtree(cpython_dst)
+                shutil.copytree(cpython_src, cpython_dst)
+            on_line(f"PALLAIDIUM headers: copied {copied} header files")
+
+            # --- pyconfig.h ---
+            # Prefer the system Python's pyconfig.h if the version matches exactly.
+            pyconfig_dst = os.path.join(include_dir, "pyconfig.h")
+            system_pyconfig = f"/usr/include/{ver_tag}/pyconfig.h"
+            if os.path.exists(system_pyconfig):
+                shutil.copy2(system_pyconfig, pyconfig_dst)
+                on_line(f"PALLAIDIUM headers: copied pyconfig.h from {system_pyconfig}")
+            else:
+                # Fall back: run ./configure in the extracted source tree
+                on_line("PALLAIDIUM headers: system pyconfig.h not found, running ./configure ...")
+                configure_script = os.path.join(src_root, "configure")
+                if os.path.exists(configure_script):
+                    r = subprocess.run(
+                        ["./configure", f"--prefix={os.path.join(tmp, 'build')}"],
+                        cwd=src_root, capture_output=True, text=True, timeout=120,
+                    )
+                    generated = os.path.join(src_root, "pyconfig.h")
+                    if r.returncode == 0 and os.path.exists(generated):
+                        shutil.copy2(generated, pyconfig_dst)
+                        on_line("PALLAIDIUM headers: pyconfig.h generated via ./configure")
+                    else:
+                        on_line("PALLAIDIUM headers: ./configure failed — pyconfig.h not installed")
+                        on_line("  Manual fix: https://github.com/tin2tin/Pallaidium — see Linux guide step 7")
+                        return False
+                else:
+                    on_line("PALLAIDIUM headers: configure script not found — pyconfig.h not installed")
+                    return False
+
+        on_line(f"PALLAIDIUM headers: Python.h successfully installed in {include_dir}")
+        return True
+
+    except Exception as exc:
+        on_line(f"PALLAIDIUM headers: failed — {exc}")
+        on_line("  Manual fix: see Linux installation guide step 7")
+        return False
+
+
 def _run_install(snapshot: dict, cancel_event: threading.Event):
     import sys, traceback, platform as _plat
     state     = _dep_state
@@ -228,6 +347,13 @@ def _run_install(snapshot: dict, cancel_event: threading.Event):
         batch_output_lines.append(line)
 
     try:
+        # Linux pre-flight: ensure Python.h is present so compiled extensions work
+        if _plat.system() == "Linux":
+            state["phase"] = "Checking Python headers..."
+            _ensure_python_headers_linux(on_line)
+            if cancel_event.is_set():
+                return
+
         # pip self-upgrade
         run_pip_streaming(
             [pybin, "-m", "pip", "install", "--upgrade", "pip", "--disable-pip-version-check"],
@@ -412,6 +538,14 @@ class GENERATOR_OT_install(Operator):
             if lines:
                 batches.append((phase_name, False, lines))
 
+        # Linux: thinc/spacy must be installed as binary wheels (Python 3.13 Cython compat)
+        if _plat.system() == "Linux":
+            linux_bin = mgr.get_phase_linux_binary_only()
+            safe_bin = BlenderInternalManager.filter_list(linux_bin)
+            bin_lines = safe_bin if self.force_reinstall else SmartSkipManager.filter_existing(safe_bin)
+            if bin_lines:
+                batches.append(("LinuxBinary", True, bin_lines))
+
         total_pkgs = sum(len(b[2]) for b in batches)
 
         _dep_cancel_event.clear()
@@ -469,7 +603,8 @@ class GENERATOR_OT_uninstall(Operator):
 
         for line in (mgr.get_phase_1_5_source_libs()
                      + mgr.get_phase_2_torch()
-                     + mgr.get_phase_3_git_and_extensions()):
+                     + mgr.get_phase_3_git_and_extensions()
+                     + mgr.get_phase_linux_binary_only()):
             name = SmartSkipManager.extract_package_name(line)
             if name:
                 all_targets.add(name)

@@ -1002,6 +1002,26 @@ class BlenderInternalManager:
                 safe_list.append(line)
         return safe_list
 
+def _linux_flash_attn_compatible():
+    """Return True only if system nvcc version matches the torch CUDA 12.8 target.
+
+    flash-attn must be compiled from source on Linux. If the system CUDA toolkit
+    version (reported by nvcc) differs from torch's cu128 target, the build fails.
+    Skip the install rather than leaving the user with a noisy error batch.
+    """
+    import subprocess, re
+    try:
+        out = subprocess.check_output(
+            ["nvcc", "--version"], stderr=subprocess.DEVNULL, timeout=5, text=True
+        )
+        m = re.search(r"release (\d+)\.(\d+)", out)
+        if m:
+            return (int(m.group(1)), int(m.group(2))) == (12, 8)
+    except Exception:
+        pass
+    return False
+
+
 class DependencyManager:
     def __init__(self):
         self.os_platform = get_platform_specs()
@@ -1056,11 +1076,33 @@ class DependencyManager:
                 "torch==2.9.1+cu128",
                 "torchvision==0.24.1+cu128",
                 "torchaudio==2.9.1+cu128",
-                "xformers",
+                # nvidia CUDA runtime wheels — fix libcusparseLt.so.0 and related .so import errors
+                "nvidia-cublas-cu12==12.8.4.1",
+                "nvidia-cuda-runtime-cu12==12.8.90",
+                "nvidia-cusparselt-cu12==0.7.1",
+                "nvidia-cudnn-cu12==9.10.2.21",
+                "nvidia-nccl-cu12==2.27.5",
+                "nvidia-nvtx-cu12==12.8.90",
+                # xformers removed: 0.0.35 was built for Python 3.10/PyTorch 2.10 and causes
+                # "cannot import name 'GroupName'" from diffusers on Python 3.13 + PyTorch 2.9
             ]
         else:
             # macOS — CPU / MPS builds from PyPI
             return ["torch", "torchvision", "torchaudio"]
+
+    def get_phase_linux_binary_only(self):
+        """Packages that must be installed as binary wheels on Linux.
+
+        thinc and spacy have Cython extensions that fail to compile from source under
+        Python 3.13 due to C API changes. Binary wheels work correctly.
+        """
+        if self.os_platform != "Linux":
+            return []
+        return [
+            "thinc",
+            "spacy",
+            "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl",
+        ]
 
     # for installing branch: git+https://github.com/huggingface/diffusers.git@ltx2-i2v-lora-mixin-fix
 
@@ -1074,8 +1116,7 @@ class DependencyManager:
             "stable-audio-tools",
             "torcheval",
             "torchao",
-            "spacy",
-            "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl",
+            # spacy and model wheel: Windows/macOS install here; Linux uses get_phase_linux_binary_only()
         ]
 
         if self.py_major == 3 and self.py_minor >= 8:
@@ -1083,20 +1124,30 @@ class DependencyManager:
 
         if self.os_platform == "Windows":
             reqs.extend([
+                "spacy",
+                "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl",
                 #"https://huggingface.co/lldacing/flash-attention-windows-wheel/resolve/main/flash_attn-2.7.4.post1%2Bcu128torch2.7.0cxx11abiFALSE-cp311-cp311-win_amd64.whl",
                 "https://github.com/kingbri1/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3+cu128torch2.8.0cxx11abiFALSE-cp313-cp313-win_amd64.whl",
                 "git+https://github.com/hkchengrex/MMAudio.git",
-                "git+https://github.com/tin2tin/resemble-enhance-windows.git",
                 #"https://github.com/woct0rdho/triton-windows/releases/download/empty/triton-3.4.0-py3-none-any.whl",
                 #"triton-windows<3.3",
             ])
-        else:
+        elif self.os_platform == "Linux":
             reqs.extend([
-                "flash-attn",
                 "git+https://github.com/hkchengrex/MMAudio.git",
-                "resemble-enhance",
-                "triton",
+                "triton==3.5.1",
                 "sageattention==1.0.6",
+            ])
+            # flash-attn requires source compilation on Linux; skip when the system CUDA
+            # toolkit version doesn't match torch's cu128 target to avoid build failures
+            if _linux_flash_attn_compatible():
+                reqs.append("flash-attn")
+        else:
+            # macOS — CPU / MPS
+            reqs.extend([
+                "spacy",
+                "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl",
+                "flash-attn",
             ])
         return reqs
 
