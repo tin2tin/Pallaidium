@@ -1138,10 +1138,11 @@ class SEQUENCER_OT_add_to_queue(Operator):
             if strip is not None:
                 image_path, movie_path, sound_path, last_image_path, middle_images_json = self._paths_from_strip(strip)
 
-                # For META strips: render the SOUND child at its trimmed in/out points
-                # so the job stores a short WAV rather than the full source audio file.
-                # Loading a full multi-minute audio file later causes CUDA OOM because
-                # the frame count is derived from the audio duration.
+                # Render audio to a trimmed WAV so the job never holds a pointer to
+                # the full source file (avoids CUDA OOM when frame count is derived
+                # from audio duration).
+                # • META strip  → use render_meta_child_to_path (META-range export)
+                # • SOUND strip → use render_strip_to_wav (strip's own trimmed range)
                 if strip.type == "META" and sound_path:
                     from ..utils.helpers import render_meta_child_to_path
                     for _c in strip.strips:
@@ -1153,6 +1154,14 @@ class SEQUENCER_OT_add_to_queue(Operator):
                             else:
                                 print(f"[Queue] META SOUND trim failed, keeping raw: {sound_path!r}")
                             break
+                elif strip.type == "SOUND" and sound_path:
+                    from ..utils.helpers import render_strip_to_wav
+                    _trimmed = render_strip_to_wav(context, strip)
+                    if _trimmed:
+                        sound_path = _trimmed
+                        print(f"[Queue] SOUND trimmed → {_trimmed!r}")
+                    else:
+                        print(f"[Queue] SOUND trim failed, keeping raw: {sound_path!r}")
 
                 # Align output to the input strip's in-point
                 strip_frame_start = strip.frame_final_start

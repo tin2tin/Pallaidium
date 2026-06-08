@@ -181,7 +181,6 @@ class LTX2_3MultiPlugin(ModelPlugin):
                 import soundfile as sf
                 info = sf.info(sound_path)
                 dur_s = info.frames / info.samplerate
-                # print(f"[DEBUG] Audio duration calculated via soundfile: {dur_s:.2f}s")
             except Exception as e1:
                 try:
                     # Fallback to PyAV (works for MP4/WebM video containers)
@@ -190,25 +189,29 @@ class LTX2_3MultiPlugin(ModelPlugin):
                         audio_stream = next((s for s in container.streams if s.type == 'audio'), None)
                         if audio_stream and audio_stream.duration:
                             dur_s = float(audio_stream.duration * audio_stream.time_base)
-                            # print(f"[DEBUG] Audio duration calculated via av: {dur_s:.2f}s")
                 except Exception as e2:
-                    pass  # print(f"[DEBUG] Failed to read audio duration (sf: {e1}, av: {e2}).")
+                    pass
 
             if dur_s is None:
-                # print("[DEBUG] Falling back to requested frames for duration.")
                 dur_s = inputs.frames / fps
 
-            raw = dur_s * fps
-            num_frames = int(((raw + 7) // 8) * 8) + 1
-            num_frames = max(9, num_frames)
-            # Safety: if audio duration is implausibly longer than the requested strip
-            # frames (e.g. untrimmed source file was used), clamp to requested count.
             if inputs.frames > 0:
-                _req = max(9, ((inputs.frames - 1) // 8) * 8 + 1)
-                if num_frames > _req * 4:
-                    print(f"[LTX23Multi] WARN audio num_frames={num_frames} >> requested={_req} (likely untrimmed audio) — clamping")
-                    num_frames = _req
+                # inputs.frames is authoritative (resolved from the strip at queue time).
+                # Use it directly for LTX 8-frame alignment so rounding in the audio
+                # duration probe can't produce a mismatched frame count.
+                num_frames = max(9, ((inputs.frames - 1) // 8) * 8 + 1)
+                # Warn only when audio is genuinely much longer (trimming likely failed).
+                _audio_frames = int(((dur_s * fps + 7) // 8) * 8) + 1
+                if _audio_frames > num_frames + 8:
+                    print(f"[LTX23Multi] WARN audio={_audio_frames} fr >> requested={num_frames} fr "
+                          f"(likely untrimmed) — clamping dur_s")
                     dur_s = num_frames / fps
+                else:
+                    dur_s = num_frames / fps
+            else:
+                raw = dur_s * fps
+                num_frames = max(9, int(((raw + 7) // 8) * 8) + 1)
+                dur_s = num_frames / fps
         else:
             target = inputs.frames
             num_frames = max(9, ((target - 1) // 8) * 8 + 1)

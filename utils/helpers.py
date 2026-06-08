@@ -1717,11 +1717,15 @@ def render_meta_child_to_path(context, meta_strip, child_strip, image_output=Fal
 
     Unlike render_strip_to_path(), this keeps the META unmuted (so the child's
     content is composited correctly) while muting all other top-level strips.
-    The frame range is restricted to the child's trimmed in/out points so that
-    audio exports are correctly trimmed and don't load the entire source file.
+
+    For SOUND children the frame range is set to the META strip's full range so
+    that the exported WAV has exactly the META's duration and the audio sits at
+    the correct relative position within it (silence fills any gap before/after
+    the child strip).  This guarantees the downstream model receives audio whose
+    length matches the video it will generate.
 
     image_output=True              → single-frame PNG at child.frame_final_start
-    child.type == 'SOUND'          → PCM WAV for the child's trimmed duration
+    child.type == 'SOUND'          → PCM WAV covering the META's full duration
     otherwise                      → MP4 for the child's trimmed duration
     Returns the absolute output path, or None on failure.
     """
@@ -1744,8 +1748,15 @@ def render_meta_child_to_path(context, meta_strip, child_strip, image_output=Fal
     seq_editor.use_prefetch  = False
     seq_editor.use_cache_raw = False
 
-    render_start = int(child_strip.frame_final_start)
-    render_end   = int(child_strip.frame_final_start + child_strip.frame_final_duration - 1)
+    # For SOUND: render the full META range so the exported audio duration equals
+    # the META duration and the child's audio lands at its correct relative offset.
+    # For IMAGE/MOVIE: use the child's own range as before.
+    if child_strip.type == "SOUND":
+        render_start = int(meta_strip.frame_final_start)
+        render_end   = int(meta_strip.frame_final_start + meta_strip.frame_final_duration - 1)
+    else:
+        render_start = int(child_strip.frame_final_start)
+        render_end   = int(child_strip.frame_final_start + child_strip.frame_final_duration - 1)
 
     # Keep META unmuted so children composite correctly; mute everything else
     for s in seq_editor.strips:
@@ -1764,81 +1775,59 @@ def render_meta_child_to_path(context, meta_strip, child_strip, image_output=Fal
         if child_strip.type == "SOUND":
             output_path = os.path.abspath(
                 os.path.join(rendered_dir, f"{safe_name}_{render_start:06d}_meta_audio.wav"))
+            _fps_sound   = vse_scene.render.fps / max(1.0, getattr(vse_scene.render, 'fps_base', 1.0))
+            _expected_s  = meta_strip.frame_final_duration / _fps_sound
+            _child_dur_s = child_strip.frame_final_duration / _fps_sound
+            _src_start_s = child_strip.frame_offset_start / _fps_sound
+            _child_off_s = max(0.0, (child_strip.frame_final_start - meta_strip.frame_final_start) / _fps_sound)
+            _src_path    = bpy.path.abspath(child_strip.sound.filepath)
+
+            print(f"[render_meta_child_to_path] ── SOUND IN ──────────────────────────")
+            print(f"  source file      : {_src_path!r}")
+            print(f"  fps              : {_fps_sound:.4f}")
+            print(f"  meta  frames     : {meta_strip.frame_final_start} – {meta_strip.frame_final_start + meta_strip.frame_final_duration - 1}  ({meta_strip.frame_final_duration} fr = {_expected_s:.3f}s)")
+            print(f"  child frames     : {child_strip.frame_final_start} – {child_strip.frame_final_start + child_strip.frame_final_duration - 1}  ({child_strip.frame_final_duration} fr = {_child_dur_s:.3f}s)")
+            print(f"  child offset_start (source skip): {child_strip.frame_offset_start} fr = {_src_start_s:.3f}s")
+            print(f"  child offset in META : {_child_off_s:.3f}s")
+            print(f"  will write       : {_child_dur_s:.3f}s of audio at +{_child_off_s:.3f}s into {_expected_s:.3f}s output")
+            print(f"[render_meta_child_to_path] ──────────────────────────────────────")
+
+            # sound.mixdown ignores scene.frame_start/end and always exports the full
+            # source file, so use soundfile directly for precise in/out control.
             try:
-                result = bpy.ops.sound.mixdown(
-                    'EXEC_DEFAULT', filepath=output_path, container='WAV', codec='PCM',
-                    relative_path=False)
-                print(f"[render_meta_child_to_path] mixdown result: {result}")
-            except Exception as _mix_err:
-                print(f"[render_meta_child_to_path] mixdown exception: {_mix_err}")
-            _fps_sound = vse_scene.render.fps / max(1.0, getattr(vse_scene.render, 'fps_base', 1.0))
-            _expected_s = child_strip.frame_final_duration / _fps_sound
+                import soundfile as _sf
+                import numpy as _np
+                _info   = _sf.info(_src_path)
+                _sr     = _info.samplerate
+                _ch     = _info.channels
+                _s0     = int(_src_start_s * _sr)
+                _s1     = _s0 + int(_child_dur_s * _sr)
+                print(f"[render_meta_child_to_path] soundfile read: sr={_sr} ch={_ch} samples [{_s0}:{_s1}]")
+                _child_data, _ = _sf.read(_src_path, start=_s0, stop=_s1, always_2d=True)
+                _total_smp = int(_expected_s * _sr)
+                _off_smp   = int(_child_off_s * _sr)
+                _out_arr   = _np.zeros((_total_smp, _ch), dtype='float32')
+                _end_smp   = min(_off_smp + len(_child_data), _total_smp)
+                _out_arr[_off_smp:_end_smp] = _child_data[:_end_smp - _off_smp]
+                _sf.write(output_path, _out_arr, _sr, subtype='PCM_16')
+                print(f"[render_meta_child_to_path] soundfile write OK")
+            except Exception as _sf_err:
+                print(f"[render_meta_child_to_path] soundfile write failed: {_sf_err}")
+                import traceback as _tb; _tb.print_exc()
 
-            # PyAV fallback — used when mixdown returns CANCELLED or doesn't write the file
-            if not os.path.exists(output_path):
-                print("[render_meta_child_to_path] mixdown produced no file — trying PyAV trim")
-                try:
-                    import av as _av
-                    _src = bpy.path.abspath(child_strip.sound.filepath)
-                    _start_s = child_strip.frame_offset_start / _fps_sound
-                    _dur_s   = _expected_s
-                    print(f"[render_meta_child_to_path] av trim: src={_src!r} start={_start_s:.3f}s dur={_dur_s:.3f}s")
-                    with _av.open(_src) as _inp:
-                        _aud = next((s for s in _inp.streams if s.type == 'audio'), None)
-                        if _aud is not None:
-                            _inp.seek(int(_start_s * 1_000_000))
-                            with _av.open(output_path, 'w', format='wav') as _out:
-                                _ostream = _out.add_stream('pcm_s16le',
-                                    rate=_aud.codec_context.sample_rate)
-                                _written_s = 0.0
-                                for _frame in _inp.decode(_aud):
-                                    if _written_s >= _dur_s:
-                                        break
-                                    _written_s += _frame.samples / _frame.sample_rate
-                                    _frame.pts = None
-                                    for _pkt in _ostream.encode(_frame):
-                                        _out.mux(_pkt)
-                                for _pkt in _ostream.encode(None):
-                                    _out.mux(_pkt)
-                    if os.path.exists(output_path):
-                        print(f"[render_meta_child_to_path] av trim OK → {output_path!r}")
-                    else:
-                        print("[render_meta_child_to_path] av trim produced no file")
-                except Exception as _av_err:
-                    print(f"[render_meta_child_to_path] av trim failed: {_av_err}")
-                    import traceback as _tb; _tb.print_exc()
-
-            # Post-trim: sound.mixdown may export beyond the strip's in/out range
-            # (ignoring the frame_start/frame_end we set); cap to the expected duration.
             if os.path.exists(output_path):
                 try:
                     import soundfile as _sf_chk
-                    _actual_s = _sf_chk.info(output_path).frames / _sf_chk.info(output_path).samplerate
-                    if _actual_s > _expected_s + 0.1:
-                        print(f"[render_meta_child_to_path] audio too long "
-                              f"({_actual_s:.2f}s > {_expected_s:.2f}s) — re-trimming")
-                        import av as _av_rt
-                        _tmp_path = output_path + ".trimtmp.wav"
-                        with _av_rt.open(output_path) as _c_in:
-                            _as_rt = next((s for s in _c_in.streams if s.type == 'audio'), None)
-                            if _as_rt:
-                                with _av_rt.open(_tmp_path, 'w', format='wav') as _c_out:
-                                    _os_rt = _c_out.add_stream(
-                                        'pcm_s16le', rate=_as_rt.codec_context.sample_rate)
-                                    _w_rt = 0.0
-                                    for _f_rt in _c_in.decode(_as_rt):
-                                        if _w_rt >= _expected_s:
-                                            break
-                                        _w_rt += _f_rt.samples / _f_rt.sample_rate
-                                        _f_rt.pts = None
-                                        for _p_rt in _os_rt.encode(_f_rt):
-                                            _c_out.mux(_p_rt)
-                                    for _p_rt in _os_rt.encode(None):
-                                        _c_out.mux(_p_rt)
-                                os.replace(_tmp_path, output_path)
-                                print(f"[render_meta_child_to_path] re-trimmed → {_expected_s:.2f}s")
-                except Exception as _rt_err:
-                    print(f"[render_meta_child_to_path] post-trim failed: {_rt_err}")
+                    _info_chk = _sf_chk.info(output_path)
+                    _actual_s = _info_chk.frames / _info_chk.samplerate
+                    print(f"[render_meta_child_to_path] ── WAV OUT ───────────────────────────")
+                    print(f"  output file    : {output_path!r}")
+                    print(f"  actual duration: {_actual_s:.3f}s  ({_info_chk.frames} samples @ {_info_chk.samplerate} Hz)")
+                    print(f"  expected       : {_expected_s:.3f}s")
+                    print(f"  delta          : {_actual_s - _expected_s:+.3f}s")
+                    print(f"[render_meta_child_to_path] ──────────────────────────────────────")
+                except Exception as _chk_err:
+                    print(f"[render_meta_child_to_path] WAV OUT check failed: {_chk_err}")
 
         elif image_output:
             base = os.path.abspath(
@@ -1939,6 +1928,24 @@ def render_strip_to_wav(context, strip):
     output_path = os.path.abspath(
         os.path.join(rendered_dir, f"{safe_name}_{render_start:06d}_stem_input.wav"))
 
+    _fps_stw      = vse_scene.render.fps / max(1.0, getattr(vse_scene.render, 'fps_base', 1.0))
+    _expected_stw = strip.frame_final_duration / _fps_stw
+    try:
+        _src_stw   = bpy.path.abspath(strip.sound.filepath)
+        _off_stw   = strip.frame_offset_start / _fps_stw
+    except Exception:
+        _src_stw = "(unknown)"
+        _off_stw = 0.0
+    print(f"[render_strip_to_wav] ── SOUND IN ──────────────────────────")
+    print(f"  strip            : {strip.name!r}  type={strip.type}")
+    print(f"  source file      : {_src_stw!r}")
+    print(f"  fps              : {_fps_stw:.4f}")
+    print(f"  strip frames     : {render_start} – {render_end}  ({strip.frame_final_duration} fr = {_expected_stw:.3f}s)")
+    print(f"  source skip      : frame_offset_start={strip.frame_offset_start} fr = {_off_stw:.3f}s")
+    print(f"  mixdown range    : scene.frame_start={render_start}  scene.frame_end={render_end}")
+    print(f"  expected WAV dur : {_expected_stw:.3f}s")
+    print(f"[render_strip_to_wav] ──────────────────────────────────────")
+
     try:
         bpy.ops.sound.mixdown(filepath=output_path, container="WAV", codec="PCM")
     finally:
@@ -1950,7 +1957,60 @@ def render_strip_to_wav(context, strip):
         seq_editor.use_prefetch  = orig_prefetch
         seq_editor.use_cache_raw = orig_cache
 
-    return output_path if os.path.exists(output_path) else None
+    if not os.path.exists(output_path):
+        print("[render_strip_to_wav] mixdown produced no file")
+        return None
+
+    # Post-trim: mixdown may ignore the frame range and export the full source.
+    # Cap to the strip's actual trimmed duration.
+    try:
+        import soundfile as _sf_stw
+        _info_stw   = _sf_stw.info(output_path)
+        _actual_stw = _info_stw.frames / _info_stw.samplerate
+        print(f"[render_strip_to_wav] ── WAV OUT ───────────────────────────")
+        print(f"  output file    : {output_path!r}")
+        print(f"  actual duration: {_actual_stw:.3f}s  ({_info_stw.frames} samples @ {_info_stw.samplerate} Hz)")
+        print(f"  expected       : {_expected_stw:.3f}s")
+        print(f"  delta          : {_actual_stw - _expected_stw:+.3f}s")
+        print(f"[render_strip_to_wav] ──────────────────────────────────────")
+        if _actual_stw > _expected_stw + 0.1:
+            print(f"[render_strip_to_wav] audio too long — re-trimming")
+            import av as _av_stw
+            _tmp_stw = output_path + ".trimtmp.wav"
+            _trim_ok = False
+            with _av_stw.open(output_path) as _cin:
+                _astr = next((s for s in _cin.streams if s.type == 'audio'), None)
+                if _astr:
+                    with _av_stw.open(_tmp_stw, 'w', format='wav') as _cout:
+                        _os = _cout.add_stream('pcm_s16le', rate=_astr.codec_context.sample_rate)
+                        _w = 0.0
+                        for _f in _cin.decode(_astr):
+                            if _w >= _expected_stw:
+                                break
+                            _w += _f.samples / _f.sample_rate
+                            _f.pts = None
+                            for _p in _os.encode(_f):
+                                _cout.mux(_p)
+                        for _p in _os.encode(None):
+                            _cout.mux(_p)
+                    _trim_ok = True
+            if _trim_ok and os.path.exists(_tmp_stw):
+                # os.replace can fail on Windows if the destination is still
+                # locked by the OS/AV scanner; unlink first as a workaround.
+                try:
+                    os.replace(_tmp_stw, output_path)
+                except OSError:
+                    try:
+                        os.unlink(output_path)
+                        os.rename(_tmp_stw, output_path)
+                    except OSError as _e2:
+                        print(f"[render_strip_to_wav] replace failed: {_e2} — keeping trim as {_tmp_stw!r}")
+                        output_path = _tmp_stw
+                print(f"[render_strip_to_wav] re-trimmed → {_expected_stw:.2f}s")
+    except Exception as _e_stw:
+        print(f"[render_strip_to_wav] post-trim failed: {_e_stw}")
+
+    return output_path
 
 
 def decompose_meta(context, meta_strip, target_type="video"):
