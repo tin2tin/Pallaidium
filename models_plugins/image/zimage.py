@@ -65,7 +65,7 @@ class _ZImageBase(ModelPlugin):
             if not turbo:
                 pipe.vae.enable_tiling()
         else:
-            pipe.to("cuda")
+            pipe.enable_model_cpu_offload()
         return pipe
 
     def _build_img2img(self, model_id, prefs, turbo=False):
@@ -105,7 +105,7 @@ class _ZImageBase(ModelPlugin):
             if not turbo:
                 conv.vae.enable_tiling()
         else:
-            conv.to("cuda")
+            conv.enable_model_cpu_offload()
         return conv
 
     def generate(self, pipe_obj, inputs: ModelInputs, scene, prefs):

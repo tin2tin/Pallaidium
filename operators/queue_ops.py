@@ -768,7 +768,12 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
         })
     except Exception as exc:
         _err_str = str(exc)
-        if snapshot.get("local_files_only") and isinstance(exc, OSError):
+        if isinstance(exc, ModuleNotFoundError):
+            _err_str = (
+                f"Missing dependency: {exc.name}. "
+                "Install Dependencies in the add-on Preferences."
+            )
+        elif snapshot.get("local_files_only") and isinstance(exc, OSError):
             _err_str = (
                 "Weights missing. Uncheck 'Use Local Files Only' in Preferences to download."
             )

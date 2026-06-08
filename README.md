@@ -459,6 +459,7 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 - [ZImage](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo)
 - [Schematic](https://huggingface.co/nomadoor/flux-2-klein-9B-schematic-lora)
 - [Anima](https://huggingface.co/mrfatso/anima-preview3-diffusers)
+- [Disty0/Ideogram-4-SDNQ-4bit-dynamic-hadamard](https://huggingface.co/Disty0/Ideogram-4-SDNQ-4bit-dynamic-hadamard)
 
 ### Audio:
 - [Chatterbox / Chatterbox Turbo](https://github.com/resemble-ai/chatterbox)

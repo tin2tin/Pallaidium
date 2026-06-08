@@ -17,7 +17,7 @@ from ...utils.helpers import gfx_device
 
 
 class Ideogram4Plugin(ModelPlugin):
-    MODEL_ID     = "vladmandic/Ideogram-4-sdnq-uint4-hadamard"
+    MODEL_ID     = "Disty0/Ideogram-4-SDNQ-4bit-dynamic-hadamard"
     DISPLAY_NAME = "Image: Ideogram 4"
     DESCRIPTION  = (
         "Text-to-image via Ideogram 4 (uint4 SDNQ, ~17.9 GB). "
@@ -109,6 +109,8 @@ class Ideogram4Plugin(ModelPlugin):
             height=inputs.height,
             width=inputs.width,
             num_inference_steps=inputs.steps,
+            guidance_scale=inputs.guidance,
+            guidance_schedule=None,
             prompt_upsampling=prompt_upsampling,
             max_sequence_length=2048,
             generator=generator,

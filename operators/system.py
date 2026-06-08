@@ -382,7 +382,6 @@ def _run_install(snapshot: dict, cancel_event: threading.Event):
                     "--upgrade",
                     "--disable-pip-version-check",
                     "--no-warn-script-location",
-                    "--no-user",
                     "--no-deps",
                     "--target", site_packages_dir,
                     "-r", temp_req,
@@ -445,27 +444,48 @@ def _run_install(snapshot: dict, cancel_event: threading.Event):
 
 
 def _run_uninstall(snapshot: dict, cancel_event: threading.Event):
-    state     = _dep_state
-    pybin     = snapshot["pybin"]
-    pkgs      = snapshot["pkgs"]
-    addon_dir = snapshot["addon_dir"]
+    state = _dep_state
+    state["phase"]    = "Uninstalling dependencies..."
+    state["progress"] = 0.0
 
-    state["phase"]    = f"Uninstalling {len(pkgs)} packages..."
-    state["progress"] = 0.05
+    try:
+        if not os.path.isdir(site_packages_dir):
+            state["status_line"] = "Nothing to remove."
+        else:
+            # Count total files first so we can show real progress.
+            all_files = []
+            for root, _dirs, files in os.walk(site_packages_dir):
+                for f in files:
+                    all_files.append(os.path.join(root, f))
+            total = max(len(all_files), 1)
 
-    def on_line(line):
-        state["status_line"] = line
-        state["progress"]    = min(state["progress"] + 0.005, 0.95)
+            state["status_line"] = f"Removing {total} files..."
 
-    uninstall_file = os.path.join(addon_dir, "_temp_uninstall_list.txt")
-    write_requirements_file(uninstall_file, pkgs)
+            for i, fpath in enumerate(all_files):
+                if cancel_event.is_set():
+                    state["phase"]   = "Uninstall cancelled"
+                    state["running"] = False
+                    return
+                try:
+                    os.remove(fpath)
+                except Exception:
+                    pass
+                state["progress"]    = (i + 1) / total
+                state["status_line"] = os.path.basename(fpath)
 
-    run_pip_streaming(
-        [pybin, "-m", "pip", "uninstall", "-y", "-r", uninstall_file],
-        on_line=on_line, cancel_event=cancel_event,
-    )
-    if os.path.exists(uninstall_file):
-        os.remove(uninstall_file)
+            # Remove leftover empty directories.
+            for root, dirs, _files in os.walk(site_packages_dir, topdown=False):
+                for d in dirs:
+                    try:
+                        os.rmdir(os.path.join(root, d))
+                    except Exception:
+                        pass
+
+            os.makedirs(site_packages_dir, exist_ok=True)
+            state["status_line"] = f"Removed {total} files."
+
+    except Exception as e:
+        state["status_line"] = f"Error during uninstall: {e}"
 
     state["phase"]    = "Uninstall complete — please restart Blender"
     state["progress"] = 1.0
@@ -585,32 +605,6 @@ class GENERATOR_OT_uninstall(Operator):
             self.report({"WARNING"}, "Dependency operation already running.")
             return {"CANCELLED"}
 
-        import platform as _plat
-        pybin     = python_exec()
-        mgr       = DependencyManager()
-        addon_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-        _linux_req = os.path.join(addon_dir, "requirements_linux.txt")
-        local_req = _linux_req if _plat.system() == "Linux" and os.path.exists(_linux_req) \
-                    else os.path.join(addon_dir, "requirements.txt")
-
-        all_targets: set = set()
-        if os.path.exists(local_req):
-            with open(local_req, 'r') as f:
-                for line in f.read().splitlines():
-                    name = SmartSkipManager.extract_package_name(line)
-                    if name:
-                        all_targets.add(name)
-
-        for line in (mgr.get_phase_1_5_source_libs()
-                     + mgr.get_phase_2_torch()
-                     + mgr.get_phase_3_git_and_extensions()
-                     + mgr.get_phase_linux_binary_only()):
-            name = SmartSkipManager.extract_package_name(line)
-            if name:
-                all_targets.add(name)
-
-        safe_list = [p for p in all_targets if not BlenderInternalManager.is_protected(p)]
-
         _dep_cancel_event.clear()
         _dep_failed_batches.clear()
         _dep_state.update({
@@ -619,9 +613,8 @@ class GENERATOR_OT_uninstall(Operator):
             "status_line": "", "failure_report": "",
         })
 
-        snapshot = {"pybin": pybin, "addon_dir": addon_dir, "pkgs": safe_list}
         _dep_worker_thread = threading.Thread(
-            target=_run_uninstall, args=(snapshot, _dep_cancel_event), daemon=True
+            target=_run_uninstall, args=({}, _dep_cancel_event), daemon=True
         )
         _dep_worker_thread.start()
 

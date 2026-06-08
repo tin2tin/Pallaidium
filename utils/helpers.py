@@ -49,15 +49,13 @@ ADDON_ID = __package__.rsplit(".", 1)[0]
 
 print("Python: " + sys.version)
 
-site_packages_dir = sysconfig.get_path("purelib")
+site_packages_dir = os.path.join(bpy.utils.user_resource("DATAFILES"), "Pallaidium", "site-packages")
+os.makedirs(site_packages_dir, exist_ok=True)
 print("Pallaidium site-packages:", site_packages_dir)
 
 dir_path = os.path.join(bpy.utils.user_resource("DATAFILES"), "Pallaidium Media")
 
 os.makedirs(dir_path, exist_ok=True)
-
-if site_packages_dir and site_packages_dir not in sys.path:
-    sys.path.insert(0, site_packages_dir)
 
 def _prune_stale_blender_paths():
     # Remove sys.path entries from other Blender installs that have permission
@@ -66,12 +64,16 @@ def _prune_stale_blender_paths():
     blender_root = os.path.normcase(
         os.path.dirname(os.path.dirname(os.path.dirname(sys.executable)))
     )
+    our_dir = os.path.normcase(site_packages_dir)
     pruned = []
     for p in sys.path:
         if not p:
             pruned.append(p)
             continue
         pn = os.path.normcase(p)
+        if pn == our_dir:
+            pruned.append(p)
+            continue
         if "site-packages" in pn and blender_root not in pn:
             parent = os.path.normcase(os.path.abspath(os.path.join(p, "..", "..", "..", "..")))
             if "blender" in parent and blender_root not in parent:
@@ -80,6 +82,9 @@ def _prune_stale_blender_paths():
     sys.path[:] = pruned
 
 _prune_stale_blender_paths()
+
+if site_packages_dir and site_packages_dir not in sys.path:
+    sys.path.insert(0, site_packages_dir)
 
 warnings.filterwarnings("ignore", category=FutureWarning, module="xformers.*")
 
@@ -700,7 +705,7 @@ def clear_cuda_cache():
             torch.cuda.reset_max_memory_allocated()
         if torch.backends.mps.is_available():
             torch.mps.empty_cache()
-    except (ImportError, PermissionError, OSError):
+    except (ImportError, AttributeError, PermissionError, OSError):
         pass
 
 def release_model_cache(cache: dict) -> None:
@@ -721,7 +726,7 @@ def release_model_cache(cache: dict) -> None:
             torch.cuda.reset_max_memory_allocated()
         if torch.backends.mps.is_available():
             torch.mps.empty_cache()
-    except (ImportError, PermissionError, OSError):
+    except (ImportError, AttributeError, PermissionError, OSError):
         pass
 
 def python_exec():
@@ -787,7 +792,7 @@ def python_exec():
 
 def install_requirements_binary_only(requirements_file):
     """
-    Installs using --only-binary=:all: into Blender's own site-packages.
+    Installs using --only-binary=:all: into the user site-packages.
     """
     if os.path.getsize(requirements_file) == 0:
         return True
@@ -797,7 +802,6 @@ def install_requirements_binary_only(requirements_file):
         pybin, "-m", "pip", "install",
         "--disable-pip-version-check",
         "--no-warn-script-location",
-        "--no-user",
         "--no-deps",
         "--upgrade",
         "--only-binary=:all:",
@@ -813,7 +817,7 @@ def install_requirements_binary_only(requirements_file):
 
 def install_requirements_allow_source(requirements_file):
     """
-    Installs WITHOUT --only-binary into Blender's own site-packages.
+    Installs WITHOUT --only-binary into the user site-packages.
     """
     if os.path.getsize(requirements_file) == 0:
         return True
@@ -823,7 +827,6 @@ def install_requirements_allow_source(requirements_file):
         pybin, "-m", "pip", "install",
         "--disable-pip-version-check",
         "--no-warn-script-location",
-        "--no-user",
         "--no-deps",
         "--upgrade",
         "--target", site_packages_dir,
@@ -912,57 +915,53 @@ class SmartSkipManager:
             except importlib.metadata.PackageNotFoundError:
                 return False
 
-        if "git+" in line or "http" in line:
-            print(f"  [SKIP] {name} is already installed.")
-            return True
-
-        if req_version:
-            if installed_version != req_version:
-                print(f"  [UPDATE] {name}: Installed {installed_version} != Required {req_version}")
-                return False
-
-        # Guard against broken installs where dist-info exists but the actual
-        # module file was deleted (e.g. interrupted pip run on Windows).
+        # Verify the package lives in our dedicated site-packages and is intact.
+        # This must run before the git shortcut so git packages are also relocated
+        # when found in the wrong directory (e.g. an old Blender purelib).
         try:
             dist = importlib.metadata.Distribution.from_name(name)
-            record_text = dist.read_text("RECORD")
-            if record_text:
-                dist_info_dir = getattr(dist, "_path", None)
-                if dist_info_dir is not None:
-                    site_dir = os.path.dirname(str(dist_info_dir))
+            dist_info_dir = getattr(dist, "_path", None)
+            if dist_info_dir is not None:
+                site_dir = os.path.normpath(os.path.dirname(str(dist_info_dir)))
+                target   = os.path.normpath(site_packages_dir)
+                if os.path.normcase(site_dir) != os.path.normcase(target):
+                    print(f"  [RELOCATE] {name} found at {site_dir}, reinstalling to {target}")
+                    return False
+
+                record_text = dist.read_text("RECORD")
+                if record_text:
                     for rec_line in record_text.splitlines():
                         file_rel = rec_line.split(",")[0].strip()
                         if not file_rel:
                             continue
                         if file_rel.startswith("__pycache__") or ".dist-info" in file_rel:
                             continue
-                        # Skip console-script entries — Blender's Python has no bin/ or Scripts/
                         norm = file_rel.replace("\\", "/")
                         if "/bin/" in norm or "/Scripts/" in norm or norm.startswith("../"):
                             continue
-                        full_path = os.path.normpath(os.path.join(site_dir, file_rel))
-                        if not os.path.exists(full_path):
+                        if not os.path.exists(os.path.normpath(os.path.join(site_dir, file_rel))):
                             print(f"  [BROKEN] {name} {installed_version}: {file_rel} missing, will reinstall")
                             return False
                         break
-                    # Extra guard: if the package directory exists but has no __init__.py
-                    # it acts as a hollow namespace package that shadows the real install.
-                    # This catches partial pip installs where subdirs were written but the
-                    # root __init__.py was never extracted (e.g. interrupted --target install).
-                    # Only applied to simple (non-namespace) package names.
                     pkg_dir_name = name.replace("-", "_")
                     if "." not in pkg_dir_name:
                         pkg_dir = os.path.join(site_dir, pkg_dir_name)
                         if os.path.isdir(pkg_dir) and not os.path.exists(
                             os.path.join(pkg_dir, "__init__.py")
                         ):
-                            print(
-                                f"  [BROKEN] {name} {installed_version}: "
-                                f"{pkg_dir_name}/__init__.py missing, will reinstall"
-                            )
+                            print(f"  [BROKEN] {name} {installed_version}: {pkg_dir_name}/__init__.py missing, will reinstall")
                             return False
         except Exception:
             pass
+
+        # Git/URL installs: location verified above, skip version comparison
+        if "git+" in line or "http" in line:
+            print(f"  [SKIP] {name} is already installed.")
+            return True
+
+        if req_version and installed_version != req_version:
+            print(f"  [UPDATE] {name}: Installed {installed_version} != Required {req_version}")
+            return False
 
         print(f"  [SKIP] {name} {installed_version} is already installed.")
         return True
@@ -1772,15 +1771,17 @@ def render_meta_child_to_path(context, meta_strip, child_strip, image_output=Fal
                 print(f"[render_meta_child_to_path] mixdown result: {result}")
             except Exception as _mix_err:
                 print(f"[render_meta_child_to_path] mixdown exception: {_mix_err}")
+            _fps_sound = vse_scene.render.fps / max(1.0, getattr(vse_scene.render, 'fps_base', 1.0))
+            _expected_s = child_strip.frame_final_duration / _fps_sound
+
             # PyAV fallback — used when mixdown returns CANCELLED or doesn't write the file
             if not os.path.exists(output_path):
                 print("[render_meta_child_to_path] mixdown produced no file — trying PyAV trim")
                 try:
                     import av as _av
-                    _fps = vse_scene.render.fps / max(1.0, getattr(vse_scene.render, 'fps_base', 1.0))
                     _src = bpy.path.abspath(child_strip.sound.filepath)
-                    _start_s = child_strip.frame_offset_start / _fps
-                    _dur_s   = child_strip.frame_final_duration / _fps
+                    _start_s = child_strip.frame_offset_start / _fps_sound
+                    _dur_s   = _expected_s
                     print(f"[render_meta_child_to_path] av trim: src={_src!r} start={_start_s:.3f}s dur={_dur_s:.3f}s")
                     with _av.open(_src) as _inp:
                         _aud = next((s for s in _inp.streams if s.type == 'audio'), None)
@@ -1806,6 +1807,38 @@ def render_meta_child_to_path(context, meta_strip, child_strip, image_output=Fal
                 except Exception as _av_err:
                     print(f"[render_meta_child_to_path] av trim failed: {_av_err}")
                     import traceback as _tb; _tb.print_exc()
+
+            # Post-trim: sound.mixdown may export beyond the strip's in/out range
+            # (ignoring the frame_start/frame_end we set); cap to the expected duration.
+            if os.path.exists(output_path):
+                try:
+                    import soundfile as _sf_chk
+                    _actual_s = _sf_chk.info(output_path).frames / _sf_chk.info(output_path).samplerate
+                    if _actual_s > _expected_s + 0.1:
+                        print(f"[render_meta_child_to_path] audio too long "
+                              f"({_actual_s:.2f}s > {_expected_s:.2f}s) — re-trimming")
+                        import av as _av_rt
+                        _tmp_path = output_path + ".trimtmp.wav"
+                        with _av_rt.open(output_path) as _c_in:
+                            _as_rt = next((s for s in _c_in.streams if s.type == 'audio'), None)
+                            if _as_rt:
+                                with _av_rt.open(_tmp_path, 'w', format='wav') as _c_out:
+                                    _os_rt = _c_out.add_stream(
+                                        'pcm_s16le', rate=_as_rt.codec_context.sample_rate)
+                                    _w_rt = 0.0
+                                    for _f_rt in _c_in.decode(_as_rt):
+                                        if _w_rt >= _expected_s:
+                                            break
+                                        _w_rt += _f_rt.samples / _f_rt.sample_rate
+                                        _f_rt.pts = None
+                                        for _p_rt in _os_rt.encode(_f_rt):
+                                            _c_out.mux(_p_rt)
+                                    for _p_rt in _os_rt.encode(None):
+                                        _c_out.mux(_p_rt)
+                                os.replace(_tmp_path, output_path)
+                                print(f"[render_meta_child_to_path] re-trimmed → {_expected_s:.2f}s")
+                except Exception as _rt_err:
+                    print(f"[render_meta_child_to_path] post-trim failed: {_rt_err}")
 
         elif image_output:
             base = os.path.abspath(
