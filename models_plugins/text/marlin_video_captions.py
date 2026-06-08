@@ -15,7 +15,8 @@ import os
 
 from ...models.base import ModelPlugin, InputSpec, ParamSpec, ModelInputs
 
-_MODEL_ID = "lunahr/Marlin-2B-ungated"
+#_MODEL_ID = "lunahr/Marlin-2B-ungated"
+_MODEL_ID = "tintwotin/Marlin-2B-SDNQ-int8"
 
 # ── Scene props registered at import time ─────────────────────────────────────
 # draw_custom_ui() runs on every panel redraw, so the props must exist from the
@@ -168,23 +169,23 @@ class MarlinVideoCaptionsPlugin(ModelPlugin):
     UI_SECTIONS = []
     PARAMS      = ParamSpec()
 
-    REQUIRED_PACKAGES    = ["qwen_vl_utils"]
+    REQUIRED_PACKAGES    = ["qwen_vl_utils", "sdnq"]
     requires_input_strip = True
-    requires_main_thread = True   # generate() calls bpy directly
+    requires_main_thread = False  # inference runs in worker; bpy writes via bpy.app.timers
 
     def load(self, prefs, scene, **kw) -> dict:
         import os as _os
         # Set before transformers import — Qwen reads these at module-import time.
-        _os.environ["FPS"]                    = str(_SAMPLE_FPS)
-        _os.environ["VIDEO_MAX_PIXELS"]       = "100352"
-        _os.environ["FPS_MIN_FRAMES"]         = "4"
+        _os.environ["FPS"]                       = str(_SAMPLE_FPS)
+        _os.environ["VIDEO_MAX_PIXELS"]          = "100352"
+        _os.environ["FPS_MIN_FRAMES"]            = "4"
         _os.environ["FORCE_QWENVL_VIDEO_READER"] = "cv2"  # torchcodec hangs on Windows
-        _os.environ["TOKENIZERS_PARALLELISM"] = "false"
+        _os.environ["TOKENIZERS_PARALLELISM"]    = "false"
 
         import torch
-        from transformers import AutoModelForCausalLM, BitsAndBytesConfig
+        import sdnq  # registers SDNQ quantizer with transformers before from_pretrained
+        from transformers import AutoModelForCausalLM
 
-        # Match reference app: disable grad globally and enable TF32 on both paths.
         torch.set_grad_enabled(False)
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32       = True
@@ -192,39 +193,26 @@ class MarlinVideoCaptionsPlugin(ModelPlugin):
         local     = getattr(prefs, "local_files_only", False)
         cache_dir = getattr(prefs, "hf_cache_dir", None) or None
 
-        bnb = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_quant_type="nf4",
-            bnb_4bit_compute_dtype=torch.bfloat16,
-            bnb_4bit_use_double_quant=True,
+        common = dict(
+            trust_remote_code=True,
+            torch_dtype=torch.bfloat16,
+            device_map={"": "cuda"},
+            low_cpu_mem_usage=True,
+            local_files_only=local,
+            cache_dir=cache_dir,
         )
-        # bf16 first (fastest generation, ~4.5 GB VRAM for 2B) → 4-bit only if OOM.
-        for attempt_kwargs in [
-            dict(trust_remote_code=True, torch_dtype=torch.bfloat16,
-                 attn_implementation="flash_attention_2",
-                 device_map={"": "cuda"}, low_cpu_mem_usage=True,
-                 local_files_only=local, cache_dir=cache_dir),
-            dict(trust_remote_code=True, torch_dtype=torch.bfloat16,
-                 attn_implementation="sdpa",
-                 device_map={"": "cuda"}, low_cpu_mem_usage=True,
-                 local_files_only=local, cache_dir=cache_dir),
-            dict(trust_remote_code=True, quantization_config=bnb,
-                 attn_implementation="flash_attention_2",
-                 device_map={"": "cuda"}, low_cpu_mem_usage=True,
-                 local_files_only=local, cache_dir=cache_dir),
-            dict(trust_remote_code=True, quantization_config=bnb,
-                 attn_implementation="sdpa",
-                 device_map={"": "cuda"}, low_cpu_mem_usage=True,
-                 local_files_only=local, cache_dir=cache_dir),
-        ]:
+
+        # Try FA2 first, fall back to SDPA, then eager (no attn kwarg).
+        for attn_impl in ["flash_attention_2", "sdpa", None]:
+            kwargs = dict(common)
+            if attn_impl:
+                kwargs["attn_implementation"] = attn_impl
             try:
-                marlin = AutoModelForCausalLM.from_pretrained(_MODEL_ID, **attempt_kwargs)
+                marlin = AutoModelForCausalLM.from_pretrained(_MODEL_ID, **kwargs)
                 marlin.eval()
                 _ = marlin.processor   # pre-warm lazy-loaded processor
-                bnb_used = "quantization_config" in attempt_kwargs
-                fa2_used = attempt_kwargs.get("attn_implementation") == "flash_attention_2"
-                used = f"{'FA2' if fa2_used else 'SDPA'}+{'4-bit' if bnb_used else 'bf16'}"
-                print(f"Marlin: loaded ({used})")
+                used = attn_impl or "eager"
+                print(f"Marlin: loaded (SDNQ int8 + {used})")
                 return {"model": marlin}
             except OSError as e:
                 if local:
@@ -448,65 +436,104 @@ class MarlinVideoCaptionsPlugin(ModelPlugin):
                 except Exception:
                     pass
 
+        # ── Schedule all bpy mutations on the main thread ─────────────────
+        # generate() runs in a worker thread; bpy writes must happen via timers.
+        import bpy as _bpy
+
+        if mode == "FIND":
+            _query_snap        = query
+            _scene_name        = scene.name
+            _find_result_snap  = find_result
+            _strip_start_snap  = strip_start_frame
+            _clip_start_snap   = clip_start
+            _fps_snap          = fps
+
+            def _apply_find():
+                _s = _bpy.data.scenes.get(_scene_name)
+                if _s is None:
+                    return None
+                span = _find_result_snap.get("span") if _find_result_snap else None
+                if not span or not _find_result_snap.get("format_ok"):
+                    raw = (_find_result_snap.get("raw") or "") if _find_result_snap else ""
+                    print(f"Marlin: No span found for {_query_snap!r}. Raw: {raw!r}")
+                    _s.marlin_last_query = _query_snap
+                    return None
+                t_start = float(span[0])
+                frame   = _strip_start_snap + int((t_start - _clip_start_snap) * _fps_snap)
+                frame   = max(frame, _strip_start_snap)
+                _s.timeline_markers.new(name=f"MARLIN: {_query_snap[:30]}", frame=frame)
+                _s.frame_current = frame
+                _s.marlin_last_query = _query_snap
+                print(f"Marlin: Marker added for {_query_snap!r} → frame {frame}.")
+                return None
+
+            _bpy.app.timers.register(_apply_find, first_interval=0.1)
+            return None
+
+        # Caption mode — build plain-data snapshot, no bpy references
         scene_text = (result.get("scene") or "").strip()
         events     = result.get("events") or []
-
-        # Keep only events within the clip's visible window
-        events = [ev for ev in events if ev["start"] < clip_end and ev["end"] > clip_start]
+        events     = [ev for ev in events if ev["start"] < clip_end and ev["end"] > clip_start]
 
         if not events:
             print("Marlin: No events returned within the strip duration.")
             return None
 
-        clip_end_frame = strip_start_frame + int(trim_dur_s * fps)
-        need_ch  = 2 if scene_text else 1
-        _ch_hint = inputs.insert_channel if inputs.insert_channel > 0 else 1
-        channels = _find_free_channels(seq_editor, strip_start_frame, clip_end_frame + 2,
-                                       need_ch, start_ch=_ch_hint)
-        events_ch = channels[0]
-        scene_ch  = channels[1] if need_ch == 2 else None
+        _scene_name       = scene.name
+        _scene_text_snap  = scene_text
+        _events_snap      = [dict(ev) for ev in events]   # plain dicts, no bpy refs
+        _strip_start_snap = strip_start_frame
+        _trim_dur_snap    = trim_dur_s
+        _clip_start_snap  = clip_start
+        _fps_snap         = fps
+        _ch_hint_snap     = inputs.insert_channel if inputs.insert_channel > 0 else 1
 
-        # Scene overview strip spanning the entire trimmed clip
-        if scene_ch and scene_text:
-            ov = seq_editor.strips.new_effect(
-                name=scene_text[:63],
-                type="TEXT",
-                frame_start=strip_start_frame,
-                length=max(1, int(clip_end_frame - strip_start_frame)),
-                channel=scene_ch,
-            )
-            ov.text = _format_two_lines(scene_text)
-            _apply_text_strip_style(ov, font_size=12, y=0.95)
-            ov.box_color = (0, 0, 0, 0.6)
+        def _apply_caption():
+            _s = _bpy.data.scenes.get(_scene_name)
+            if _s is None or not _s.sequence_editor:
+                return None
+            _seq          = _s.sequence_editor
+            _clip_end_fr  = _strip_start_snap + int(_trim_dur_snap * _fps_snap)
+            _need_ch      = 2 if _scene_text_snap else 1
+            _channels     = _find_free_channels(_seq, _strip_start_snap, _clip_end_fr + 2,
+                                                _need_ch, start_ch=_ch_hint_snap)
+            _events_ch    = _channels[0]
+            _scene_ch     = _channels[1] if _need_ch == 2 else None
 
-        # (ev["start"] - clip_start) maps clip time to strip-relative seconds
-        created = 0
-        for ev in events:
-            ev_start = strip_start_frame + int((ev["start"] - clip_start) * fps)
-            ev_end   = strip_start_frame + int((ev["end"]   - clip_start) * fps)
-            ev_start = max(ev_start, strip_start_frame)
-            ev_end   = min(ev_end,   int(clip_end_frame))
-            length   = max(1, ev_end - ev_start)
-            disp     = _format_two_lines(ev["description"])
+            if _scene_ch and _scene_text_snap:
+                ov = _seq.strips.new_effect(
+                    name=_scene_text_snap[:63],
+                    type="TEXT",
+                    frame_start=_strip_start_snap,
+                    length=max(1, int(_clip_end_fr - _strip_start_snap)),
+                    channel=_scene_ch,
+                )
+                ov.text = _format_two_lines(_scene_text_snap)
+                _apply_text_strip_style(ov, font_size=12, y=0.95)
+                ov.box_color = (0, 0, 0, 0.6)
 
-            s = seq_editor.strips.new_effect(
-                name=disp[:63],
-                type="TEXT",
-                frame_start=ev_start,
-                length=length,
-                channel=events_ch,
-            )
-            if hasattr(s, "right_handle"):
-                s.right_handle = ev_end
-            else:
+            _created = 0
+            for ev in _events_snap:
+                ev_start = _strip_start_snap + int((ev["start"] - _clip_start_snap) * _fps_snap)
+                ev_end   = _strip_start_snap + int((ev["end"]   - _clip_start_snap) * _fps_snap)
+                ev_start = max(ev_start, _strip_start_snap)
+                ev_end   = min(ev_end,   int(_clip_end_fr))
+                length   = max(1, ev_end - ev_start)
+                disp     = _format_two_lines(ev["description"])
+                s = _seq.strips.new_effect(
+                    name=disp[:63], type="TEXT",
+                    frame_start=ev_start, length=length, channel=_events_ch,
+                )
                 try:
                     s.frame_final_end = ev_end
                 except Exception:
                     pass
+                s.text = disp
+                _apply_text_strip_style(s)
+                _created += 1
 
-            s.text = disp
-            _apply_text_strip_style(s)
-            created += 1
+            print(f"Marlin: Done — {_created} event strip(s) on channel {_events_ch}.")
+            return None
 
-        print(f"Marlin: Done — {created} event strip(s) on channel {events_ch}.")
+        _bpy.app.timers.register(_apply_caption, first_interval=0.1)
         return None
