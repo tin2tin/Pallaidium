@@ -78,13 +78,11 @@ For Linux, we'll have to rely on contributor support. Post your issues here: htt
 
 * Download the add-on: [https://github.com/tin2tin/Pallaidium/archive/refs/heads/main.zip](https://github.com/tin2tin/Pallaidium/archive/refs/heads/main.zip)
 
-* On Windows, right-click on the Blender(blender.exe) icon and "Run Blender as Administrator"(or you'll get write permission errors).
-
 * Install the add-on as usual: Preferences > Add-ons > Install > select file > enable the add-on. 
 
 * In the Generative AI add-on preferences, hit the "Install Dependencies" button.
-  
-* Restart the computer and run Blender via "Run as Administrator".
+
+* Restart the computer after installing dependencies, then open Blender normally.
 
 * Open the add-on UI in the Sequencer > Sidebar > Generative AI.
 
@@ -103,13 +101,19 @@ https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=ms
 
 ## Uninstall
 
-To remove Pallaidium and all its dependencies, delete the Blender 5.2 folder from your Documents folder. This removes the add-on together with all installed Python libraries.
+Python dependencies are now installed into the Blender user data folder, separate from the Blender executable:
+
+- **Windows:** `%APPDATA%\Blender Foundation\Blender\5.2\datafiles\Pallaidium\site-packages`
+- **Linux:** `~/.config/blender/5.2/datafiles/Pallaidium/site-packages`
+
+To remove Pallaidium's Python libraries, delete the `Pallaidium` folder at the path above.
+
+To remove the add-on itself, disable and uninstall it via Preferences > Add-ons, or delete the Blender 5.2 folder from your Documents folder (Windows portable install).
 
 To remove only the downloaded AI model weights, delete the Hugging Face cache folder manually:
 
-On Linux: ~/.cache/huggingface/hub
-
-On Windows: %userprofile%\\.cache\huggingface\hub
+- **Linux:** `~/.cache/huggingface/hub`
+- **Windows:** `%userprofile%\.cache\huggingface\hub`
 
 
 ## Usage
@@ -131,6 +135,8 @@ The addon panel is located in the **Video Sequence Editor > Sidebar (N-Panel) > 
 The generated media will be saved to the directory specified in the addon preferences and automatically added to your VSE timeline on a new channel.
 
 ## Change Log
+
+2026-06-08: Change: Python dependencies location — packages are now installed into the Blender user data directory (`%APPDATA%\Blender Foundation\Blender\5.2\datafiles\Pallaidium\site-packages` on Windows; `~/.config/blender/5.2/datafiles/Pallaidium/site-packages` on Linux) instead of the Blender executable folder. A computer restart is still required after installing dependencies. Running Blender as Administrator is no longer needed.
 
 2026-06-07: Add: LTX-2.3 Multi-Input N-Anchor mode — place **3 or more** Image strips inside a Meta strip to pin the generated video at multiple points in time. Each image's position within the Meta strip determines its frame anchor: the first image locks frame 0, the last image locks the final frame, and every image in between is mapped proportionally to the corresponding frame index. Works with the interactive generator and the Render Queue.
 
