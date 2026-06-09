@@ -22,7 +22,7 @@ class SkyReelsPlugin(ModelPlugin):
         UISection.PROMPT, UISection.NEG_PROMPT, UISection.VIDEO_STRIP,
         UISection.RESOLUTION, UISection.FRAMES, UISection.STEPS, UISection.GUIDANCE, UISection.SEED,
     ]
-    PARAMS       = ParamSpec(width=848, height=480, frames=97, steps=50, guidance=1.0)
+    PARAMS       = ParamSpec(width=1920, height=896, frames=97, steps=50, guidance=1.0)
     REQUIRED_PACKAGES = ["torch", "diffusers"]
 
     def load(self, prefs, scene, **kw):

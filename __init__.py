@@ -129,7 +129,7 @@ def register():
     )
     bpy.types.Scene.generate_movie_y = bpy.props.IntProperty(
         name="generate_movie_y",
-        default=1080,
+        default=896,
         step=32,
         min=64,
         max=4096,

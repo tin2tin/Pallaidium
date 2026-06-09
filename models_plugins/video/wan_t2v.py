@@ -17,7 +17,7 @@ class WanT2VPlugin(ModelPlugin):
         UISection.PROMPT, UISection.NEG_PROMPT,
         UISection.RESOLUTION, UISection.FRAMES, UISection.SEED, UISection.LORA,
     ]
-    PARAMS       = ParamSpec(width=832, height=480, frames=81, steps=8, guidance=1.0)
+    PARAMS       = ParamSpec(width=1920, height=896, frames=81, steps=8, guidance=1.0)
     REQUIRED_PACKAGES = ["torch", "diffusers", "transformers"]
 
     def load(self, prefs, scene, **kw):

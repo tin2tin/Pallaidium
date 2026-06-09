@@ -15,7 +15,7 @@ class LTX2Plugin(ModelPlugin):
         UISection.PROMPT, UISection.NEG_PROMPT, UISection.VIDEO_STRIP,
         UISection.RESOLUTION, UISection.FRAMES, UISection.SEED, UISection.LORA,
     ]
-    PARAMS       = ParamSpec(width=512, height=320, frames=97, steps=8, guidance=1.0)
+    PARAMS       = ParamSpec(width=1920, height=896, frames=97, steps=8, guidance=1.0)
     REQUIRED_PACKAGES = ["torch", "diffusers"]
 
     def load(self, prefs, scene, **kw):

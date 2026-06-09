@@ -349,33 +349,37 @@ class SEQUENCER_OT_generate_movie(Operator):
                     if area.type == "SEQUENCE_EDITOR":
                         from bpy import context as _ctx
                         with _ctx.temp_override(window=window, area=area):
+                            _strip_name = str(seed) + "_" + prompt
                             new_movie_strip = scene.sequence_editor.strips.new_movie(
-                                name=str(seed) + "_" + prompt,
+                                name=_strip_name,
                                 filepath=dst_path,
                                 frame_start=start_frame,
                                 channel=empty_channel,
                                 fit_method="FIT",
                             )
                             set_ai_metadata_from_dict(new_movie_strip, {
-                                "model":   movie_model_card,
-                                "prompt":  inputs.prompt,
-                                "steps":   inputs.steps,
+                                "model":    movie_model_card,
+                                "prompt":   inputs.prompt,
+                                "steps":    inputs.steps,
                                 "guidance": inputs.guidance,
-                                "seed":    seed,
-                                "width":   inputs.width,
-                                "height":  inputs.height,
-                                "frames":  inputs.frames,
-                                "mode":    inputs.mode,
+                                "seed":     seed,
+                                "width":    inputs.width,
+                                "height":   inputs.height,
+                                "frames":   inputs.frames,
+                                "mode":     inputs.mode,
                             })
                             scene.sequence_editor.active_strip = new_movie_strip
                             if i > 0:
-                                scene.frame_current = scene.sequence_editor.active_strip.frame_final_start
-                            scene.sequence_editor.strips.new_sound(
-                                name=str(seed) + "_" + prompt,
-                                filepath=dst_path,
-                                channel=empty_channel - 1,
-                                frame_start=start_frame,
-                            )
+                                scene.frame_current = new_movie_strip.frame_final_start
+                            if empty_channel > 1:
+                                snd_ch = max(1, empty_channel - 1)
+                                snd = scene.sequence_editor.strips.new_sound(
+                                    name=_strip_name,
+                                    filepath=dst_path,
+                                    channel=snd_ch,
+                                    frame_start=start_frame,
+                                )
+                                snd.select = False
                         break
                 else:
                     continue
@@ -1300,6 +1304,16 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
 
                 current_temp_strip = None
                 _multi_text_only = False  # tracks standalone TEXT strip in non-META context
+                # Decompose trigger: first non-TEXT child.  If TEXT is strips[0] the
+                # "child_strip == strips[0]" check inside the elif never fires because TEXT
+                # takes the if-TEXT branch first → decompose silently skipped → audio lost.
+                if _multi_input_video and meta_strip:
+                    _meta_trigger_child = next(
+                        (s for s in meta_strip.strips if s.type != "TEXT"),
+                        meta_strip.strips[0] if meta_strip.strips else None,
+                    )
+                else:
+                    _meta_trigger_child = None
                 for child_strip in strips_array:
                     for dsel_strip in bpy.context.scene.sequence_editor.strips:
                         dsel_strip.select = False
@@ -1333,8 +1347,8 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
 
                     elif _multi_input_video and meta_strip:
                         # LTX multi-input with META: render all children once (triggered by
-                        # first child), then skip subsequent children.
-                        if child_strip == meta_strip.strips[0]:
+                        # first non-TEXT child), then skip subsequent children.
+                        if child_strip is _meta_trigger_child:
                             # Clear stale paths from prior runs / other plugins
                             scene.movie_path = ""
                             scene.image_path = ""
@@ -1437,10 +1451,11 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                                 and len(_images_wf) == 2
                                 and _images_wf[0][1] != _images_wf[1][1]
                             )
-                            # Mode B: 1 image whose frame_start > every other child's frame_start
+                            # Mode B: 1 image whose frame_start > every other media child's frame_start.
+                            # Exclude TEXT strips — they are prompt anchors, not temporal anchors.
                             _other_starts = (
                                 [_oc.frame_start for _oc in meta_strip.strips
-                                 if _oc is not _images_wf[0][2]]
+                                 if _oc is not _images_wf[0][2] and _oc.type != "TEXT"]
                                 if len(_images_wf) == 1 else []
                             )
                             _lfo_mode = (

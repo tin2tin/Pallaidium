@@ -30,7 +30,7 @@ class Ideogram4Plugin(ModelPlugin):
         UISection.RESOLUTION, UISection.FRAMES,
         UISection.SEED,
     ]
-    PARAMS            = ParamSpec(steps=40, guidance=7.0, width=1024, height=1024)
+    PARAMS            = ParamSpec(steps=40, guidance=7.0, width=1920, height=896)
     REQUIRED_PACKAGES = ["torch", "diffusers", "transformers", "outlines"]
     supports_inpaint      = False
     supports_img2img      = False

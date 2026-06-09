@@ -52,7 +52,7 @@ class LTX2_3MultiPlugin(ModelPlugin):
         UISection.RESOLUTION, UISection.FRAMES, UISection.SEED, UISection.LORA,
     ]
     # Standard ParamSpec without unsupported UI fields
-    PARAMS            = ParamSpec(width=768, height=512, frames=121, steps=8, guidance=1.0)
+    PARAMS            = ParamSpec(width=1920, height=896, frames=121, steps=8, guidance=1.0)
     REQUIRED_PACKAGES =["torch", "torchaudio", "soundfile", "av", "diffusers", "transformers", "sdnq"]
     supports_inpaint  = False
 
@@ -581,19 +581,49 @@ class LTX2_3MultiPlugin(ModelPlugin):
         # ── Save ────────────────────────────────────────────────────────────
         self.set_phase(inputs, "Saving")
         dst_path = solve_path(clean_filename(str(seed) + "_" + inputs.prompt[:40]) + ".mp4")
-        if audio_out is not None:
+
+        # When an input audio was provided, mux it directly as the output audio track.
+        # The model's audio VAE generates new audio conditioned on the input but does
+        # not reproduce speech faithfully; passing the rendered source through preserves it.
+        _use_audio    = None
+        _use_audio_sr = 24000
+
+        if sound_path:
+            try:
+                import torchaudio
+                _wav, _sr = torchaudio.load(sound_path)   # [C, T]
+                _target_n = int(round(dur_s * _sr))
+                if _wav.shape[-1] > _target_n:
+                    _wav = _wav[..., :_target_n]
+                elif _wav.shape[-1] < _target_n:
+                    _wav = torch.nn.functional.pad(_wav, (0, _target_n - _wav.shape[-1]))
+                # encode_video expects [T, 2] stereo (samples-first, 2-channel)
+                _mono = _wav.mean(0).float()               # [T]
+                _use_audio    = _mono.unsqueeze(-1).expand(-1, 2).contiguous()  # [T, 2]
+                _use_audio_sr = int(_sr)
+                print(f"[LTX23Multi] Muxing input audio: {_sr} Hz, "
+                      f"{_wav.shape[-1]} samples → {dur_s:.2f}s")
+            except Exception as _ae:
+                print(f"[LTX23Multi] Input audio mux failed ({_ae}), "
+                      f"falling back to model audio.")
+                if audio_out is not None:
+                    _use_audio    = audio_out[0].float().cpu()
+                    _use_audio_sr = audio_sr
+        elif audio_out is not None:
+            _use_audio    = audio_out[0].float().cpu()
+            _use_audio_sr = audio_sr
+
+        if _use_audio is not None:
             encode_video(
                 torch.from_numpy((video[0] * 255).round().astype("uint8")),
-                fps=fps, audio=audio_out[0].float().cpu(),
-                audio_sample_rate=audio_sr, output_path=dst_path,
+                fps=fps, audio=_use_audio,
+                audio_sample_rate=_use_audio_sr, output_path=dst_path,
             )
-            # print("[DEBUG] Muxed MP4 Output generated WITH AUDIO.")
         else:
             encode_video(
                 torch.from_numpy((video[0] * 255).round().astype("uint8")),
                 fps=fps, output_path=dst_path,
             )
-            # print("[DEBUG] Muxed MP4 Output generated WITHOUT AUDIO (video only).")
             
         print(f"LTX-2.3 saved: {dst_path}")
         return dst_path

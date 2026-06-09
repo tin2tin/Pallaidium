@@ -945,8 +945,10 @@ class SEQUENCER_OT_add_to_queue(Operator):
                 movie_path      = _sorted[0][0]
                 last_image_path = _sorted[1][0]
             elif not movie_path and len(_meta_images) == 1:
-                # Check LFO: image's frame_start > all other children's frame_start
-                _other_starts = [c.frame_start for c in strip.strips if c.type != "IMAGE"]
+                # Check LFO: image's frame_start > all other media children's frame_start.
+                # Exclude TEXT strips — they carry prompts, not temporal anchors, and a
+                # late-positioned TEXT strip would otherwise block LFO detection.
+                _other_starts = [c.frame_start for c in strip.strips if c.type not in ("IMAGE", "TEXT")]
                 if _other_starts and _meta_images[0][1] > max(_other_starts):
                     # LFO: image is the last strip → last-frame-only
                     last_image_path = _meta_images[0][0]
@@ -1698,15 +1700,14 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 channel=channel,
                 fit_method="FIT",
             )
-            if channel > 1:
-                snd_ch = _find_free_channel(seq_scene, frame_start, frame_end, channel - 1)
-                snd_strip = ed.strips.new_sound(
-                    name=name,
-                    filepath=out_path,
-                    channel=snd_ch,
-                    frame_start=frame_start,
-                )
-                snd_strip.select = False
+            snd_ch = _find_free_channel(seq_scene, frame_start, frame_end, max(1, channel - 1))
+            snd_strip = ed.strips.new_sound(
+                name=name,
+                filepath=out_path,
+                channel=snd_ch,
+                frame_start=frame_start,
+            )
+            snd_strip.select = False
 
         elif otype == "audio":
             new_strip = ed.strips.new_sound(
