@@ -119,6 +119,7 @@ onnxruntime
 demucs-onnx
 faster-whisper
 wheel
+ctranslate2
 
 # --- Image & Vision ---
 opencv-python

@@ -136,6 +136,12 @@ The generated media will be saved to the directory specified in the addon prefer
 
 ## Change Log
 
+2026-06-09: Add: Claude agent integration via Blender MCP — `pallaidium_mcp_tools.py` provides a high-level Python API (`generate_image()`, `generate_video()`, `generate_audio()`, `queue_generate()`, `list_image_models()`, `list_styles()`, etc.) that Claude agents can call through the Blender MCP server (`execute_blender_code`). Load the helper once per session in Blender's Python Console, then ask Claude to generate, queue, or inspect content in natural language.
+
+2026-06-09: Fix: Marlin Video Captions — switched to SDNQ int8 quantized weights (`tintwotin/Marlin-2B-SDNQ-int8`), display name updated to "Marlin: Video Captions (SDNQ)". Inference now runs on the main thread for stability. Added `ctranslate2` to Windows and Linux requirements.
+
+2026-06-09: Add: 20+ new prompt styles — Flux Klein / High-Fidelity Realism, LTX Video / Motion Still, Character Sheet, Storyboard, and a full set of Ads, Art (Vintage Pencil Sketch, Deconstructed Collage, Lithography variants, Folk Art, Sci-Fi Scale, 1980s Editorial, Storyboard Technical Study), Atmosphere (Volumetric Dispersion, Light Catching Particles), and Look (Clean Commercial, Dynamic Action, High-Performance Technical) templates.
+
 2026-06-08: Change: Python dependencies location — packages are now installed into the Blender user data directory (`%APPDATA%\Blender Foundation\Blender\5.2\datafiles\Pallaidium\site-packages` on Windows; `~/.config/blender/5.2/datafiles/Pallaidium/site-packages` on Linux) instead of the Blender executable folder. A computer restart is still required after installing dependencies. Running Blender as Administrator is no longer needed.
 
 2026-06-07: Add: LTX-2.3 Multi-Input N-Anchor mode — place **3 or more** Image strips inside a Meta strip to pin the generated video at multiple points in time. Each image's position within the Meta strip determines its frame anchor: the first image locks frame 0, the last image locks the final frame, and every image in between is mapped proportionally to the corresponding frame index. Works with the interactive generator and the Render Queue.

@@ -385,6 +385,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             render                         = types.SimpleNamespace(
                 fps=round(snapshot.get("fps", 24.0)), fps_base=1.0
             ),
+            sequencer_scene_name = snapshot.get("sequencer_scene_name", ""),
             whisper_model_size = snapshot.get("whisper_model_size", "large-v3-turbo"),
             whisper_language   = snapshot.get("whisper_language",   ""),
             stem_split_model  = snapshot.get("stem_split_model",  "htdemucs_ft"),

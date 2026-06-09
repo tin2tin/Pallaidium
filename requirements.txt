@@ -120,6 +120,7 @@ sox
 onnxruntime==1.20.1
 demucs-onnx
 wheel
+ctranslate2
 
 # --- Image & Vision ---
 opencv-python==4.12.0.88

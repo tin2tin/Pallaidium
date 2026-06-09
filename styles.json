@@ -1,603 +1,653 @@
 [
 	{
-		"name": "Ads: General Commercial",
-		"prompt": "Commercial advertising style {prompt}. Professional, modern, product-focused, eye-catching, highly detailed, clean, Commercial-Style",
-		"negative_prompt": "noisy, blurry, amateurish, sloppy, unattractive, ugly, cluttered"
+		"name": "Template: Flux Klein / High-Fidelity Realism",
+		"prompt": "A high-fidelity hyper-realistic photographic style of {prompt}. Shot on high-end medium format digital sensor, sharp focus, micro-contrast, natural material textures, visible fine structures, textile fibers, subtle subsurface scattering, hyper-detailed environment, neutral color grade, 8k resolution, authentic lighting, pristine optical clarity, deep spatial depth",
+		"negative_prompt": "cgi, render, 3d, plastic surfaces, airbrushed, cartoon, anime, illustration, fake, over-sharpened, saturated"
 	},
 	{
-		"name": "Ads: Food/Product Photography",
-		"prompt": "Food or product photography style {prompt}. Appetizing, professional, culinary, high-resolution, commercial, well-lit, highly detailed, Product-Focus",
-		"negative_prompt": "unappetizing, sloppy, unprofessional, noisy, blurry, dark"
+		"name": "Template: LTX Video / Motion Still",
+		"prompt": "Cinematic 24fps motion still of {prompt}, portraying a character with dialogue. Camera movement: dynamic slow tracking shot, 180-degree shutter angle, subtle motion blur, consistent lighting across frames, volumetric atmosphere, high dynamic range, filmic texture, LTX-optimized temporal consistency, deep shadows, 35mm sensor noise profile",
+		"negative_prompt": "stuttering, jitter, static, frozen, low frame rate, morphing, glitch, flashing, amateur video"
+	},
+	{
+		"name": "Template: Character sheet",
+		"prompt": "A professional, high-fidelity reference sheet of {prompt}. Layout & Aesthetic: Premium production bible design. Clean, minimalist white background with thin, elegant black grid lines for scale and alignment. Editorial-style typography labeling each view clearly. The overall composition is highly organized, balanced, and uncluttered. Views & Composition: - Top Row (Orthographic Views): A complete set of multi-angle views of the subject, perfectly aligned horizontally. 1. FRONT: A clear, unobstructed front view. 2. SIDE: A profile view showing the subject from the side. 3. BACK: A full back view. - Middle Section (Action Shot): A large 3/4 hero shot depicting the subject in a dynamic pose, moment, or functional state, conveying personality and utility in their world. - Bottom Left (Details Gallery): Three clearly distinct and visually unambiguous circular close-up shots showing three different states, expressions, or visual angles. - Bottom Right (Technical Callouts): Four distinct, isolated macro detail shots of specific technical, surface, or functional elements. Style & Quality: Realistic render style with high-detail textures, material physics, and clean studio lighting with soft shadows. Sharp focus, high-resolution, professional design sheet, editorial photography aesthetic",
+		"negative_prompt": "messy layout, overlapping frames, dark background, complex scenery, photorealistic environmental clutter"
+	},
+	{
+		"name": "Template: Storyboard",
+		"prompt": "A professional, high-fidelity film storyboard sequence depicting {prompt}. Layout & Aesthetic: Premium director's storyboard layout. Clean, minimalist dark grey background with thin, elegant white grid lines dividing the canvas into a structured grid of six identical 16:9 widescreen panels. Beneath each panel is a thin black text box with professional editorial-style typography labeling the Scene, Shot, Action, and Dialogue. Composition & Sequence: Six sequential frames arranged in a 2x3 grid, showing clear temporal progression from top-left to bottom-right. Panel 1: Establishing shot setting the scene. Panel 2: Medium tracking shot introducing the subject in detail. Panel 3: Close-up highlighting a key visual detail or kinetic action. Panel 4: Low-angle dynamic perspective shifting the spatial tension. Panel 5: High-angle wide view showing the dramatic interaction or consequence. Panel 6: Extreme close-up or cinematic resolution frame closing the sequence. Style & Quality: High-contrast sketch style with professional grey washes. Sharp, dark outlines with visible technical camera indicators. High-fidelity paper grain texture, cinematic lighting, minimalist pre-production aesthetic",
+		"negative_prompt": "color, photo, hyper-realistic, messy sketches, unstructured panels, chaotic borders"
+	},
+	{
+		"name": "Ads: General Commercial",
+		"prompt": "Commercial advertising style of {prompt}. Professional modern studio execution, high-end commercial key lighting, crisp micro-contrast, sharp focus, perfectly balanced highlights, clean high-impact commercial look",
+		"negative_prompt": "noisy, blurry, amateurish, sloppy, unattractive, ugly, cluttered, low-effort, grain"
+	},
+	{
+		"name": "Ads: Commercial Material Photography",
+		"prompt": "High-end product photography style of {prompt}. Professional studio setting, commercial-grade presentation, intricate textures, ultra-high-resolution, macro lens depth, perfectly diffused rim lighting, material-focus composition",
+		"negative_prompt": "sloppy, unprofessional, noisy, blurry, dark, harsh shadows"
 	},
 	{
 		"name": "Art: Abstract",
-		"prompt": "Abstract style {prompt}. non-representational, colors and shapes, expression of feelings, imaginative, highly detailed, Abstract-Form",
-		"negative_prompt": "realistic, photographic, figurative, concrete"
+		"prompt": "Abstract style of {prompt}. Non-representational visual forms, fluid color fields, geometric shapes, expression of complex spatial depth, highly detailed textures, high-art gallery aesthetic, Abstract-Form",
+		"negative_prompt": "realistic, photographic, figurative, concrete, representational"
 	},
 	{
 		"name": "Art: Complex Technical Lineart",
-		"prompt": "Monochrome technical lineart style {prompt}. raw pencil sketch, messy but intricate, high complexity, thin lines, dense composition, Technical-Lineart",
-		"negative_prompt": "color, soft focus, bold brush strokes, simple, minimalist"
+		"prompt": "Monochrome technical lineart style of {prompt}. Raw graphite pencil sketch, messy but intricately detailed technical blueprint design, dense layout composition, high spatial complexity, thin clean lines, Technical-Lineart",
+		"negative_prompt": "color, soft focus, bold brush strokes, simple, minimalist, paint"
 	},
 	{
 		"name": "Art: Dreamscape/Ethereal",
-		"prompt": "Dreamscape or ethereal style {prompt}. surreal, mysterious, fantasy, soft glows, dreamlike sequences, pastel palette, gentle lighting, highly detailed, Ethereal-Vibe",
-		"negative_prompt": "realistic, concrete, ordinary, mundane, harsh lighting"
+		"prompt": "Dreamscape and ethereal art style of {prompt}. Surreal environmental depth, mysterious glowing highlights, massive fantasy scale, soft sub-surface glows, pastel film colors, gentle cinematic lighting, high-fidelity details, Ethereal-Vibe",
+		"negative_prompt": "realistic, concrete, ordinary, mundane, harsh lighting, hard edges"
 	},
 	{
 		"name": "Art: Eldritch Pen and Ink",
-		"prompt": "Eldritch pen and ink illustration {prompt}. bold expressive linework, subtle crosshatching, vibrant otherworldly color palette, pulsing organic textures, cosmic horror aesthetic, Eldritch-Ink",
-		"negative_prompt": "photorealistic, minimalist, clean, soft focus, mundane, realistic perspective"
+		"prompt": "Eldritch pen and ink illustration style of {prompt}. Bold expressive ink linework, subtle crosshatching, vibrant otherworldly color palette, pulsing organic textures, cosmic horror aesthetic, fine-art stippling, Eldritch-Ink",
+		"negative_prompt": "photorealistic, minimalist, clean, soft focus, mundane, realistic perspective, flat vectors"
 	},
 	{
 		"name": "Art: Expressive Ink Sketch",
-		"prompt": "Black and white ink sketch style {prompt}. expressive loose brush strokes, high contrast, minimalist fashion illustration, visible sketchy lines, clean white space, Ink-Sketch",
-		"negative_prompt": "color, shading, gradients, photorealistic, cluttered, soft edges"
+		"prompt": "Black and white ink sketch style of {prompt}. Expressive loose brush strokes, high contrast calligraphic marks, minimalist graphic illustration style, visible sketchy outlines, elegant negative space, Ink-Sketch",
+		"negative_prompt": "color, shading, gradients, photorealistic, cluttered, soft edges, 3d render"
 	},
 	{
 		"name": "Art: Fantasy Art",
-		"prompt": "Ethereal fantasy concept art of {prompt}. magnificent, celestial, painterly, epic, majestic, magical, cover art, dreamy, Fantasy-Illustration",
+		"prompt": "Ethereal fantasy concept art of {prompt}. Magnificent scale, celestial lighting, painterly digital application, epic fantasy style, majestic environment design, cover art quality, magical, dreamy landscape, Fantasy-Illustration",
 		"negative_prompt": "photographic, realism, 35mm film, dslr, cropped, text, deformed, glitch, noisy, ugly"
 	},
 	{
 		"name": "Art: Flat Graphic Illustration",
-		"prompt": "Flat graphic illustration style {prompt}. bold black outlines, minimal detail, stylized elements, playful childlike quality, flat colors, high contrast, Graphic-Illustration",
+		"prompt": "Flat graphic illustration style of {prompt}. Bold black outlines, minimal details, stylized structural elements, playful flat layouts, screenprint aesthetic, high contrast vector shapes, Graphic-Illustration",
 		"negative_prompt": "3D render, realistic shading, gradients, photorealistic, complex texture, blurry"
 	},
 	{
 		"name": "Art: Impressionistic",
-		"prompt": "Impressionist painting style {prompt}. loose brushwork, vibrant color, light and shadow play, captures feeling over form, Painterly-Texture",
-		"negative_prompt": "photorealistic, sharp, defined lines, noisy, deformed"
+		"prompt": "Impressionist fine art painting style of {prompt}. Loose impasto brushwork, highly vibrant natural color mixing, light and shadow play, dynamic textures, captures sensory feeling over form, Painterly-Texture",
+		"negative_prompt": "photorealistic, sharp, defined lines, noisy, deformed, digital vectors"
 	},
 	{
 		"name": "Art: Masterpiece Illustration",
-		"prompt": "(masterpiece), (best quality), (ultra-detailed) illustration of {prompt}, detailed eyes, perfect composition, intricate details, High-Fidelity-Art",
+		"prompt": "(masterpiece), (best quality), (ultra-detailed) illustration of {prompt}. Perfect composition, intricate textures, masterful line control, high-fidelity color design, professional key art, High-Fidelity-Art",
 		"negative_prompt": "longbody, lowres, bad anatomy, bad hands, missing fingers, cropped, (worst quality, low quality:1.2), amateur, sketch, photo"
 	},
 	{
 		"name": "Art: Naive Playful Chaos",
-		"prompt": "Naive hand-drawn illustration style {prompt}. dense overlapping arrangement, quirky character design, bold outlines, flat colors, playful chaos, Naive-Chaos",
+		"prompt": "Naive hand-drawn illustration style of {prompt}. Dense overlapping arrangements, quirky stylized design elements, bold pencil outlines, flat chalky colors, playful chaotic composition, Naive-Chaos",
 		"negative_prompt": "photorealistic, realistic proportions, complex shading, 3D, polished, anatomical correctness"
 	},
 	{
 		"name": "Art: Surrealist",
-		"prompt": "Surrealist art {prompt}. dreamlike, mysterious, provocative, symbolic, intricate, detailed, Surreal-Composition",
+		"prompt": "Surrealist fine art style of {prompt}. Dreamlike logic, mysterious juxtaposed elements, provocative symbolism, intricate detail, high artistic resolution, Surreal-Composition",
 		"negative_prompt": "photorealistic, realistic, deformed, glitch, noisy, low contrast, mundane"
 	},
 	{
-		"name": "Art: Vintage Pencil Fashion Sketch",
-		"prompt": "Vintage fashion sketch style {prompt}. rough pencil lines, visible construction marks, cross-hatched shading, organic and messy, black and white ink, Vintage-Fashion-Sketch",
+		"name": "Art: Vintage Pencil Sketch",
+		"prompt": "Vintage graphite sketch style of {prompt}. Rough graphite lines, visible structural construction marks, cross-hatched shading, organic and beautifully messy, black and white ink stains, Vintage-Sketch",
 		"negative_prompt": "color, digital painting, smooth lines, polished, realistic, modern"
 	},
 	{
 		"name": "Art: Watercolor",
-		"prompt": "Watercolor painting style {prompt}. vibrant, beautiful, painterly, detailed, textural, artistic, soft edges, Watercolor-Wash",
-		"negative_prompt": "photorealistic, 35mm film, deformed, glitch, low contrast, noisy, harsh lines"
+		"prompt": "Watercolor painting style of {prompt}. Vibrant pigment flows, beautiful bleeding edges, painterly textures, intricate wet-on-wet details, artistic paper grain, soft wash aesthetics, Watercolor-Wash",
+		"negative_prompt": "photorealistic, 35mm film, deformed, glitch, low contrast, noisy, harsh lines, vectors"
 	},
 	{
 		"name": "Art: Whimsical Storybook Illustration",
-		"prompt": "Whimsical hand-drawn vector illustration style {prompt}. warm-to-neutral watercolor fills, delicate hand-sketched line work, textured surfaces, sketch dust and paint splashes, storybook aesthetic, Whimsical-Vector",
+		"prompt": "Whimsical hand-drawn vector illustration style of {prompt}. Warm-to-neutral watercolor fills, delicate hand-sketched line work, textured organic surfaces, sketch dust and paint splashes, nostalgic storybook aesthetic, Whimsical-Vector",
 		"negative_prompt": "photorealistic, sharp digital edges, neon colors, harsh gradients, symmetrical, clean"
 	},
 	{
-		"name": "Atmosphere: Cinematic Smoke/Fog",
-		"prompt": "{prompt}, (heavy atmospheric smoke or fog:1.2), diffused light, mysterious, moody, reduced visibility, cinematic haze, Atmospheric-Density",
-		"negative_prompt": "clear air, crisp visibility, sunny day, no haze, bright"
+		"name": "Art: Deconstructed Collage",
+		"prompt": "A fragmented composition of {prompt}, composed of overlapping textures, found images, and abstract shapes. Tactile visual layering, celebrating imperfection, torn edges, mixed media textures, paper grain, print ephemera",
+		"negative_prompt": "smooth digital render, photorealistic, sharp focus, clean vector, minimalist, simple"
 	},
 	{
-		"name": "Atmosphere: Dust & Particulates",
-		"prompt": "{prompt}, (visible dust motes or particles in the air:1.2), (light beams catching particles:1.1), textured air, gritty, realistic interior, old building, Particle-Depth",
-		"negative_prompt": "clean air, pristine environment, sterile, no visible particles"
+		"name": "Art: Lithography (Art Nouveau)",
+		"prompt": "Art Nouveau style lithography illustration of {prompt}. Flat organic lines, oil and water repulsion print textures, vibrant colors, stone-pressed illustration quality, flowing decorative patterns, elegant poster design",
+		"negative_prompt": "3d render, photography, high-contrast digital graphics, neon colors"
+	},
+	{
+		"name": "Art: Lithography (Comic Book)",
+		"prompt": "Comic book cover style of {prompt}. Vibrant saturated colors, lithography print texture, classic halftone dots, bold ink lines, hand-lettered aesthetic, pulp comic paper aging",
+		"negative_prompt": "modern digital, CGI, clean 3d render, photorealistic"
+	},
+	{
+		"name": "Art: Lithography (Constructivist Poster)",
+		"prompt": "Mid-century constructivist propaganda poster style of {prompt}. Bold graphic lines, vibrant limited color palette, lithography print texture, dramatic graphic composition, heroic angles, textured weathered paper",
+		"negative_prompt": "modern photorealism, soft lighting, pastel colors, 3d graphic design"
+	},
+	{
+		"name": "Art: Lithography (Retro Poster)",
+		"prompt": "Retro poster style of {prompt}. Vibrant colors, lithography printing technique, hand-inked typography layout, weathered paper edges, mid-century graphic design aesthetic",
+		"negative_prompt": "minimalist, modern digital render, photographic, flat 3d"
+	},
+	{
+		"name": "Art: Whimsical Folk Art Style",
+		"prompt": "Whimsical folk art style illustration of {prompt}. Simplistic and playful stylized forms, flat graphic patterns, bold decorative details, highly textured painted appearance, hand-painted aesthetic, charmingly naive, simplistic shapes, flat background color gouache texture",
+		"negative_prompt": "photorealistic, anatomically correct, 3d, realistic shading, muted tones"
+	},
+	{
+		"name": "Art: Sci-Fi Scale Composition",
+		"prompt": "Ground-level composition of {prompt} emphasizing a colossal and dwarfing sense of scale, dramatic atmospheric background elements filling the horizon, highly detailed cinematic sci-fi concept art aesthetic, dramatic atmospheric lighting, weathered textures, cool blue-gray and icy white palette with vibrant red-orange accents",
+		"negative_prompt": "close-up, domestic indoor setting, small-scale scene, cheerful bright colors"
+	},
+	{
+		"name": "Art: 1980s Editorial Graphic",
+		"prompt": "High-impact 1980s editorial graphic illustration of {prompt}. Bold stylized outlines, structured geometric silhouettes, crisp graphic lines, strong high-contrast color blocking, expressive hand-inked flair",
+		"negative_prompt": "modern photorealism, pastel colors, soft edges, 3d digital render"
+	},
+	{
+		"name": "Art: Storyboard Technical Study",
+		"prompt": "Professional storyboard study of {prompt}. Isolated on a clean, textured white paper background with absolutely no surrounding objects. Sharp dark charcoal outlines with visible precise technical construction guidelines, rendered with sophisticated watercolor washes in a limited palette of cerulean blue and warm grey, wet-on-wet blooming, pigment granulation, high-fidelity paper grain texture",
+		"negative_prompt": "fully painted background, photographic realism, messy sketches, cluttered canvas"
+	},
+	{
+		"name": "Atmosphere: Volumetric Dispersion",
+		"prompt": "{prompt}, (soft volumetric light dispersion:1.2), diffused directional light beams, mysterious, moody, beautifully reduced contrast, cinematic heavy haze, Atmospheric-Density",
+		"negative_prompt": "clear air, crisp visibility, sunny day, no haze, bright, clean"
+	},
+	{
+		"name": "Atmosphere: Light Catching Particles",
+		"prompt": "{prompt}, (visible floating micro-particles in the light:1.2), (light beams catching atmospheric particles:1.1), textured air, gritty realism, high-fidelity lens depth, Particle-Depth",
+		"negative_prompt": "clean sterile air, pristine environment, modern studio, no visible particles"
 	},
 	{
 		"name": "Camera: Bird's-Eye View Shot",
-		"prompt": "Cinematic, (bird's-eye view shot: 1.5) {prompt} looking top-down from above, distance to people, wide-angle lens, movie still, Aerial-Perspective",
-		"negative_prompt": "Low-angle shot, close up, look in camera, ground level"
+		"prompt": "Cinematic, (bird's-eye view shot: 1.5) {prompt} looking top-down from high above, sweeping perspective, wide-angle lens, film still framing, Aerial-Perspective",
+		"negative_prompt": "Low-angle shot, close up, look in camera, ground level, eye level"
 	},
 	{
 		"name": "Camera: Close-up Shot",
-		"prompt": "Cinematic, (close-up shot: 1.5) (head and neck: 1.5) {prompt} focusing on specific details of the main character's face, skin and eyes or an object, asymmetrical, using a long lens, movie still, Close-Detail",
-		"negative_prompt": "Wide shot, full body, legs, feet, shoes, look in camera, distant"
+		"prompt": "Cinematic, (close-up shot: 1.5) {prompt} focusing heavily on specific fine details, macro surface textures, asymmetrical composition, long telephoto lens compression, movie still, Close-Detail",
+		"negative_prompt": "Wide shot, full body, legs, feet, shoes, distant shot"
 	},
 	{
 		"name": "Camera: Dolly In (Push)",
-		"prompt": "Cinematic, [Push in] {prompt}, camera physically moves closer to the subject, increasing focus/intimacy, movie still, Dolly-Push",
-		"negative_prompt": "Static shot, zoom out, dolly out, pull out, camera moves away"
+		"prompt": "Cinematic, [Push in] {prompt}, the camera physically moves closer, increasing focus and intimate depth, movie still, Dolly-Push",
+		"negative_prompt": "Static shot, zoom out, dolly out, pull out, camera moving away"
 	},
 	{
 		"name": "Camera: Dolly Out (Pull)",
-		"prompt": "Cinematic, [Pull out] {prompt}, camera physically moves further away from the subject, revealing context or creating distance, movie still, Dolly-Pull",
-		"negative_prompt": "Static shot, zoom in, dolly in, push in, camera moves closer"
+		"prompt": "Cinematic, [Pull out] {prompt}, the camera physically moves further away, revealing environmental context and scale, movie still, Dolly-Pull",
+		"negative_prompt": "Static shot, zoom in, dolly in, push in, camera moving closer"
 	},
 	{
 		"name": "Camera: Drone/Aerial View (Moving)",
-		"prompt": "{prompt}, (drone aerial shot:1.3), high angle looking down, sweeping landscape or cityscape, sense of movement, establishing shot, epic scale, Drone-Cinematic",
-		"negative_prompt": "ground level, low angle, static shot, close up, interior"
+		"prompt": "{prompt}, (moving drone aerial shot:1.3), high altitude angle looking down, sweeping panoramic perspective, epic scale, establishing film shot, Drone-Cinematic",
+		"negative_prompt": "ground level, low angle, static camera, close up, interior studio"
 	},
 	{
 		"name": "Camera: Dutch Angle Shot",
-		"prompt": "Cinematic, (Dutch angle shot: 1.5) {prompt} tilted framing, creating a sense of unease, asymmetrical, using a standard lens, movie still, Tilted-Frame",
-		"negative_prompt": "Steady shot, level horizon, look in camera, normal angle"
+		"prompt": "Cinematic, (Dutch angle shot: 1.5) {prompt} tilted camera framing, creating a sense of tension or unease, asymmetrical, standard film lens, movie still, Tilted-Frame",
+		"negative_prompt": "Steady shot, level horizon, flat angle, stable shot"
 	},
 	{
 		"name": "Camera: Extreme Close-up Shot",
-		"prompt": "Cinematic, (extreme close-up shot: 1.5) (eyes: 1.5) {prompt} emphasizing tiny details of the main character or object, using a macro lens, movie still, Macro-Detail",
-		"negative_prompt": "Long shot, wide shot, full body, look in camera, distant"
+		"prompt": "Cinematic, (extreme close-up shot: 1.5) {prompt} emphasizing micro details, using a macro cine lens, high textural fidelity, movie still, Macro-Detail",
+		"negative_prompt": "Long shot, wide shot, full body, distant, zoomed out"
 	},
 	{
 		"name": "Camera: Extreme Wide Shot",
-		"prompt": "Cinematic, (extreme wide shot: 1.5) (humans far away: 1.5) {prompt} with an extreme wide shot, great distance, people are far away, horizon, ultra wide angle lens, movie still, Grand-Scale",
-		"negative_prompt": "Close-up shot, skin details, look in camera, medium shot"
+		"prompt": "Cinematic, (extreme wide shot: 1.5) {prompt} with vast distance, scale emphasis, horizon line, ultra wide-angle lens, cinematic composition, Grand-Scale",
+		"negative_prompt": "Close-up shot, skin details, medium shot, zoom in"
 	},
 	{
 		"name": "Camera: Full Shot",
-		"prompt": "Cinematic, (establishing shot: 1.5) (full body with feet: 1.5) {prompt} with a wide shot, people are far away, wide angle lens, movie still, Full-Body",
-		"negative_prompt": "Close-up shot, skin details, close on eyes, look in camera, medium shot"
+		"prompt": "Cinematic, (establishing wide shot: 1.5) {prompt}, framing the complete subject within the spatial environment, wide-angle cinematic lens, movie still, Full-Body",
+		"negative_prompt": "Close-up shot, macro details, tight crop"
 	},
 	{
 		"name": "Camera: Handheld/Shaky Cam",
-		"prompt": "{prompt}, (handheld camera look:1.2), (slight motion blur:1.1), dynamic, immediate, realistic, documentary feel, sense of urgency or chaos, Handheld-Motion",
-		"negative_prompt": "tripod shot, steady cam, smooth movement, static, perfectly stable"
+		"prompt": "{prompt}, (handheld camera aesthetic:1.2), (slight organic motion blur:1.1), dynamic documentary movement, immediate feel, sense of realism and physical presence, Handheld-Motion",
+		"negative_prompt": "tripod shot, steady cam, smooth movement, static, perfectly stable, CGI"
 	},
 	{
 		"name": "Camera: High-Angle Shot",
-		"prompt": "Cinematic, (high-angle shot: 1.5) {prompt} looking down on subject, using a standard lens, movie still, High-Perspective",
-		"negative_prompt": "Low-angle shot, seen from below, eye-level, look in camera"
+		"prompt": "Cinematic, (high-angle shot: 1.5) {prompt} looking down at the subject, standard cinema lens, movie still, High-Perspective",
+		"negative_prompt": "Low-angle shot, seen from below, eye-level"
 	},
 	{
 		"name": "Camera: Low-Angle Shot",
-		"prompt": "Cinematic, (low-angle shot: 1.5) {prompt} looking up at subject, using a standard lens, movie still, Low-Perspective",
-		"negative_prompt": "High-angle shot, seen from above, eye-level, look in camera"
+		"prompt": "Cinematic, (low-angle shot: 1.5) {prompt} looking up at the subject, towering perspective, standard cinema lens, movie still, Low-Perspective",
+		"negative_prompt": "High-angle shot, seen from above, eye-level"
 	},
 	{
 		"name": "Camera: Medium Close-up Shot",
-		"prompt": "Cinematic, (medium close-up shot: 1.5) (head and shoulders: 1.5) {prompt} portrait, details of main character's head, skin and shoulders, asymmetrical, using a standard lens, movie still, MCU-Portrait",
-		"negative_prompt": "Extreme Wide shot, legs, feet, shoes, look in camera, full body"
+		"prompt": "Cinematic, (medium close-up shot: 1.5) {prompt} portrait framing the upper portions, asymmetrical composition, standard prime lens, movie still, MCU-Portrait",
+		"negative_prompt": "Extreme Wide shot, legs, feet, full body"
 	},
 	{
 		"name": "Camera: Medium Full Shot",
-		"prompt": "Cinematic, (Medium Full Shot: 1.5) (full body from knees up: 1.5) {prompt} two-shot, framing the subject from the knees up, using a standard lens, movie still, MFS-Framing",
-		"negative_prompt": "Extreme Close-up shot, feet, look in camera, headshot"
+		"prompt": "Cinematic, (Medium Full Shot: 1.5) {prompt} framing from the lower mid-ground, standard cinema lens, clean composition, movie still, MFS-Framing",
+		"negative_prompt": "Extreme Close-up shot, macro details, headshot"
 	},
 	{
 		"name": "Camera: Medium Shot",
-		"prompt": "Cinematic, (medium shot: 1.5) (upper body: 1.5) {prompt} portrait, framing the subject from the waist up, asymmetrical, standard lens, movie still, Medium-Framing",
-		"negative_prompt": "Extreme long shot, legs, feet, look in camera, full body"
+		"prompt": "Cinematic, (medium shot: 1.5) {prompt}, mid-range framing, asymmetrical composition, standard prime lens, movie still, Medium-Framing",
+		"negative_prompt": "Extreme long shot, macro details, full body"
 	},
 	{
 		"name": "Camera: Over-the-Shoulder Shot",
-		"prompt": "Cinematic, (over the shoulder shot: 1.5) {prompt} two-shot, medium shot, portrait, another person is seen from the back on the side out of focus, dialogue, asymmetrical, using a standard lens, movie still, OTS-Framing",
-		"negative_prompt": "Frontal shot, look in camera, single subject, wide shot"
+		"prompt": "Cinematic, (over the shoulder shot: 1.5) {prompt} cinematic two-shot depth, foreground element out of focus on the side, movie still, OTS-Framing",
+		"negative_prompt": "Frontal shot, single subject, flat perspective"
 	},
 	{
 		"name": "Camera: Pan Left",
-		"prompt": "Cinematic, [Pan left] {prompt}, camera rotates horizontally left from a fixed point, revealing, movie still, Pan-Motion",
-		"negative_prompt": "Static shot, truck right, tilt, pan right, camera moves"
+		"prompt": "Cinematic, [Pan left] {prompt}, the camera rotates horizontally left from a fixed tripod point, sweeping reveal, movie still, Pan-Motion",
+		"negative_prompt": "Static shot, truck right, tilt, pan right, camera moving physically"
 	},
 	{
 		"name": "Camera: Pan Right",
-		"prompt": "Cinematic, [Pan right] {prompt}, camera rotates horizontally right from a fixed point, revealing, movie still, Pan-Motion",
-		"negative_prompt": "Static shot, truck left, tilt, pan left, camera moves"
+		"prompt": "Cinematic, [Pan right] {prompt}, the camera rotates horizontally right from a fixed tripod point, sweeping reveal, movie still, Pan-Motion",
+		"negative_prompt": "Static shot, truck left, tilt, pan left, camera moving physically"
 	},
 	{
 		"name": "Camera: Pedestal Down",
-		"prompt": "Cinematic, [Pedestal down] {prompt}, camera physically moves vertically downwards, looking down or revealing lower area, movie still, Pedestal-Motion",
+		"prompt": "Cinematic, [Pedestal down] {prompt}, the camera physically moves vertically downwards, revealing lower level detail, movie still, Pedestal-Motion",
 		"negative_prompt": "Static shot, tilt up, pedestal up, camera moves up"
 	},
 	{
 		"name": "Camera: Pedestal Up",
-		"prompt": "Cinematic,[Pedestal up] {prompt}, camera physically moves vertically upwards, revealing height or looking up, movie still, Pedestal-Motion",
+		"prompt": "Cinematic, [Pedestal up] {prompt}, the camera physically moves vertically upwards, revealing height and scale, movie still, Pedestal-Motion",
 		"negative_prompt": "Static shot, tilt down, pedestal down, camera moves down"
 	},
 	{
 		"name": "Camera: Point-of-View (POV) Shot",
-		"prompt": "Cinematic, (point-of-view shot: 1.5) {prompt} handheld, character's perspective, using a gopro lens, movie still, POV-Perspective",
-		"negative_prompt": "External perspective shot, third person, close-up of face, look in camera"
+		"prompt": "Cinematic, (point-of-view POV shot: 1.5) {prompt} shot from a direct perspective, immersive action, action-camera wide lens, movie still, POV-Perspective",
+		"negative_prompt": "Third-person perspective, external view, studio shot"
 	},
 	{
 		"name": "Camera: Reflection Shot",
-		"prompt": "{prompt}, (reflection in water, mirror, window, or metallic surface:1.3), subject seen through reflection, layered composition, introspective, creative framing, Reflective-Frame",
-		"negative_prompt": "direct view, no reflective surfaces, clear background, simple composition"
+		"prompt": "{prompt}, (seen through reflection in water, glass, mirror, or metallic surface:1.3), complex layered composition, introspective depth, creative visual framing, Reflective-Frame",
+		"negative_prompt": "direct view, no reflective surfaces, simple composition"
 	},
 	{
 		"name": "Camera: Shake",
-		"prompt": "Cinematic, [Shake] {prompt}, camera movement is intentionally shaky, creating sense of unease, action, or realism (e.g., earthquake, explosion), handheld, movie still, Dynamic-Shake",
-		"negative_prompt": "Static shot, smooth movement, tripod, steadycam, calm"
+		"prompt": "Cinematic, [Shake] {prompt}, intentional shaky camera movement, dynamic action, chaos, realistic physical disruption, handheld, movie still, Dynamic-Shake",
+		"negative_prompt": "Static shot, smooth movement, tripod, steadycam, calm, stable"
 	},
 	{
 		"name": "Camera: Static Shot",
-		"prompt": "Cinematic,[Static shot] {prompt}, camera is fixed, no movement, allowing action to unfold within the frame, movie still, Static-Frame",
+		"prompt": "Cinematic, [Static shot] {prompt}, fixed camera position, absolute stability, action unfolds within the stationary frame, movie still, Static-Frame",
 		"negative_prompt": "Pan, tilt, zoom, truck, dolly, handheld, shaky, tracking shot, moving camera"
 	},
 	{
 		"name": "Camera: Tilt Down",
-		"prompt": "Cinematic,[Tilt down] {prompt}, camera rotates vertically downwards from a fixed point, looking down, movie still, Tilt-Motion",
+		"prompt": "Cinematic, [Tilt down] {prompt}, camera rotates vertically downwards from a fixed node, movie still, Tilt-Motion",
 		"negative_prompt": "Static shot, pedestal up, tilt up, camera tilts up"
 	},
 	{
 		"name": "Camera: Tilt Up",
-		"prompt": "Cinematic,[Tilt up] {prompt}, camera rotates vertically upwards from a fixed point, looking up, movie still, Tilt-Motion",
+		"prompt": "Cinematic, [Tilt up] {prompt}, camera rotates vertically upwards from a fixed node, movie still, Tilt-Motion",
 		"negative_prompt": "Static shot, pedestal down, tilt down, camera tilts down"
 	},
 	{
 		"name": "Camera: Tracking Shot (Follow)",
-		"prompt": "Cinematic, [Tracking shot] {prompt}, camera follows a moving subject, keeping it in frame, dynamic, movie still, Tracking-Motion",
-		"negative_prompt": "Static shot, subject moves out of frame, fixed camera, zoom"
+		"prompt": "Cinematic, [Tracking shot] {prompt}, the camera actively travels alongside or behind the moving subject, maintaining consistent distance, movie still, Tracking-Motion",
+		"negative_prompt": "Static shot, subject moves out of frame, zoom"
 	},
 	{
 		"name": "Camera: Truck Left",
-		"prompt": "Cinematic, [Truck left] {prompt}, camera moves horizontally left alongside subject or scene, dynamic, movie still, Truck-Motion",
+		"prompt": "Cinematic, [Truck left] {prompt}, the camera physically rolls horizontally left alongside the scene, parallax depth, movie still, Truck-Motion",
 		"negative_prompt": "Static shot, zoom, pan right, truck right, camera moves right"
 	},
 	{
 		"name": "Camera: Truck Right",
-		"prompt": "Cinematic, [Truck right] {prompt}, camera moves horizontally right alongside subject or scene, dynamic, movie still, Truck-Motion",
+		"prompt": "Cinematic, [Truck right] {prompt}, the camera physically rolls horizontally right alongside the scene, parallax depth, movie still, Truck-Motion",
 		"negative_prompt": "Static shot, zoom, pan left, truck left, camera moves left"
 	},
 	{
 		"name": "Camera: Zoom In",
-		"prompt": "Cinematic, [Zoom in] {prompt}, lens focal length changes to magnify subject, apparent movement towards subject, movie still, Zoom-Effect",
+		"prompt": "Cinematic, [Zoom in] {prompt}, optical change in lens focal length to magnify, distinct compression shift, movie still, Zoom-Effect",
 		"negative_prompt": "Static shot, dolly out, pull out, no zoom, camera zooms out"
 	},
 	{
 		"name": "Camera: Zoom Out",
-		"prompt": "Cinematic, [Zoom out] {prompt}, lens focal length changes to reduce magnification, apparent movement away from subject, movie still, Zoom-Effect",
+		"prompt": "Cinematic, [Zoom out] {prompt}, optical change in lens focal length to expand the field of view, movie still, Zoom-Effect",
 		"negative_prompt": "Static shot, dolly in, push in, no zoom, camera zooms in"
 	},
 	{
-		"name": "Character: Young Child (Playful)",
-		"prompt": "{prompt} featuring a young child, (approximately 4-7 years old), bright curious eyes, (rosy cheeks:1.1), often with (slightly messy hair:1.1). Wearing (colorful, practical clothing:1.2) like t-shirts, shorts, or simple dresses. Natural, vibrant look, Youthful-Character",
-		"negative_prompt": "adult, teenager, elderly, sophisticated clothing, makeup, somber expression, weapons, muscular, formal wear"
-	},
-	{
-		"name": "Character: Teenager (Expressive)",
-		"prompt": "{prompt} featuring a teenager, (approximately 14-18 years old), (expressive face:1.1), perhaps with (modern hairstyle:1.1) or accessories like headphones/cap. Clothing style can vary from (casual streetwear, band t-shirts, jeans to slightly alternative:1.2). Dynamic, youthful energy, Teen-Character",
-		"negative_prompt": "child, elderly, overly formal, business attire, wrinkles, expressionless, static pose, outdated fashion"
-	},
-	{
-		"name": "Character: Young Adult Professional (Female)",
-		"prompt": "{prompt} featuring a young adult woman, (approximately 25-35 years old), (clear, intelligent gaze:1.1), (well-kept hair:1.1), perhaps in (smart casual or business-appropriate attire:1.2) like a blouse, blazer, or neat dress. Confident, composed demeanor. Neutral or subtle color palette for clothing, Professional-Character",
-		"negative_prompt": "child, teenager, elderly, disheveled, grunge, fantasy attire, heavy makeup unless professional, overly casual"
-	},
-	{
-		"name": "Character: Middle-Aged Craftsman (Male)",
-		"prompt": "{prompt} featuring a middle-aged man, (approximately 40-55 years old), (weathered or kind face:1.1), maybe with (facial hair like a beard or mustache:1.1). Often in (durable, practical clothing:1.2) like work shirts, jeans, or an apron. Earthy tones (browns, greens, blues) in attire. Hands might show signs of work, Craftsman-Character",
-		"negative_prompt": "child, teenager, young adult, pristine clothing, suit and tie, glamorous, delicate features, office worker"
-	},
-	{
-		"name": "Character: Elegant Elderly Woman",
-		"prompt": "{prompt} featuring an elderly woman, (approximately 65+ years old), (graceful presence:1.1), (silver or white hair, often styled:1.1), (smile lines or kind eyes:1.1). Wearing (comfortable yet tasteful clothing:1.2), perhaps a knitted cardigan, classic blouse, or pearls. Soft, classic color palette, Elderly-Character",
-		"negative_prompt": "child, teenager, young adult, athletic wear, revealing clothing, chaotic, heavy armor, grunge, overly bright neon colors"
-	},
-	{
-		"name": "Character: Rugged Outdoorsman (Adult Male)",
-		"prompt": "{prompt} featuring an adult man, (approximately 30-50 years old), (strong, weathered features:1.1), (short practical hair or a beard:1.1). Dressed in (functional outdoor gear:1.2) like flannel shirts, sturdy pants, hiking boots. Natural, earthy color palette (greens, browns, grays). Capable, resilient appearance, Outdoors-Character",
-		"negative_prompt": "child, elderly, formal suit, delicate, urban fashion, clean-shaven (unless specified), indoor setting, bright city lights"
-	},
-	{
 		"name": "Color: Bleach Bypass",
-		"prompt": "{prompt}, (bleach bypass effect:1.3), (desaturated colors:1.1), (high contrast:1.2), gritty, edgy, silver retention, metallic look, filmic, Bleach-Bypass-Style",
-		"negative_prompt": "vibrant colors, saturated, low contrast, soft, colorful, pastel"
+		"prompt": "{prompt}, (bleach bypass effect:1.3), (desaturated color palette:1.1), (high monochrome-like contrast:1.2), gritty textures, silver retention, metallic highlights, industrial film look, Bleach-Bypass-Style",
+		"negative_prompt": "vibrant colors, highly saturated, soft focus, pastel, colorful"
 	},
 	{
 		"name": "Color: Cross-Processing",
-		"prompt": "{prompt}, (cross-processed film look:1.3), (shifted colors:1.2), unusual color casts (e.g., magenta shadows, green highlights), high contrast, vibrant yet unnatural, retro, experimental, Cross-Process-Style",
+		"prompt": "{prompt}, (cross-processed vintage film look:1.3), (shifted chemical colors:1.2), distinctive color casts (magenta shadows, yellow-green highlights), retro photographic look, Cross-Process-Style",
 		"negative_prompt": "natural colors, accurate color reproduction, desaturated, monochrome, flat"
 	},
 	{
 		"name": "Color: Day for Night (Noir/Moonlit)",
-		"prompt": "{prompt}, (day for night effect:1.3), (deep blue tint:1.2), (underexposed:1.1), high contrast, visible details in shadows, simulating moonlight, noir aesthetic, Night-Simulation",
-		"negative_prompt": "daytime, bright sunlight, warm colors, overexposed, flat lighting, colorful"
+		"prompt": "{prompt}, (day-for-night cinematic effect:1.3), (deep blue and tungsten tint:1.2), (underexposed look:1.1), high contrast shadows, visible twilight emulation, dramatic noir aesthetic, Night-Simulation",
+		"negative_prompt": "bright daylight, warm sunlit colors, flat studio lighting, overexposed"
 	},
 	{
 		"name": "Color: Sepia Tone Vintage",
-		"prompt": "{prompt}, (sepia tone:1.4), monochrome brown, vintage photograph, old film look, nostalgic, historical, Sepia-Vintage",
-		"negative_prompt": "full color, black and white, vibrant, modern, futuristic, blue tone"
+		"prompt": "{prompt}, (sepia tint:1.4), monochrome deep brown hues, antique glass plate photograph aesthetic, old weathered film, nostalgic archival look, Sepia-Vintage",
+		"negative_prompt": "full color, vibrant, modern, digital look, blue tones"
 	},
 	{
 		"name": "Color: Technicolor Vibrancy (Vintage)",
-		"prompt": "{prompt}, (Technicolor film look:1.3), (highly saturated primary colors:1.2), vibrant, rich tones, classic Hollywood cinema (1930s-1950s), slightly unreal, lush, Technicolor-Vibe",
-		"negative_prompt": "desaturated, muted colors, modern color grading, gritty, realistic, monochrome"
+		"prompt": "{prompt}, (three-strip Technicolor film aesthetic:1.3), (highly saturated primary colors:1.2), rich color tones, classic mid-century studio lighting, bright vintage palette, Technicolor-Vibe",
+		"negative_prompt": "desaturated, muted colors, modern realistic grading, gritty, monochrome"
 	},
 	{
 		"name": "Comic: American Modern",
-		"prompt": "Modern American comic style {prompt}. digital, color, dynamic action, graphic novel art, vibrant, highly detailed, Modern-Comic",
-		"negative_prompt": "manga, anime, grayscale, monochrome, photo, Franco-Belgian, realism"
+		"prompt": "Modern American comic illustration style of {prompt}. Crisp digital linework, bold graphic color fills, action panel dynamic composition, comic book design, Modern-Comic",
+		"negative_prompt": "manga, grayscale, monochrome, photographic, painterly, Franco-Belgian"
 	},
 	{
 		"name": "Comic: Franco-Belgian",
-		"prompt": "Franco-Belgian color comic (bande dessinée) style {prompt}. album art, in the style of Franquin or Moebius, clear lines, Bande-Dessinee-Style",
-		"negative_prompt": "manga, anime, american comic, grayscale, monochrome, photo, painting, 3D render"
+		"prompt": "Franco-Belgian color comic style of {prompt}. Clear lines, European comic design, elegant hand-painted colors, Bande-Dessinee-Style",
+		"negative_prompt": "manga, anime, american superhero comic, grayscale, 3D render, photo"
 	},
 	{
 		"name": "Comic: Manga",
-		"prompt": "Manga style {prompt}. vibrant, high-energy, detailed, iconic, Japanese comic style, screentones, intricate, Manga-Style",
-		"negative_prompt": "ugly, deformed, noisy, blurry, low contrast, realism, photorealistic, Western comic style"
+		"prompt": "Classic Manga illustration style of {prompt}. High-energy black and white layouts, expressive screentones, dynamic action lines, traditional Japanese comic print aesthetic, Manga-Style",
+		"negative_prompt": "ugly, deformed, Western comic style, photorealistic, color"
 	},
 	{
 		"name": "Comic: Vintage Pulp/50s",
-		"prompt": "Vintage American pulp comic style {prompt}. 1950s, retro, halftone dots, limited color palette, dark cyan and red, suburban, ghoulpunk, Pulp-Comic",
-		"negative_prompt": "modern, digital, anime, grayscale, photo, Franco-Belgian, 3D render"
+		"prompt": "Vintage American pulp comic style {prompt}. Retro 1950s printing, retro halftone dots, limited aged color palette, deep cyans and hot reds, pulp paper texture, Pulp-Comic",
+		"negative_prompt": "modern, digital vectors, anime, grayscale, photorealistic"
 	},
 	{
 		"name": "Computer: CG/3D Model",
-		"prompt": "Professional 3D model {prompt}. Octane render, Blender render, Unreal Engine, highly detailed, volumetric lighting, dramatic lighting, CG-Render",
-		"negative_prompt": "ugly, deformed, noisy, low poly, blurry, painting, 2D"
+		"prompt": "Professional 3D model design of {prompt}. Octane render base, Blender modeling, Unreal Engine volumetric lighting, high surface detail, dramatic studio lighting, CG-Render",
+		"negative_prompt": "low-poly, painting, 2D sketch, flat vector, drawing, hand-drawn"
 	},
 	{
 		"name": "Computer: Digital Painting/Concept Art",
-		"prompt": "Concept art {prompt}. digital artwork, illustrative, painterly, matte painting, highly detailed, ArtStation, Concept-Art",
-		"negative_prompt": "photo, photorealistic, realism, ugly, 3D model"
+		"prompt": "Concept art of {prompt}. Rich digital painting, heavy illustrative brushwork, matte painting layers, ArtStation trend, professional game art style, Concept-Art",
+		"negative_prompt": "photo, photorealistic, real life, low-effort sketch, 3D model"
 	},
 	{
 		"name": "Computer: Texture",
-		"prompt": "Seamless texture {prompt}. top down close-up, PBR material, detailed, high resolution, PBR-Texture",
-		"negative_prompt": "ugly, deformed, noisy, blurry, unsharp, non-seamless"
+		"prompt": "Seamless texture map of {prompt}. Top-down direct macro view, clean PBR material design, high surface definition, high-resolution repeating texture pattern, PBR-Texture",
+		"negative_prompt": "perspective angle, blurry, non-seamless, shadows, background scenic"
 	},
 	{
 		"name": "Drawn: Storyboard/Sketch",
-		"prompt": "Storyboard drawing or sketch style {prompt}. simplified sketch, soft gestural lines, cross hatching, monochrome or muted colors, focus on composition and action, intricate, 8k, Sketch-Draft",
-		"negative_prompt": "photograph, deformed, glitch, noisy, realistic, highly detailed photo, vibrant colors"
+		"prompt": "Storyboard drawing style of {prompt}. Gestural pencil sketch, cross-hatched shading, monochrome graphite tones, composition and framing markers, detailed drafting lines, Sketch-Draft",
+		"negative_prompt": "photograph, clean painting, vibrant colors, vector graphics, 3D render"
 	},
 	{
 		"name": "Film Genre: Anime",
-		"prompt": "Anime artwork {prompt}. anime style, key visual, vibrant, studio anime, highly detailed, cell shading, Anime-Genre",
-		"negative_prompt": "photo, deformed, black and white, realism, disfigured, low contrast"
+		"prompt": "Anime key visual artwork of {prompt}. Hand-painted backgrounds, vibrant cel-shaded style, iconic studio production quality, highly detailed lighting highlights, Anime-Genre",
+		"negative_prompt": "photorealistic, 3D render, real-life, black and white, oil painting"
 	},
 	{
 		"name": "Film Genre: Children's Movie",
-		"prompt": "{prompt} with enchanting craft, endearing characters, magical settings, exciting adventures, vibrant palette, fantastical elements, low-angle shots, child's perspective, playful appearance, Family-Movie",
-		"negative_prompt": "Dark and scary themes, lack of whimsy, dull visuals, harsh lighting, unsettling camera angles, look in the camera, centered"
+		"prompt": "{prompt}, children's movie theme. Enchanting whimsical style, endearing design, magical warm lighting, vibrant primary colors, playful camera perspective, Family-Movie",
+		"negative_prompt": "dark themes, scary atmosphere, harsh shadows, unsettling angles, look in camera"
 	},
 	{
 		"name": "Film Genre: Comedy",
-		"prompt": "{prompt} crafting hilarity, witty dialogues, slapstick humor, absurd situations, vibrant colors, energetic colors, comedic timing, wide shots, quick cuts, joyful expressions, Comedy-Tone",
-		"negative_prompt": "Bleak tone, somber atmosphere, lack of humor, dim lighting, serious camera angles, look in the camera, centered"
+		"prompt": "{prompt}, comedy film still. Energetic lighting, bright accessible colors, upbeat scenario composition, wide camera angles, comedic timing, Comedy-Tone",
+		"negative_prompt": "somber, dark, bleak, high contrast, low-key lighting, serious drama"
 	},
 	{
 		"name": "Film Genre: Drama",
-		"prompt": "{prompt} delving into intense emotion, complex emotions, human experiences, character development, intricate relationships, powerful dialogues, diverse color palette, dramatic tension, close-ups, raw emotions, Drama-Depth",
-		"negative_prompt": "Superficial characters, lack of emotional depth, weak plot development, flat lighting, generic camera angles, look in the camera, centered"
+		"prompt": "{prompt}, dramatic film still. Deep emotional tension, focused focal layout, moody natural lighting, cinematic shadow play, intimate close-ups, Drama-Depth",
+		"negative_prompt": "flat lighting, superficial comedy, bright neon colors, over-the-top action"
 	},
 	{
 		"name": "Film Genre: Dystopian",
-		"prompt": "Dystopian style {prompt}. bleak, post-apocalyptic, somber, dramatic, highly detailed, oppressive atmosphere, Dystopian-Mood",
-		"negative_prompt": "ugly, deformed, noisy, blurry, low contrast, cheerful, optimistic, vibrant, colorful, utopia"
+		"prompt": "Dystopian sci-fi film still of {prompt}. Bleak environment, somber desaturated color scheme, oppressive scale, highly detailed textural decay, Dystopian-Mood",
+		"negative_prompt": "cheerful, bright, optimistic, clean, vibrant, utopia"
 	},
 	{
 		"name": "Film Genre: Futuristic Sci-Fi",
-		"prompt": "{prompt} on futuristic journey, hovering vehicles, neon skyscrapers, holographic displays, vibrant colors, metallic colors, advanced technology, dynamic low-angle shots, modern attire, SciFi-Genre",
-		"negative_prompt": "Earthy tones, dim lighting, outdated visuals, lack of metallic sheen, conventional camera angles, look in the camera, centered, historical"
+		"prompt": "Futuristic sci-fi aesthetic of {prompt}. Clean holographic visual overlays, advanced technical materials, cool metallic colors, dynamic low-angle framing, sleek geometric details, SciFi-Genre",
+		"negative_prompt": "earthy historical settings, warm traditional lighting, old technology, rustic"
 	},
 	{
 		"name": "Film Genre: Horror (General)",
-		"prompt": "Horror-themed {prompt}. eerie, unsettling, dark, spooky, suspenseful, grim, highly detailed, sense of dread, Horror-Vibe",
-		"negative_prompt": "cheerful, bright, vibrant, light-hearted, cute, comical"
+		"prompt": "Horror film still of {prompt}. Eerie unsettling composition, shadowy dark corners, suspenseful atmosphere, grim colors, dramatic high-contrast lighting, sense of absolute dread, Horror-Vibe",
+		"negative_prompt": "cheerful, bright, comedic, comforting, cute, bright lighting"
 	},
 	{
 		"name": "Film Genre: Lovecraftian Horror",
-		"prompt": "Lovecraftian horror {prompt}. eldritch, cosmic horror, unknown, mysterious, surreal, tentacles, ancient Ones, highly detailed, Eldritch-Horror",
-		"negative_prompt": "light-hearted, mundane, familiar, simplistic, realistic, cute"
+		"prompt": "Lovecraftian cosmic horror style of {prompt}. Unearthly scale, mysterious swirling fog, deep dark greens and purples, cosmic insignificance, dramatic shadows, Eldritch-Horror",
+		"negative_prompt": "cheerful, bright daylight, mundane, safe, clear layout"
 	},
 	{
 		"name": "Film Genre: Musical",
-		"prompt": "{prompt} infused with magic of music, elaborate choreography, dazzling costumes, show-stopping performances, vibrant palette, musical numbers, dynamic camera movements, rhythm and energy, singing, dancing, radiant appearances, Musical-Energy",
-		"negative_prompt": "Lack of musical sequences, absence of dance, dull visuals, inappropriate lighting, conventional camera angles, look in the camera, centered"
+		"prompt": "Musical movie still of {prompt}. Spectacular dynamic lighting, highly vibrant color scheme, theatrical camera tracking, high energy, choreographed dynamic layout, Musical-Energy",
+		"negative_prompt": "bleak, gritty realism, silent, monochromatic, low-key lighting"
 	},
 	{
 		"name": "Film Genre: Noir",
-		"prompt": "{prompt} in captivating film noir style. (Monochrome or desaturated color:1.2), high contrast, dramatic shadows, (Venetian blinds effect:1.1), 1940s-1950s aesthetic, smoky alleys, enigmatic characters (femme fatale, hard-boiled detective), low-key lighting, mysterious, cinematic, Noir-Genre",
-		"negative_prompt": "Bright colors, lack of shadows, inconsistent mood, overly bright lighting, standard camera angles, look in the camera, centered, colorful, vibrant"
+		"prompt": "Classic film noir style of {prompt}. High contrast monochrome palette, deep dramatic shadows, Venetian blinds shadow lines, classic low-key studio lighting, mysterious cinematic atmosphere, Noir-Genre",
+		"negative_prompt": "bright colors, modern elements, flat daylight, happy atmosphere"
 	},
 	{
 		"name": "Film Genre: Romantic Comedy",
-		"prompt": "{prompt} for heartwarming creation, charming meet-cutes, quirky characters, delightful misunderstandings, warm colors, soft lighting, emotional connections, close-ups, affectionate interactions, RomCom-Tone",
-		"negative_prompt": "Lack of chemistry, humorless interactions, dull visuals, cold lighting, distant camera angles, look in the camera, centered"
+		"prompt": "Romantic comedy movie still of {prompt}. Warm and inviting color grading, soft flattering lighting, charming composition, expressive figures, bright accessible art design, RomCom-Tone",
+		"negative_prompt": "dark horror, bleak drama, high contrast shadow, cold colors"
 	},
 	{
 		"name": "Film Genre: War",
-		"prompt": "{prompt} immersing in intensity, heroism, sacrifice, grim atmosphere, desaturated palette, battlefield lighting, immersive tracking shots, combat scenes, determined looks, War-Genre",
-		"negative_prompt": "Lack of tension, absence of battle scenes, unrealistic portrayal, colorful visuals, inappropriate camera angles, look in the camera, centered"
+		"prompt": "War film still of {prompt}. Gritty and raw environment, desaturated colors, immersive tracking camera motion, atmospheric dust and low-key lighting, raw intense action framing, War-Genre",
+		"negative_prompt": "peaceful, clean, vibrant colors, bright studio lighting, comedic"
 	},
 	{
 		"name": "Film Genre: Whimsical/Fairy Tale",
-		"prompt": "{prompt} with whimsical twist or fairy tale aesthetic, floating umbrellas, dancing flowers, flying books, bright colors, pastel colors, soft lighting, unconventional framing, Dutch angles, quirky costumes, magical, enchanting, FairyTale-Mood",
-		"negative_prompt": "Gloomy lighting, monochromatic tones, unbalanced fantasy, lack of playfulness, traditional camera angles, look in the camera, centered, realistic"
+		"prompt": "Fairy tale style of {prompt}. Whimsical magical design, dreamy soft-focused highlights, pastel-rich color palette, unconventional cinematic framing, enchanting storybook motifs, FairyTale-Mood",
+		"negative_prompt": "gritty realism, contemporary industrial, dark horror, low-key shadows"
 	},
 	{
 		"name": "Film Genre: Whodunit/Mystery",
-		"prompt": "{prompt} unraveling mystery, intricate plots, suspenseful clues, unexpected twists, dark color palette, hidden details, tracking shots, creative framing, intriguing demeanor, Mystery-Genre",
-		"negative_prompt": "Bright colors, even lighting, transparent mystery, lack of tension, conventional camera angles, look in the camera, centered"
+		"prompt": "Mystery whodunit film still of {prompt}. Intricate composition, moody atmospheric lighting, suspicious spatial placements, tight tracking camera shots, suspenseful color palette, Mystery-Genre",
+		"negative_prompt": "flat daylight, overt comedy, simple bright scenes"
 	},
 	{
 		"name": "Futuristic: Biomechanical/Cybernetic",
-		"prompt": "Biomechanical or cybernetic style {prompt}. blend of organic and mechanical elements, futuristic, cybernetic enhancements, robotics, Giger influence, intricate, detailed, Cybernetic-Detail",
-		"negative_prompt": "natural, rustic, primitive, organic, simplistic, colorful, sketch"
+		"prompt": "Biomechanical cybernetic style of {prompt}. Complex integration of organic textures and hard structural machinery, glossy carbon fiber and weathered steel textures, intricate technical details, Cybernetic-Detail",
+		"negative_prompt": "purely natural, rustic, historic, cartoon sketch, simplistic"
 	},
 	{
 		"name": "Futuristic: Cyberpunk/Neonpunk",
-		"prompt": "Cyberpunk or Neonpunk style {prompt}. (Neon lights:1.2), dark alleys, (rainy streets:1.1), skyscrapers, dystopian, vaporwave vibes, (vibrant blues and pinks:1.1), magenta highlights, dark purple shadows, high contrast, (reflections on wet pavement:1.1), ultramodern, techwear, cinematic, highly detailed, Cyberpunk-Vibe",
-		"negative_prompt": "natural, rural, deformed, low contrast, black and white, sketch, watercolor, historical, steampunk, bright, sunny, daytime"
+		"prompt": "Cyberpunk neonpunk style of {prompt}. Heavy moisture-slicked surfaces, vibrant neon chromatic reflections, towering spatial design, high-tech aesthetic, rich blues, magentas, and deep purple shadows, Cyberpunk-Vibe",
+		"negative_prompt": "sunny daytime, rural nature, historical, high fantasy, simple clean lines"
 	},
 	{
 		"name": "Futuristic: Retro-Futurism",
-		"prompt": "Retro-futuristic {prompt}. vintage sci-fi, 50s and 60s style, atomic age, Googie architecture, vibrant, highly detailed, analog future, RetroFuturistic-Vibe",
-		"negative_prompt": "contemporary, realistic, rustic, primitive, cyberpunk, sleek digital"
+		"prompt": "Retro-futuristic style of {prompt}. Mid-century sci-fi design, sleek aerodynamic curves, vintage material finishes, analog tactile panel aesthetics, vibrant retro colors, RetroFuturistic-Vibe",
+		"negative_prompt": "contemporary, cybernetic, post-apocalyptic, fantasy"
 	},
 	{
 		"name": "Futuristic: Steampunk",
-		"prompt": "Steampunk style {prompt}. antique, mechanical, brass and copper tones, gears, clockwork, Victorian era science fiction, intricate, detailed, Steampunk-Vibe",
-		"negative_prompt": "deformed, glitch, noisy, low contrast, anime, photorealistic, modern, futuristic, cyberpunk"
+		"prompt": "Steampunk style of {prompt}. Brass and copper metallic finishes, complex structural clockwork textures, weathered leather and industrial piping aesthetics, warm sepia tones, Steampunk-Vibe",
+		"negative_prompt": "sleek modern digital, cyberpunk, neon, futuristic plastic"
 	},
 	{
 		"name": "Lens: Anamorphic Look",
-		"prompt": "{prompt}, (anamorphic lens flare:1.2), (oval bokeh:1.1), cinematic, widescreen aspect ratio feel, horizontal streaks, shallow depth of field, Anamorphic-Lens",
-		"negative_prompt": "spherical lens, perfectly round bokeh, no flares, deep focus, standard aspect ratio"
+		"prompt": "{prompt}, (anamorphic lens flare streaks:1.2), (oval-shaped bokeh:1.1), widescreen cinematic aspect ratio, horizontal light flares, shallow depth of field, dramatic cinematic camera, Anamorphic-Lens",
+		"negative_prompt": "spherical lenses, circular bokeh, no flares, flat lighting"
 	},
 	{
 		"name": "Lens: Fisheye Distortion",
-		"prompt": "{prompt}, (fisheye lens effect:1.3), extreme wide angle, barrel distortion, curved lines, disorienting perspective, dynamic, Fisheye-Lens",
-		"negative_prompt": "rectilinear lens, straight lines, normal perspective, telephoto, flat"
+		"prompt": "{prompt}, (fisheye lens distortion:1.3), ultra wide-angle field of view, dramatic barrel distortion, warped spatial lines, dynamic immersive camera placement, Fisheye-Lens",
+		"negative_prompt": "rectilinear perspective, straight lines, telephoto flat compression"
 	},
 	{
 		"name": "Lens: Soft Focus/Diffusion Filter",
-		"prompt": "{prompt}, (soft focus:1.2), (diffusion filter effect:1.1), dreamy, ethereal, glowing highlights, romantic, vintage film look, Soft-Diffusion",
-		"negative_prompt": "sharp focus, crisp details, harsh lines, modern digital look, high contrast"
+		"prompt": "{prompt}, (soft focus bloom:1.2), (diffusion lens filter:1.1), glowing highlights, dreamy romantic vintage film style, classic studio portrait look, Soft-Diffusion",
+		"negative_prompt": "ultra-sharp digital focus, harsh lines, high digital contrast"
 	},
 	{
 		"name": "Light Setting: Afternoon (Golden Hour)",
-		"prompt": "{prompt} during golden hours of late afternoon, warm and inviting light, long shadows, Golden-Hour",
-		"negative_prompt": "Harsh cold light, night, midday direct sun"
+		"prompt": "{prompt} during golden hour, low-angle warm sunlight, long rich shadows, glowing amber highlights, welcoming cinematic atmosphere, Golden-Hour",
+		"negative_prompt": "harsh midday light, dark night, overcast gray"
 	},
 	{
 		"name": "Light Setting: Evening (Twilight/Blue Hour)",
-		"prompt": "{prompt} in calm evening light or blue hour, subtle hues, soft light, transition to night, Blue-Hour",
-		"negative_prompt": "Blinding midday light, direct sunlight"
+		"prompt": "{prompt} during evening blue hour, deep indigo sky hues, soft transition daylight, warm artificial highlights, moody calm twilight, Blue-Hour",
+		"negative_prompt": "bright midday sun, direct morning rays"
 	},
 	{
 		"name": "Light Setting: Midday",
-		"prompt": "{prompt} under bright midday sun, strong shadows, high contrast, harsh light, Midday-Light",
-		"negative_prompt": "Flat evening light, night, soft light"
+		"prompt": "{prompt} under harsh midday sun, direct overhead sunlight, sharp defined dark shadows, high dynamic range challenge, vivid daylight colors, Midday-Light",
+		"negative_prompt": "soft evening glow, night, volumetric fog"
 	},
 	{
 		"name": "Light Setting: Morning (Sunrise)",
-		"prompt": "{prompt} in early morning or sunrise, fresh light breaking through, soft golden light, dew, Morning-Light",
-		"negative_prompt": "Overexposed midday glare, night, harsh shadows"
+		"prompt": "{prompt} during early morning sunrise, fresh clear light, soft golden highlights, morning dew mist, crisp atmosphere, Morning-Light",
+		"negative_prompt": "deep night, afternoon heat, harsh sunset shadows"
 	},
 	{
 		"name": "Light Setting: Night",
-		"prompt": "{prompt} beneath starry night sky, illuminated by moonlight, city lights, or artificial sources, dark shadows, Night-Light",
-		"negative_prompt": "Glaring midday sun, daytime, bright even light"
+		"prompt": "{prompt} beneath starry night sky, illuminated by cinematic moonlight and ambient artificial highlight sources, dark velvet shadows, deep night composition, Night-Light",
+		"negative_prompt": "bright sun, daylight, afternoon lighting"
 	},
 	{
 		"name": "Lighting: Rim Lighting",
-		"prompt": "{prompt}, (strong rim lighting:1.3), subject outlined by light, (backlit edge:1.2), separation from background, dramatic, silhouette detail, Rim-Lighting",
-		"negative_prompt": "flat lighting, front lighting, no highlights, subject blended with background, evenly lit"
+		"prompt": "{prompt}, (strong rim lighting:1.3), backlit edge highlights, separation from dark background, elegant outline contours, Rim-Lighting",
+		"negative_prompt": "flat front lighting, evenly lit, bright background"
 	},
 	{
 		"name": "Lighting: Volumetric / God Rays",
-		"prompt": "{prompt}, (volumetric lighting:1.2), (god rays:1.2), light beams visible in atmosphere (dust, fog, smoke), ethereal, dramatic, cinematic, Volumetric-Lighting",
-		"negative_prompt": "clear air, no visible light beams, flat lighting, harsh direct light"
+		"prompt": "{prompt}, (volumetric light shafts:1.2), (light beams visible in atmosphere:1.2), fog or haze scattering, ethereal dramatic cinematic lighting, Volumetric-Lighting",
+		"negative_prompt": "clear air, no visible light beams, flat boring lighting"
 	},
 	{
 		"name": "Look: Aged Distressed Texture",
-		"prompt": "Aged and weathered aesthetic {prompt}. sepia-toned, textured border, distressed material, rough edges, smudges, scratches and dust, hazy atmosphere, Aged-Texture",
-		"negative_prompt": "modern, pristine, clean, digital, vibrant, high-definition"
+		"prompt": "Aged and weathered aesthetic of {prompt}. Sepia-toned, textured border, distressed material, light surface scratches and dust, antique archival look, Aged-Texture",
+		"negative_prompt": "clean modern digital render, pristine, high-definition"
 	},
 	{
 		"name": "Look: Analog Film",
-		"prompt": "Analog film photo {prompt}. faded film, desaturated, 35mm photo, film grain, vignette, vintage, Kodachrome, Lomography, stained, highly detailed, found footage, Analog-Look",
-		"negative_prompt": "digital, clean, sharp, painting, drawing, illustration, glitch, deformed, mutated, ugly, disfigured"
+		"prompt": "Analog film photography of {prompt}. Faded vintage film palette, desaturated hues, 35mm film grain, subtle vignette, classic color film stock color science, authentic archival scan, Analog-Look",
+		"negative_prompt": "modern digital, clean vector, sharp cgi render, 3d"
 	},
 	{
 		"name": "Look: Architectural",
-		"prompt": "Architectural style {prompt}. Clean lines, geometric shapes, minimalist or complex patterns, modern or historical, highly detailed building facade or interior, Architectural-Look",
-		"negative_prompt": "curved lines, organic shapes, ornate unless specified, abstract, grunge, blurry"
+		"prompt": "Architectural design style of {prompt}. Structural clean lines, geometric patterns, minimalist spatial composition, perfect perspective correction, monumental scale, Architectural-Look",
+		"negative_prompt": "cluttered, messy organic forms, chaotic, abstract"
 	},
 	{
 		"name": "Look: Atmospheric Mood",
-		"prompt": "{prompt} in enchanting atmosphere, misty forests, lanterns, haunting shadows, deep blues, soft grays, intriguing shadows, wide establishing shots, ethereal appearance, Atmospheric-Mood",
-		"negative_prompt": "Neon colors, harsh lighting, oversaturated visuals, inconsistent lighting, generic camera angles, look in the camera, centered"
+		"prompt": "{prompt} set in an atmospheric moody environment, mysterious misty shadows, soft luminous points, deep cinematic blues and grays, wide scale establishing framing, ethereal visual mood, Atmospheric-Mood",
+		"negative_prompt": "bright neon, flat studio lighting, oversaturated color"
 	},
 	{
 		"name": "Look: Cinematic Portrait",
-		"prompt": "Cinematic portrait of {prompt}. 85mm lens, f/1.8, dramatic lighting (e.g., side lighting, Rembrandt), moody atmosphere, shallow depth of field, focused on eyes, Cinematic-Portrait",
-		"negative_prompt": "overblown highlights, noisy, grainy, oversaturated, wide-angle distortion, flat lighting, passport photo"
+		"prompt": "Cinematic portrait style of {prompt}. Shot on 85mm prime lens, f/1.8, dramatic side-lighting, rich moody atmosphere, shallow depth of field, sharp focus, rich surface textures, Cinematic-Portrait",
+		"negative_prompt": "flat studio passport photo, overblown highlights, wide-angle distortion"
 	},
 	{
 		"name": "Look: Cinematic Visuals",
-		"prompt": "Cinematic film still {prompt}. emotional, harmonious, shallow depth of field, vignette, highly detailed, high budget, bokeh, cinemascope, moody, epic, gorgeous, film grain, Cinematic-Visuals",
-		"negative_prompt": "anime, cartoon, graphic, text, painting, crayon, graphite, abstract, deformed, mutated, ugly, disfigured, flat lighting, deep depth of field"
+		"prompt": "Cinematic film still of {prompt}. Emotional narrative composition, harmonious color grading, shallow depth of field, subtle vignette, widescreen cinemascope framing, rich organic film grain, Cinematic-Visuals",
+		"negative_prompt": "flat 3d animation, low-effort drawing, text, watermark, bad anatomy"
 	},
 	{
 		"name": "Look: Cinematic Visuals (Sharp Focus)",
-		"prompt": "Cinematic still {prompt}. sharp focus, 4k, epic detailed, shot on kodak, 35mm photo, high budget, cinemascope, moody, film grain, vignette, emotional, harmonious, Cinematic-Sharp",
-		"negative_prompt": "(blur, blurry:1.3), soft focus, anime, cartoon, painting, abstract, ugly, deformed, text, glitch"
+		"prompt": "Cinematic film still of {prompt}. Ultra sharp focus, highly detailed, shot on vintage 35mm film stock, high production value, widescreen cinemascope, rich moody atmosphere, subtle vignette, Cinematic-Sharp",
+		"negative_prompt": "(blurry, blur:1.3), soft focus, flat digital, cgi render, drawing"
 	},
 	{
-		"name": "Look: Clean Commercial (Product/Fashion)",
-		"prompt": "Clean commercial shot of {prompt} (product or fashion). 70mm lens, f/5.6, neutral background, clear focus on subject, well-lit, professional, catalog style, Clean-Commercial",
-		"negative_prompt": "poor lighting, unflattering angles, distorted perspective, underexposed, oversaturated, cluttered background, artistic blur"
+		"name": "Look: Clean Commercial",
+		"prompt": "Clean commercial photography of {prompt}. Shot on 70mm studio lens, f/5.6, clean neutral background, perfect focus, flawless diffused professional lighting, editorial styling, Clean-Commercial",
+		"negative_prompt": "artistic blur, sloppy, dark lighting, cluttered background, messy framing"
 	},
 	{
 		"name": "Look: Disco/70s Style",
-		"prompt": "Disco-themed {prompt}. Vibrant, groovy, retro 70s style, shiny disco balls, neon lights, dance floor, bell bottoms, highly detailed, Disco-Look",
-		"negative_prompt": "minimalist, rustic, monochrome, contemporary, simplistic, modern"
+		"prompt": "Retro 1970s disco style of {prompt}. High-gloss reflective surfaces, vibrant multi-colored light flares, warm saturated nostalgic color palette, retro vintage atmosphere, Disco-Look",
+		"negative_prompt": "minimalist, monochrome, futuristic, post-apocalyptic"
 	},
 	{
-		"name": "Look: Dynamic Action/Sports",
-		"prompt": "Dynamic action shot of {prompt} (sports or movement). 200mm lens, f/2.8, high shutter speed, capture peak moment, motion blur on background if panning, Dynamic-Action",
-		"negative_prompt": "excessive motion blur on subject, underexposed, out of focus, distracting background, unsteady shot, static pose"
+		"name": "Look: Dynamic Action",
+		"prompt": "Dynamic action shot of {prompt}. Shot on 200mm telephoto lens, f/2.8, high shutter speed capturing peak split-second movement, dramatic motion blur on the background, high-intensity kinetic action, Dynamic-Action",
+		"negative_prompt": "static boring pose, blurry subject, flat lighting, portrait pose"
 	},
 	{
 		"name": "Look: Gritty Documentary/Photojournalism",
-		"prompt": "Gritty documentary or photojournalism style shot of {prompt}. 35mm or 50mm lens, f/4-f/5.6, candid, spontaneous, unposed, truthful representation, available light, reportage, Gritty-Documentary",
-		"negative_prompt": "poor lighting, motion blur, out of focus, distracting background, overprocessed, staged, posed, artificial lighting"
+		"prompt": "Gritty raw photojournalism style of {prompt}. Candid shot on 35mm lens, f/4, unposed spontaneous composition, available natural lighting, documentary reportage, realistic unfiltered moment, Gritty-Documentary",
+		"negative_prompt": "staged, studio lights, flawless airbrushed skin, CGI, posed portrait"
 	},
 	{
 		"name": "Look: Gritty Raw Documentary",
-		"prompt": "Gritty raw documentary style {prompt}. handheld 16mm grain, blown-out flares, muted military tones, authentic instrumentation, dynamic realism, Documentary-Grain",
-		"negative_prompt": "clean, stable, color-corrected, stylized, artificial, CGI"
+		"prompt": "Gritty raw documentary style of {prompt}. Handheld 16mm film grain, high-contrast blown-out light flares, muted atmospheric color tones, authentic photojournalism feel, dramatic natural realism, Documentary-Grain",
+		"negative_prompt": "clean digital, stable tripod, modern cgi, neon colors"
 	},
 	{
 		"name": "Look: Gritty/Raw Visuals",
-		"prompt": "{prompt} with gritty edge, raw realism, authentic grit, unfiltered emotion, desaturated tones, moody lighting, handheld camera movements, close-ups, rugged appearance, Raw-Visuals",
-		"negative_prompt": "Soft lighting, pastel tones, polished visuals, lack of authenticity, ordinary camera angles, look in the camera, centered, clean"
+		"prompt": "{prompt} with a gritty realistic edge, raw unfiltered emotion, heavy desaturated color tones, dramatic shadow-play, rugged surface textures, natural environment backdrop, Raw-Visuals",
+		"negative_prompt": "soft studio lights, pastel colors, clean airbrushed, happy pop"
 	},
 	{
 		"name": "Look: Grunge Style",
-		"prompt": "Grunge style {prompt}. Textured, distressed, vintage, edgy, punk rock vibe, dirty, noisy, faded, flannel shirts, ripped jeans, Grunge-Style",
-		"negative_prompt": "smooth, clean, minimalist, sleek, modern, photorealistic, pristine"
+		"prompt": "Grunge style of {prompt}. Heavy distress textures, raw organic grain, moody dark low-key lighting, faded industrial tones, punk rock aesthetic, weathered dirty surfaces, Grunge-Style",
+		"negative_prompt": "clean, sleek, polished modern, vector, pristine, bright colors"
 	},
 	{
 		"name": "Look: HDR (High Dynamic Range)",
-		"prompt": "HDR photo of {prompt}. Vivid, rich details, clear shadows and highlights, realistic, intense, enhanced contrast, highly detailed, HDR-Look",
-		"negative_prompt": "flat, low contrast, oversaturated, underexposed, overexposed, blurred, noisy, SDR"
+		"prompt": "High dynamic range rendering of {prompt}. Vivid visual details, rich dynamic range in highlights and deep shadows, enhanced contrast, highly detailed textures, intense lifelike depth, HDR-Look",
+		"negative_prompt": "flat, low contrast, soft focus, blurry, noisy"
 	},
 	{
 		"name": "Look: Imperfect Realism (Film Photograph)",
-		"prompt": "Photo of {prompt}. Rolleiflex photo, Portra 800 film, realistic skin texture, imperfect details, film grain, pensive stillness, natural lighting, film photography aesthetic, Imperfect-Realism",
-		"negative_prompt": "ugly, deformed, noisy, blurry, overly smooth skin, perfect, digital, airbrushed"
+		"prompt": "Photo of {prompt}. Rolleiflex camera aesthetic, professional color-negative film stock, natural realistic surface textures with slight imperfections, organic film grain, quiet nostalgic atmosphere, soft natural window lighting, film photography, Imperfect-Realism",
+		"negative_prompt": "airbrushed, hyper-perfect digital, 3D render, smooth vector art"
 	},
 	{
 		"name": "Look: Long Exposure",
-		"prompt": "Long exposure photo of {prompt}. Blurred motion (water, lights), streaks of light, surreal, dreamy, ghosting effect, highly detailed, Long-Exposure",
-		"negative_prompt": "static, noisy, deformed, shaky, abrupt, flat, low contrast, fast shutter"
+		"prompt": "Long exposure photography of {prompt}. Beautifully blurred kinetic motion, trails of moving light, surreal dreamy composition, soft ghosting effects, highly detailed static elements, Long-Exposure",
+		"negative_prompt": "high shutter speed, sharp freeze frame, noisy, static boring shots"
 	},
 	{
 		"name": "Look: Macabre/Gothic Mood",
-		"prompt": "Macabre or gothic style {prompt}. dark, mysterious, haunting, dramatic, ornate, detailed, sense of decay, Gothic-Mood",
-		"negative_prompt": "bright, cheerful, light-hearted, cartoonish, cute, minimalist"
+		"prompt": "Macabre gothic style of {prompt}. Mysterious dark atmosphere, dramatic shadows, ornate historical design elements, subtle textures of decay, hauntingly beautiful, Gothic-Mood",
+		"negative_prompt": "bright, cheerful, modern minimal, cartoon, cute"
 	},
 	{
 		"name": "Look: Minimalist Style",
-		"prompt": "Minimalist style {prompt}. Simple, clean, uncluttered, modern, elegant, negative space, limited color palette, Minimalist-Look",
-		"negative_prompt": "ornate, complicated, highly detailed, cluttered, disordered, messy, noisy, baroque"
+		"prompt": "Minimalist style of {prompt}. Simple spatial lines, clean composition, extensive negative space, limited cohesive color palette, modern elegant layout, Minimalist-Look",
+		"negative_prompt": "cluttered, highly detailed chaos, ornate baroque, complex patterns"
 	},
 	{
 		"name": "Look: Monochrome Visuals",
-		"prompt": "Monochrome {prompt}. Black and white, contrast, tone, texture, detailed, grayscale, highlights and shadows, Monochrome-Look",
-		"negative_prompt": "colorful, vibrant, noisy, blurry, deformed, oversaturated"
+		"prompt": "Monochrome fine art style of {prompt}. Timeless black and white, deep contrast, rich tonal range, sharp shadow textures, dramatic lighting highlights, Monochrome-Look",
+		"negative_prompt": "color, vibrant, oversaturated, pastel colors"
 	},
 	{
 		"name": "Look: Moody Analog Photograph",
-		"prompt": "Moody analog photograph {prompt}. (50mm lens aesthetic:1.1), (dark moody lighting:1.2), (HBO aesthetic:1.1), cinematic, 35mm photo, film grain, vignette, vintage film stock (Kodachrome, Lomography), stained, highly detailed, found footage, Moody-Analog",
-		"negative_prompt": "(worst quality, low quality:1.4), (cgi, 3d, render, sketch, cartoon, anime:1.2), (bad hands, bad anatomy:1.3), overexposed, clean, bright, perfectly lit, cheerful, flat"
+		"prompt": "Moody analog photograph of {prompt}. 50mm lens camera look:1.1, dark low-key moody lighting:1.2, cinematic television aesthetic style, raw 35mm film grain, organic vignette, vintage film stock colors, stained vintage paper texture, Moody-Analog",
+		"negative_prompt": "hyper-clean digital, flat studio lighting, cgi, 3d render, anime"
 	},
 	{
 		"name": "Look: Silhouette",
-		"prompt": "Silhouette style {prompt} against a bright background. High contrast, minimalistic, stark, dramatic, subject in shadow, Silhouette-Style",
-		"negative_prompt": "ugly, deformed, noisy, blurry, low contrast, color, realism, photorealistic, subject well-lit"
+		"prompt": "Dramatic silhouette style of {prompt} against a bright back-lit background. High stark contrast, minimalist graphic lines, dramatic shadow framing, subject completely dark, Silhouette-Style",
+		"negative_prompt": "subject lit from front, low contrast, modern flat colors"
 	},
 	{
-		"name": "Look: Techwear Fashion Style",
-		"prompt": "Techwear fashion {prompt}. Futuristic, cyberpunk, urban, tactical, sleek, dark colors, functional, straps, buckles, highly detailed, Techwear-Style",
-		"negative_prompt": "vintage, rural, colorful, low contrast, realism, sketch, watercolor, flowing fabrics, historical"
+		"name": "Look: High-Performance Technical",
+		"prompt": "High-performance technical style of {prompt}. Sleek dark synthetic textures, modular utilitarian strap details, geometric structural patterns, high-tech aesthetic, matte black finishes, Techwear-Style",
+		"negative_prompt": "historical, traditional, bright floral colors, retro"
 	},
 	{
 		"name": "Look: Tilt-Shift (Miniature Faking)",
-		"prompt": "Tilt-shift photo of {prompt}. Selective focus, miniature effect, blurred foreground and background, highly detailed, vibrant, perspective control, Tilt-Shift",
-		"negative_prompt": "blurry, noisy, deformed, flat, low contrast, unrealistic, oversaturated, underexposed, full focus"
+		"prompt": "Tilt-shift miniature style of {prompt}. Dramatic selective focus depth, miniature toy-like scale effect, heavily blurred foreground and background, vibrant colors, unique perspective tilt control, Tilt-Shift",
+		"negative_prompt": "fully sharp focus, wide-angle deep depth, realistic scale flat colors"
+	},
+	{
+		"name": "Look: Y2K Photocopied Zine",
+		"prompt": "Black-and-white halftone print texture, gritty Y2K flash photography, photocopied magazine aesthetic, grainy halftone print, harsh monochrome contrast, photocopied print aesthetic, glitch aesthetic, lo-fi cyber editorial photography, Y2K underground aesthetic vibe, analog screen texture, grain, digital decay, emotional close-up, minimal white background, soft blur and pixel dithering, retro internet aesthetic, {prompt}",
+		"negative_prompt": "clean, vibrant, high-fidelity, modern digital, 4k, smooth, color, vector"
+	},
+	{
+		"name": "Look: DreamTube Transit",
+		"prompt": "Nostalgic transit fashion still of {prompt}. Light leak moments in underground pause, soft texture in tile glow, thoughts in transit, stalled movement aesthetic, professional tungsten film stock style, soft grain finish, DreamTube-Style",
+		"negative_prompt": "sunny, outdoor, bright daylight, crisp digital, sharp focus"
+	},
+	{
+		"name": "Look: 70s Analog Surrealism",
+		"prompt": "Analog photography of {prompt}. Soft natural light, vibrant saturated color palette, 70s vintage effect, subtle surrealism, shot on 35mm film, dreamy and nostalgic composition",
+		"negative_prompt": "cold digital, modern high contrast, sharp 8k, futuristic clean"
 	},
 	{
 		"name": "Quality: Baseline Clean",
@@ -606,37 +656,37 @@
 	},
 	{
 		"name": "Weather: Early Autumn Crispness",
-		"prompt": "{prompt} in early autumn crispness, with leaves falling gently (red, orange, yellow) and a hint of freshness in the air, clear skies, Autumn-Weather",
-		"negative_prompt": "Muggy late summer humidity, snow, heavy rain"
+		"prompt": "{prompt} in early autumn crispness. Warm and cool transitional daylight, gentle falling foliage motion, fresh crisp air, clear amber-tinted sky, seasonal color shift, Autumn-Weather",
+		"negative_prompt": "humid summer heat, winter snow, torrential rain"
 	},
 	{
 		"name": "Weather: Early Spring Rain",
-		"prompt": "{prompt} in early spring rain, with gentle showers, fresh air, budding leaves, wet surfaces, Spring-Weather",
-		"negative_prompt": "Dry desert heat, snow, bright sunshine"
+		"prompt": "{prompt} during soft early spring rain. Gentle rain showers, fresh atmosphere, wet surface reflections, soft mist, Spring-Weather",
+		"negative_prompt": "dry desert heat, heavy winter snow, bright direct sun"
 	},
 	{
 		"name": "Weather: Late Autumn Fog/Mist",
-		"prompt": "{prompt} in late autumn fog or mist, with mysterious atmosphere, dampness, bare trees, muted colors, Autumn-Fog",
-		"negative_prompt": "Bright summer sun, clear skies, heavy snow"
+		"prompt": "{prompt} in late autumn deep fog and mist. Mysterious damp atmosphere, heavy spatial fog and mist, highly muted desaturated color palette, cold dampness, stark silhouettes, Autumn-Fog",
+		"negative_prompt": "bright summer sun, clear summer skies, green summer foliage"
 	},
 	{
 		"name": "Weather: Late Spring Sunshine",
-		"prompt": "{prompt} in late spring sunshine, with blossoms in full bloom, a gentle breeze, vibrant green foliage, warm light, Spring-Sun",
-		"negative_prompt": "Harsh midsummer heat, winter snow, autumn leaves"
+		"prompt": "{prompt} in late spring sunshine. Rich floral tones, gentle breeze, vibrant rich green tones, warm soft natural daylight, Spring-Sun",
+		"negative_prompt": "harsh dry summer, dark snow, heavy gray autumn rain"
 	},
 	{
 		"name": "Weather: Summer Heatwave",
-		"prompt": "{prompt} during a scorching summer heatwave, with shimmering air, a sense of intense warmth, bright sun, deep shadows, Summer-Heat",
-		"negative_prompt": "Cold winter winds, rain, snow, fog"
+		"prompt": "{prompt} during a scorching summer heatwave. Shimmering heat distortion in the air, intense direct overhead lighting, deep dark shadows, high contrast dry atmosphere, Summer-Heat",
+		"negative_prompt": "cold winter winds, rain, deep snow, heavy fog"
 	},
 	{
 		"name": "Weather: Thunderstorm",
-		"prompt": "{prompt} during a thunderstorm, with lightning flashing, heavy rain pouring, dark clouds, wind, dramatic atmosphere, Storm-Weather",
-		"negative_prompt": "Calm clear skies, sunny day, gentle breeze"
+		"prompt": "{prompt} during a heavy thunderstorm. Dramatic electrical light flashes in dark clouds, heavy rain streak textures, dark sky gradients, intense stormy atmosphere, Storm-Weather",
+		"negative_prompt": "calm clear skies, gentle breeze, sunny afternoon"
 	},
 	{
 		"name": "Weather: Winter Snowfall",
-		"prompt": "{prompt} during a snowfall in winter, with snowflakes gently descending, snow-covered landscape, cold air, soft light, Winter-Weather",
-		"negative_prompt": "Hot summer sun, rain, green foliage, desert"
+		"prompt": "{prompt} during a gentle snowfall in winter. Gentle falling flake textures, pristine white surface blankets, crisp cold air, soft diffused winter daylight, Winter-Weather",
+		"negative_prompt": "hot summer sun, green foliage, dry desert heat, rain"
 	}
 ]
