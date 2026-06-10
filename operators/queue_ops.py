@@ -1505,6 +1505,13 @@ def _queue_start_job(scene, job) -> None:
         "img_guidance_scale", "illumination_style", "light_direction",
         "ip_adapter_face_folder", "ip_adapter_style_folder",
         "openpose_use_bones", "use_scribble_image",
+        # ltx23_multi_v2 guidance params
+        "ltx23m_modality_scale", "ltx23m_audio_guidance", "ltx23m_audio_stg_scale",
+        "ltx23m_audio_modality_scale", "ltx23m_audio_noise_scale", "ltx23m_audio_start_time",
+        # ltx23_multi_ic_lora control paths + params
+        "ltx23ic_control_video_path", "ltx23ic_control_audio_path",
+        "ltx23ic_control_strength", "ltx23ic_control_downscale",
+        "ltx23ic_control_audio_str", "ltx23ic_identity_guidance",
     )}
     _cancel_event.clear()
     _worker_thread = threading.Thread(

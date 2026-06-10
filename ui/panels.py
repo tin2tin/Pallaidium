@@ -354,6 +354,9 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             if type == "audio" and plugin is not None:
                 plugin.draw_custom_ui(col, context)
 
+            if type == "movie" and plugin is not None and plugin.uses_standard_input_strip:
+                plugin.draw_custom_ui(col, context)
+
             if _has(UISection.SEED):
                 row = col.row(align=True)
                 row.use_property_split = False

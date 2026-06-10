@@ -17,8 +17,7 @@ from ...utils.helpers import gfx_device
 
 
 class Ideogram4Plugin(ModelPlugin):
-    #MODEL_ID     = "Disty0/Ideogram-4-SDNQ-4bit-dynamic-hadamard"
-    MODEL_ID     = "Disty0/Ideogram-4-SDNQ-FP8"
+    MODEL_ID     = "Disty0/Ideogram-4-SDNQ-4bit-dynamic-hadamard"
     DISPLAY_NAME = "Image: Ideogram 4"
     DESCRIPTION  = (
         "Text-to-image via Ideogram 4 (uint4 SDNQ, ~17.9 GB). "

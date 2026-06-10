@@ -447,11 +447,6 @@ class LTX2_3MultiV2Plugin(ModelPlugin):
         if audio_latent is not None:
             refine_kw["audio_latents"] = audio_latent.to(onload_device, dtype=torch_dtype)
 
-        if image_conditions is not None and audio_conditions is not None and _audio_stg_scale == 0.0:
-            refine_kw["stg_scale"] = 1.0
-            refine_kw["spatio_temporal_guidance_blocks"] = [28]
-            refine_kw["guidance_rescale"] = 0.7
-
         with torch.inference_mode(), torch.autocast("cuda", dtype=torch_dtype):
             outputs2 = refine_pipe(**refine_kw)
 
