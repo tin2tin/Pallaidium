@@ -4,11 +4,13 @@ Workflow:
   Input strip  → META strip containing:
                    1st MOVIE child  = image-condition source (first frame used)
                    2nd MOVIE child  = IC-LoRA control reference video (pre-trimmed at queue time)
-                   SOUND child      = IC-LoRA control reference audio (pre-trimmed at queue time)
+                   1st SOUND child  = driving audio condition for inference (audio_conditions)
+                   2nd SOUND child  = IC-LoRA control reference audio (control_audio, optional)
   OR single-file:
                  ltx23ic_control_strip scene prop → MOVIE strip used as control_video
 
 IMAGE / AUDIO_REF inputs provide the driving first-frame image and the target audio condition.
+A MOVIE with embedded audio can serve as both image source and audio driver (auto-detected via av).
 
 Fallback IC-LoRA: if no LoRA is loaded, Lightricks/LTX-2.3-22b-IC-LoRA-Union-Control is
 auto-downloaded so generation still proceeds.
@@ -363,9 +365,15 @@ class LTX2_3MultiICLoRAPlugin(ModelPlugin):
 
         # ── Stage 1 ─────────────────────────────────────────────────────────
         self.set_phase(inputs, f"Stage 1: generating {stage1_w}×{stage1_h}")
-        transformer = LTX2VideoTransformer3DModel.from_pretrained(
-            SDNQ_PATH, subfolder="transformer", torch_dtype=torch_dtype, device_map="cpu",
-            cache_dir=_cache_dir, local_files_only=_lfo,
+        import os as _os
+        from huggingface_hub import snapshot_download as _snap
+        from sdnq.loader import load_sdnq_model as _load_sdnq
+        _sdnq_transformer_path = _os.path.join(
+            _snap(SDNQ_PATH, cache_dir=_cache_dir, local_files_only=_lfo), "transformer"
+        )
+        transformer = _load_sdnq(
+            model_path=_sdnq_transformer_path, model_cls=LTX2VideoTransformer3DModel,
+            dtype=torch_dtype, device="cpu",
         )
         pipe = LTX2MultiModalPipeline.from_pretrained(
             MODEL_PATH,
@@ -471,9 +479,9 @@ class LTX2_3MultiICLoRAPlugin(ModelPlugin):
 
         # ── Stage 2: Refinement ─────────────────────────────────────────────
         self.set_phase(inputs, f"Stage 2: refinement {w}×{h}")
-        transformer2 = LTX2VideoTransformer3DModel.from_pretrained(
-            SDNQ_PATH, subfolder="transformer", torch_dtype=torch_dtype, device_map="cpu",
-            cache_dir=_cache_dir, local_files_only=_lfo,
+        transformer2 = _load_sdnq(
+            model_path=_sdnq_transformer_path, model_cls=LTX2VideoTransformer3DModel,
+            dtype=torch_dtype, device="cpu",
         )
         refine_pipe = LTX2MultiModalPipeline.from_pretrained(
             MODEL_PATH,

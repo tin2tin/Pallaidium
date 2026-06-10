@@ -293,9 +293,15 @@ class LTX2_3MultiV2Plugin(ModelPlugin):
 
         # ── Stage 1: Base generation ────────────────────────────────────────
         self.set_phase(inputs, f"Stage 1: generating {stage1_w}×{stage1_h}")
-        transformer = LTX2VideoTransformer3DModel.from_pretrained(
-            SDNQ_PATH, subfolder="transformer", torch_dtype=torch_dtype, device_map="cpu",
-            cache_dir=_cache_dir, local_files_only=_lfo,
+        import os as _os
+        from huggingface_hub import snapshot_download as _snap
+        from sdnq.loader import load_sdnq_model as _load_sdnq
+        _sdnq_transformer_path = _os.path.join(
+            _snap(SDNQ_PATH, cache_dir=_cache_dir, local_files_only=_lfo), "transformer"
+        )
+        transformer = _load_sdnq(
+            model_path=_sdnq_transformer_path, model_cls=LTX2VideoTransformer3DModel,
+            dtype=torch_dtype, device="cpu",
         )
         pipe = LTX2MultiModalPipeline.from_pretrained(
             MODEL_PATH,
@@ -390,9 +396,9 @@ class LTX2_3MultiV2Plugin(ModelPlugin):
 
         # ── Stage 2: Refinement ─────────────────────────────────────────────
         self.set_phase(inputs, f"Stage 2: refinement {w}×{h}")
-        transformer2 = LTX2VideoTransformer3DModel.from_pretrained(
-            SDNQ_PATH, subfolder="transformer", torch_dtype=torch_dtype, device_map="cpu",
-            cache_dir=_cache_dir, local_files_only=_lfo,
+        transformer2 = _load_sdnq(
+            model_path=_sdnq_transformer_path, model_cls=LTX2VideoTransformer3DModel,
+            dtype=torch_dtype, device="cpu",
         )
         refine_pipe = LTX2MultiModalPipeline.from_pretrained(
             MODEL_PATH,
