@@ -17,7 +17,8 @@ from ...utils.helpers import gfx_device
 
 
 class Ideogram4Plugin(ModelPlugin):
-    MODEL_ID     = "Disty0/Ideogram-4-SDNQ-4bit-dynamic-hadamard"
+    #MODEL_ID     = "Disty0/Ideogram-4-SDNQ-4bit-dynamic-hadamard"
+    MODEL_ID     = "Disty0/Ideogram-4-SDNQ-FP8"
     DISPLAY_NAME = "Image: Ideogram 4"
     DESCRIPTION  = (
         "Text-to-image via Ideogram 4 (uint4 SDNQ, ~17.9 GB). "
@@ -39,7 +40,10 @@ class Ideogram4Plugin(ModelPlugin):
 
     def load(self, prefs, scene, **_kw):
         import torch
-        import sdnq  # registers "sdnq" quantizer with diffusers/transformers before from_pretrained
+        #import sdnq  # registers "sdnq" quantizer with diffusers/transformers before from_pretrained
+        from sdnq import SDNQConfig # import sdnq to register it into diffusers and transformers
+        from sdnq.common import use_torch_compile as triton_is_available
+        from sdnq.loader import apply_sdnq_options_to_model
         from diffusers import Ideogram4Pipeline
 
         _cache_dir = prefs.hf_cache_dir or None
@@ -63,6 +67,12 @@ class Ideogram4Plugin(ModelPlugin):
                 print(f"Ideogram4: prompt enhancer head failed ({e}); skipping")
 
         pipe = Ideogram4Pipeline.from_pretrained(self.MODEL_ID, **load_kwargs)
+
+        # Enable FP8 MatMul for AMD, Intel ARC and Nvidia GPUs:
+        if triton_is_available and (torch.cuda.is_available() or torch.xpu.is_available()):
+            pipe.transformer = apply_sdnq_options_to_model(pipe.transformer, use_quantized_matmul=True)
+            pipe.unconditional_transformer = apply_sdnq_options_to_model(pipe.unconditional_transformer, use_quantized_matmul=True)
+            pipe.text_encoder = apply_sdnq_options_to_model(pipe.text_encoder, use_quantized_matmul=True)
 
         if gfx_device == "mps":
             pipe.to("mps")

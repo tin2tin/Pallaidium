@@ -356,7 +356,8 @@ def _run_install(snapshot: dict, cancel_event: threading.Event):
 
         # pip self-upgrade
         run_pip_streaming(
-            [pybin, "-m", "pip", "install", "--upgrade", "pip", "--disable-pip-version-check"],
+            [pybin, "-m", "pip", "install", "--upgrade", "pip",
+             "--disable-pip-version-check", "--no-cache-dir"],
             on_line=on_line, cancel_event=cancel_event,
         )
         if cancel_event.is_set():
@@ -382,6 +383,7 @@ def _run_install(snapshot: dict, cancel_event: threading.Event):
                     "--upgrade",
                     "--disable-pip-version-check",
                     "--no-warn-script-location",
+                    "--no-cache-dir",
                     "--no-deps",
                     "--target", site_packages_dir,
                     "-r", temp_req,

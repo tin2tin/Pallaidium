@@ -2978,6 +2978,36 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
         if v is not None and hasattr(scene, "use_scribble_image"):
             scene.use_scribble_image = str(v).lower() in ("true", "1", "yes")
 
+        # ltx23_multi_v2 guidance params
+        for _attr, _cast in [
+            ("ltx23m_modality_scale",       float),
+            ("ltx23m_audio_guidance",       float),
+            ("ltx23m_audio_stg_scale",      float),
+            ("ltx23m_audio_modality_scale", float),
+            ("ltx23m_audio_noise_scale",    float),
+            ("ltx23m_audio_start_time",     float),
+        ]:
+            _v = _get(_attr)
+            if _v is not None and hasattr(scene, _attr):
+                try:
+                    setattr(scene, _attr, _cast(_v))
+                except Exception:
+                    pass
+
+        # ltx23_multi_ic_lora params
+        for _attr, _cast in [
+            ("ltx23ic_control_strength",  float),
+            ("ltx23ic_control_downscale", int),
+            ("ltx23ic_control_audio_str", float),
+            ("ltx23ic_identity_guidance", float),
+        ]:
+            _v = _get(_attr)
+            if _v is not None and hasattr(scene, _attr):
+                try:
+                    setattr(scene, _attr, _cast(_v))
+                except Exception:
+                    pass
+
         # Restore LoRA: scan full folder so all files appear in the UIList,
         # then mark the saved (enabled) ones and restore their weights.
         lora_folder = _get("lora_folder")

@@ -587,6 +587,21 @@ def register():
         min=1,
         max=9
     )
+    # ltx23_multi_v2 — independent audio / modality guidance
+    bpy.types.Scene.ltx23m_modality_scale       = bpy.props.FloatProperty(name="Modality Scale",       default=1.0, min=0.0, max=5.0,  description="Cross-modal influence amplifier (1.0=off)")
+    bpy.types.Scene.ltx23m_audio_guidance       = bpy.props.FloatProperty(name="Audio CFG",            default=1.0, min=0.0, max=10.0, description="Independent audio guidance scale")
+    bpy.types.Scene.ltx23m_audio_stg_scale      = bpy.props.FloatProperty(name="Audio STG",            default=0.0, min=0.0, max=5.0,  description="Audio spatio-temporal guidance scale")
+    bpy.types.Scene.ltx23m_audio_modality_scale = bpy.props.FloatProperty(name="Audio Modality Scale", default=1.0, min=0.0, max=5.0,  description="Audio cross-modal scale")
+    bpy.types.Scene.ltx23m_audio_noise_scale    = bpy.props.FloatProperty(name="Audio Noise Scale",    default=0.0, min=0.0, max=1.0,  description="Noise level for unmasked audio regions")
+    bpy.types.Scene.ltx23m_audio_start_time     = bpy.props.FloatProperty(name="Audio Start Time",     default=0.0, min=0.0, max=3600.0, description="Audio condition start time in seconds (computed from strip offset)")
+
+    # ltx23_multi_ic_lora — IC-LoRA control params
+    bpy.types.Scene.ltx23ic_control_strip       = bpy.props.StringProperty(name="IC-LoRA Ref Strip",    default="",  description="Name of the IC-LoRA reference strip (META or MOVIE)")
+    bpy.types.Scene.ltx23ic_control_strength    = bpy.props.FloatProperty( name="Control Strength",     default=1.0, min=0.0, max=1.0,  description="Strength of IC-LoRA reference token conditioning")
+    bpy.types.Scene.ltx23ic_control_downscale   = bpy.props.IntProperty(   name="Control Downscale",    default=1,   min=1,   max=4,    description="Spatial downscale factor for IC-LoRA reference encoding")
+    bpy.types.Scene.ltx23ic_control_audio_str   = bpy.props.FloatProperty( name="Audio Ref Strength",   default=1.0, min=0.0, max=1.0,  description="Strength of IC-LoRA audio reference conditioning")
+    bpy.types.Scene.ltx23ic_identity_guidance   = bpy.props.FloatProperty( name="Identity Guidance",    default=0.0, min=0.0, max=5.0,  description="Extra forward pass amplification for audio identity transfer")
+
     # The guidance number.
     bpy.types.Scene.img_guidance_scale = bpy.props.FloatProperty(
         name="img_guidance_scale",
@@ -887,6 +902,14 @@ def unregister():
             delattr(bpy.types.Scene, _prop)
     for _prop in ("omnivoice_language", "omnivoice_instruct", "omnivoice_preprocess",
                   "omnivoice_denoise", "omnivoice_postprocess"):
+        if hasattr(bpy.types.Scene, _prop):
+            delattr(bpy.types.Scene, _prop)
+    for _prop in (
+        "ltx23m_modality_scale", "ltx23m_audio_guidance", "ltx23m_audio_stg_scale",
+        "ltx23m_audio_modality_scale", "ltx23m_audio_noise_scale", "ltx23m_audio_start_time",
+        "ltx23ic_control_strip", "ltx23ic_control_strength", "ltx23ic_control_downscale",
+        "ltx23ic_control_audio_str", "ltx23ic_identity_guidance",
+    ):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
 

@@ -200,6 +200,22 @@ class RenderQueueJob(PropertyGroup):
     openpose_use_bones:    BoolProperty(default=False)
     use_scribble_image:    BoolProperty(default=False)
 
+    # ltx23_multi_v2 — independent audio/modality guidance
+    ltx23m_modality_scale:       FloatProperty(default=1.0)
+    ltx23m_audio_guidance:       FloatProperty(default=1.0)
+    ltx23m_audio_stg_scale:      FloatProperty(default=0.0)
+    ltx23m_audio_modality_scale: FloatProperty(default=1.0)
+    ltx23m_audio_noise_scale:    FloatProperty(default=0.0)
+    ltx23m_audio_start_time:     FloatProperty(default=0.0)
+
+    # ltx23_multi_ic_lora — IC-LoRA control paths + params
+    ltx23ic_control_video_path:  StringProperty(default="")
+    ltx23ic_control_audio_path:  StringProperty(default="")
+    ltx23ic_control_strength:    FloatProperty(default=1.0)
+    ltx23ic_control_downscale:   IntProperty(default=1)
+    ltx23ic_control_audio_str:   FloatProperty(default=1.0)
+    ltx23ic_identity_guidance:   FloatProperty(default=0.0)
+
     # VRAM management — set at run-time based on the next queued job
     should_unload: BoolProperty(default=True)
 
@@ -380,6 +396,20 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             light_direction                = snapshot.get("light_direction", ""),
             openpose_use_bones             = snapshot.get("openpose_use_bones", False),
             use_scribble_image             = snapshot.get("use_scribble_image", False),
+            # ltx23_multi_v2 guidance params
+            ltx23m_modality_scale          = snapshot.get("ltx23m_modality_scale",       1.0),
+            ltx23m_audio_guidance          = snapshot.get("ltx23m_audio_guidance",       1.0),
+            ltx23m_audio_stg_scale         = snapshot.get("ltx23m_audio_stg_scale",      0.0),
+            ltx23m_audio_modality_scale    = snapshot.get("ltx23m_audio_modality_scale", 1.0),
+            ltx23m_audio_noise_scale       = snapshot.get("ltx23m_audio_noise_scale",    0.0),
+            ltx23m_audio_start_time        = snapshot.get("ltx23m_audio_start_time",     0.0),
+            # ltx23_multi_ic_lora params
+            ltx23ic_control_video_path     = snapshot.get("ltx23ic_control_video_path",  ""),
+            ltx23ic_control_audio_path     = snapshot.get("ltx23ic_control_audio_path",  ""),
+            ltx23ic_control_strength       = snapshot.get("ltx23ic_control_strength",    1.0),
+            ltx23ic_control_downscale      = snapshot.get("ltx23ic_control_downscale",   1),
+            ltx23ic_control_audio_str      = snapshot.get("ltx23ic_control_audio_str",   1.0),
+            ltx23ic_identity_guidance      = snapshot.get("ltx23ic_identity_guidance",   0.0),
             lora_files                     = enabled_items,
             lora_folder                    = snapshot.get("lora_folder", ""),
             render                         = types.SimpleNamespace(
@@ -759,6 +789,20 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             "ip_adapter_style_folder": snapshot.get("ip_adapter_style_folder", ""),
             "openpose_use_bones":     snapshot.get("openpose_use_bones", False),
             "use_scribble_image":     snapshot.get("use_scribble_image", False),
+            # ltx23_multi_v2
+            "ltx23m_modality_scale":       snapshot.get("ltx23m_modality_scale",       1.0),
+            "ltx23m_audio_guidance":       snapshot.get("ltx23m_audio_guidance",       1.0),
+            "ltx23m_audio_stg_scale":      snapshot.get("ltx23m_audio_stg_scale",      0.0),
+            "ltx23m_audio_modality_scale": snapshot.get("ltx23m_audio_modality_scale", 1.0),
+            "ltx23m_audio_noise_scale":    snapshot.get("ltx23m_audio_noise_scale",    0.0),
+            "ltx23m_audio_start_time":     snapshot.get("ltx23m_audio_start_time",     0.0),
+            # ltx23_multi_ic_lora
+            "ltx23ic_control_video_path":  snapshot.get("ltx23ic_control_video_path",  ""),
+            "ltx23ic_control_audio_path":  snapshot.get("ltx23ic_control_audio_path",  ""),
+            "ltx23ic_control_strength":    snapshot.get("ltx23ic_control_strength",    1.0),
+            "ltx23ic_control_downscale":   snapshot.get("ltx23ic_control_downscale",   1),
+            "ltx23ic_control_audio_str":   snapshot.get("ltx23ic_control_audio_str",   1.0),
+            "ltx23ic_identity_guidance":   snapshot.get("ltx23ic_identity_guidance",   0.0),
         })
 
     except KeyboardInterrupt:
@@ -878,8 +922,9 @@ class SEQUENCER_OT_add_to_queue(Operator):
               last_image_path = that image
         """
         image_path = movie_path = sound_path = last_image_path = middle_images_json = ""
+        control_video_path = control_audio_path = ""
         if strip is None:
-            return image_path, movie_path, sound_path, last_image_path, middle_images_json
+            return image_path, movie_path, sound_path, last_image_path, middle_images_json, control_video_path, control_audio_path
         if strip.type == "IMAGE":
             dirname = os.path.dirname(bpy.path.abspath(strip.directory))
             try:
@@ -917,11 +962,27 @@ class SEQUENCER_OT_add_to_queue(Operator):
                             movie_path = mp
                     except Exception:
                         pass
+                elif child.type == "MOVIE" and movie_path and not control_video_path:
+                    # Second MOVIE in META → IC-LoRA control reference video
+                    try:
+                        cv = bpy.path.abspath(child.filepath)
+                        if os.path.isfile(cv):
+                            control_video_path = cv
+                    except Exception:
+                        pass
                 elif child.type == "SOUND" and not sound_path:
                     try:
                         sp = bpy.path.abspath(child.sound.filepath)
                         if os.path.isfile(sp):
                             sound_path = sp
+                    except AttributeError:
+                        pass
+                elif child.type == "SOUND" and sound_path and not control_audio_path:
+                    # Second SOUND in META → IC-LoRA control reference audio
+                    try:
+                        ca = bpy.path.abspath(child.sound.filepath)
+                        if os.path.isfile(ca):
+                            control_audio_path = ca
                     except AttributeError:
                         pass
 
@@ -959,7 +1020,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
 
         # TEXT, COLOR, ADJUSTMENT, SCENE, effect strips, etc.:
         # return empty strings → mode detection falls through to txt2* path.
-        return image_path, movie_path, sound_path, last_image_path, middle_images_json
+        return image_path, movie_path, sound_path, last_image_path, middle_images_json, control_video_path, control_audio_path
 
     @staticmethod
     def _detect_mode(otype, image_path, movie_path, inpaint_strip):
@@ -1098,6 +1159,17 @@ class SEQUENCER_OT_add_to_queue(Operator):
             ip_adapter_style_folder = bpy.path.abspath(getattr(scene, "ip_adapter_style_folder", "") or ""),
             openpose_use_bones     = getattr(scene, "openpose_use_bones",     False),
             use_scribble_image     = getattr(scene, "use_scribble_image",     False),
+            # ltx23_multi_v2 guidance params
+            ltx23m_modality_scale       = getattr(scene, "ltx23m_modality_scale",       1.0),
+            ltx23m_audio_guidance       = getattr(scene, "ltx23m_audio_guidance",       1.0),
+            ltx23m_audio_stg_scale      = getattr(scene, "ltx23m_audio_stg_scale",      0.0),
+            ltx23m_audio_modality_scale = getattr(scene, "ltx23m_audio_modality_scale", 1.0),
+            ltx23m_audio_noise_scale    = getattr(scene, "ltx23m_audio_noise_scale",    0.0),
+            # ltx23_multi_ic_lora params
+            ltx23ic_control_strength    = getattr(scene, "ltx23ic_control_strength",    1.0),
+            ltx23ic_control_downscale   = getattr(scene, "ltx23ic_control_downscale",   1),
+            ltx23ic_control_audio_str   = getattr(scene, "ltx23ic_control_audio_str",   1.0),
+            ltx23ic_identity_guidance   = getattr(scene, "ltx23ic_identity_guidance",   0.0),
         )
 
         # ---- Decide which strips to iterate over -------------------------
@@ -1139,7 +1211,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
 
         for strip in strip_list:
             if strip is not None:
-                image_path, movie_path, sound_path, last_image_path, middle_images_json = self._paths_from_strip(strip)
+                image_path, movie_path, sound_path, last_image_path, middle_images_json, control_video_path, control_audio_path = self._paths_from_strip(strip)
 
                 # Render audio to a trimmed WAV so the job never holds a pointer to
                 # the full source file (avoids CUDA OOM when frame count is derived
@@ -1166,6 +1238,60 @@ class SEQUENCER_OT_add_to_queue(Operator):
                     else:
                         print(f"[Queue] SOUND trim failed, keeping raw: {sound_path!r}")
 
+                # Compute audio start offset (seconds) from SOUND strip position in META
+                _audio_start_time = 0.0
+                if strip.type == "META" and sound_path:
+                    _fps_scene = scene.render.fps / max(1.0, getattr(scene.render, "fps_base", 1.0))
+                    for _c in strip.strips:
+                        if _c.type == "SOUND":
+                            _off_f = _c.frame_final_start - strip.frame_final_start
+                            _audio_start_time = max(0.0, _off_f / _fps_scene)
+                            break
+
+                # Pre-trim IC-LoRA control MOVIE strips to honour frame_offset_start
+                # and avoid loading the full source file (OOM risk).
+                if strip.type == "META" and control_video_path:
+                    from ..utils.helpers import render_meta_child_to_path
+                    for _c in strip.strips:
+                        try:
+                            _cv = bpy.path.abspath(_c.filepath) if _c.type == "MOVIE" else ""
+                        except Exception:
+                            _cv = ""
+                        if _c.type == "MOVIE" and _cv == control_video_path:
+                            _trimmed_cv = render_meta_child_to_path(context, strip, _c, image_output=False)
+                            if _trimmed_cv:
+                                control_video_path = _trimmed_cv
+                                print(f"[Queue] IC-LoRA MOVIE trimmed → {_trimmed_cv!r}")
+                            else:
+                                print(f"[Queue] IC-LoRA MOVIE trim failed, keeping raw: {control_video_path!r}")
+                            break
+                elif strip.type == "MOVIE" and control_video_path:
+                    # Single MOVIE control strip: render trimmed version
+                    _ctrl_strip_name = getattr(scene, "ltx23ic_control_strip", "")
+                    _ctrl_strip_obj  = scene.sequence_editor.sequences.get(_ctrl_strip_name) if _ctrl_strip_name and scene.sequence_editor else None
+                    if _ctrl_strip_obj and _ctrl_strip_obj.type == "MOVIE":
+                        from ..utils.helpers import render_strip_to_path
+                        _trimmed_cv = render_strip_to_path(context, _ctrl_strip_obj, image_output=False)
+                        if _trimmed_cv:
+                            control_video_path = _trimmed_cv
+                            print(f"[Queue] IC-LoRA single-MOVIE trimmed → {_trimmed_cv!r}")
+
+                # Pre-trim IC-LoRA control audio strip
+                if strip.type == "META" and control_audio_path:
+                    from ..utils.helpers import render_meta_child_to_path
+                    for _c in strip.strips:
+                        if _c.type == "SOUND" and sound_path:
+                            try:
+                                _ca = bpy.path.abspath(_c.sound.filepath)
+                            except Exception:
+                                _ca = ""
+                            if _ca == control_audio_path:
+                                _trimmed_ca = render_meta_child_to_path(context, strip, _c, image_output=False)
+                                if _trimmed_ca:
+                                    control_audio_path = _trimmed_ca
+                                    print(f"[Queue] IC-LoRA SOUND trimmed → {_trimmed_ca!r}")
+                                break
+
                 # Align output to the input strip's in-point
                 strip_frame_start = strip.frame_final_start
                 # -1 (or any negative) = match the input strip's length
@@ -1187,12 +1313,15 @@ class SEQUENCER_OT_add_to_queue(Operator):
                     sound_path and (otype == "audio" or _pi_strip_input)
                 ) else ""
             else:
-                image_path         = bpy.path.abspath(getattr(scene, "image_path", "") or "")
-                movie_path         = bpy.path.abspath(getattr(scene, "movie_path", "") or "")
-                sound_path         = bpy.path.abspath(getattr(scene, "sound_path", "") or "")
-                last_image_path    = ""
-                middle_images_json = ""
-                strip_audio_path = ""
+                image_path          = bpy.path.abspath(getattr(scene, "image_path", "") or "")
+                movie_path          = bpy.path.abspath(getattr(scene, "movie_path", "") or "")
+                sound_path          = bpy.path.abspath(getattr(scene, "sound_path", "") or "")
+                last_image_path     = ""
+                middle_images_json  = ""
+                control_video_path  = ""
+                control_audio_path  = ""
+                _audio_start_time   = 0.0
+                strip_audio_path    = ""
 
                 # Negative raw_frames = "auto" sentinel. In prompt mode there is no
                 # input strip to derive duration from, so fall back to 100 frames.
@@ -1260,6 +1389,24 @@ class SEQUENCER_OT_add_to_queue(Operator):
                 job.sound_path         = sound_path
                 job.last_image_path    = last_image_path
                 job.middle_images_json = middle_images_json
+
+                # IC-LoRA / V2 — resolved at queue time so the worker is self-contained
+                job.ltx23ic_control_video_path = control_video_path
+                job.ltx23ic_control_audio_path = control_audio_path
+                job.ltx23m_audio_start_time    = _audio_start_time
+
+                # Single-file control strip: resolve ltx23ic_control_strip scene prop
+                if not control_video_path:
+                    _ctrl_name = getattr(scene, "ltx23ic_control_strip", "")
+                    if _ctrl_name and se:
+                        _ctrl_s = se.sequences.get(_ctrl_name)
+                        if _ctrl_s and _ctrl_s.type == "MOVIE":
+                            try:
+                                _cp = bpy.path.abspath(_ctrl_s.filepath)
+                                if os.path.isfile(_cp):
+                                    job.ltx23ic_control_video_path = _cp
+                            except Exception:
+                                pass
 
                 for attr, val in common.items():
                     setattr(job, attr, val)
@@ -1807,6 +1954,27 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 extra_meta["openpose_use_bones"] = result.get("openpose_use_bones", False)
             if result.get("use_scribble_image"):
                 extra_meta["use_scribble_image"] = result.get("use_scribble_image", False)
+            # ltx23_multi_v2 — only write non-default values to keep metadata compact
+            for _k, _def in [
+                ("ltx23m_modality_scale",       1.0),
+                ("ltx23m_audio_guidance",       1.0),
+                ("ltx23m_audio_stg_scale",      0.0),
+                ("ltx23m_audio_modality_scale", 1.0),
+                ("ltx23m_audio_noise_scale",    0.0),
+                ("ltx23m_audio_start_time",     0.0),
+            ]:
+                _v = result.get(_k, _def)
+                if _v != _def:
+                    extra_meta[_k] = _v
+            # ltx23_multi_ic_lora — always write so redo-from-metadata can reconstruct paths
+            for _k in (
+                "ltx23ic_control_video_path", "ltx23ic_control_audio_path",
+                "ltx23ic_control_strength", "ltx23ic_control_downscale",
+                "ltx23ic_control_audio_str", "ltx23ic_identity_guidance",
+            ):
+                _v = result.get(_k)
+                if _v is not None:
+                    extra_meta[_k] = _v
 
             set_ai_metadata_from_dict(new_strip, {
                 "model":           result.get("model_card", ""),
