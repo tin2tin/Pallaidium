@@ -34,17 +34,27 @@ class Flux2Klein9BPlugin(ModelPlugin):
         mode = kw.get("mode", "txt2img")
         print(f"Loading {self.MODEL_ID} ({mode})…")
 
+        # Pre-quantized BNB models require an explicit quantization_config so that
+        # diffusers' from_pretrained doesn't derive a None config and crash calling
+        # quantization_config.to_dict() (diffusers bug in modeling_utils.py).
+        try:
+            from transformers import BitsAndBytesConfig
+            _bnb4 = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16)
+        except Exception:
+            _bnb4 = None
+        _bnb_kw = {"quantization_config": _bnb4} if _bnb4 is not None else {}
+
         _lfo = prefs.local_files_only
         if mode == "inpaint":
             from diffusers import Flux2KleinInpaintPipeline, Flux2Transformer2DModel
 
             transformer = Flux2Transformer2DModel.from_pretrained(
                 self._TRANSFORMER, torch_dtype=torch.bfloat16, device_map="cpu", cache_dir=_cache_dir,
-                local_files_only=_lfo,
+                local_files_only=_lfo, **_bnb_kw,
             )
             text_encoder = Qwen3ForCausalLM.from_pretrained(
                 self._TEXT_ENCODER, torch_dtype=torch.bfloat16, device_map="cpu", cache_dir=_cache_dir,
-                local_files_only=_lfo,
+                local_files_only=_lfo, **_bnb_kw,
             )
             pipe = Flux2KleinInpaintPipeline.from_pretrained(
                 self._BASE_PIPELINE,
@@ -62,11 +72,11 @@ class Flux2Klein9BPlugin(ModelPlugin):
         dtype = torch.bfloat16
         transformer = Flux2Transformer2DModel.from_pretrained(
             self._TRANSFORMER, torch_dtype=dtype, device_map="cpu", cache_dir=_cache_dir,
-            local_files_only=_lfo,
+            local_files_only=_lfo, **_bnb_kw,
         )
         text_encoder = Qwen3ForCausalLM.from_pretrained(
             self._TEXT_ENCODER, torch_dtype=dtype, device_map="cpu", cache_dir=_cache_dir,
-            local_files_only=_lfo,
+            local_files_only=_lfo, **_bnb_kw,
         )
         pipe = Flux2KleinPipeline.from_pretrained(
             self._BASE_PIPELINE,

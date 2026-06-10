@@ -34,14 +34,23 @@ class Flux2Klein9BKVPlugin(ModelPlugin):
         mode = kw.get("mode", "txt2img")
         print(f"Loading {self.MODEL_ID} ({mode})…")
 
+        try:
+            from transformers import BitsAndBytesConfig
+            _bnb4 = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16)
+        except Exception:
+            _bnb4 = None
+        _bnb_kw = {"quantization_config": _bnb4} if _bnb4 is not None else {}
+
         if mode == "inpaint":
             from diffusers import Flux2KleinInpaintPipeline, Flux2Transformer2DModel
 
             transformer = Flux2Transformer2DModel.from_pretrained(
                 self._TRANSFORMER, torch_dtype=torch.bfloat16, device_map="cpu", cache_dir=_cache_dir,
+                **_bnb_kw,
             )
             text_encoder = Qwen3ForCausalLM.from_pretrained(
                 self._TEXT_ENCODER, torch_dtype=torch.bfloat16, device_map="cpu", cache_dir=_cache_dir,
+                **_bnb_kw,
             )
             pipe = Flux2KleinInpaintPipeline.from_pretrained(
                 self._BASE_PIPELINE,
@@ -59,9 +68,11 @@ class Flux2Klein9BKVPlugin(ModelPlugin):
         dtype = torch.bfloat16
         transformer = Flux2Transformer2DModel.from_pretrained(
             self._TRANSFORMER, torch_dtype=dtype, device_map="cpu", cache_dir=_cache_dir,
+            **_bnb_kw,
         )
         text_encoder = Qwen3ForCausalLM.from_pretrained(
             self._TEXT_ENCODER, torch_dtype=dtype, device_map="cpu", cache_dir=_cache_dir,
+            **_bnb_kw,
         )
         pipe = Flux2KleinPipeline.from_pretrained(
             self._BASE_PIPELINE,
