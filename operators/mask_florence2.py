@@ -7,59 +7,83 @@ the main thread to:
   - add one rectangle mask layer per JSON element
   - open (or reuse) an Image Editor area in MASK mode with the source image
     as background
-The sidebar panel (Florence-2 tab) shows the properties of the active layer
-and provides an "Export JSON to Strip" button.
 
-All per-layer metadata is stored as JSON in Florence2MaskProps.f2_layers_json
-(keyed by layer name) because bpy.types.MaskLayer supports neither
-PointerProperty nor IDProperties (custom props).
+Per-layer metadata is stored as a CollectionProperty on Florence2MaskProps
+(which lives on bpy.types.Mask, an ID subtype).  Each item's .name matches
+the corresponding MaskLayer.name so lookups are O(1) via collection.get().
+MaskLayer itself supports neither PointerProperty nor IDProperties.
 """
 
 import json
 import os
 
 import bpy
-from bpy.props import PointerProperty, StringProperty
+from bpy.props import (
+    BoolProperty, CollectionProperty, EnumProperty,
+    IntProperty, PointerProperty, StringProperty,
+)
 from bpy.types import Operator, Panel, PropertyGroup
 
 
 # ---------------------------------------------------------------------------
-# Property group — mask-level (bpy.types.Mask IS an ID subtype)
+# Property groups
 # ---------------------------------------------------------------------------
+
+class Florence2LayerData(PropertyGroup):
+    """Metadata for one Florence-2 mask layer.  .name == MaskLayer.name."""
+    f2_type:  EnumProperty(
+        name="Type",
+        items=[("obj", "Object", ""), ("text", "Text", "")],
+        default="obj",
+    )
+    f2_desc:  StringProperty(name="Description")
+    f2_text:  StringProperty(name="Text Content")
+    f2_color: StringProperty(name="Color")
+    f2_font:  StringProperty(name="Font")
+    f2_bbox:  StringProperty(name="BBox JSON", default="[0,0,1000,1000]")
+
 
 class Florence2MaskProps(PropertyGroup):
-    f2_high_level_description: StringProperty(name="Description")
+    f2_high_level_description: StringProperty(name="Scene Description")
     f2_background:             StringProperty(name="Background")
     f2_style_json:             StringProperty(name="Style JSON")
-    # Per-layer metadata keyed by layer.name: {name: {type,desc,text,color,font,bbox}}
-    f2_layers_json:            StringProperty(name="Layers JSON", default="{}")
+    f2_layers:                 CollectionProperty(type=Florence2LayerData)
 
 
 # ---------------------------------------------------------------------------
-# Per-layer metadata helpers (stored on the Mask, not on MaskLayer)
+# Per-layer helpers
 # ---------------------------------------------------------------------------
 
-def _get_layers_data(mask) -> dict:
-    try:
-        return json.loads(mask.florence2_props.f2_layers_json or "{}")
-    except Exception:
-        return {}
-
-
-def _set_layers_data(mask, data: dict) -> None:
-    mask.florence2_props.f2_layers_json = json.dumps(data, ensure_ascii=False)
+def _get_layer_data(layer, mask) -> "Florence2LayerData | None":
+    """Return the Florence2LayerData item for this layer, or None."""
+    return mask.florence2_props.f2_layers.get(layer.name)
 
 
 def _layer_is_florence(layer, mask) -> bool:
-    return layer.name in _get_layers_data(mask)
+    return mask.florence2_props.f2_layers.get(layer.name) is not None
 
 
-def _get_layer_data(layer, mask) -> dict:
-    return _get_layers_data(mask).get(layer.name, {})
+def _add_layer_data(mask, layer_name: str, elem: dict) -> "Florence2LayerData":
+    col = mask.florence2_props.f2_layers
+    item = col.get(layer_name)
+    if item is None:
+        item = col.add()
+        item.name = layer_name
+    item.f2_type  = elem.get("type",  "obj")
+    item.f2_desc  = elem.get("desc",  "")
+    item.f2_text  = elem.get("text",  "")
+    item.f2_color = elem.get("color", "")
+    item.f2_font  = elem.get("font",  "")
+    item.f2_bbox  = json.dumps(elem.get("bbox", [0, 0, 1000, 1000]))
+    return item
+
+
+def _clear_layer_data(mask) -> None:
+    mask.florence2_props.f2_layers.clear()
 
 
 # ---------------------------------------------------------------------------
-# Layer / color conventions
+# Color / name conventions
 # ---------------------------------------------------------------------------
 
 _FACE_WORDS = frozenset(
@@ -69,8 +93,7 @@ _FACE_WORDS = frozenset(
 def _layer_fill_color(elem_type: str, desc: str):
     if elem_type == "text":
         return (1.0, 0.5, 0.0, 0.5)
-    words = desc.lower().split()
-    if any(w in _FACE_WORDS for w in words):
+    if any(w in desc.lower().split() for w in _FACE_WORDS):
         return (0.0, 0.7, 1.0, 0.5)
     return (0.2, 0.8, 0.2, 0.5)
 
@@ -80,8 +103,7 @@ def _layer_name(elem_type: str, desc: str, text: str) -> str:
         return f'[T] "{text[:24]}"'[:63]
     if elem_type == "text":
         return f"[T] {desc[:40]}"[:63]
-    words = desc.lower().split()
-    if any(w in _FACE_WORDS for w in words):
+    if any(w in desc.lower().split() for w in _FACE_WORDS):
         return f"[F] {desc[:40]}"[:63]
     return desc[:63]
 
@@ -102,7 +124,7 @@ def _bbox_to_mask(bbox, W: int, H: int):
 
 
 def _spline_to_bbox(spline, W: int, H: int):
-    """Read current spline corners → [y1,x1,y2,x2] 0-1000."""
+    """Live spline corners → [y1,x1,y2,x2] 0-1000."""
     aspect = W / H if H else 1.0
     pts = [p.co for p in spline.points]
     if not pts:
@@ -122,7 +144,6 @@ def _spline_to_bbox(spline, W: int, H: int):
 # ---------------------------------------------------------------------------
 
 def _load_image(source_image_path: str):
-    """Return bpy.data.images entry for path, loading it if needed."""
     if not source_image_path or not os.path.isfile(source_image_path):
         print(f"[Florence2Mask] Image not found: {source_image_path!r}")
         return None
@@ -144,12 +165,12 @@ def _load_image(source_image_path: str):
 
 
 # ---------------------------------------------------------------------------
-# Core utility — called from main_ops / queue_ops after generation
+# Core: build mask from JSON
 # ---------------------------------------------------------------------------
 
 def apply_florence_json_to_mask(json_str: str, source_image_path: str) -> None:
-    """Parse JSON, build/update a Mask, open the mask editor. Main-thread only."""
-    print(f"[Florence2Mask] apply_florence_json_to_mask called, source={source_image_path!r}")
+    """Parse Ideogram4 JSON, populate a Mask, open in Image Editor. Main thread."""
+    print(f"[Florence2Mask] apply called, source={source_image_path!r}")
 
     try:
         data = json.loads(json_str)
@@ -158,69 +179,55 @@ def apply_florence_json_to_mask(json_str: str, source_image_path: str) -> None:
         return
 
     elements = data.get("compositional_deconstruction", {}).get("elements", [])
-    print(f"[Florence2Mask] Parsed JSON — {len(elements)} element(s)")
+    print(f"[Florence2Mask] {len(elements)} element(s)")
 
-    # --- Load source image (no ops) ---
     img = _load_image(source_image_path)
     W = img.size[0] if img else 1920
     H = img.size[1] if img else 1080
-    print(f"[Florence2Mask] Canvas size: {W}×{H}")
 
-    # --- Get / create Mask (no ops) ---
+    # Get or create mask
     if source_image_path:
         mask_name = os.path.splitext(os.path.basename(source_image_path))[0][:63]
     else:
         mask_name = "Florence2"
-    mask = bpy.data.masks.get(mask_name)
-    if mask is None:
-        mask = bpy.data.masks.new(name=mask_name)
-        print(f"[Florence2Mask] Created new mask: {mask_name!r}")
-    else:
-        print(f"[Florence2Mask] Reusing existing mask: {mask_name!r}")
+    mask = bpy.data.masks.get(mask_name) or bpy.data.masks.new(name=mask_name)
+    print(f"[Florence2Mask] Mask: {mask_name!r}")
 
-    # --- Store mask-level properties ---
+    # Store mask-level props
     mp = mask.florence2_props
     mp.f2_high_level_description = data.get("high_level_description", "")
     mp.f2_background = data.get("compositional_deconstruction", {}).get("background", "")
     mp.f2_style_json = json.dumps(data.get("style_description", {}), ensure_ascii=False)
 
-    # --- Clear all layers (this mask is Florence-2 owned) ---
-    existing = list(mask.layers)
-    for layer in existing:
+    # Clear everything
+    for layer in list(mask.layers):
         mask.layers.remove(layer)
-    print(f"[Florence2Mask] Cleared {len(existing)} existing layer(s)")
+    _clear_layer_data(mask)
 
-    # --- Add one layer per element; build new layers dict ---
-    new_layers_data = {}
+    # Add one layer per element
     for elem in elements[:40]:
         elem_type = elem.get("type", "obj")
         desc      = (elem.get("desc") or "element").strip()
         text_val  = (elem.get("text") or "").strip()
         bbox      = elem.get("bbox") or [0, 0, 1000, 1000]
 
-        name = _layer_name(elem_type, desc, text_val)
-        # Ensure unique name (Blender may suffix duplicates)
-        layer = mask.layers.new(name=name)
-        actual_name = layer.name  # Blender may have suffixed it
+        layer = mask.layers.new(name=_layer_name(elem_type, desc, text_val))
+        actual_name = layer.name
 
-        # Fill color by type
         try:
             layer.fill_color = _layer_fill_color(elem_type, desc)
         except AttributeError:
             pass
 
-        # Store metadata on the Mask (MaskLayer supports neither PointerProperty
-        # nor IDProperties, so we serialise to the mask-level JSON blob)
-        new_layers_data[actual_name] = {
+        _add_layer_data(mask, actual_name, {
             "type":  elem_type,
             "desc":  desc,
             "text":  text_val,
             "color": elem.get("color", ""),
             "font":  elem.get("font",  ""),
             "bbox":  bbox,
-        }
+        })
 
-        # Rectangle spline
         cx, cy, hx, hy = _bbox_to_mask(bbox, W, H)
         hx = max(hx, 0.001)
         hy = max(hy, 0.001)
@@ -242,26 +249,20 @@ def apply_florence_json_to_mask(json_str: str, source_image_path: str) -> None:
                 pt.handle_type = "VECTOR"
             except AttributeError:
                 pass
-
-        print(f"[Florence2Mask]   layer {actual_name!r}  type={elem_type}  bbox={bbox}")
-
-    _set_layers_data(mask, new_layers_data)
+        print(f"[Florence2Mask]   {actual_name!r}  {elem_type}  {bbox}")
 
     if mask.layers:
         mask.layers.active = mask.layers[0]
 
-    print(f"[Florence2Mask] Created {len(new_layers_data)} layer(s) in mask {mask_name!r}")
-
-    # --- Open / configure an Image Editor area (no image.open op needed) ---
     _open_mask_in_editor(mask, img)
+    print(f"[Florence2Mask] Done — {len(elements)} layer(s) in {mask_name!r}")
 
 
 # ---------------------------------------------------------------------------
-# Area management (no operators except area_split as soft fallback)
+# Area management
 # ---------------------------------------------------------------------------
 
 def _open_mask_in_editor(mask, img) -> None:
-    """Configure an Image Editor area in MASK mode with mask and image set."""
     for window in bpy.context.window_manager.windows:
         screen = window.screen
         areas  = screen.areas
@@ -278,7 +279,7 @@ def _open_mask_in_editor(mask, img) -> None:
             ) or next((a for a in areas if a.type == "SEQUENCE_EDITOR"), None)
 
             if target is None:
-                print("[Florence2Mask] No Image Editor or Sequencer area found — open one manually.")
+                print("[Florence2Mask] No suitable area to split — open Image Editor manually.")
                 return
 
             ids_before = {id(a) for a in areas}
@@ -304,29 +305,28 @@ def _open_mask_in_editor(mask, img) -> None:
         if img is not None:
             try:
                 space.image = img
-                print(f"[Florence2Mask] Set image editor background: {img.name!r}")
+                print(f"[Florence2Mask] Background image: {img.name!r}")
             except Exception as exc:
                 print(f"[Florence2Mask] Could not set image: {exc}")
         try:
             space.mask = mask
-            print(f"[Florence2Mask] Set mask in editor: {mask.name!r}")
+            print(f"[Florence2Mask] Mask set: {mask.name!r}")
         except Exception as exc:
             print(f"[Florence2Mask] Could not set mask: {exc}")
 
-        # Fit the view so the image fills the editor with masks overlaid
         try:
             region = next((r for r in image_ed.regions if r.type == "WINDOW"), None)
             if region:
                 with bpy.context.temp_override(window=window, area=image_ed, region=region):
                     bpy.ops.image.view_all(fit_view=True)
-                print("[Florence2Mask] View fitted to image")
+                print("[Florence2Mask] View fitted")
         except Exception as exc:
             print(f"[Florence2Mask] view_all failed: {exc}")
         return
 
 
 # ---------------------------------------------------------------------------
-# Panel
+# Sidebar panel
 # ---------------------------------------------------------------------------
 
 class FLORENCE2_PT_mask_panel(Panel):
@@ -337,10 +337,10 @@ class FLORENCE2_PT_mask_panel(Panel):
 
     def draw(self, context):
         layout = self.layout
-        col    = layout.column(align=True)
         space  = context.space_data
 
         if getattr(space, "mode", "") != "MASK":
+            col = layout.column(align=True)
             col.label(text="Switch Image Editor to Mask mode,", icon="INFO")
             col.label(text="or run Florence-2 Ideogram 4")
             col.label(text="from the Generate panel.")
@@ -348,48 +348,86 @@ class FLORENCE2_PT_mask_panel(Panel):
 
         mask = getattr(space, "mask", None)
         if mask is None:
-            col.label(text="Run Florence-2 Ideogram 4", icon="INFO")
-            col.label(text="from the Generate panel.")
+            layout.label(text="Run Florence-2 Ideogram 4", icon="INFO")
+            layout.label(text="from the Generate panel.")
             return
 
         mp = mask.florence2_props
-        if not mp.f2_high_level_description:
-            col.label(text="No Florence-2 data on this mask.", icon="INFO")
-            col.operator("florence2.export_strip", icon="SEQUENCE")
-            return
 
-        # Mask-level description
-        box = col.box()
+        # ── Scene-level description ──────────────────────────────────────────
+        box = layout.box()
         box.label(text="Scene", icon="SCENE_DATA")
         box.prop(mp, "f2_high_level_description", text="")
         box.label(text="Background:")
         box.prop(mp, "f2_background", text="")
 
-        # Active layer
+        # ── Active layer ─────────────────────────────────────────────────────
         active = mask.layers.active
-        if active:
-            ld = _get_layer_data(active, mask)
-            if ld:
-                f2_type = ld.get("type", "obj")
-                f2_desc = ld.get("desc", "")
-                box = col.box()
-                icon = "FONT_DATA" if f2_type == "text" else (
-                    "COMMUNITY" if any(w in f2_desc.lower().split() for w in _FACE_WORDS)
-                    else "OBJECT_DATA"
-                )
-                box.label(text=active.name, icon=icon)
-                box.label(text=f"Type: {f2_type}")
-                box.label(text="Description:")
-                box.label(text=f2_desc, icon="NONE")
-                if f2_type == "text":
-                    box.label(text=f"Text:  {ld.get('text', '')}")
-                    box.label(text=f"Color: {ld.get('color', '')}")
-                    box.label(text=f"Font:  {ld.get('font', '')}")
-            else:
-                col.label(text="(Non-Florence layer selected)", icon="INFO")
+        if active is None:
+            layout.separator()
+            layout.operator("florence2.export_strip", icon="SEQUENCE")
+            return
 
-        col.separator()
-        col.operator("florence2.export_strip", icon="SEQUENCE")
+        layout.separator()
+        box = layout.box()
+
+        # Built-in MaskLayer properties
+        hdr = box.row(align=True)
+        hdr.label(text=active.name, icon="LAYER_ACTIVE")
+        for attr in ("hide", "hide_select", "hide_render"):
+            try:
+                hdr.prop(active, attr, text="", emboss=False)
+            except TypeError:
+                pass
+
+        row = box.row(align=True)
+        try:
+            row.prop(active, "alpha")
+        except TypeError:
+            pass
+        try:
+            row.prop(active, "invert", toggle=True)
+        except TypeError:
+            pass
+
+        try:
+            box.prop(active, "blend", text="Blend")
+        except TypeError:
+            pass
+
+        try:
+            box.prop(active, "falloff", text="Falloff")
+        except TypeError:
+            pass
+
+        try:
+            box.prop(active, "fill_color", text="Fill Color")
+        except TypeError:
+            pass
+
+        # ── Florence-2 custom metadata ───────────────────────────────────────
+        ld = _get_layer_data(active, mask)
+        if ld:
+            layout.separator()
+            fbox = layout.box()
+            fbox.label(text="Florence-2 Metadata", icon="NODE_COMPOSITING")
+
+            fbox.prop(ld, "f2_type", text="Type")
+
+            fbox.label(text="Description:")
+            fbox.prop(ld, "f2_desc", text="")
+
+            if ld.f2_type == "text":
+                fbox.label(text="Text Content:")
+                fbox.prop(ld, "f2_text", text="")
+                row = fbox.row(align=True)
+                row.prop(ld, "f2_color", text="Color")
+                row.prop(ld, "f2_font",  text="Font")
+        else:
+            layout.label(text="(Non-Florence layer)", icon="INFO")
+
+        layout.separator()
+        layout.operator("florence2.export_strip", icon="SEQUENCE")
 
 
 # ---------------------------------------------------------------------------
@@ -399,7 +437,7 @@ class FLORENCE2_PT_mask_panel(Panel):
 class FLORENCE2_OT_export_strip(Operator):
     bl_idname      = "florence2.export_strip"
     bl_label       = "Export JSON to Strip"
-    bl_description = "Serialize mask elements to an Ideogram 4 JSON text strip in the sequencer"
+    bl_description = "Re-serialize mask bounding boxes to an Ideogram 4 JSON text strip"
 
     @classmethod
     def poll(cls, context):
@@ -414,22 +452,21 @@ class FLORENCE2_OT_export_strip(Operator):
         img   = getattr(space, "image", None)
         W     = img.size[0] if img else 1920
         H     = img.size[1] if img else 1080
-
-        mp         = mask.florence2_props
-        layers_data = _get_layers_data(mask)
+        mp    = mask.florence2_props
 
         elements = []
         for layer in mask.layers:
-            ld = layers_data.get(layer.name)
+            ld = _get_layer_data(layer, mask)
             if not ld:
                 continue
-            bbox = _spline_to_bbox(layer.splines[0], W, H) if layer.splines else ld.get("bbox", [0, 0, 1000, 1000])
+            bbox = (_spline_to_bbox(layer.splines[0], W, H) if layer.splines
+                    else json.loads(ld.f2_bbox or "[0,0,1000,1000]"))
 
-            elem = {"type": ld["type"], "bbox": bbox, "desc": ld.get("desc", "")}
-            if ld["type"] == "text":
-                elem["text"]  = ld.get("text",  "")
-                elem["color"] = ld.get("color", "")
-                elem["font"]  = ld.get("font",  "")
+            elem = {"type": ld.f2_type, "bbox": bbox, "desc": ld.f2_desc}
+            if ld.f2_type == "text":
+                elem["text"]  = ld.f2_text
+                elem["color"] = ld.f2_color
+                elem["font"]  = ld.f2_font
             elements.append(elem)
 
         try:
@@ -467,7 +504,7 @@ class FLORENCE2_OT_export_strip(Operator):
         strip.wrap_width = 0.0
         strip.font_size  = 12
 
-        self.report({"INFO"}, f"JSON strip inserted at frame {frame_start}, channel {channel}")
+        self.report({"INFO"}, f"JSON strip at frame {frame_start}, channel {channel}")
         return {"FINISHED"}
 
 
@@ -476,6 +513,7 @@ class FLORENCE2_OT_export_strip(Operator):
 # ---------------------------------------------------------------------------
 
 classes = [
+    Florence2LayerData,    # must be before Florence2MaskProps (referenced as CollectionProperty)
     Florence2MaskProps,
     FLORENCE2_OT_export_strip,
     FLORENCE2_PT_mask_panel,
@@ -483,12 +521,12 @@ classes = [
 
 
 def register():
-    print("[Florence2Mask] Registering classes...")
+    print("[Florence2Mask] Registering...")
     for cls in classes:
         bpy.utils.register_class(cls)
-        print(f"[Florence2Mask]   registered {cls.__name__}")
+        print(f"[Florence2Mask]   {cls.__name__}")
     bpy.types.Mask.florence2_props = PointerProperty(type=Florence2MaskProps)
-    print("[Florence2Mask] florence2_props assigned to bpy.types.Mask — registration complete")
+    print("[Florence2Mask] Registration complete")
 
 
 def unregister():
