@@ -407,38 +407,6 @@ class FLORENCE2_PT_mask_panel(Panel):
             except TypeError:
                 pass
 
-        # Opacity + invert
-        row = box.row(align=True)
-        try:
-            row.prop(active, "alpha", text="Opacity")
-        except TypeError:
-            pass
-        try:
-            row.prop(active, "invert", toggle=True, text="Invert")
-        except TypeError:
-            pass
-
-        # Blend / falloff
-        try:
-            box.prop(active, "blend", text="Blend")
-        except TypeError:
-            pass
-        try:
-            box.prop(active, "falloff", text="Falloff")
-        except TypeError:
-            pass
-
-        # Fill options
-        row = box.row(align=True)
-        try:
-            row.prop(active, "use_fill_overlap", toggle=True, text="Overlap")
-        except TypeError:
-            pass
-        try:
-            row.prop(active, "use_fill_holes", toggle=True, text="Holes")
-        except TypeError:
-            pass
-
         # ── Active spline (mirrors MASK_PT_spline — determines which layer
         #    is shown; clicking any spline point sets splines.active) ─────────
         spline = active.splines.active if active.splines else None
@@ -600,17 +568,77 @@ def _tag_image_editors_redraw():
         pass
 
 
-def _depsgraph_handler(scene, depsgraph):
-    """Redraw panel whenever any Mask data-block is modified.
+_last_selection_state = None
 
-    slide_point and other mask operators mutate spline point selection on the
-    Mask ID, which travels through the depsgraph but does NOT fire the
-    active_layer_index msgbus subscription.  Watching depsgraph updates covers
-    point selection, handle drags, and layer changes in one place.
+
+def _sync_from_point_selection():
+    """Sync active_layer_index by scanning selected spline points.
+
+    Uses bpy.context.edit_mask (same source as the mask editor) and checks
+    active_point first, then falls back to scanning select_control_point /
+    select_left_handle / select_right_handle.  Schedules a redraw if the
+    selection or active layer changed.
     """
+    global _last_selection_state
+    try:
+        mask = getattr(bpy.context, "edit_mask", None)
+        if mask is None:
+            return
+
+        # --- Priority 1: active point on the active layer ---
+        active_layer = mask.layers.active
+        active_spline = active_layer.splines.active if active_layer else None
+        active_point = active_layer.splines.active_point if active_layer else None
+
+        winner_name = None
+        selection_key = []
+
+        if active_point is not None and active_spline is not None:
+            try:
+                sp_idx = list(active_layer.splines).index(active_spline)
+                pt_idx = list(active_spline.points).index(active_point)
+                winner_name = active_layer.name
+                selection_key.append((active_layer.name, sp_idx, pt_idx, True))
+            except ValueError:
+                pass
+
+        # --- Priority 2: scan all layers for any selected point ---
+        for layer in mask.layers:
+            if layer.hide:
+                continue
+            for sp_idx, spline in enumerate(layer.splines):
+                for pt_idx, point in enumerate(spline.points):
+                    if (point.select_control_point or
+                            point.select_left_handle or
+                            point.select_right_handle):
+                        entry = (layer.name, sp_idx, pt_idx, False)
+                        if entry not in selection_key:
+                            selection_key.append(entry)
+                        if winner_name is None:
+                            winner_name = layer.name
+
+        if selection_key == _last_selection_state:
+            return
+        _last_selection_state = selection_key
+
+        # Sync active_layer_index to the layer that owns the selection
+        if winner_name is not None:
+            for i, layer in enumerate(mask.layers):
+                if layer.name == winner_name and mask.active_layer_index != i:
+                    mask.active_layer_index = i
+                    break
+
+        _tag_image_editors_redraw()
+    except Exception:
+        pass
+
+
+def _depsgraph_handler(scene, depsgraph):
+    """Sync layer index + redraw when any Mask data-block is modified."""
     for update in depsgraph.updates:
         if isinstance(update.id, bpy.types.Mask):
-            _tag_image_editors_redraw()
+            if not bpy.app.timers.is_registered(_sync_from_point_selection):
+                bpy.app.timers.register(_sync_from_point_selection, first_interval=0.0)
             return
 
 
@@ -633,28 +661,18 @@ def register():
         print(f"[Florence2Mask]   {cls.__name__}")
     bpy.types.Mask.florence2_props = PointerProperty(type=Florence2MaskProps)
 
-    # msgbus: active_layer_index — fires on layer list clicks
-    bpy.msgbus.subscribe_rna(
-        key=(bpy.types.Mask, "active_layer_index"),
-        owner=_msgbus_owner,
-        args=(),
-        notify=_tag_image_editors_redraw,
-    )
-    # msgbus: MaskLayer.select — fires when slide_point selects a layer
-    bpy.msgbus.subscribe_rna(
-        key=(bpy.types.MaskLayer, "select"),
-        owner=_msgbus_owner,
-        args=(),
-        notify=_tag_image_editors_redraw,
-    )
-    # msgbus: MaskLayers.active — fires when the active layer pointer changes
-    # (slide_point updates layers.active directly, not always active_layer_index)
-    bpy.msgbus.subscribe_rna(
-        key=(bpy.types.MaskLayers, "active"),
-        owner=_msgbus_owner,
-        args=(),
-        notify=_tag_image_editors_redraw,
-    )
+    # msgbus: fire sync on any of the three paths that indicate layer change
+    for rna_key in (
+        (bpy.types.Mask, "active_layer_index"),
+        (bpy.types.MaskLayer, "select"),
+        (bpy.types.MaskLayers, "active"),
+    ):
+        bpy.msgbus.subscribe_rna(
+            key=rna_key,
+            owner=_msgbus_owner,
+            args=(),
+            notify=_sync_from_point_selection,
+        )
 
     # depsgraph handler: fires when mask data changes (slide_point, handle drags)
     if _depsgraph_handler not in bpy.app.handlers.depsgraph_update_post:
