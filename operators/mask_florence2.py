@@ -526,28 +526,48 @@ def _tag_image_editors_redraw():
         pass
 
 
+def _select_all_points_on_active_layer():
+    """When the UIList selection changes, select all points of the new active layer."""
+    try:
+        has_em = hasattr(bpy.context, "edit_mask")
+        mask = bpy.context.edit_mask if has_em else None
+        if not mask:
+            return
+        active = mask.layers.active
+        if not active:
+            return
+        # Deselect all points on every layer, then select all on the active one
+        for layer in mask.layers:
+            for spline in layer.splines:
+                for point in spline.points:
+                    sel = (layer == active)
+                    point.select_control_point = sel
+                    point.select_left_handle  = sel
+                    point.select_right_handle = sel
+        _tag_image_editors_redraw()
+    except Exception:
+        pass
+
+
 @bpy.app.handlers.persistent
 def _depsgraph_handler(scene, depsgraph=None):
-    """Sync active_layer_index to match layers.active; redraw mask panel.
-
-    Blender sets layers.active when the user clicks any spline or point.
-    active_layer_index (the integer UIList uses) does not always follow.
-    We just keep the two in sync — no point scanning needed.
-    """
-    if not hasattr(bpy.context, "edit_mask"):
-        return
-    mask = bpy.context.edit_mask
-    if not mask:
-        return
-
-    active = mask.layers.active
-    if active is None:
+    """Sync active_layer_index to match layers.active; redraw mask panel."""
+    has_em = hasattr(bpy.context, "edit_mask")
+    mask = bpy.context.edit_mask if has_em else None
+    active = mask.layers.active if mask else None
+    print(
+        f"[F2Sync] has_em={has_em}"
+        f" mask={getattr(mask,'name',None)!r}"
+        f" active={getattr(active,'name',None)!r}"
+        f" idx={getattr(mask,'active_layer_index',None)}"
+    )
+    if not mask or not active:
         return
 
     for i, layer in enumerate(mask.layers):
         if layer == active:
             if mask.active_layer_index != i:
-                print(f"[F2Sync] {active.name!r}: index {mask.active_layer_index} -> {i}")
+                print(f"[F2Sync] syncing index {mask.active_layer_index} -> {i}")
                 mask.active_layer_index = i
                 _tag_image_editors_redraw()
             return
@@ -572,11 +592,15 @@ def register():
         print(f"[Florence2Mask]   {cls.__name__}")
     bpy.types.Mask.florence2_props = PointerProperty(type=Florence2MaskProps)
 
-    # msgbus: fire redraw on any of the three paths that indicate layer change.
-    # active_layer_index changes come from the UIList; MaskLayers.active /
-    # MaskLayer.select come from operator-driven selection.
+    # When the user clicks a layer in the UIList, select all its points.
+    bpy.msgbus.subscribe_rna(
+        key=(bpy.types.Mask, "active_layer_index"),
+        owner=_msgbus_owner,
+        args=(),
+        notify=_select_all_points_on_active_layer,
+    )
+    # Redraw on layer select-flag or active-pointer changes.
     for rna_key in (
-        (bpy.types.Mask, "active_layer_index"),
         (bpy.types.MaskLayer, "select"),
         (bpy.types.MaskLayers, "active"),
     ):
