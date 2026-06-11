@@ -367,9 +367,11 @@ class FLORENCE2_PT_mask_panel(Panel):
         box.label(text="Background:")
         box.prop(mp, "f2_background", text="")
 
-        # ── Active layer — use active_layer_index for reliable sync ──────────
-        idx = getattr(mask, "active_layer_index", 0)
-        active = mask.layers[idx] if mask.layers and 0 <= idx < len(mask.layers) else None
+        # ── Active layer — indexed via active_layer_index for reliable sync ──
+        idx    = getattr(mask, "active_layer_index", 0)
+        n      = len(mask.layers)
+        active = mask.layers[idx] if n and 0 <= idx < n else None
+
         if active is None:
             layout.separator()
             layout.operator("florence2.export_strip", icon="SEQUENCE")
@@ -378,52 +380,65 @@ class FLORENCE2_PT_mask_panel(Panel):
         layout.separator()
         box = layout.box()
 
-        # Built-in MaskLayer properties
+        # Header: layer counter + visibility toggles
         hdr = box.row(align=True)
-        hdr.label(text=active.name, icon="LAYER_ACTIVE")
+        hdr.label(text=f"Layer {idx + 1} / {n}", icon="LAYER_ACTIVE")
         for attr in ("hide", "hide_select", "hide_render"):
             try:
                 hdr.prop(active, attr, text="", emboss=False)
             except TypeError:
                 pass
 
+        # Editable layer name
+        box.prop(active, "name", text="Name")
+
+        # Built-in MaskLayer properties
         row = box.row(align=True)
         try:
-            row.prop(active, "alpha")
+            row.prop(active, "alpha", text="Opacity")
         except TypeError:
             pass
         try:
-            row.prop(active, "invert", toggle=True)
+            row.prop(active, "invert", toggle=True, text="Invert")
         except TypeError:
             pass
-
         try:
             box.prop(active, "blend", text="Blend")
         except TypeError:
             pass
-
         try:
             box.prop(active, "falloff", text="Falloff")
         except TypeError:
             pass
-
         try:
             box.prop(active, "fill_color", text="Fill Color")
         except TypeError:
             pass
 
-        # ── Florence-2 custom metadata ───────────────────────────────────────
+        # ── Current spline position ──────────────────────────────────────────
+        if active.splines:
+            img = getattr(space, "image", None)
+            W   = img.size[0] if img else 1920
+            H   = img.size[1] if img else 1080
+            try:
+                y1, x1, y2, x2 = _spline_to_bbox(active.splines[0], W, H)
+                pbox = box.box()
+                pbox.label(text="Position (0 – 1000):", icon="TRANSFORM_ORIGINS")
+                row = pbox.row(align=True)
+                row.label(text=f"X  {x1} – {x2}")
+                row.label(text=f"Y  {y1} – {y2}")
+            except Exception:
+                pass
+
+        # ── Florence-2 metadata ──────────────────────────────────────────────
         ld = _get_layer_data(active, mask)
         if ld:
             layout.separator()
             fbox = layout.box()
             fbox.label(text="Florence-2 Metadata", icon="NODE_COMPOSITING")
-
             fbox.prop(ld, "f2_type", text="Type")
-
             fbox.label(text="Description:")
             fbox.prop(ld, "f2_desc", text="")
-
             if ld.f2_type == "text":
                 fbox.label(text="Text Content:")
                 fbox.prop(ld, "f2_text", text="")
