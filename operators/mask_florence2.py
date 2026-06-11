@@ -407,47 +407,6 @@ class FLORENCE2_PT_mask_panel(Panel):
             except TypeError:
                 pass
 
-        # ── Active spline (mirrors MASK_PT_spline — determines which layer
-        #    is shown; clicking any spline point sets splines.active) ─────────
-        spline = active.splines.active if active.splines else None
-        if spline:
-            sbox = box.box()
-            sbox.label(text="Active Spline", icon="CURVE_DATA")
-            col = sbox.column(align=True)
-            try:
-                col.prop(spline, "offset_mode")
-            except TypeError:
-                pass
-            try:
-                col.prop(spline, "weight_interpolation", text="Interpolation")
-            except TypeError:
-                pass
-            row = col.row(align=True)
-            try:
-                row.prop(spline, "use_cyclic",  toggle=True, text="Cyclic")
-            except TypeError:
-                pass
-            try:
-                row.prop(spline, "use_fill",    toggle=True, text="Fill")
-            except TypeError:
-                pass
-            try:
-                col.prop(spline, "use_self_intersection_check", text="Self-Intersection")
-            except TypeError:
-                pass
-
-            # Live position from spline corners
-            img = getattr(space, "image", None)
-            W   = img.size[0] if img else 1920
-            H   = img.size[1] if img else 1080
-            try:
-                y1, x1, y2, x2 = _spline_to_bbox(spline, W, H)
-                prow = sbox.row(align=True)
-                prow.label(text=f"X  {x1} – {x2}")
-                prow.label(text=f"Y  {y1} – {y2}")
-            except Exception:
-                pass
-
         # ── Florence-2 metadata ──────────────────────────────────────────────
         ld = _get_layer_data(active, mask)
         if ld:
@@ -571,74 +530,74 @@ def _tag_image_editors_redraw():
 _last_selection_state = None
 
 
-def _sync_from_point_selection():
-    """Sync active_layer_index by scanning selected spline points.
+def _sync_from_point_selection(mask):
+    """Sync active_layer_index by scanning selected spline points on *mask*.
 
-    Uses bpy.context.edit_mask (same source as the mask editor) and checks
-    active_point first, then falls back to scanning select_control_point /
-    select_left_handle / select_right_handle.  Schedules a redraw if the
-    selection or active layer changed.
+    Priority 1: active_layer.splines.active_point (fastest).
+    Priority 2: scan every point's select flags as fallback.
+    Returns True if active_layer_index was changed.
     """
     global _last_selection_state
-    try:
-        mask = getattr(bpy.context, "edit_mask", None)
-        if mask is None:
-            return
 
-        # --- Priority 1: active point on the active layer ---
-        active_layer = mask.layers.active
-        active_spline = active_layer.splines.active if active_layer else None
-        active_point = active_layer.splines.active_point if active_layer else None
+    # --- Priority 1: active point ---
+    active_layer = mask.layers.active
+    active_spline = active_layer.splines.active if active_layer else None
+    active_point = (active_layer.splines.active_point
+                    if active_layer and active_layer.splines else None)
 
-        winner_name = None
-        selection_key = []
+    winner_name = None
+    selection_key = []
 
-        if active_point is not None and active_spline is not None:
-            try:
-                sp_idx = list(active_layer.splines).index(active_spline)
-                pt_idx = list(active_spline.points).index(active_point)
-                winner_name = active_layer.name
-                selection_key.append((active_layer.name, sp_idx, pt_idx, True))
-            except ValueError:
-                pass
+    if active_point is not None and active_spline is not None:
+        try:
+            sp_idx = list(active_layer.splines).index(active_spline)
+            pt_idx = list(active_spline.points).index(active_point)
+            winner_name = active_layer.name
+            selection_key.append((active_layer.name, sp_idx, pt_idx))
+        except ValueError:
+            pass
 
-        # --- Priority 2: scan all layers for any selected point ---
-        for layer in mask.layers:
-            if layer.hide:
-                continue
-            for sp_idx, spline in enumerate(layer.splines):
-                for pt_idx, point in enumerate(spline.points):
-                    if (point.select_control_point or
-                            point.select_left_handle or
-                            point.select_right_handle):
-                        entry = (layer.name, sp_idx, pt_idx, False)
-                        if entry not in selection_key:
-                            selection_key.append(entry)
-                        if winner_name is None:
-                            winner_name = layer.name
+    # --- Priority 2: per-point select flags ---
+    for layer in mask.layers:
+        if layer.hide:
+            continue
+        for sp_idx, spline in enumerate(layer.splines):
+            for pt_idx, point in enumerate(spline.points):
+                if (point.select_control_point or
+                        point.select_left_handle or
+                        point.select_right_handle):
+                    entry = (layer.name, sp_idx, pt_idx)
+                    if entry not in selection_key:
+                        selection_key.append(entry)
+                    if winner_name is None:
+                        winner_name = layer.name
 
-        if selection_key == _last_selection_state:
-            return
-        _last_selection_state = selection_key
+    if selection_key == _last_selection_state:
+        return False
+    _last_selection_state = selection_key
 
-        # Sync active_layer_index to the layer that owns the selection
-        if winner_name is not None:
-            for i, layer in enumerate(mask.layers):
-                if layer.name == winner_name and mask.active_layer_index != i:
-                    mask.active_layer_index = i
-                    break
+    if winner_name is not None:
+        for i, layer in enumerate(mask.layers):
+            if layer.name == winner_name and mask.active_layer_index != i:
+                mask.active_layer_index = i
+                break
 
-        _tag_image_editors_redraw()
-    except Exception:
-        pass
+    return True
 
 
 def _depsgraph_handler(scene, depsgraph):
     """Sync layer index + redraw when any Mask data-block is modified."""
     for update in depsgraph.updates:
         if isinstance(update.id, bpy.types.Mask):
-            if not bpy.app.timers.is_registered(_sync_from_point_selection):
-                bpy.app.timers.register(_sync_from_point_selection, first_interval=0.0)
+            mask = update.id
+            try:
+                changed = _sync_from_point_selection(mask)
+            except Exception:
+                changed = False
+            if changed:
+                _tag_image_editors_redraw()
+            else:
+                _tag_image_editors_redraw()
             return
 
 
@@ -661,7 +620,9 @@ def register():
         print(f"[Florence2Mask]   {cls.__name__}")
     bpy.types.Mask.florence2_props = PointerProperty(type=Florence2MaskProps)
 
-    # msgbus: fire sync on any of the three paths that indicate layer change
+    # msgbus: fire redraw on any of the three paths that indicate layer change.
+    # active_layer_index changes come from the UIList; MaskLayers.active /
+    # MaskLayer.select come from operator-driven selection.
     for rna_key in (
         (bpy.types.Mask, "active_layer_index"),
         (bpy.types.MaskLayer, "select"),
@@ -671,7 +632,7 @@ def register():
             key=rna_key,
             owner=_msgbus_owner,
             args=(),
-            notify=_sync_from_point_selection,
+            notify=_tag_image_editors_redraw,
         )
 
     # depsgraph handler: fires when mask data changes (slide_point, handle drags)
