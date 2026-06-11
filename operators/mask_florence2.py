@@ -385,8 +385,7 @@ class FLORENCE2_PT_mask_panel(Panel):
         row.operator("mask.layer_move", text="", icon="TRIA_UP").direction   = "UP"
         row.operator("mask.layer_move", text="", icon="TRIA_DOWN").direction = "DOWN"
         row.separator()
-        row.operator("mask.select_all",      text="", icon="RESTRICT_SELECT_OFF").action = "SELECT"
-        row.operator("mask.handle_type_set", text="", icon="IPO_CONSTANT").type = "VECTOR"
+        row.operator("mask.select_all", text="", icon="RESTRICT_SELECT_OFF").action = "SELECT"
 
         # ── Active layer — use layers.active (Blender keeps this in sync when
         #    a spline is clicked, which may not update active_layer_index) ────
@@ -530,34 +529,41 @@ def _tag_image_editors_redraw():
 _last_selection_state = None
 
 
-def _sync_from_point_selection(mask):
-    """Sync active_layer_index by scanning selected spline points on *mask*.
-
-    Priority 1: active_layer.splines.active_point (fastest).
-    Priority 2: scan every point's select flags as fallback.
-    Returns True if active_layer_index was changed.
-    """
+@bpy.app.handlers.persistent
+def _depsgraph_handler(scene, depsgraph=None):
+    """Sync active_layer_index from point selection; redraw mask panel."""
     global _last_selection_state
 
-    # --- Priority 1: active point ---
+    # bpy.context.edit_mask is the live editable mask — not the evaluated copy
+    # from update.id.  The context attribute is populated whenever a mask editor
+    # is active, and depsgraph handlers run with the proper window context.
+    if not hasattr(bpy.context, "edit_mask"):
+        return
+    mask = bpy.context.edit_mask
+    if not mask:
+        return
+
+    current_selection = []
+
+    # --- Method A: active_point on the active layer (fastest path) ---
     active_layer = mask.layers.active
-    active_spline = active_layer.splines.active if active_layer else None
-    active_point = (active_layer.splines.active_point
-                    if active_layer and active_layer.splines else None)
+    if active_layer:
+        active_spline = active_layer.splines.active
+        active_point  = active_layer.splines.active_point
+        if active_point and active_spline:
+            try:
+                sp_idx = list(active_layer.splines).index(active_spline)
+                pt_idx = list(active_spline.points).index(active_point)
+                current_selection.append({
+                    "layer_name": active_layer.name,
+                    "spline_idx": sp_idx,
+                    "point_idx":  pt_idx,
+                    "is_active":  True,
+                })
+            except ValueError:
+                pass
 
-    winner_name = None
-    selection_key = []
-
-    if active_point is not None and active_spline is not None:
-        try:
-            sp_idx = list(active_layer.splines).index(active_spline)
-            pt_idx = list(active_spline.points).index(active_point)
-            winner_name = active_layer.name
-            selection_key.append((active_layer.name, sp_idx, pt_idx))
-        except ValueError:
-            pass
-
-    # --- Priority 2: per-point select flags ---
+    # --- Method B: scan all points for select flags ---
     for layer in mask.layers:
         if layer.hide:
             continue
@@ -566,39 +572,33 @@ def _sync_from_point_selection(mask):
                 if (point.select_control_point or
                         point.select_left_handle or
                         point.select_right_handle):
-                    entry = (layer.name, sp_idx, pt_idx)
-                    if entry not in selection_key:
-                        selection_key.append(entry)
-                    if winner_name is None:
-                        winner_name = layer.name
+                    if not any(
+                        item["layer_name"] == layer.name and
+                        item["spline_idx"] == sp_idx and
+                        item["point_idx"]  == pt_idx
+                        for item in current_selection
+                    ):
+                        current_selection.append({
+                            "layer_name": layer.name,
+                            "spline_idx": sp_idx,
+                            "point_idx":  pt_idx,
+                            "is_active":  False,
+                        })
 
-    if selection_key == _last_selection_state:
-        return False
-    _last_selection_state = selection_key
+    if current_selection == _last_selection_state:
+        return
+    _last_selection_state = current_selection
 
-    if winner_name is not None:
+    # Sync active_layer_index to the first selected layer so the UIList
+    # highlight follows the spline/point click.
+    if current_selection:
+        winner = current_selection[0]["layer_name"]
         for i, layer in enumerate(mask.layers):
-            if layer.name == winner_name and mask.active_layer_index != i:
+            if layer.name == winner and mask.active_layer_index != i:
                 mask.active_layer_index = i
                 break
 
-    return True
-
-
-def _depsgraph_handler(scene, depsgraph):
-    """Sync layer index + redraw when any Mask data-block is modified."""
-    for update in depsgraph.updates:
-        if isinstance(update.id, bpy.types.Mask):
-            mask = update.id
-            try:
-                changed = _sync_from_point_selection(mask)
-            except Exception:
-                changed = False
-            if changed:
-                _tag_image_editors_redraw()
-            else:
-                _tag_image_editors_redraw()
-            return
+    _tag_image_editors_redraw()
 
 
 # ---------------------------------------------------------------------------
