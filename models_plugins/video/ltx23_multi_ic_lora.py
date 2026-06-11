@@ -533,6 +533,11 @@ class LTX2_3MultiICLoRAPlugin(ModelPlugin):
             refine_kw["control_audio"]         = _ctrl_audio_wave
             refine_kw["control_audio_strength"] = _ctrl_audio_str
 
+        if image_conditions is not None and audio_conditions is not None:
+            refine_kw["stg_scale"] = 1.0
+            refine_kw["spatio_temporal_guidance_blocks"] = [28]
+            refine_kw["guidance_rescale"] = 0.7
+
         with torch.inference_mode(), torch.autocast("cuda", dtype=torch_dtype):
             outputs2 = refine_pipe(**refine_kw)
 
