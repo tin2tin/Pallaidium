@@ -549,28 +549,81 @@ def _select_all_points_on_active_layer():
         pass
 
 
+_last_selection_state = None
+
+
 @bpy.app.handlers.persistent
 def _depsgraph_handler(scene, depsgraph=None):
-    """Sync active_layer_index to match layers.active; redraw mask panel."""
-    has_em = hasattr(bpy.context, "edit_mask")
-    mask = bpy.context.edit_mask if has_em else None
-    active = mask.layers.active if mask else None
-    print(
-        f"[F2Sync] has_em={has_em}"
-        f" mask={getattr(mask,'name',None)!r}"
-        f" active={getattr(active,'name',None)!r}"
-        f" idx={getattr(mask,'active_layer_index',None)}"
-    )
-    if not mask or not active:
+    """Detect which layer the user clicked by scanning point selection state."""
+    global _last_selection_state
+
+    if not hasattr(bpy.context, "edit_mask"):
+        return
+    mask = bpy.context.edit_mask
+    if not mask:
         return
 
+    current_selection = []
+
+    # Method A: active_point on active layer (fastest, set by Blender on click)
+    active_layer = mask.layers.active
+    if active_layer:
+        active_spline = active_layer.splines.active
+        active_point  = active_layer.splines.active_point
+        if active_point and active_spline:
+            try:
+                sp_idx = list(active_layer.splines).index(active_spline)
+                pt_idx = list(active_spline.points).index(active_point)
+                current_selection.append({
+                    "layer_name": active_layer.name,
+                    "spline_idx": sp_idx,
+                    "point_idx":  pt_idx,
+                    "is_active":  True,
+                })
+            except ValueError:
+                pass
+
+    # Method B: scan every point's select flags across all layers
+    for layer in mask.layers:
+        if layer.hide:
+            continue
+        for sp_idx, spline in enumerate(layer.splines):
+            for pt_idx, point in enumerate(spline.points):
+                if (point.select_control_point or
+                        point.select_left_handle or
+                        point.select_right_handle):
+                    if not any(
+                        d["layer_name"] == layer.name and
+                        d["spline_idx"] == sp_idx and
+                        d["point_idx"]  == pt_idx
+                        for d in current_selection
+                    ):
+                        current_selection.append({
+                            "layer_name": layer.name,
+                            "spline_idx": sp_idx,
+                            "point_idx":  pt_idx,
+                            "is_active":  False,
+                        })
+
+    # Only act when selection actually changed
+    if current_selection == _last_selection_state:
+        return
+    _last_selection_state = current_selection
+
+    if not current_selection:
+        return
+
+    # Prefer the entry flagged is_active; fall back to first found
+    winner = next(
+        (d["layer_name"] for d in current_selection if d["is_active"]),
+        current_selection[0]["layer_name"],
+    )
     for i, layer in enumerate(mask.layers):
-        if layer == active:
-            if mask.active_layer_index != i:
-                print(f"[F2Sync] syncing index {mask.active_layer_index} -> {i}")
-                mask.active_layer_index = i
-                _tag_image_editors_redraw()
-            return
+        if layer.name == winner and mask.active_layer_index != i:
+            mask.active_layer_index = i
+            break
+
+    _tag_image_editors_redraw()
 
 
 # ---------------------------------------------------------------------------
