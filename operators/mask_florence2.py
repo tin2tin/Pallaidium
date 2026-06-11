@@ -528,49 +528,29 @@ def _tag_image_editors_redraw():
 
 @bpy.app.handlers.persistent
 def _depsgraph_handler(scene, depsgraph=None):
-    """Sync active_layer_index from point selection; redraw mask panel."""
+    """Sync active_layer_index to match layers.active; redraw mask panel.
+
+    Blender sets layers.active when the user clicks any spline or point.
+    active_layer_index (the integer UIList uses) does not always follow.
+    We just keep the two in sync — no point scanning needed.
+    """
     if not hasattr(bpy.context, "edit_mask"):
         return
     mask = bpy.context.edit_mask
     if not mask:
         return
 
-    winner_name = None
-
-    # --- Method A: active_point on the active layer (fastest path) ---
-    active_layer = mask.layers.active
-    if active_layer:
-        active_point = active_layer.splines.active_point
-        if active_point:
-            winner_name = active_layer.name
-
-    # --- Method B: scan all points for select flags ---
-    if winner_name is None:
-        for layer in mask.layers:
-            if layer.hide:
-                continue
-            for spline in layer.splines:
-                for point in spline.points:
-                    if (point.select_control_point or
-                            point.select_left_handle or
-                            point.select_right_handle):
-                        winner_name = layer.name
-                        break
-                if winner_name:
-                    break
-            if winner_name:
-                break
-
-    if winner_name is None:
+    active = mask.layers.active
+    if active is None:
         return
 
-    # Sync active_layer_index so the UIList highlight follows the click.
     for i, layer in enumerate(mask.layers):
-        if layer.name == winner_name and mask.active_layer_index != i:
-            mask.active_layer_index = i
-            break
-
-    _tag_image_editors_redraw()
+        if layer == active:
+            if mask.active_layer_index != i:
+                print(f"[F2Sync] {active.name!r}: index {mask.active_layer_index} -> {i}")
+                mask.active_layer_index = i
+                _tag_image_editors_redraw()
+            return
 
 
 # ---------------------------------------------------------------------------
