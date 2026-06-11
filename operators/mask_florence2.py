@@ -116,14 +116,14 @@ def _bbox_to_mask(bbox, W: int, H: int):
     """Ideogram [y1,x1,y2,x2] 0-1000 → mask center + half-sizes.
 
     Blender mask coordinate space (observed):
-      X: centred at 0, range [-aspect/2, +aspect/2]  (aspect = W/H)
-      Y: lower-left origin, range [0, 1] with 1 = top
+      X: (x/1000 - 0.5)*aspect + 0.5  →  range [0.5-aspect/2, 0.5+aspect/2]
+      Y: 1 - y/1000                   →  lower-left origin, range [0, 1]
     Ideogram y=0 is the image TOP, so Y must be flipped.
     """
     y1, x1, y2, x2 = bbox
     aspect = W / H if H else 1.0
-    cx = ((x1 + x2) / 2 / 1000 - 0.5) * aspect   # X centred at 0, range [-aspect/2, +aspect/2]
-    cy = 1.0 - (y1 + y2) / 2 / 1000              # Y lower-left origin, range [0, 1]
+    cx = ((x1 + x2) / 2 / 1000 - 0.5) * aspect + 0.5   # X: centred+aspect, then +0.5 offset
+    cy = 1.0 - (y1 + y2) / 2 / 1000                    # Y: lower-left origin [0, 1]
     hx = (x2 - x1) / 1000 / 2 * aspect
     hy = (y2 - y1) / 1000 / 2
     return cx, cy, hx, hy
@@ -137,8 +137,8 @@ def _spline_to_bbox(spline, W: int, H: int):
         return [0, 0, 1000, 1000]
     xs = [p[0] for p in pts]
     ys = [p[1] for p in pts]
-    x1 = round((min(xs) / aspect + 0.5) * 1000)
-    x2 = round((max(xs) / aspect + 0.5) * 1000)
+    x1 = round(((min(xs) - 0.5) / aspect + 0.5) * 1000)
+    x2 = round(((max(xs) - 0.5) / aspect + 0.5) * 1000)
     y1 = round((1.0 - max(ys)) * 1000)
     y2 = round((1.0 - min(ys)) * 1000)
     clamp = lambda v: max(0, min(1000, v))
