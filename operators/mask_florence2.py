@@ -184,14 +184,11 @@ def apply_florence_json_to_mask(json_str: str, source_image_path: str) -> None:
     mp.f2_background = data.get("compositional_deconstruction", {}).get("background", "")
     mp.f2_style_json = json.dumps(data.get("style_description", {}), ensure_ascii=False)
 
-    # --- Remove stale Florence layers (identified via f2_layers_json) ---
-    old_data = _get_layers_data(mask)
-    removed = 0
-    for layer in list(mask.layers):
-        if layer.name in old_data:
-            mask.layers.remove(layer)
-            removed += 1
-    print(f"[Florence2Mask] Removed {removed} stale layer(s)")
+    # --- Clear all layers (this mask is Florence-2 owned) ---
+    existing = list(mask.layers)
+    for layer in existing:
+        mask.layers.remove(layer)
+    print(f"[Florence2Mask] Cleared {len(existing)} existing layer(s)")
 
     # --- Add one layer per element; build new layers dict ---
     new_layers_data = {}
@@ -251,7 +248,7 @@ def apply_florence_json_to_mask(json_str: str, source_image_path: str) -> None:
     _set_layers_data(mask, new_layers_data)
 
     if mask.layers:
-        mask.layers.active_index = 0
+        mask.layers.active = mask.layers[0]
 
     print(f"[Florence2Mask] Created {len(new_layers_data)} layer(s) in mask {mask_name!r}")
 
