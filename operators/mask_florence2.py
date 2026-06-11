@@ -312,6 +312,16 @@ def _open_mask_in_editor(mask, img) -> None:
             print(f"[Florence2Mask] Set mask in editor: {mask.name!r}")
         except Exception as exc:
             print(f"[Florence2Mask] Could not set mask: {exc}")
+
+        # Fit the view so the image fills the editor with masks overlaid
+        try:
+            region = next((r for r in image_ed.regions if r.type == "WINDOW"), None)
+            if region:
+                with bpy.context.temp_override(window=window, area=image_ed, region=region):
+                    bpy.ops.image.view_all(fit_view=True)
+                print("[Florence2Mask] View fitted to image")
+        except Exception as exc:
+            print(f"[Florence2Mask] view_all failed: {exc}")
         return
 
 
