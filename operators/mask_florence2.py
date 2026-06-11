@@ -113,28 +113,31 @@ def _layer_name(elem_type: str, desc: str, text: str) -> str:
 # ---------------------------------------------------------------------------
 
 def _bbox_to_mask(bbox, W: int, H: int):
-    """Ideogram [y1,x1,y2,x2] 0-1000 → mask center + half-sizes."""
+    """Ideogram [y1,x1,y2,x2] 0-1000 → mask UV center + half-sizes.
+
+    Blender mask UV space: origin (0,0) = image lower-left, (1,1) = upper-right.
+    Ideogram y=0 is the TOP of the image, so Y must be flipped.
+    No aspect-ratio adjustment — both axes are plain [0,1] UV.
+    """
     y1, x1, y2, x2 = bbox
-    aspect = W / H if H else 1.0
-    cx = ((x1 + x2) / 2 / 1000 - 0.5) * aspect
-    cy = -((y1 + y2) / 2 / 1000 - 0.5)
-    hx = (x2 - x1) / 1000 / 2 * aspect
+    cx = (x1 + x2) / 2 / 1000
+    cy = 1.0 - (y1 + y2) / 2 / 1000   # flip: Ideogram y=0 → UV y=1 (top)
+    hx = (x2 - x1) / 1000 / 2
     hy = (y2 - y1) / 1000 / 2
     return cx, cy, hx, hy
 
 
 def _spline_to_bbox(spline, W: int, H: int):
-    """Live spline corners → [y1,x1,y2,x2] 0-1000."""
-    aspect = W / H if H else 1.0
+    """Live spline corners → Ideogram [y1,x1,y2,x2] 0-1000."""
     pts = [p.co for p in spline.points]
     if not pts:
         return [0, 0, 1000, 1000]
     xs = [p[0] for p in pts]
     ys = [p[1] for p in pts]
-    x1 = round((min(xs) / aspect + 0.5) * 1000)
-    x2 = round((max(xs) / aspect + 0.5) * 1000)
-    y1 = round((-max(ys) + 0.5) * 1000)
-    y2 = round((-min(ys) + 0.5) * 1000)
+    x1 = round(min(xs) * 1000)
+    x2 = round(max(xs) * 1000)
+    y1 = round((1.0 - max(ys)) * 1000)   # flip back
+    y2 = round((1.0 - min(ys)) * 1000)
     clamp = lambda v: max(0, min(1000, v))
     return [clamp(y1), clamp(x1), clamp(y2), clamp(x2)]
 
