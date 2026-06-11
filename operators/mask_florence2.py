@@ -531,6 +531,21 @@ class FLORENCE2_OT_export_strip(Operator):
 
 
 # ---------------------------------------------------------------------------
+# Msgbus: redraw Image Editor when active mask layer changes
+# ---------------------------------------------------------------------------
+
+_msgbus_owner = object()
+
+
+def _tag_image_editors_redraw():
+    """Force all Image Editor areas to redraw so the panel stays in sync."""
+    for window in bpy.context.window_manager.windows:
+        for area in window.screen.areas:
+            if area.type == "IMAGE_EDITOR":
+                area.tag_redraw()
+
+
+# ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
 
@@ -548,10 +563,21 @@ def register():
         bpy.utils.register_class(cls)
         print(f"[Florence2Mask]   {cls.__name__}")
     bpy.types.Mask.florence2_props = PointerProperty(type=Florence2MaskProps)
+
+    # Subscribe to active_layer_index changes on any Mask so the panel
+    # updates when the user clicks a spline handle (slide_spline_curvature
+    # and similar operators change active_layer_index before the panel redraws).
+    bpy.msgbus.subscribe_rna(
+        key=(bpy.types.Mask, "active_layer_index"),
+        owner=_msgbus_owner,
+        args=(),
+        notify=_tag_image_editors_redraw,
+    )
     print("[Florence2Mask] Registration complete")
 
 
 def unregister():
+    bpy.msgbus.clear_by_owner(_msgbus_owner)
     if hasattr(bpy.types.Mask, "florence2_props"):
         del bpy.types.Mask.florence2_props
     for cls in reversed(classes):
