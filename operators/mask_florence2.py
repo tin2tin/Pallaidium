@@ -258,7 +258,7 @@ def apply_florence_json_to_mask(json_str: str, source_image_path: str) -> None:
         print(f"[Florence2Mask]   {actual_name!r}  {elem_type}  {bbox}")
 
     if mask.layers:
-        mask.layers.active = mask.layers[0]
+        mask.active_layer_index = 0
 
     _open_mask_in_editor(mask, img)
     print(f"[Florence2Mask] Done — {len(elements)} layer(s) in {mask_name!r}")
@@ -367,8 +367,9 @@ class FLORENCE2_PT_mask_panel(Panel):
         box.label(text="Background:")
         box.prop(mp, "f2_background", text="")
 
-        # ── Active layer ─────────────────────────────────────────────────────
-        active = mask.layers.active
+        # ── Active layer — use active_layer_index for reliable sync ──────────
+        idx = getattr(mask, "active_layer_index", 0)
+        active = mask.layers[idx] if mask.layers and 0 <= idx < len(mask.layers) else None
         if active is None:
             layout.separator()
             layout.operator("florence2.export_strip", icon="SEQUENCE")
