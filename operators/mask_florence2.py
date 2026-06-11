@@ -531,9 +531,11 @@ def _select_all_points_on_active_layer():
     try:
         has_em = hasattr(bpy.context, "edit_mask")
         mask = bpy.context.edit_mask if has_em else None
+        print(f"[F2SelectAll] has_em={has_em} mask={getattr(mask,'name',None)!r}")
         if not mask:
             return
         active = mask.layers.active
+        print(f"[F2SelectAll] active={getattr(active,'name',None)!r} idx={mask.active_layer_index}")
         if not active:
             return
         # Deselect all points on every layer, then select all on the active one
@@ -544,9 +546,10 @@ def _select_all_points_on_active_layer():
                     point.select_control_point = sel
                     point.select_left_handle  = sel
                     point.select_right_handle = sel
+        print(f"[F2SelectAll] selected all points of {active.name!r}")
         _tag_image_editors_redraw()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[F2SelectAll] ERROR: {e}")
 
 
 _last_selection_state = None
@@ -567,6 +570,7 @@ def _depsgraph_handler(scene, depsgraph=None):
 
     # Method A: active_point on active layer (fastest, set by Blender on click)
     active_layer = mask.layers.active
+    print(f"[F2Handler] active_layer={getattr(active_layer,'name',None)!r} active_point={getattr(active_layer.splines if active_layer else None,'active_point',None)!r}")
     if active_layer:
         active_spline = active_layer.splines.active
         active_point  = active_layer.splines.active_point
@@ -605,8 +609,11 @@ def _depsgraph_handler(scene, depsgraph=None):
                             "is_active":  False,
                         })
 
+    print(f"[F2Handler] current_selection={[(d['layer_name'],d['is_active']) for d in current_selection]} last={[(d['layer_name'],d['is_active']) for d in (_last_selection_state or [])]}")
+
     # Only act when selection actually changed
     if current_selection == _last_selection_state:
+        print("[F2Handler] no change, skipping")
         return
     _last_selection_state = current_selection
 
@@ -618,8 +625,10 @@ def _depsgraph_handler(scene, depsgraph=None):
         (d["layer_name"] for d in current_selection if d["is_active"]),
         current_selection[0]["layer_name"],
     )
+    print(f"[F2Handler] winner={winner!r} current idx={mask.active_layer_index}")
     for i, layer in enumerate(mask.layers):
         if layer.name == winner and mask.active_layer_index != i:
+            print(f"[F2Handler] writing active_layer_index {mask.active_layer_index} -> {i}")
             mask.active_layer_index = i
             break
 
