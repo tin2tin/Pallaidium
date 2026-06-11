@@ -526,77 +526,49 @@ def _tag_image_editors_redraw():
         pass
 
 
-_last_selection_state = None
-
-
 @bpy.app.handlers.persistent
 def _depsgraph_handler(scene, depsgraph=None):
     """Sync active_layer_index from point selection; redraw mask panel."""
-    global _last_selection_state
-
-    # bpy.context.edit_mask is the live editable mask — not the evaluated copy
-    # from update.id.  The context attribute is populated whenever a mask editor
-    # is active, and depsgraph handlers run with the proper window context.
     if not hasattr(bpy.context, "edit_mask"):
         return
     mask = bpy.context.edit_mask
     if not mask:
         return
 
-    current_selection = []
+    winner_name = None
 
     # --- Method A: active_point on the active layer (fastest path) ---
     active_layer = mask.layers.active
     if active_layer:
-        active_spline = active_layer.splines.active
-        active_point  = active_layer.splines.active_point
-        if active_point and active_spline:
-            try:
-                sp_idx = list(active_layer.splines).index(active_spline)
-                pt_idx = list(active_spline.points).index(active_point)
-                current_selection.append({
-                    "layer_name": active_layer.name,
-                    "spline_idx": sp_idx,
-                    "point_idx":  pt_idx,
-                    "is_active":  True,
-                })
-            except ValueError:
-                pass
+        active_point = active_layer.splines.active_point
+        if active_point:
+            winner_name = active_layer.name
 
     # --- Method B: scan all points for select flags ---
-    for layer in mask.layers:
-        if layer.hide:
-            continue
-        for sp_idx, spline in enumerate(layer.splines):
-            for pt_idx, point in enumerate(spline.points):
-                if (point.select_control_point or
-                        point.select_left_handle or
-                        point.select_right_handle):
-                    if not any(
-                        item["layer_name"] == layer.name and
-                        item["spline_idx"] == sp_idx and
-                        item["point_idx"]  == pt_idx
-                        for item in current_selection
-                    ):
-                        current_selection.append({
-                            "layer_name": layer.name,
-                            "spline_idx": sp_idx,
-                            "point_idx":  pt_idx,
-                            "is_active":  False,
-                        })
-
-    if current_selection == _last_selection_state:
-        return
-    _last_selection_state = current_selection
-
-    # Sync active_layer_index to the first selected layer so the UIList
-    # highlight follows the spline/point click.
-    if current_selection:
-        winner = current_selection[0]["layer_name"]
-        for i, layer in enumerate(mask.layers):
-            if layer.name == winner and mask.active_layer_index != i:
-                mask.active_layer_index = i
+    if winner_name is None:
+        for layer in mask.layers:
+            if layer.hide:
+                continue
+            for spline in layer.splines:
+                for point in spline.points:
+                    if (point.select_control_point or
+                            point.select_left_handle or
+                            point.select_right_handle):
+                        winner_name = layer.name
+                        break
+                if winner_name:
+                    break
+            if winner_name:
                 break
+
+    if winner_name is None:
+        return
+
+    # Sync active_layer_index so the UIList highlight follows the click.
+    for i, layer in enumerate(mask.layers):
+        if layer.name == winner_name and mask.active_layer_index != i:
+            mask.active_layer_index = i
+            break
 
     _tag_image_editors_redraw()
 
