@@ -56,6 +56,10 @@ class LTX2_3MultiPlugin(ModelPlugin):
     REQUIRED_PACKAGES =["torch", "torchaudio", "soundfile", "av", "diffusers", "transformers", "sdnq"]
     supports_inpaint  = False
 
+    def draw_custom_ui(self, col, context) -> bool:
+        col.prop(context.scene, "ltx23m_modality_scale", text="Audio Influence (Modality Scale)")
+        return False
+
     def load(self, prefs, scene, **kw):
         return {"pipe": None, "refiner": None, "last_model_card": self.MODEL_ID}
 
@@ -69,6 +73,7 @@ class LTX2_3MultiPlugin(ModelPlugin):
         # print(f"  inputs.prompt     = {inputs.prompt!r}")
         # print(f"  inputs.neg_prompt = {inputs.neg_prompt!r}")
         # print(f"  inputs.image      = {'<PIL Image>' if inputs.image is not None else None}")
+        # print(f"  inputs.last_image = {'<PIL Image>' if getattr(inputs,'last_image',None) is not None else None}")
         # print(f"  inputs.video_path = {inputs.video_path!r}")
         # print(f"  inputs.audio_ref  = {inputs.audio_ref!r}")
         # print(f"  inputs.width      = {inputs.width}, inputs.height = {inputs.height}")
@@ -100,6 +105,7 @@ class LTX2_3MultiPlugin(ModelPlugin):
 
         seed = inputs.seed or torch.randint(0, 2**32, (1,)).item()
         generator = torch.Generator(device="cpu").manual_seed(seed)
+        _modality_scale = getattr(scene, "ltx23m_modality_scale", 1.5)
 
         def _flush():
             gc.collect()
@@ -408,9 +414,12 @@ class LTX2_3MultiPlugin(ModelPlugin):
         if audio_conditions is not None:
             stage1_kw["audio_conditions"] = audio_conditions
 
-        # Gentle Guidance overrides. Excludes destructive audio modalities overrides
+        # With guidance_scale=1.0 (distilled), audio_cfg_delta=0 always.
+        # modality_scale>1 triggers do_modality_isolation_guidance — the only
+        # mechanism that actually amplifies audio's effect at distilled scale.
+        if audio_conditions is not None and _modality_scale != 1.0:
+            stage1_kw["modality_scale"] = _modality_scale
         if image_conditions is not None and audio_conditions is not None:
-            # print("[DEBUG] Image + Audio detected: Applying gentle alignment STG guidance.")
             stage1_kw["stg_scale"] = 1.0
             stage1_kw["spatio_temporal_guidance_blocks"] = [28]
             stage1_kw["guidance_rescale"] = 0.7
@@ -512,10 +521,12 @@ class LTX2_3MultiPlugin(ModelPlugin):
         
         if image_conditions is not None:
             refine_kw["image_conditions"] = image_conditions
-            
+
         if audio_conditions is not None:
             refine_kw["audio_conditions"] = audio_conditions
-            
+            if _modality_scale != 1.0:
+                refine_kw["modality_scale"] = _modality_scale
+
         if audio_latent is not None:
             refine_kw["audio_latents"] = audio_latent.to(onload_device, dtype=torch_dtype)
 

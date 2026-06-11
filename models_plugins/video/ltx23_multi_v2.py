@@ -58,11 +58,13 @@ class LTX2_3MultiV2Plugin(ModelPlugin):
 
     def draw_custom_ui(self, col, context) -> bool:
         scene = context.scene
-        col.prop(scene, "ltx23m_modality_scale")
-        col.prop(scene, "ltx23m_audio_guidance")
-        col.prop(scene, "ltx23m_audio_stg_scale")
-        col.prop(scene, "ltx23m_audio_modality_scale")
-        col.prop(scene, "ltx23m_audio_noise_scale")
+        col.prop(scene, "ltx23m_enable_guidance", toggle=True)
+        if scene.ltx23m_enable_guidance:
+            col.prop(scene, "ltx23m_modality_scale")
+            col.prop(scene, "ltx23m_audio_guidance")
+            col.prop(scene, "ltx23m_audio_stg_scale")
+            col.prop(scene, "ltx23m_audio_modality_scale")
+            col.prop(scene, "ltx23m_audio_noise_scale")
         return False
 
     @staticmethod
@@ -350,14 +352,20 @@ class LTX2_3MultiV2Plugin(ModelPlugin):
             guidance_scale=1.0, generator=generator,
             output_type="latent", return_dict=False,
             use_cross_timestep=True,
-            # V2: independent audio/modality guidance
-            modality_scale=_modality_scale,
-            audio_guidance_scale=_audio_guidance,
-            audio_stg_scale=_audio_stg_scale,
-            audio_modality_scale=_audio_modality_scale,
-            audio_noise_scale=_audio_noise_scale,
             callback_on_step_end=self.step_callback(inputs),
         )
+
+        # Only inject non-default V2 params so pipeline behaviour matches V1 at defaults
+        if _modality_scale != 1.0:
+            stage1_kw["modality_scale"] = _modality_scale
+        if _audio_guidance != 1.0:
+            stage1_kw["audio_guidance_scale"] = _audio_guidance
+        if _audio_stg_scale != 0.0:
+            stage1_kw["audio_stg_scale"] = _audio_stg_scale
+        if _audio_modality_scale != 1.0:
+            stage1_kw["audio_modality_scale"] = _audio_modality_scale
+        if _audio_noise_scale != 0.0:
+            stage1_kw["audio_noise_scale"] = _audio_noise_scale
 
         if image_conditions is not None:
             stage1_kw["image_conditions"] = image_conditions
@@ -380,7 +388,7 @@ class LTX2_3MultiV2Plugin(ModelPlugin):
             video_latent = outputs.detach().to(offload_device, copy=True)
             audio_latent = None
 
-        del pipe, transformer
+        del pipe, transformer, stage1_kw
         _flush()
 
         # ── Latent upsampling (2×) ──────────────────────────────────────────
@@ -432,13 +440,20 @@ class LTX2_3MultiV2Plugin(ModelPlugin):
             guidance_scale=1.0, generator=generator,
             output_type="latent", return_dict=False,
             use_cross_timestep=True,
-            modality_scale=_modality_scale,
-            audio_guidance_scale=_audio_guidance,
-            audio_stg_scale=_audio_stg_scale,
-            audio_modality_scale=_audio_modality_scale,
-            audio_noise_scale=_audio_noise_scale,
             callback_on_step_end=self.step_callback(inputs),
         )
+
+        # Only inject non-default V2 params so pipeline behaviour matches V1 at defaults
+        if _modality_scale != 1.0:
+            refine_kw["modality_scale"] = _modality_scale
+        if _audio_guidance != 1.0:
+            refine_kw["audio_guidance_scale"] = _audio_guidance
+        if _audio_stg_scale != 0.0:
+            refine_kw["audio_stg_scale"] = _audio_stg_scale
+        if _audio_modality_scale != 1.0:
+            refine_kw["audio_modality_scale"] = _audio_modality_scale
+        if _audio_noise_scale != 0.0:
+            refine_kw["audio_noise_scale"] = _audio_noise_scale
 
         if image_conditions is not None:
             refine_kw["image_conditions"] = image_conditions
@@ -457,7 +472,7 @@ class LTX2_3MultiV2Plugin(ModelPlugin):
             final_v = outputs2.detach().to(offload_device, copy=True)
             final_a = audio_latent
 
-        del refine_pipe, transformer2, up_latent, prompt_embeds, prompt_attention_mask
+        del refine_pipe, transformer2, up_latent, prompt_embeds, prompt_attention_mask, refine_kw
         _flush()
 
         # ── Decode ──────────────────────────────────────────────────────────

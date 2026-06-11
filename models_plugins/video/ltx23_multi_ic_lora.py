@@ -463,7 +463,7 @@ class LTX2_3MultiICLoRAPlugin(ModelPlugin):
             video_latent = outputs.detach().to(offload_device, copy=True)
             audio_latent = None
 
-        del pipe, transformer
+        del pipe, transformer, stage1_kw
         _flush()
 
         # ── Latent upsampling ───────────────────────────────────────────────
@@ -548,7 +548,7 @@ class LTX2_3MultiICLoRAPlugin(ModelPlugin):
             final_v = outputs2.detach().to(offload_device, copy=True)
             final_a = audio_latent
 
-        del refine_pipe, transformer2, up_latent, prompt_embeds, prompt_attention_mask
+        del refine_pipe, transformer2, up_latent, prompt_embeds, prompt_attention_mask, refine_kw
         _flush()
 
         # ── Decode ──────────────────────────────────────────────────────────

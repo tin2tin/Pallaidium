@@ -588,7 +588,8 @@ def register():
         max=9
     )
     # ltx23_multi_v2 — independent audio / modality guidance
-    bpy.types.Scene.ltx23m_modality_scale       = bpy.props.FloatProperty(name="Modality Scale",       default=1.0, min=0.0, max=5.0,  description="Cross-modal influence amplifier (1.0=off)")
+    bpy.types.Scene.ltx23m_enable_guidance      = bpy.props.BoolProperty( name="V2 Guidance",          default=False, description="Enable independent audio/modality guidance sliders")
+    bpy.types.Scene.ltx23m_modality_scale       = bpy.props.FloatProperty(name="Modality Scale",       default=1.5, min=1.0, max=5.0,  description="Audio-to-video influence. >1.0 enables modality isolation guidance; 1.5 is a good default")
     bpy.types.Scene.ltx23m_audio_guidance       = bpy.props.FloatProperty(name="Audio CFG",            default=1.0, min=0.0, max=10.0, description="Independent audio guidance scale")
     bpy.types.Scene.ltx23m_audio_stg_scale      = bpy.props.FloatProperty(name="Audio STG",            default=0.0, min=0.0, max=5.0,  description="Audio spatio-temporal guidance scale")
     bpy.types.Scene.ltx23m_audio_modality_scale = bpy.props.FloatProperty(name="Audio Modality Scale", default=1.0, min=0.0, max=5.0,  description="Audio cross-modal scale")
@@ -750,6 +751,12 @@ def register():
     if _reset_dep_state not in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.append(_reset_dep_state)
 
+    try:
+        from .operators.mask_florence2 import register as _mf_register
+        _mf_register()
+    except Exception as _mfe:
+        print(f"[Pallaidium] mask_florence2 register failed: {_mfe}")
+
 def _reset_dep_state(_=None):
     """Clear stale dep-install runtime flags on every startup/file-load.
 
@@ -832,6 +839,11 @@ def _reset_queue_state(_=None):
 
 
 def unregister():
+    try:
+        from .operators.mask_florence2 import unregister as _mf_unregister
+        _mf_unregister()
+    except Exception:
+        pass
     if _restore_model_selections in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.remove(_restore_model_selections)
     if _reset_queue_state in bpy.app.handlers.load_post:
@@ -889,6 +901,9 @@ def unregister():
     for _prop in ("klein_schematic_mode", "klein_schematic_target"):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
+    for _prop in ("florence2_mode", "florence2_send_to_mask"):
+        if hasattr(bpy.types.Scene, _prop):
+            delattr(bpy.types.Scene, _prop)
     for _prop in ("marlin_mode", "marlin_find_query", "marlin_last_query"):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
@@ -905,6 +920,7 @@ def unregister():
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
     for _prop in (
+        "ltx23m_enable_guidance",
         "ltx23m_modality_scale", "ltx23m_audio_guidance", "ltx23m_audio_stg_scale",
         "ltx23m_audio_modality_scale", "ltx23m_audio_noise_scale", "ltx23m_audio_start_time",
         "ltx23ic_control_strip", "ltx23ic_control_strength", "ltx23ic_control_downscale",
