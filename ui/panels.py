@@ -459,6 +459,8 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
 
         if type == "image":
             col.prop(addon_prefs, "image_model_card", text=" ")
+            if plugin.__class__.__name__ == "Ideogram4Plugin":
+                col.operator("florence2.open_box_editor", text="Open Box Editor", icon="MOD_MASK")
             from ..models.base import InputSpec as _InputSpec
             if plugin is not None and _InputSpec.HF_TOKEN in plugin.INPUTS:
                 row = col.row(align=True)

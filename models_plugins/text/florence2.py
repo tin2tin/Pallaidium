@@ -15,6 +15,12 @@ try:
             ],
             default="CAPTION",
         )
+    if not hasattr(_bpy.types.Scene, "florence2_send_to_mask"):
+        _bpy.types.Scene.florence2_send_to_mask = _bpy.props.BoolProperty(
+            name="Send to Mask Editor",
+            description="After generation, open result as mask layers in the Image Editor",
+            default=False,
+        )
 except Exception:
     pass
 
@@ -50,6 +56,9 @@ class Florence2Plugin(ModelPlugin):
 
     def draw_custom_ui(self, col, context) -> bool:
         col.prop(context.scene, "florence2_mode", expand=True)
+        if context.scene.florence2_mode == "IDEOGRAM4":
+            col.prop(context.scene, "florence2_send_to_mask", text="Send to Box Editor")
+            col.operator("florence2.open_box_editor", text="Open Box Editor", icon="MOD_MASK")
         return False
 
     # ------------------------------------------------------------------

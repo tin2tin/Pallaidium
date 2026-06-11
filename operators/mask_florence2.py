@@ -20,7 +20,7 @@ import os
 import bpy
 from bpy.props import (
     BoolProperty, CollectionProperty, EnumProperty,
-    IntProperty, PointerProperty, StringProperty,
+    FloatVectorProperty, PointerProperty, StringProperty,
 )
 from bpy.types import Operator, Panel, PropertyGroup
 
@@ -38,8 +38,23 @@ class Florence2LayerData(PropertyGroup):
     )
     f2_desc:  StringProperty(name="Description")
     f2_text:  StringProperty(name="Text Content")
-    f2_color: StringProperty(name="Color")
-    f2_font:  StringProperty(name="Font")
+    f2_color: FloatVectorProperty(
+        name="Color",
+        subtype="COLOR",
+        size=4,
+        min=0.0, max=1.0,
+        default=(1.0, 1.0, 1.0, 1.0),
+    )
+    f2_font:  EnumProperty(
+        name="Font Size",
+        items=[
+            ("small",  "Small",  "Small / caption text  (< 3 % of image height)"),
+            ("medium", "Medium", "Medium body text (3 – 7 % of image height)"),
+            ("large",  "Large",  "Large heading text (7 – 15 % of image height)"),
+            ("huge",   "Huge",   "Headline / display text (> 15 % of image height)"),
+        ],
+        default="small",
+    )
     f2_bbox:  StringProperty(name="BBox JSON", default="[0,0,1000,1000]")
 
 
@@ -72,14 +87,66 @@ def _add_layer_data(mask, layer_name: str, elem: dict) -> "Florence2LayerData":
     item.f2_type  = elem.get("type",  "obj")
     item.f2_desc  = elem.get("desc",  "")
     item.f2_text  = elem.get("text",  "")
-    item.f2_color = elem.get("color", "")
-    item.f2_font  = elem.get("font",  "")
+    item.f2_color = _parse_color_string(elem.get("color", ""))
+    item.f2_font  = _FONT_ALIAS_MAP.get((elem.get("font") or "").strip().lower(), "small")
     item.f2_bbox  = json.dumps(elem.get("bbox", [0, 0, 1000, 1000]))
     return item
 
 
 def _clear_layer_data(mask) -> None:
     mask.florence2_props.f2_layers.clear()
+
+
+# ---------------------------------------------------------------------------
+# Color helpers
+# ---------------------------------------------------------------------------
+
+_CSS_NAMED_COLORS = {
+    "red":     (1.000, 0.000, 0.000), "green":   (0.000, 0.502, 0.000),
+    "blue":    (0.000, 0.000, 1.000), "white":   (1.000, 1.000, 1.000),
+    "black":   (0.000, 0.000, 0.000), "yellow":  (1.000, 1.000, 0.000),
+    "orange":  (1.000, 0.647, 0.000), "purple":  (0.502, 0.000, 0.502),
+    "pink":    (1.000, 0.753, 0.796), "gray":    (0.502, 0.502, 0.502),
+    "grey":    (0.502, 0.502, 0.502), "cyan":    (0.000, 1.000, 1.000),
+    "magenta": (1.000, 0.000, 1.000), "brown":   (0.647, 0.165, 0.165),
+    "silver":  (0.753, 0.753, 0.753), "gold":    (1.000, 0.843, 0.000),
+}
+
+_FONT_ALIAS_MAP = {
+    "small":  "small",
+    "medium": "medium",
+    "large":  "large",
+    "huge":   "huge",
+}
+
+
+def _parse_color_string(color_str: str) -> tuple:
+    """Parse a CSS hex or named color to an (r, g, b, 1.0) float tuple."""
+    s = (color_str or "").strip()
+    if s.startswith("#"):
+        h = s[1:]
+        try:
+            if len(h) == 3:
+                r, g, b = (int(c + c, 16) / 255 for c in h)
+            elif len(h) == 6:
+                r = int(h[0:2], 16) / 255
+                g = int(h[2:4], 16) / 255
+                b = int(h[4:6], 16) / 255
+            else:
+                return (1.0, 1.0, 1.0, 1.0)
+            return (r, g, b, 1.0)
+        except ValueError:
+            pass
+    rgb = _CSS_NAMED_COLORS.get(s.lower())
+    if rgb:
+        return (rgb[0], rgb[1], rgb[2], 1.0)
+    return (1.0, 1.0, 1.0, 1.0)
+
+
+def _color_to_hex(rgba) -> str:
+    """Convert an (r, g, b[, a]) float tuple to a #RRGGBB hex string."""
+    r, g, b = (max(0, min(255, round(c * 255))) for c in rgba[:3])
+    return f"#{r:02X}{g:02X}{b:02X}"
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +248,16 @@ def apply_florence_json_to_mask(json_str: str, source_image_path: str) -> None:
     try:
         data = json.loads(json_str)
     except Exception as exc:
-        print(f"[Florence2Mask] JSON parse error: {exc}")
+        msg = f"JSON parse error: {exc}"
+        print(f"[Florence2Mask] {msg}")
+        try:
+            bpy.context.window_manager.popup_menu(
+                lambda self, _: self.layout.label(text=msg, icon="ERROR"),
+                title="Box Editor — Invalid JSON",
+                icon="ERROR",
+            )
+        except Exception:
+            pass
         return
 
     elements = data.get("compositional_deconstruction", {}).get("elements", [])
@@ -251,6 +327,9 @@ def apply_florence_json_to_mask(json_str: str, source_image_path: str) -> None:
             pt.co           = (px, py)
             pt.handle_left  = (px, py)
             pt.handle_right = (px, py)
+            pt.select_control_point = False
+            pt.select_left_handle   = False
+            pt.select_right_handle  = False
             try:
                 pt.handle_type = "VECTOR"
             except AttributeError:
@@ -276,13 +355,17 @@ def _open_mask_in_editor(mask, img) -> None:
         image_ed = next((a for a in areas if a.type == "IMAGE_EDITOR"), None)
 
         if image_ed is None:
-            target = next(
-                (a for a in areas
-                 if a.type == "SEQUENCE_EDITOR"
-                 and hasattr(a.spaces[0], "view_type")
-                 and a.spaces[0].view_type == "PREVIEW"),
-                None,
-            ) or next((a for a in areas if a.type == "SEQUENCE_EDITOR"), None)
+            target = (
+                next(
+                    (a for a in areas
+                     if a.type == "SEQUENCE_EDITOR"
+                     and hasattr(a.spaces[0], "view_type")
+                     and a.spaces[0].view_type == "PREVIEW"),
+                    None,
+                )
+                or next((a for a in areas if a.type == "SEQUENCE_EDITOR"), None)
+                or next((a for a in areas if a.type == "TEXT_EDITOR"), None)
+            )
 
             if target is None:
                 print("[Florence2Mask] No suitable area to split — open Image Editor manually.")
@@ -312,8 +395,8 @@ def _open_mask_in_editor(mask, img) -> None:
             try:
                 space.image = img
                 print(f"[Florence2Mask] Background image: {img.name!r}")
-            except Exception as exc:
-                print(f"[Florence2Mask] Could not set image: {exc}")
+            except Exception:
+                pass
         try:
             space.mask = mask
             print(f"[Florence2Mask] Mask set: {mask.name!r}")
@@ -328,6 +411,21 @@ def _open_mask_in_editor(mask, img) -> None:
                 print("[Florence2Mask] View fitted")
         except Exception as exc:
             print(f"[Florence2Mask] view_all failed: {exc}")
+
+        # Switch N-panel to the Box Editor tab
+        try:
+            ui_region = next((r for r in image_ed.regions if r.type == "UI"), None)
+            if ui_region:
+                with bpy.context.temp_override(window=window, area=image_ed, region=ui_region):
+                    bpy.ops.wm.context_set_string(
+                        data_path="space_data.active_panel_category",
+                        value="Box Editor",
+                    )
+                # Make the N-panel visible
+                space.show_region_ui = True
+                print("[Florence2Mask] Box Editor tab selected")
+        except Exception as exc:
+            print(f"[Florence2Mask] Tab switch failed: {exc}")
         return
 
 
@@ -336,10 +434,10 @@ def _open_mask_in_editor(mask, img) -> None:
 # ---------------------------------------------------------------------------
 
 class FLORENCE2_PT_mask_panel(Panel):
-    bl_label       = "Florence-2"
+    bl_label       = "Box Editor"
     bl_space_type  = "IMAGE_EDITOR"
     bl_region_type = "UI"
-    bl_category    = "Florence-2"
+    bl_category    = "Box Editor"
 
     def draw(self, context):
         layout = self.layout
@@ -348,14 +446,14 @@ class FLORENCE2_PT_mask_panel(Panel):
         if getattr(space, "mode", "") != "MASK":
             col = layout.column(align=True)
             col.label(text="Switch Image Editor to Mask mode,", icon="INFO")
-            col.label(text="or run Florence-2 Ideogram 4")
-            col.label(text="from the Generate panel.")
+            col.label(text="or use the button below:")
+            col.operator("florence2.open_box_editor", text="Open Box Editor", icon="MOD_MASK")
             return
 
         mask = getattr(space, "mask", None)
         if mask is None:
-            layout.label(text="Run Florence-2 Ideogram 4", icon="INFO")
-            layout.label(text="from the Generate panel.")
+            layout.label(text="No Box Editor mask active.", icon="INFO")
+            layout.operator("florence2.open_box_editor", text="New Box Editor Mask", icon="ADD")
             return
 
         mp = mask.florence2_props
@@ -363,9 +461,9 @@ class FLORENCE2_PT_mask_panel(Panel):
         # ── Scene-level description ──────────────────────────────────────────
         box = layout.box()
         box.label(text="Scene", icon="SCENE_DATA")
-        box.prop(mp, "f2_high_level_description", text="")
+        box.textbox(mp, "f2_high_level_description", placeholder="Scene description...")
         box.label(text="Background:")
-        box.prop(mp, "f2_background", text="")
+        box.textbox(mp, "f2_background", placeholder="Background description...")
 
         layout.separator()
 
@@ -379,7 +477,7 @@ class FLORENCE2_PT_mask_panel(Panel):
 
         # Layer stack operator toolbar
         row = layout.row(align=True)
-        row.operator("mask.layer_new",    text="", icon="ADD")
+        row.operator("florence2.layer_new_with_square", text="", icon="ADD")
         row.operator("mask.layer_remove", text="", icon="REMOVE")
         row.separator()
         row.operator("mask.layer_move", text="", icon="TRIA_UP").direction   = "UP"
@@ -406,23 +504,20 @@ class FLORENCE2_PT_mask_panel(Panel):
             except TypeError:
                 pass
 
-        # ── Florence-2 metadata ──────────────────────────────────────────────
+        # ── Florence-2 metadata (same box) ───────────────────────────────────
         ld = _get_layer_data(active, mask)
         if ld:
-            layout.separator()
-            fbox = layout.box()
-            fbox.label(text="Florence-2 Metadata", icon="NODE_COMPOSITING")
-            fbox.prop(ld, "f2_type", text="Type")
-            fbox.label(text="Description:")
-            fbox.prop(ld, "f2_desc", text="")
+            box.prop(ld, "f2_type", text="Type")
+            box.label(text="Description:")
+            box.textbox(ld, "f2_desc", placeholder="Object description...")
             if ld.f2_type == "text":
-                fbox.label(text="Text Content:")
-                fbox.prop(ld, "f2_text", text="")
-                row = fbox.row(align=True)
-                row.prop(ld, "f2_color", text="Color")
-                row.prop(ld, "f2_font",  text="Font")
+                box.label(text="Text Content:")
+                box.textbox(ld, "f2_text", placeholder="Text content...")
+                row = box.row(align=True)
+                row.prop(ld, "f2_font",  text="Font Size")
+                row.prop(ld, "f2_color", text="")
         else:
-            layout.label(text="(Non-Florence layer)", icon="INFO")
+            box.label(text="(Non-Florence layer)", icon="INFO")
 
         layout.separator()
         layout.operator("florence2.export_strip", icon="SEQUENCE")
@@ -463,7 +558,7 @@ class FLORENCE2_OT_export_strip(Operator):
             elem = {"type": ld.f2_type, "bbox": bbox, "desc": ld.f2_desc}
             if ld.f2_type == "text":
                 elem["text"]  = ld.f2_text
-                elem["color"] = ld.f2_color
+                elem["color"] = _color_to_hex(ld.f2_color)
                 elem["font"]  = ld.f2_font
             elements.append(elem)
 
@@ -506,6 +601,159 @@ class FLORENCE2_OT_export_strip(Operator):
         return {"FINISHED"}
 
 
+class FLORENCE2_OT_layer_new_with_square(Operator):
+    bl_idname      = "florence2.layer_new_with_square"
+    bl_label       = "New Box Layer"
+    bl_description = "Add a new Box Editor layer with a centered square spline"
+    bl_options     = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        space = getattr(context, "space_data", None)
+        if not space or space.type != "IMAGE_EDITOR":
+            return False
+        return getattr(space, "mask", None) is not None
+
+    def execute(self, context):
+        global _last_active_layer_name
+
+        space = context.space_data
+        mask  = space.mask
+        img   = getattr(space, "image", None)
+        W     = img.size[0] if img else 1920
+        H     = img.size[1] if img else 1080
+
+        layer = mask.layers.new(name="New Layer")
+
+        # Register Box Editor metadata BEFORE activating the layer, so the
+        # depsgraph handler never sees it without f2_layers data.
+        _add_layer_data(mask, layer.name, {
+            "type": "obj", "desc": "", "text": "",
+            "color": "", "font": "", "bbox": [400, 400, 600, 600],
+        })
+
+        try:
+            layer.fill_color = (0.2, 0.8, 0.2, 0.5)
+        except AttributeError:
+            pass
+
+        # Suppress the depsgraph handler's "active layer changed" branch for
+        # this activation — the metadata already exists so no extra sync needed.
+        _last_active_layer_name = layer.name
+
+        for i, lyr in enumerate(mask.layers):
+            if lyr == layer:
+                mask.active_layer_index = i
+                break
+
+        # Centered square: bbox [y1,x1,y2,x2] = [400,400,600,600] on 0-1000 scale
+        cx, cy, hx, hy = _bbox_to_mask([400, 400, 600, 600], W, H)
+        hx = max(hx, 0.001)
+        hy = max(hy, 0.001)
+
+        spline = layer.splines.new()
+        spline.use_cyclic = True
+        spline.points.add(3)
+        corners = [
+            (cx - hx, cy - hy),
+            (cx + hx, cy - hy),
+            (cx + hx, cy + hy),
+            (cx - hx, cy + hy),
+        ]
+        for i, (px, py) in enumerate(corners):
+            pt = spline.points[i]
+            pt.co           = (px, py)
+            pt.handle_left  = (px, py)
+            pt.handle_right = (px, py)
+            pt.select_control_point = False
+            pt.select_left_handle   = False
+            pt.select_right_handle  = False
+            try:
+                pt.handle_type = "VECTOR"
+            except AttributeError:
+                pass
+
+        return {"FINISHED"}
+
+
+class FLORENCE2_OT_open_box_editor(Operator):
+    bl_idname      = "florence2.open_box_editor"
+    bl_label       = "Open Box Editor"
+    bl_description = "Open (or switch) an Image Editor to Box Editor / Mask mode"
+
+    def execute(self, context):
+        # Reuse or create the mask ──────────────────────────────────────────
+        mask = None
+
+        # 1. Active Image Editor in MASK mode already has one?
+        for window in context.window_manager.windows:
+            for area in window.screen.areas:
+                if area.type == "IMAGE_EDITOR":
+                    sp = area.spaces[0]
+                    if getattr(sp, "mode", "") == "MASK" and getattr(sp, "mask", None):
+                        mask = sp.mask
+                        break
+            if mask:
+                break
+
+        # 2. Any Image Editor at all has a mask?
+        if not mask:
+            for window in context.window_manager.windows:
+                for area in window.screen.areas:
+                    if area.type == "IMAGE_EDITOR":
+                        sp = area.spaces[0]
+                        if getattr(sp, "mask", None):
+                            mask = sp.mask
+                            break
+                if mask:
+                    break
+
+        # 3. Any mask already in bpy.data.masks?
+        if not mask and bpy.data.masks:
+            mask = bpy.data.masks[0]
+
+        # 4. Create a fresh "Box Editor" mask and initialise its props
+        if not mask:
+            mask = bpy.data.masks.new(name="Box Editor")
+            mp = mask.florence2_props
+            mp.f2_high_level_description = ""
+            mp.f2_background             = ""
+            mp.f2_style_json             = "{}"
+            print("[BoxEditor] Created new mask 'Box Editor' with florence2_props")
+
+        # Open it in an Image Editor area ──────────────────────────────────
+        _open_mask_in_editor(mask, None)
+        return {"FINISHED"}
+
+
+class FLORENCE2_OT_text_to_box_editor(Operator):
+    bl_idname      = "florence2.text_to_box_editor"
+    bl_label       = "Text to Box Editor"
+    bl_description = "Parse the current text block as Ideogram 4 JSON and send it to the Box Editor"
+
+    @classmethod
+    def poll(cls, context):
+        return (
+            getattr(context, "area", None) is not None
+            and context.area.type == "TEXT_EDITOR"
+            and getattr(context.space_data, "text", None) is not None
+        )
+
+    def execute(self, context):
+        text_block = context.space_data.text
+        json_str = text_block.as_string()
+        if not json_str.strip():
+            self.report({"WARNING"}, "Text block is empty.")
+            return {"CANCELLED"}
+        apply_florence_json_to_mask(json_str, "")
+        return {"FINISHED"}
+
+
+def _text_menu_draw(self, context):
+    self.layout.operator("florence2.text_to_box_editor")
+
+
+
 # ---------------------------------------------------------------------------
 # Panel sync helpers
 # ---------------------------------------------------------------------------
@@ -526,51 +774,146 @@ def _tag_image_editors_redraw():
         pass
 
 
-def _select_all_points_on_active_layer():
-    """When the UIList selection changes, select all points of the new active layer."""
+_active_mask_name = None   # cached during rich depsgraph ticks; used by msgbus callbacks
+
+
+def _do_select_all_on_active(mask) -> int:
+    """Deselect every point except those on mask.layers.active. Returns count selected."""
+    active = mask.layers.active
+    if not active:
+        print("[F2SelectAll] _do_select_all_on_active: no active layer")
+        return 0
+    total_sel = 0
+    for layer in mask.layers:
+        for spline in layer.splines:
+            for point in spline.points:
+                sel = (layer == active)
+                point.select_control_point = sel
+                point.select_left_handle   = sel
+                point.select_right_handle  = sel
+                if sel:
+                    total_sel += 1
+    print(f"[F2SelectAll] selected {total_sel} point(s) on {active.name!r}")
+    return total_sel
+
+
+def _get_or_cache_active_mask():
+    """Resolve the active mask using several fallback strategies.
+
+    The msgbus callback runs in a restricted context where edit_mask is None.
+    This helper tries four escalating methods so the callback still works:
+      1. bpy.context.edit_mask  (works in depsgraph / operator contexts)
+      2. _active_mask_name cache (populated every depsgraph tick)
+      3. Screen area scan       (walks every IMAGE_EDITOR in MASK mode)
+      4. Single-mask fallback   (if only one mask exists in the file)
+    """
+    global _active_mask_name
+
+    # 1. Standard context path
     try:
-        has_em = hasattr(bpy.context, "edit_mask")
-        mask = bpy.context.edit_mask if has_em else None
-        print(f"[F2SelectAll] has_em={has_em} mask={getattr(mask,'name',None)!r}")
+        if hasattr(bpy.context, "edit_mask") and bpy.context.edit_mask is not None:
+            _active_mask_name = bpy.context.edit_mask.name
+            print(f"[F2Mask] resolved via edit_mask: {_active_mask_name!r}")
+            return bpy.context.edit_mask
+    except Exception:
+        pass
+
+    # 2. Name cache updated on every depsgraph tick
+    if _active_mask_name and _active_mask_name in bpy.data.masks:
+        print(f"[F2Mask] resolved via name cache: {_active_mask_name!r}")
+        return bpy.data.masks[_active_mask_name]
+
+    # 3. Walk all IMAGE_EDITOR areas in MASK mode
+    try:
+        for window in bpy.context.window_manager.windows:
+            for area in window.screen.areas:
+                if area.type == "IMAGE_EDITOR":
+                    space = area.spaces[0]
+                    if getattr(space, "mode", "") == "MASK":
+                        m = getattr(space, "mask", None)
+                        if m:
+                            _active_mask_name = m.name
+                            print(f"[F2Mask] resolved via area scan: {_active_mask_name!r}")
+                            return m
+    except Exception:
+        pass
+
+    # 4. Single-mask file shortcut
+    if len(bpy.data.masks) == 1:
+        _active_mask_name = bpy.data.masks[0].name
+        print(f"[F2Mask] resolved via single-mask fallback: {_active_mask_name!r}")
+        return bpy.data.masks[0]
+
+    print("[F2Mask] could not resolve active mask")
+    return None
+
+
+def _select_all_points_on_active_layer():
+    """msgbus callback: active_layer_index changed in UIList."""
+    try:
+        ctx_type = type(bpy.context).__name__
+        print(f"[F2SelectAll] called — context type={ctx_type!r}")
+
+        mask = _get_or_cache_active_mask()
+        print(f"[F2SelectAll] resolved mask={getattr(mask,'name',None)!r}")
         if not mask:
+            print("[F2SelectAll] EARLY EXIT — no mask resolved by any method")
             return
+
         active = mask.layers.active
-        print(f"[F2SelectAll] active={getattr(active,'name',None)!r} idx={mask.active_layer_index}")
+        idx    = mask.active_layer_index
+        print(f"[F2SelectAll] layers.active={getattr(active,'name',None)!r}  active_layer_index={idx}")
         if not active:
+            print("[F2SelectAll] EARLY EXIT — no active layer")
             return
-        # Deselect all points on every layer, then select all on the active one
-        for layer in mask.layers:
-            for spline in layer.splines:
-                for point in spline.points:
-                    sel = (layer == active)
-                    point.select_control_point = sel
-                    point.select_left_handle  = sel
-                    point.select_right_handle = sel
-        print(f"[F2SelectAll] selected all points of {active.name!r}")
+
+        _do_select_all_on_active(mask)
         _tag_image_editors_redraw()
     except Exception as e:
+        import traceback
         print(f"[F2SelectAll] ERROR: {e}")
+        traceback.print_exc()
 
 
-_last_selection_state = None
+_last_selection_state   = None
+_last_active_layer_name = None   # tracks UIList / active-layer changes
 
 
 @bpy.app.handlers.persistent
 def _depsgraph_handler(scene, depsgraph=None):
     """Detect which layer the user clicked by scanning point selection state."""
-    global _last_selection_state
+    global _last_selection_state, _last_active_layer_name, _active_mask_name
 
-    if not hasattr(bpy.context, "edit_mask"):
-        return
-    mask = bpy.context.edit_mask
+    # Resolve mask — also keeps _active_mask_name warm for msgbus callbacks
+    mask = _get_or_cache_active_mask()
     if not mask:
         return
 
+    print(f"[F2Handler] TICK  mask={mask.name!r}  layers={len(mask.layers)}")
+
+    # ── UIList-click detection: active_layer pointer changed ──────────────────
+    active_layer    = mask.layers.active
+    cur_active_name = getattr(active_layer, "name", None)
+    if cur_active_name != _last_active_layer_name:
+        print(f"[F2Handler] active_layer changed: {_last_active_layer_name!r} -> {cur_active_name!r}")
+        _last_active_layer_name = cur_active_name
+        if active_layer:
+            _do_select_all_on_active(mask)
+        # Sync index in case Blender's active pointer is ahead of active_layer_index
+        for i, layer in enumerate(mask.layers):
+            if layer.name == cur_active_name and mask.active_layer_index != i:
+                print(f"[F2Handler] syncing active_layer_index -> {i}")
+                mask.active_layer_index = i
+                break
+        _tag_image_editors_redraw()
+        return   # let selection settle on the next tick
+
     current_selection = []
 
-    # Method A: active_point on active layer (fastest, set by Blender on click)
-    active_layer = mask.layers.active
-    print(f"[F2Handler] active_layer={getattr(active_layer,'name',None)!r} active_point={getattr(active_layer.splines if active_layer else None,'active_point',None)!r}")
+    # Method A: active_point on active layer
+    active_splines  = active_layer.splines if active_layer else None
+    active_point_ma = getattr(active_splines, "active_point", None)
+    print(f"[F2Handler] MethodA: active_layer={cur_active_name!r}  active_point={active_point_ma!r}")
     if active_layer:
         active_spline = active_layer.splines.active
         active_point  = active_layer.splines.active_point
@@ -587,9 +930,13 @@ def _depsgraph_handler(scene, depsgraph=None):
             except ValueError:
                 pass
 
-    # Method B: scan every point's select flags across all layers
+    # Method B: scan select flags across ALL layers
+    # (detects clicks on non-active layers — Blender marks the point selected
+    #  but does NOT change mask.layers.active when clicking a foreign layer)
+    print(f"[F2Handler] MethodB: scanning {len(mask.layers)} layer(s)")
     for layer in mask.layers:
         if layer.hide:
+            print(f"[F2Handler]   layer {layer.name!r} hidden, skipping")
             continue
         for sp_idx, spline in enumerate(layer.splines):
             for pt_idx, point in enumerate(spline.points):
@@ -602,6 +949,7 @@ def _depsgraph_handler(scene, depsgraph=None):
                         d["point_idx"]  == pt_idx
                         for d in current_selection
                     ):
+                        print(f"[F2Handler]   MethodB hit: layer={layer.name!r} sp={sp_idx} pt={pt_idx}")
                         current_selection.append({
                             "layer_name": layer.name,
                             "spline_idx": sp_idx,
@@ -609,27 +957,51 @@ def _depsgraph_handler(scene, depsgraph=None):
                             "is_active":  False,
                         })
 
-    print(f"[F2Handler] current_selection={[(d['layer_name'],d['is_active']) for d in current_selection]} last={[(d['layer_name'],d['is_active']) for d in (_last_selection_state or [])]}")
+    cur_summary  = [(d['layer_name'], d['is_active']) for d in current_selection]
+    last_summary = [(d['layer_name'], d['is_active']) for d in (_last_selection_state or [])]
+    print(f"[F2Handler] current={cur_summary}  last={last_summary}")
 
-    # Only act when selection actually changed
     if current_selection == _last_selection_state:
-        print("[F2Handler] no change, skipping")
+        print("[F2Handler] no change — skipping")
         return
+
+    # Snapshot last_keys BEFORE updating state (winner logic reads it)
+    last_keys = {
+        (d["layer_name"], d["spline_idx"], d["point_idx"])
+        for d in (_last_selection_state or [])
+    }
     _last_selection_state = current_selection
 
     if not current_selection:
         return
 
-    # Prefer the entry flagged is_active; fall back to first found
-    winner = next(
-        (d["layer_name"] for d in current_selection if d["is_active"]),
-        current_selection[0]["layer_name"],
-    )
+    # Winner: prefer NEWLY appeared MethodB entries over the stale is_active
+    # entry.  "New" means this (layer, spline, point) tuple wasn't in last state.
+    # This correctly handles clicking a non-active layer whose active_point
+    # pointer lags behind on the old layer.
+    new_entries = [
+        d for d in current_selection
+        if (d["layer_name"], d["spline_idx"], d["point_idx"]) not in last_keys
+           and not d["is_active"]   # MethodB entries only — ignore MethodA churn
+    ]
+    print(f"[F2Handler] new_entries={[(d['layer_name'], d['point_idx']) for d in new_entries]}")
+
+    if new_entries:
+        winner = new_entries[0]["layer_name"]
+        print(f"[F2Handler] winner from new MethodB entry: {winner!r}")
+    else:
+        winner = next(
+            (d["layer_name"] for d in current_selection if d["is_active"]),
+            current_selection[0]["layer_name"],
+        )
+        print(f"[F2Handler] winner from existing selection: {winner!r}")
+
     print(f"[F2Handler] winner={winner!r} current idx={mask.active_layer_index}")
     for i, layer in enumerate(mask.layers):
         if layer.name == winner and mask.active_layer_index != i:
             print(f"[F2Handler] writing active_layer_index {mask.active_layer_index} -> {i}")
             mask.active_layer_index = i
+            _last_active_layer_name = winner   # suppress the echo on next tick
             break
 
     _tag_image_editors_redraw()
@@ -643,6 +1015,9 @@ classes = [
     Florence2LayerData,    # must be before Florence2MaskProps (CollectionProperty ref)
     Florence2MaskProps,
     FLORENCE2_OT_export_strip,
+    FLORENCE2_OT_layer_new_with_square,
+    FLORENCE2_OT_open_box_editor,
+    FLORENCE2_OT_text_to_box_editor,
     FLORENCE2_PT_mask_panel,
 ]
 
@@ -653,6 +1028,15 @@ def register():
         bpy.utils.register_class(cls)
         print(f"[Florence2Mask]   {cls.__name__}")
     bpy.types.Mask.florence2_props = PointerProperty(type=Florence2MaskProps)
+
+    # Ensure the "Send to Box Editor" scene toggle is always registered,
+    # even when the Florence-2 text captioning plugin has not been loaded.
+    if not hasattr(bpy.types.Scene, "florence2_send_to_mask"):
+        bpy.types.Scene.florence2_send_to_mask = bpy.props.BoolProperty(
+            name="Send to Box Editor",
+            description="After generation, open the result as mask layers in the Box Editor",
+            default=False,
+        )
 
     # When the user clicks a layer in the UIList, select all its points.
     bpy.msgbus.subscribe_rna(
@@ -677,15 +1061,31 @@ def register():
     if _depsgraph_handler not in bpy.app.handlers.depsgraph_update_post:
         bpy.app.handlers.depsgraph_update_post.append(_depsgraph_handler)
 
+    def _append_text_menu():
+        try:
+            bpy.types.TEXT_MT_edit.append(_text_menu_draw)
+            print("[Florence2Mask] TEXT_MT_edit menu item appended")
+        except Exception as exc:
+            print(f"[Florence2Mask] TEXT_MT_edit append failed: {exc}")
+        return None  # run once
+
+    bpy.app.timers.register(_append_text_menu, first_interval=0.1)
+
     print("[Florence2Mask] Registration complete")
 
 
 def unregister():
     if _depsgraph_handler in bpy.app.handlers.depsgraph_update_post:
         bpy.app.handlers.depsgraph_update_post.remove(_depsgraph_handler)
+    try:
+        bpy.types.TEXT_MT_edit.remove(_text_menu_draw)
+    except Exception:
+        pass
     bpy.msgbus.clear_by_owner(_msgbus_owner)
     if hasattr(bpy.types.Mask, "florence2_props"):
         del bpy.types.Mask.florence2_props
+    if hasattr(bpy.types.Scene, "florence2_send_to_mask"):
+        del bpy.types.Scene.florence2_send_to_mask
     for cls in reversed(classes):
         try:
             bpy.utils.unregister_class(cls)

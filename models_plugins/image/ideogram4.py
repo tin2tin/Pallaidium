@@ -17,7 +17,8 @@ from ...utils.helpers import gfx_device
 
 
 class Ideogram4Plugin(ModelPlugin):
-    MODEL_ID     = "Disty0/Ideogram-4-SDNQ-4bit-dynamic-hadamard"
+    MODEL_ID     = "Disty0/Ideogram-4-SDNQ-FP8"
+    #MODEL_ID     = "Disty0/Ideogram-4-SDNQ-4bit-dynamic-hadamard"
     DISPLAY_NAME = "Image: Ideogram 4"
     DESCRIPTION  = (
         "Text-to-image via Ideogram 4 (uint4 SDNQ, ~17.9 GB). "
@@ -67,11 +68,11 @@ class Ideogram4Plugin(ModelPlugin):
 
         pipe = Ideogram4Pipeline.from_pretrained(self.MODEL_ID, **load_kwargs)
 
-        # Enable FP8 MatMul for AMD, Intel ARC and Nvidia GPUs:
-        if triton_is_available and (torch.cuda.is_available() or torch.xpu.is_available()):
-            pipe.transformer = apply_sdnq_options_to_model(pipe.transformer, use_quantized_matmul=True)
-            pipe.unconditional_transformer = apply_sdnq_options_to_model(pipe.unconditional_transformer, use_quantized_matmul=True)
-            pipe.text_encoder = apply_sdnq_options_to_model(pipe.text_encoder, use_quantized_matmul=True)
+        # # Enable FP8 MatMul for AMD, Intel ARC and Nvidia GPUs:
+        # if triton_is_available and (torch.cuda.is_available() or torch.xpu.is_available()):
+        #     pipe.transformer = apply_sdnq_options_to_model(pipe.transformer, use_quantized_matmul=True)
+        #     pipe.unconditional_transformer = apply_sdnq_options_to_model(pipe.unconditional_transformer, use_quantized_matmul=True)
+        #     pipe.text_encoder = apply_sdnq_options_to_model(pipe.text_encoder, use_quantized_matmul=True)
 
         if gfx_device == "mps":
             pipe.to("mps")
