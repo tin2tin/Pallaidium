@@ -388,11 +388,9 @@ class FLORENCE2_PT_mask_panel(Panel):
         row.operator("mask.select_all",      text="", icon="RESTRICT_SELECT_OFF").action = "SELECT"
         row.operator("mask.handle_type_set", text="", icon="IPO_CONSTANT").type = "VECTOR"
 
-        # ── Active layer — active_layer_index kept in sync by template_list ───
-        idx    = getattr(mask, "active_layer_index", 0)
-        n      = len(mask.layers)
-        active = mask.layers[idx] if n and 0 <= idx < n else None
-
+        # ── Active layer — use layers.active (Blender keeps this in sync when
+        #    a spline is clicked, which may not update active_layer_index) ────
+        active = mask.layers.active
         if active is None:
             layout.separator()
             layout.operator("florence2.export_strip", icon="SEQUENCE")
@@ -400,7 +398,7 @@ class FLORENCE2_PT_mask_panel(Panel):
 
         box = layout.box()
 
-        # Header: visibility toggles inline with layer name
+        # Header: layer name + visibility toggles
         hdr = box.row(align=True)
         hdr.prop(active, "name", text="", icon="LAYER_ACTIVE")
         for attr in ("hide", "hide_select", "hide_render"):
@@ -441,18 +439,44 @@ class FLORENCE2_PT_mask_panel(Panel):
         except TypeError:
             pass
 
-        # ── Current spline position (live, updates as handles are dragged) ───
-        if active.splines:
+        # ── Active spline (mirrors MASK_PT_spline — determines which layer
+        #    is shown; clicking any spline point sets splines.active) ─────────
+        spline = active.splines.active if active.splines else None
+        if spline:
+            sbox = box.box()
+            sbox.label(text="Active Spline", icon="CURVE_DATA")
+            col = sbox.column(align=True)
+            try:
+                col.prop(spline, "offset_mode")
+            except TypeError:
+                pass
+            try:
+                col.prop(spline, "weight_interpolation", text="Interpolation")
+            except TypeError:
+                pass
+            row = col.row(align=True)
+            try:
+                row.prop(spline, "use_cyclic",  toggle=True, text="Cyclic")
+            except TypeError:
+                pass
+            try:
+                row.prop(spline, "use_fill",    toggle=True, text="Fill")
+            except TypeError:
+                pass
+            try:
+                col.prop(spline, "use_self_intersection_check", text="Self-Intersection")
+            except TypeError:
+                pass
+
+            # Live position from spline corners
             img = getattr(space, "image", None)
             W   = img.size[0] if img else 1920
             H   = img.size[1] if img else 1080
             try:
-                y1, x1, y2, x2 = _spline_to_bbox(active.splines[0], W, H)
-                pbox = box.box()
-                pbox.label(text="Position (0 – 1000):", icon="TRANSFORM_ORIGINS")
-                row = pbox.row(align=True)
-                row.label(text=f"X  {x1} – {x2}")
-                row.label(text=f"Y  {y1} – {y2}")
+                y1, x1, y2, x2 = _spline_to_bbox(spline, W, H)
+                prow = sbox.row(align=True)
+                prow.label(text=f"X  {x1} – {x2}")
+                prow.label(text=f"Y  {y1} – {y2}")
             except Exception:
                 pass
 
@@ -619,6 +643,14 @@ def register():
     # msgbus: MaskLayer.select — fires when slide_point selects a layer
     bpy.msgbus.subscribe_rna(
         key=(bpy.types.MaskLayer, "select"),
+        owner=_msgbus_owner,
+        args=(),
+        notify=_tag_image_editors_redraw,
+    )
+    # msgbus: MaskLayers.active — fires when the active layer pointer changes
+    # (slide_point updates layers.active directly, not always active_layer_index)
+    bpy.msgbus.subscribe_rna(
+        key=(bpy.types.MaskLayers, "active"),
         owner=_msgbus_owner,
         args=(),
         notify=_tag_image_editors_redraw,
