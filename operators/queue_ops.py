@@ -187,6 +187,9 @@ class RenderQueueJob(PropertyGroup):
     stem_split_guitar: BoolProperty(default=False)
     stem_split_piano:  BoolProperty(default=False)
 
+    # Florence-2 plugin
+    florence2_mode: StringProperty(default="CAPTION")
+
     # Klein Schematic LoRA plugin
     klein_schematic_mode:   StringProperty(default="DEPTH")
     klein_schematic_target: StringProperty(default="person")
@@ -430,6 +433,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             omnivoice_preprocess  = snapshot.get("omnivoice_preprocess",  True),
             omnivoice_denoise     = snapshot.get("omnivoice_denoise",     True),
             omnivoice_postprocess = snapshot.get("omnivoice_postprocess", True),
+            florence2_mode         = snapshot.get("florence2_mode",         "CAPTION"),
             klein_schematic_mode   = snapshot.get("klein_schematic_mode",   "DEPTH"),
             klein_schematic_target = snapshot.get("klein_schematic_target", "person"),
             klein_strip_1_path     = snapshot.get("klein_strip_1_path",     ""),
@@ -1150,6 +1154,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
             omnivoice_preprocess  = getattr(scene, "omnivoice_preprocess",  True),
             omnivoice_denoise     = getattr(scene, "omnivoice_denoise",     True),
             omnivoice_postprocess = getattr(scene, "omnivoice_postprocess", True),
+            florence2_mode         = getattr(scene, "florence2_mode",         "CAPTION"),
             klein_schematic_mode   = getattr(scene, "klein_schematic_mode",   "DEPTH"),
             klein_schematic_target = getattr(scene, "klein_schematic_target", "person"),
             img_guidance_scale     = getattr(scene, "img_guidance_scale",     1.6),
@@ -1501,6 +1506,7 @@ def _queue_start_job(scene, job) -> None:
         "stem_split_bass", "stem_split_other", "stem_split_guitar", "stem_split_piano",
         "qwen_strip_1_path", "qwen_strip_2_path", "qwen_strip_3_path",
         "klein_strip_1_path", "klein_strip_2_path", "klein_strip_3_path",
+        "florence2_mode",
         "klein_schematic_mode", "klein_schematic_target",
         "img_guidance_scale", "illumination_style", "light_direction",
         "ip_adapter_face_folder", "ip_adapter_style_folder",
