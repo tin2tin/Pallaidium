@@ -367,7 +367,28 @@ class FLORENCE2_PT_mask_panel(Panel):
         box.label(text="Background:")
         box.prop(mp, "f2_background", text="")
 
-        # ── Active layer — indexed via active_layer_index for reliable sync ──
+        layout.separator()
+
+        # ── Layer list (Blender's own UIList drives active_layer_index) ───────
+        layout.template_list(
+            "MASK_UL_layers", "",
+            mask, "layers",
+            mask, "active_layer_index",
+            rows=5,
+        )
+
+        # Layer stack operator toolbar
+        row = layout.row(align=True)
+        row.operator("mask.layer_new",    text="", icon="ADD")
+        row.operator("mask.layer_remove", text="", icon="REMOVE")
+        row.separator()
+        row.operator("mask.layer_move", text="", icon="TRIA_UP").type   = "UP"
+        row.operator("mask.layer_move", text="", icon="TRIA_DOWN").type = "DOWN"
+        row.separator()
+        row.operator("mask.select_all",      text="", icon="RESTRICT_SELECT_OFF").action = "SELECT"
+        row.operator("mask.handle_type_set", text="", icon="IPO_CONSTANT").type = "VECTOR"
+
+        # ── Active layer — active_layer_index kept in sync by template_list ───
         idx    = getattr(mask, "active_layer_index", 0)
         n      = len(mask.layers)
         active = mask.layers[idx] if n and 0 <= idx < n else None
@@ -377,34 +398,18 @@ class FLORENCE2_PT_mask_panel(Panel):
             layout.operator("florence2.export_strip", icon="SEQUENCE")
             return
 
-        layout.separator()
-
-        # ── Layer stack controls ─────────────────────────────────────────────
-        row = layout.row(align=True)
-        row.operator("mask.layer_new",    text="", icon="ADD")
-        row.operator("mask.layer_remove", text="", icon="REMOVE")
-        row.separator()
-        row.operator("mask.layer_move", text="", icon="TRIA_UP").type   = "UP"
-        row.operator("mask.layer_move", text="", icon="TRIA_DOWN").type = "DOWN"
-        row.separator()
-        row.operator("mask.select_all", text="", icon="RESTRICT_SELECT_OFF").action = "SELECT"
-        row.operator("mask.handle_type_set", text="", icon="IPO_CONSTANT").type = "VECTOR"
-
         box = layout.box()
 
-        # Header: layer counter + visibility toggles
+        # Header: visibility toggles inline with layer name
         hdr = box.row(align=True)
-        hdr.label(text=f"Layer {idx + 1} / {n}", icon="LAYER_ACTIVE")
+        hdr.prop(active, "name", text="", icon="LAYER_ACTIVE")
         for attr in ("hide", "hide_select", "hide_render"):
             try:
                 hdr.prop(active, attr, text="", emboss=False)
             except TypeError:
                 pass
 
-        # Editable layer name
-        box.prop(active, "name", text="Name")
-
-        # Built-in MaskLayer properties
+        # Opacity + invert
         row = box.row(align=True)
         try:
             row.prop(active, "alpha", text="Opacity")
@@ -414,6 +419,8 @@ class FLORENCE2_PT_mask_panel(Panel):
             row.prop(active, "invert", toggle=True, text="Invert")
         except TypeError:
             pass
+
+        # Blend / falloff
         try:
             box.prop(active, "blend", text="Blend")
         except TypeError:
@@ -422,12 +429,19 @@ class FLORENCE2_PT_mask_panel(Panel):
             box.prop(active, "falloff", text="Falloff")
         except TypeError:
             pass
+
+        # Fill options
+        row = box.row(align=True)
         try:
-            box.prop(active, "fill_color", text="Fill Color")
+            row.prop(active, "use_fill_overlap", toggle=True, text="Overlap")
+        except TypeError:
+            pass
+        try:
+            row.prop(active, "use_fill_holes", toggle=True, text="Holes")
         except TypeError:
             pass
 
-        # ── Current spline position ──────────────────────────────────────────
+        # ── Current spline position (live, updates as handles are dragged) ───
         if active.splines:
             img = getattr(space, "image", None)
             W   = img.size[0] if img else 1920
@@ -595,9 +609,16 @@ def register():
         print(f"[Florence2Mask]   {cls.__name__}")
     bpy.types.Mask.florence2_props = PointerProperty(type=Florence2MaskProps)
 
-    # msgbus: fires when active_layer_index changes (layer list clicks)
+    # msgbus: active_layer_index — fires on layer list clicks
     bpy.msgbus.subscribe_rna(
         key=(bpy.types.Mask, "active_layer_index"),
+        owner=_msgbus_owner,
+        args=(),
+        notify=_tag_image_editors_redraw,
+    )
+    # msgbus: MaskLayer.select — fires when slide_point selects a layer
+    bpy.msgbus.subscribe_rna(
+        key=(bpy.types.MaskLayer, "select"),
         owner=_msgbus_owner,
         args=(),
         notify=_tag_image_editors_redraw,
