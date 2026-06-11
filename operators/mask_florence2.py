@@ -382,8 +382,8 @@ class FLORENCE2_PT_mask_panel(Panel):
         row.operator("mask.layer_new",    text="", icon="ADD")
         row.operator("mask.layer_remove", text="", icon="REMOVE")
         row.separator()
-        row.operator("mask.layer_move", text="", icon="TRIA_UP").type   = "UP"
-        row.operator("mask.layer_move", text="", icon="TRIA_DOWN").type = "DOWN"
+        row.operator("mask.layer_move", text="", icon="TRIA_UP").direction   = "UP"
+        row.operator("mask.layer_move", text="", icon="TRIA_DOWN").direction = "DOWN"
         row.separator()
         row.operator("mask.select_all",      text="", icon="RESTRICT_SELECT_OFF").action = "SELECT"
         row.operator("mask.handle_type_set", text="", icon="IPO_CONSTANT").type = "VECTOR"
