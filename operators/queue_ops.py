@@ -1921,6 +1921,13 @@ def _queue_insert_strip(scene, result: dict) -> None:
             return
 
     # --- Florence-2 → Mask Editor (text/Ideogram4 with send_to_mask enabled) ---
+    print(
+        f"[Queue] florence2 mask check:"
+        f" output_type={result.get('output_type')!r}"
+        f" send_to_mask={result.get('florence2_send_to_mask')!r}"
+        f" has_text={bool(result.get('text_content'))}"
+        f" src={result.get('florence2_source_image_path')!r}"
+    )
     if (
         result.get("output_type") == "text"
         and result.get("florence2_send_to_mask")
@@ -1933,7 +1940,9 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 result.get("florence2_source_image_path", ""),
             )
         except Exception as _mex:
+            import traceback as _tb
             print(f"[Queue] Florence2 mask creation failed: {_mex}")
+            _tb.print_exc()
 
     if new_strip is not None:
         try:
