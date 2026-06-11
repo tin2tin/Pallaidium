@@ -116,13 +116,13 @@ def _bbox_to_mask(bbox, W: int, H: int):
     """Ideogram [y1,x1,y2,x2] 0-1000 → mask center + half-sizes.
 
     Blender mask coordinate space (observed):
-      X: centered at 0, range [-aspect/2, +aspect/2]  (aspect = W/H)
+      X: lower-left origin, range [0, aspect]  (aspect = W/H)
       Y: lower-left origin, range [0, 1] with 1 = top
     Ideogram y=0 is the image TOP, so Y must be flipped.
     """
     y1, x1, y2, x2 = bbox
     aspect = W / H if H else 1.0
-    cx = ((x1 + x2) / 2 / 1000 - 0.5) * aspect
+    cx = (x1 + x2) / 2 / 1000 * aspect
     cy = 1.0 - (y1 + y2) / 2 / 1000
     hx = (x2 - x1) / 1000 / 2 * aspect
     hy = (y2 - y1) / 1000 / 2
@@ -137,8 +137,8 @@ def _spline_to_bbox(spline, W: int, H: int):
         return [0, 0, 1000, 1000]
     xs = [p[0] for p in pts]
     ys = [p[1] for p in pts]
-    x1 = round((min(xs) / aspect + 0.5) * 1000)
-    x2 = round((max(xs) / aspect + 0.5) * 1000)
+    x1 = round(min(xs) / aspect * 1000)
+    x2 = round(max(xs) / aspect * 1000)
     y1 = round((1.0 - max(ys)) * 1000)
     y2 = round((1.0 - min(ys)) * 1000)
     clamp = lambda v: max(0, min(1000, v))
