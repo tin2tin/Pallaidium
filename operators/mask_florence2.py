@@ -378,6 +378,18 @@ class FLORENCE2_PT_mask_panel(Panel):
             return
 
         layout.separator()
+
+        # ── Layer stack controls ─────────────────────────────────────────────
+        row = layout.row(align=True)
+        row.operator("mask.layer_new",    text="", icon="ADD")
+        row.operator("mask.layer_remove", text="", icon="REMOVE")
+        row.separator()
+        row.operator("mask.layer_move", text="", icon="TRIA_UP").type   = "UP"
+        row.operator("mask.layer_move", text="", icon="TRIA_DOWN").type = "DOWN"
+        row.separator()
+        row.operator("mask.select_all", text="", icon="RESTRICT_SELECT_OFF").action = "SELECT"
+        row.operator("mask.handle_type_set", text="", icon="IPO_CONSTANT").type = "VECTOR"
+
         box = layout.box()
 
         # Header: layer counter + visibility toggles
@@ -531,18 +543,37 @@ class FLORENCE2_OT_export_strip(Operator):
 
 
 # ---------------------------------------------------------------------------
-# Msgbus: redraw Image Editor when active mask layer changes
+# Panel sync helpers
 # ---------------------------------------------------------------------------
 
 _msgbus_owner = object()
 
 
 def _tag_image_editors_redraw():
-    """Force all Image Editor areas to redraw so the panel stays in sync."""
-    for window in bpy.context.window_manager.windows:
-        for area in window.screen.areas:
-            if area.type == "IMAGE_EDITOR":
-                area.tag_redraw()
+    """Tag every Image Editor in MASK mode for redraw."""
+    try:
+        for window in bpy.context.window_manager.windows:
+            for area in window.screen.areas:
+                if area.type == "IMAGE_EDITOR":
+                    space = area.spaces[0]
+                    if getattr(space, "mode", "") == "MASK":
+                        area.tag_redraw()
+    except Exception:
+        pass
+
+
+def _depsgraph_handler(scene, depsgraph):
+    """Redraw panel whenever any Mask data-block is modified.
+
+    slide_point and other mask operators mutate spline point selection on the
+    Mask ID, which travels through the depsgraph but does NOT fire the
+    active_layer_index msgbus subscription.  Watching depsgraph updates covers
+    point selection, handle drags, and layer changes in one place.
+    """
+    for update in depsgraph.updates:
+        if isinstance(update.id, bpy.types.Mask):
+            _tag_image_editors_redraw()
+            return
 
 
 # ---------------------------------------------------------------------------
@@ -550,7 +581,7 @@ def _tag_image_editors_redraw():
 # ---------------------------------------------------------------------------
 
 classes = [
-    Florence2LayerData,    # must be before Florence2MaskProps (referenced as CollectionProperty)
+    Florence2LayerData,    # must be before Florence2MaskProps (CollectionProperty ref)
     Florence2MaskProps,
     FLORENCE2_OT_export_strip,
     FLORENCE2_PT_mask_panel,
@@ -564,19 +595,24 @@ def register():
         print(f"[Florence2Mask]   {cls.__name__}")
     bpy.types.Mask.florence2_props = PointerProperty(type=Florence2MaskProps)
 
-    # Subscribe to active_layer_index changes on any Mask so the panel
-    # updates when the user clicks a spline handle (slide_spline_curvature
-    # and similar operators change active_layer_index before the panel redraws).
+    # msgbus: fires when active_layer_index changes (layer list clicks)
     bpy.msgbus.subscribe_rna(
         key=(bpy.types.Mask, "active_layer_index"),
         owner=_msgbus_owner,
         args=(),
         notify=_tag_image_editors_redraw,
     )
+
+    # depsgraph handler: fires when mask data changes (slide_point, handle drags)
+    if _depsgraph_handler not in bpy.app.handlers.depsgraph_update_post:
+        bpy.app.handlers.depsgraph_update_post.append(_depsgraph_handler)
+
     print("[Florence2Mask] Registration complete")
 
 
 def unregister():
+    if _depsgraph_handler in bpy.app.handlers.depsgraph_update_post:
+        bpy.app.handlers.depsgraph_update_post.remove(_depsgraph_handler)
     bpy.msgbus.clear_by_owner(_msgbus_owner)
     if hasattr(bpy.types.Mask, "florence2_props"):
         del bpy.types.Mask.florence2_props
