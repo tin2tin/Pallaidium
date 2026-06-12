@@ -283,13 +283,15 @@ class LTX2_3MultiV2Plugin(ModelPlugin):
         )
         embeds_pipe.to(onload_device)
         with torch.inference_mode():
-            prompt_embeds, prompt_attention_mask, _, _ = embeds_pipe.encode_prompt(
+            prompt_embeds, prompt_attention_mask, neg_prompt_embeds, neg_prompt_attention_mask = embeds_pipe.encode_prompt(
                 prompt=inputs.prompt,
-                negative_prompt=inputs.neg_prompt,
-                do_classifier_free_guidance=False,
+                negative_prompt=inputs.neg_prompt or "",
+                do_classifier_free_guidance=True,
             )
-        prompt_embeds         = prompt_embeds.detach().to(offload_device, copy=True)
-        prompt_attention_mask = prompt_attention_mask.detach().to(offload_device, copy=True)
+        prompt_embeds               = prompt_embeds.detach().to(offload_device, copy=True)
+        prompt_attention_mask       = prompt_attention_mask.detach().to(offload_device, copy=True)
+        neg_prompt_embeds           = neg_prompt_embeds.detach().to(offload_device, copy=True)
+        neg_prompt_attention_mask   = neg_prompt_attention_mask.detach().to(offload_device, copy=True)
         del embeds_pipe, text_encoder
         _flush()
 
@@ -346,6 +348,8 @@ class LTX2_3MultiV2Plugin(ModelPlugin):
         stage1_kw = dict(
             prompt_embeds=prompt_embeds.to(onload_device, dtype=torch_dtype),
             prompt_attention_mask=prompt_attention_mask.to(onload_device),
+            negative_prompt_embeds=neg_prompt_embeds.to(onload_device, dtype=torch_dtype),
+            negative_prompt_attention_mask=neg_prompt_attention_mask.to(onload_device),
             width=stage1_w, height=stage1_h,
             num_frames=num_frames, frame_rate=fps,
             num_inference_steps=8, sigmas=DISTILLED_SIGMA_VALUES,
@@ -432,6 +436,8 @@ class LTX2_3MultiV2Plugin(ModelPlugin):
         refine_kw = dict(
             prompt_embeds=prompt_embeds.to(onload_device, dtype=torch_dtype),
             prompt_attention_mask=prompt_attention_mask.to(onload_device),
+            negative_prompt_embeds=neg_prompt_embeds.to(onload_device, dtype=torch_dtype),
+            negative_prompt_attention_mask=neg_prompt_attention_mask.to(onload_device),
             latents=up_latent.to(onload_device, dtype=torch_dtype),
             width=w, height=h, num_frames=num_frames,
             num_inference_steps=3,
@@ -472,7 +478,7 @@ class LTX2_3MultiV2Plugin(ModelPlugin):
             final_v = outputs2.detach().to(offload_device, copy=True)
             final_a = audio_latent
 
-        del refine_pipe, transformer2, up_latent, prompt_embeds, prompt_attention_mask, refine_kw
+        del refine_pipe, transformer2, up_latent, prompt_embeds, prompt_attention_mask, neg_prompt_embeds, neg_prompt_attention_mask, refine_kw
         _flush()
 
         # ── Decode ──────────────────────────────────────────────────────────
