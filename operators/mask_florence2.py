@@ -20,7 +20,7 @@ import os
 import bpy
 from bpy.props import (
     BoolProperty, CollectionProperty, EnumProperty,
-    FloatVectorProperty, PointerProperty, StringProperty,
+    FloatVectorProperty, IntProperty, PointerProperty, StringProperty,
 )
 from bpy.types import Operator, Panel, PropertyGroup
 
@@ -28,6 +28,28 @@ from bpy.types import Operator, Panel, PropertyGroup
 # ---------------------------------------------------------------------------
 # Property groups
 # ---------------------------------------------------------------------------
+
+class Florence2ColorEntry(PropertyGroup):
+    """One hex color in a palette CollectionProperty."""
+    def _rgb_update(self, _context):
+        r, g, b = (max(0, min(255, round(c * 255))) for c in self.color_rgb)
+        self.hex_color = f"#{r:02X}{g:02X}{b:02X}"
+
+    hex_color: StringProperty(
+        name="",
+        description="#RRGGBB hex color",
+        default="#FFFFFF",
+        maxlen=7,
+    )
+    color_rgb: FloatVectorProperty(
+        name="",
+        subtype="COLOR",
+        size=3,
+        min=0.0, max=1.0,
+        default=(1.0, 1.0, 1.0),
+        update=_rgb_update,
+    )
+
 
 class Florence2LayerData(PropertyGroup):
     """Metadata for one Florence-2 mask layer.  .name == MaskLayer.name."""
@@ -55,13 +77,34 @@ class Florence2LayerData(PropertyGroup):
         ],
         default="small",
     )
-    f2_bbox:  StringProperty(name="BBox JSON", default="[0,0,1000,1000]")
+    f2_bbox:    StringProperty(name="BBox JSON", default="[0,0,1000,1000]")
+    f2_palette: CollectionProperty(
+        type=Florence2ColorEntry,
+        name="Color Palette",
+        description="Per-element palette, up to 5 #RRGGBB colors",
+    )
 
 
 class Florence2MaskProps(PropertyGroup):
     f2_high_level_description: StringProperty(name="Scene Description")
     f2_background:             StringProperty(name="Background")
-    f2_style_json:             StringProperty(name="Style JSON")
+    # style_description individual fields
+    f2_is_photo:               BoolProperty(
+        name="Photo",
+        description="Photo/camera style uses photo+medium; art style uses medium+art_style",
+        default=True,
+    )
+    f2_aesthetics:             StringProperty(name="Aesthetics")
+    f2_lighting:               StringProperty(name="Lighting")
+    f2_photo:                  StringProperty(name="Camera / Lens")
+    f2_medium:                 StringProperty(name="Medium")
+    f2_art_style:              StringProperty(name="Art Style")
+    f2_style_palette:          CollectionProperty(
+        type=Florence2ColorEntry,
+        name="Style Palette",
+        description="Image-wide palette, up to 16 #RRGGBB colors",
+    )
+    f2_style_json:             StringProperty(name="Style JSON")   # legacy fallback
     f2_layers:                 CollectionProperty(type=Florence2LayerData)
 
 
@@ -87,7 +130,11 @@ def _add_layer_data(mask, layer_name: str, elem: dict) -> "Florence2LayerData":
     item.f2_type  = elem.get("type",  "obj")
     item.f2_desc  = elem.get("desc",  "")
     item.f2_text  = elem.get("text",  "")
-    item.f2_color = _parse_color_string(elem.get("color", ""))
+    palette = elem.get("color_palette") or []
+    _list_to_palette(item.f2_palette, palette)
+    # f2_color kept for layer-fill display; derive from first palette entry or legacy key
+    first = palette[0] if palette else elem.get("color", "")
+    item.f2_color = _parse_color_string(first)
     item.f2_font  = _FONT_ALIAS_MAP.get((elem.get("font") or "").strip().lower(), "small")
     item.f2_bbox  = json.dumps(elem.get("bbox", [0, 0, 1000, 1000]))
     return item
@@ -95,6 +142,25 @@ def _add_layer_data(mask, layer_name: str, elem: dict) -> "Florence2LayerData":
 
 def _clear_layer_data(mask) -> None:
     mask.florence2_props.f2_layers.clear()
+
+
+# ---------------------------------------------------------------------------
+# Palette helpers
+# ---------------------------------------------------------------------------
+
+def _list_to_palette(col, hex_list: list) -> None:
+    """Populate a CollectionProperty of Florence2ColorEntry from a list of hex strings."""
+    col.clear()
+    for h in hex_list:
+        entry = col.add()
+        entry.hex_color = str(h).upper()
+        rgb = _parse_color_string(h)
+        entry.color_rgb = rgb[:3]
+
+
+def _palette_to_list(col) -> list:
+    """Serialize a palette CollectionProperty to a list of uppercase hex strings."""
+    return [e.hex_color.upper() for e in col if e.hex_color.strip()]
 
 
 # ---------------------------------------------------------------------------
@@ -279,7 +345,15 @@ def apply_florence_json_to_mask(json_str: str, source_image_path: str) -> None:
     mp = mask.florence2_props
     mp.f2_high_level_description = data.get("high_level_description", "")
     mp.f2_background = data.get("compositional_deconstruction", {}).get("background", "")
-    mp.f2_style_json = json.dumps(data.get("style_description", {}), ensure_ascii=False)
+    style = data.get("style_description", {})
+    mp.f2_style_json = json.dumps(style, ensure_ascii=False)  # legacy fallback
+    mp.f2_is_photo           = "photo" in style
+    mp.f2_aesthetics         = style.get("aesthetics", "")
+    mp.f2_lighting           = style.get("lighting", "")
+    mp.f2_photo              = style.get("photo", "")
+    mp.f2_medium             = style.get("medium", "")
+    mp.f2_art_style          = style.get("art_style", "")
+    _list_to_palette(mp.f2_style_palette, style.get("color_palette") or [])
 
     # Clear everything
     for layer in list(mask.layers):
@@ -416,17 +490,31 @@ def _open_mask_in_editor(mask, img) -> None:
         try:
             ui_region = next((r for r in image_ed.regions if r.type == "UI"), None)
             if ui_region:
-                with bpy.context.temp_override(window=window, area=image_ed, region=ui_region):
-                    bpy.ops.wm.context_set_string(
-                        data_path="space_data.active_panel_category",
-                        value="Box Editor",
-                    )
-                # Make the N-panel visible
+                ui_region.active_panel_category = "Box Editor"
                 space.show_region_ui = True
                 print("[Florence2Mask] Box Editor tab selected")
         except Exception as exc:
             print(f"[Florence2Mask] Tab switch failed: {exc}")
         return
+
+
+# ---------------------------------------------------------------------------
+# Palette drawing helper
+# ---------------------------------------------------------------------------
+
+def _draw_palette(layout, col, target: str, layer_name: str = "", limit: int = 16) -> None:
+    """Draw each palette entry as a color widget + X button, plus an Add row."""
+    for i, entry in enumerate(col):
+        row = layout.row(align=True)
+        row.prop(entry, "color_rgb", text="")
+        op = row.operator("florence2.palette_remove", text="", icon="X")
+        op.target     = target
+        op.layer_name = layer_name
+        op.index      = i
+    if len(col) < limit:
+        op = layout.operator("florence2.palette_add", text="+ Add Color", icon="ADD")
+        op.target     = target
+        op.layer_name = layer_name
 
 
 # ---------------------------------------------------------------------------
@@ -465,10 +553,35 @@ class FLORENCE2_PT_mask_panel(Panel):
         box.label(text="Background:")
         box.textbox(mp, "f2_background", placeholder="Background description...")
 
+        # ── Style description ────────────────────────────────────────────────
+        box = layout.box()
+        box.label(text="Style", icon="MATERIAL")
+        row = box.row(align=True)
+        row.prop(mp, "f2_is_photo", text="Photo", toggle=True)
+        row.prop(mp, "f2_is_photo", text="Art", toggle=True, invert_checkbox=True)
+        box.label(text="Aesthetics:")
+        box.textbox(mp, "f2_aesthetics", placeholder="e.g. cinematic, vibrant, moody")
+        box.label(text="Lighting:")
+        box.textbox(mp, "f2_lighting", placeholder="e.g. golden hour, soft shadows")
+        if mp.f2_is_photo:
+            box.label(text="Camera / Lens:")
+            box.textbox(mp, "f2_photo", placeholder="e.g. 35mm, f/1.4, eye-level")
+            box.label(text="Medium:")
+            box.textbox(mp, "f2_medium", placeholder="e.g. photograph")
+        else:
+            box.label(text="Medium:")
+            box.textbox(mp, "f2_medium", placeholder="e.g. illustration, 3d_render")
+            box.label(text="Art Style:")
+            box.textbox(mp, "f2_art_style", placeholder="e.g. flat vector, bold outlines")
+        box.label(text="Color Palette (up to 16):")
+        _draw_palette(box, mp.f2_style_palette, "style", limit=16)
+
         layout.separator()
 
-        # ── Layer list (Blender's own UIList drives active_layer_index) ───────
-        layout.template_list(
+        # ── One box: layer list + toolbar + active layer details ─────────────
+        box = layout.box()
+
+        box.template_list(
             "MASK_UL_layers", "",
             mask, "layers",
             mask, "active_layer_index",
@@ -476,7 +589,7 @@ class FLORENCE2_PT_mask_panel(Panel):
         )
 
         # Layer stack operator toolbar
-        row = layout.row(align=True)
+        row = box.row(align=True)
         row.operator("florence2.layer_new_with_square", text="", icon="ADD")
         row.operator("mask.layer_remove", text="", icon="REMOVE")
         row.separator()
@@ -485,15 +598,13 @@ class FLORENCE2_PT_mask_panel(Panel):
         row.separator()
         row.operator("mask.select_all", text="", icon="RESTRICT_SELECT_OFF").action = "SELECT"
 
-        # ── Active layer — use layers.active (Blender keeps this in sync when
-        #    a spline is clicked, which may not update active_layer_index) ────
         active = mask.layers.active
         if active is None:
             layout.separator()
             layout.operator("florence2.export_strip", icon="SEQUENCE")
             return
 
-        box = layout.box()
+        box.separator()
 
         # Header: layer name + visibility toggles
         hdr = box.row(align=True)
@@ -504,7 +615,7 @@ class FLORENCE2_PT_mask_panel(Panel):
             except TypeError:
                 pass
 
-        # ── Florence-2 metadata (same box) ───────────────────────────────────
+        # ── Florence-2 metadata ───────────────────────────────────────────────
         ld = _get_layer_data(active, mask)
         if ld:
             box.prop(ld, "f2_type", text="Type")
@@ -512,15 +623,76 @@ class FLORENCE2_PT_mask_panel(Panel):
             box.textbox(ld, "f2_desc", placeholder="Object description...")
             if ld.f2_type == "text":
                 box.label(text="Text Content:")
-                box.textbox(ld, "f2_text", placeholder="Text content...")
-                row = box.row(align=True)
-                row.prop(ld, "f2_font",  text="Font Size")
-                row.prop(ld, "f2_color", text="")
+                box.textbox(ld, "f2_text", placeholder="Text to render in image...")
+            box.label(text="Color Palette (up to 5):")
+            _draw_palette(box, ld.f2_palette, "layer", layer_name=active.name, limit=5)
         else:
             box.label(text="(Non-Florence layer)", icon="INFO")
 
         layout.separator()
         layout.operator("florence2.export_strip", icon="SEQUENCE")
+
+
+# ---------------------------------------------------------------------------
+# Palette add / remove operators
+# ---------------------------------------------------------------------------
+
+def _resolve_palette(context, target: str, layer_name: str):
+    """Return the correct CollectionProperty for palette ops, or None."""
+    mask = getattr(getattr(context, "space_data", None), "mask", None)
+    if not mask:
+        return None
+    if target == "style":
+        return mask.florence2_props.f2_style_palette
+    ld = mask.florence2_props.f2_layers.get(layer_name)
+    return ld.f2_palette if ld else None
+
+
+class FLORENCE2_OT_palette_add(Operator):
+    bl_idname      = "florence2.palette_add"
+    bl_label       = "Add Color"
+    bl_description = "Add a color entry to this palette"
+    bl_options     = {"REGISTER", "UNDO"}
+
+    target:     EnumProperty(items=[("layer", "Layer", ""), ("style", "Style", "")], default="style")
+    layer_name: StringProperty()
+
+    @classmethod
+    def poll(cls, context):
+        space = getattr(context, "space_data", None)
+        return space and space.type == "IMAGE_EDITOR" and getattr(space, "mask", None) is not None
+
+    def execute(self, context):
+        col = _resolve_palette(context, self.target, self.layer_name)
+        if col is None:
+            return {"CANCELLED"}
+        entry = col.add()
+        entry.hex_color = "#FFFFFF"
+        return {"FINISHED"}
+
+
+class FLORENCE2_OT_palette_remove(Operator):
+    bl_idname      = "florence2.palette_remove"
+    bl_label       = "Remove Color"
+    bl_description = "Remove this color from the palette"
+    bl_options     = {"REGISTER", "UNDO"}
+
+    target:     EnumProperty(items=[("layer", "Layer", ""), ("style", "Style", "")], default="style")
+    layer_name: StringProperty()
+    index:      IntProperty(default=0)
+
+    @classmethod
+    def poll(cls, context):
+        space = getattr(context, "space_data", None)
+        return space and space.type == "IMAGE_EDITOR" and getattr(space, "mask", None) is not None
+
+    def execute(self, context):
+        col = _resolve_palette(context, self.target, self.layer_name)
+        if col is None:
+            return {"CANCELLED"}
+        if 0 <= self.index < len(col):
+            col.remove(self.index)
+        return {"FINISHED"}
 
 
 # ---------------------------------------------------------------------------
@@ -555,17 +727,52 @@ class FLORENCE2_OT_export_strip(Operator):
             bbox = (_spline_to_bbox(layer.splines[0], W, H) if layer.splines
                     else json.loads(ld.f2_bbox or "[0,0,1000,1000]"))
 
-            elem = {"type": ld.f2_type, "bbox": bbox, "desc": ld.f2_desc}
+            # Per-element color_palette; for text fall back to f2_color if palette empty
+            cp = _palette_to_list(ld.f2_palette)
+            if not cp and ld.f2_type == "text":
+                hex_c = _color_to_hex(ld.f2_color)
+                if hex_c not in ("#FFFFFF", "#FEFEFE"):
+                    cp = [hex_c]
+
             if ld.f2_type == "text":
-                elem["text"]  = ld.f2_text
-                elem["color"] = _color_to_hex(ld.f2_color)
-                elem["font"]  = ld.f2_font
+                # Schema key order: type, bbox, text, desc, color_palette
+                elem = {"type": "text", "bbox": bbox, "text": ld.f2_text, "desc": ld.f2_desc}
+                if cp:
+                    elem["color_palette"] = cp
+            else:
+                # Schema key order: type, bbox, desc, color_palette
+                elem = {"type": "obj", "bbox": bbox, "desc": ld.f2_desc}
+                if cp:
+                    elem["color_palette"] = cp
             elements.append(elem)
 
-        try:
-            style = json.loads(mp.f2_style_json) if mp.f2_style_json else {}
-        except Exception:
+        # Build style_description from individual props; fall back to legacy JSON
+        if mp.f2_aesthetics or mp.f2_lighting or mp.f2_medium:
             style = {}
+            if mp.f2_aesthetics:
+                style["aesthetics"] = mp.f2_aesthetics
+            if mp.f2_lighting:
+                style["lighting"] = mp.f2_lighting
+            if mp.f2_is_photo:
+                # key order: aesthetics, lighting, photo, medium, color_palette
+                if mp.f2_photo:
+                    style["photo"] = mp.f2_photo
+                if mp.f2_medium:
+                    style["medium"] = mp.f2_medium
+            else:
+                # key order: aesthetics, lighting, medium, art_style, color_palette
+                if mp.f2_medium:
+                    style["medium"] = mp.f2_medium
+                if mp.f2_art_style:
+                    style["art_style"] = mp.f2_art_style
+            sp = _palette_to_list(mp.f2_style_palette)
+            if sp:
+                style["color_palette"] = sp
+        else:
+            try:
+                style = json.loads(mp.f2_style_json) if mp.f2_style_json else {}
+            except Exception:
+                style = {}
 
         result = {
             "high_level_description": mp.f2_high_level_description,
@@ -718,7 +925,13 @@ class FLORENCE2_OT_open_box_editor(Operator):
             mp = mask.florence2_props
             mp.f2_high_level_description = ""
             mp.f2_background             = ""
-            mp.f2_style_json             = "{}"
+            mp.f2_is_photo    = True
+            mp.f2_aesthetics  = ""
+            mp.f2_lighting    = ""
+            mp.f2_photo       = ""
+            mp.f2_medium      = ""
+            mp.f2_art_style   = ""
+            mp.f2_style_json  = "{}"
             print("[BoxEditor] Created new mask 'Box Editor' with florence2_props")
 
         # Open it in an Image Editor area ──────────────────────────────────
@@ -1012,8 +1225,11 @@ def _depsgraph_handler(scene, depsgraph=None):
 # ---------------------------------------------------------------------------
 
 classes = [
-    Florence2LayerData,    # must be before Florence2MaskProps (CollectionProperty ref)
+    Florence2ColorEntry,   # must be before Florence2LayerData / Florence2MaskProps
+    Florence2LayerData,    # must be before Florence2MaskProps
     Florence2MaskProps,
+    FLORENCE2_OT_palette_add,
+    FLORENCE2_OT_palette_remove,
     FLORENCE2_OT_export_strip,
     FLORENCE2_OT_layer_new_with_square,
     FLORENCE2_OT_open_box_editor,
