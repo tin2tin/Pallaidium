@@ -58,8 +58,12 @@ class Florence2Plugin(ModelPlugin):
         col.prop(context.scene, "florence2_mode", expand=True)
         if context.scene.florence2_mode == "IDEOGRAM4":
             col.prop(context.scene, "florence2_send_to_mask", text="Send to Box Editor")
-            col.operator("florence2.open_box_editor", text="Open Box Editor", icon="MOD_MASK")
         return False
+
+    def draw_post_seed_ui(self, col, context) -> None:
+        if context.scene.florence2_mode == "IDEOGRAM4":
+            col.separator()
+            col.operator("florence2.open_box_editor", text="Open Box Editor", icon="MOD_MASK")
 
     # ------------------------------------------------------------------
 
@@ -185,8 +189,8 @@ class Florence2Plugin(ModelPlugin):
                 style["medium"] = "digital" if "digital" in t else "traditional"
                 style["art_style"] = art_style
             else:
-                style["photo"] = "photograph"
-                style["medium"] = "digital camera"
+                style["photo"] = "eye-level, natural perspective"
+                style["medium"] = "photograph"
             style["color_palette"] = dominant_palette()
             return style
 
@@ -307,15 +311,19 @@ class Florence2Plugin(ModelPlugin):
         ordered = []
         for elem in elements:
             if elem["type"] == "text":
-                ordered.append({
-                    "type":  "text",
-                    "bbox":  elem["bbox"],
-                    "text":  elem.get("text", ""),
-                    "color": elem.get("color", ""),
-                    "font":  elem.get("font", ""),
-                    "desc":  elem["desc"],
-                })
+                # Schema key order: type, bbox, text, desc, color_palette (optional)
+                e = {
+                    "type": "text",
+                    "bbox": elem["bbox"],
+                    "text": elem.get("text", ""),
+                    "desc": elem["desc"],
+                }
+                color_hex = elem.get("color", "")
+                if color_hex and color_hex.upper() not in ("#FFFFFF", "#FEFEFE"):
+                    e["color_palette"] = [color_hex.upper()]
+                ordered.append(e)
             else:
+                # Schema key order: type, bbox, desc, color_palette (optional)
                 ordered.append({
                     "type": "obj",
                     "bbox": elem["bbox"],

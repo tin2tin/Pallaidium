@@ -375,11 +375,14 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 sub.prop(context.scene, "movie_num_seed", text="")
                 
                 right.prop(
-                    context.scene, "movie_use_random", 
-                    text="", 
-                    icon="UNLOCKED" if is_rand else "LOCKED", 
+                    context.scene, "movie_use_random",
+                    text="",
+                    icon="UNLOCKED" if is_rand else "LOCKED",
                     icon_only=True
                 )
+
+            if plugin is not None and hasattr(plugin, "draw_post_seed_ui"):
+                plugin.draw_post_seed_ui(col, context)
 
             _col_pre_enhance = col
             if type == "image" and (plugin is None or plugin.UI_SECTIONS) and getattr(plugin, "show_enhance", True):
