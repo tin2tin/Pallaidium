@@ -381,9 +381,6 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                     icon_only=True
                 )
 
-            if plugin is not None and hasattr(plugin, "draw_post_seed_ui"):
-                plugin.draw_post_seed_ui(col, context)
-
             _col_pre_enhance = col
             if type == "image" and (plugin is None or plugin.UI_SECTIONS) and getattr(plugin, "show_enhance", True):
                 col = col.column(heading="Enhance", align=True)
@@ -460,17 +457,6 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         except:
             pass
 
-        if type == "image":
-            col.prop(addon_prefs, "image_model_card", text=" ")
-            if plugin.__class__.__name__ == "Ideogram4Plugin":
-                col.operator("florence2.open_box_editor", text="Open Box Editor", icon="MOD_MASK")
-            from ..models.base import InputSpec as _InputSpec
-            if plugin is not None and _InputSpec.HF_TOKEN in plugin.INPUTS:
-                row = col.row(align=True)
-                row.prop(addon_prefs, "hugginface_token")
-                row.operator(
-                    "wm.url_open", text="", icon="URL"
-                ).url = "https://huggingface.co/settings/tokens"
 
         if type == "movie":
             col.prop(addon_prefs, "movie_model_card", text=" ")
@@ -487,11 +473,26 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 ).url = "https://huggingface.co/settings/tokens"
             if plugin is not None:
                 plugin.draw_custom_ui(col, context)
+        if type == "image":
+            col.prop(addon_prefs, "image_model_card", text=" ")
+            from ..models.base import InputSpec as _InputSpec
+            if plugin is not None and _InputSpec.HF_TOKEN in plugin.INPUTS:
+                row = col.row(align=True)
+                row.prop(addon_prefs, "hugginface_token")
+                row.operator(
+                    "wm.url_open", text="", icon="URL"
+                ).url = "https://huggingface.co/settings/tokens"
         if type != "text" and not (
             type == "movie" and "Hailuo/MiniMax/" in movie_model_card
         ):
             col = col.column()
             col.prop(context.scene, "movie_num_batch", text="Batch Count")
+
+        if plugin is not None and hasattr(plugin, "draw_post_seed_ui"):
+            plugin.draw_post_seed_ui(col, context)
+        if type == "image":
+            if plugin.__class__.__name__ == "Ideogram4Plugin":
+                col.operator("florence2.open_box_editor", text="Open Box Editor", icon="MOD_MASK")
 
         # Generate.
         col = layout.column()

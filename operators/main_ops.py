@@ -1134,6 +1134,19 @@ class SEQUENCER_OT_generate_text(Operator):
             new_strip.box_color   = (0, 0, 0, 0.7)
             scene.sequence_editor.active_strip = new_strip
 
+        # --- Florence-2 → Mask Editor ---
+        if (
+            text
+            and getattr(scene, "florence2_mode",         "CAPTION") == "IDEOGRAM4"
+            and getattr(scene, "florence2_send_to_mask", False)
+        ):
+            source_path = bpy.path.abspath(scene.movie_path or scene.image_path or "")
+            try:
+                from .mask_florence2 import apply_florence_json_to_mask
+                apply_florence_json_to_mask(text, source_path)
+            except Exception as _mex:
+                print(f"[Florence2Mask] mask creation failed: {_mex}")
+
         # --- UI redraw ---
         for window in bpy.context.window_manager.windows:
             for area in window.screen.areas:

@@ -1,15 +1,14 @@
-"""Text-to-image via Ideogram 4 (uint4 SDNQ pre-quantized).
+"""Text-to-image via Ideogram 4.
 
-Uses vladmandic/Ideogram-4-sdnq-uint4-hadamard loaded through the standard
-diffusers Ideogram4Pipeline.  Weights are pre-quantized (uint4 + Hadamard
-rotation) at ~17.9 GB; no runtime quantization config required.
+Uses official ideogram-ai weights or pre-quantized SDNQ weights loaded 
+through the standard diffusers Ideogram4Pipeline.
 
 Supported  : prompt, height/width (up to 2048), steps, guidance_scale, seed,
              local prompt upsampling (requires 'outlines' package).
-Unsupported: negative_prompt  — model uses a fixed unconditional_transformer.
-             img2img / inpaint — not in Ideogram4Pipeline.
-             reference images  — not supported.
-             LoRA              — not documented / not supported.
+Unsupported: negative_prompt  - model uses a fixed unconditional_transformer.
+             img2img / inpaint - not in Ideogram4Pipeline.
+             reference images  - not supported.
+             LoRA              - not documented / not supported.
 """
 
 from ...models.base import ModelPlugin, InputSpec, UISection, ParamSpec, ModelInputs
@@ -17,15 +16,19 @@ from ...utils.helpers import gfx_device
 
 
 class Ideogram4Plugin(ModelPlugin):
-    MODEL_ID     = "Disty0/Ideogram-4-SDNQ-FP8"
-    #MODEL_ID     = "Disty0/Ideogram-4-SDNQ-4bit-dynamic-hadamard"
+    # Recommended default: Official NF4 model for higher speed, low VRAM, and clean, artifact-free output
+    MODEL_ID     = "ideogram-ai/ideogram-4-nf4-diffusers"
+    # Fallback to original FP8/SDNQ weights if preferred:
+    # MODEL_ID     = "Disty0/Ideogram-4-SDNQ-FP8"
+    # MODEL_ID     = "Disty0/Ideogram-4-SDNQ-4bit-dynamic-hadamard"
+    
     DISPLAY_NAME = "Image: Ideogram 4"
     DESCRIPTION  = (
-        "Text-to-image via Ideogram 4 (uint4 SDNQ, ~17.9 GB). "
+        "Text-to-image via Ideogram 4 (~10.5 GB NF4 / ~17.9 GB FP8). "
         "Optional local prompt upsampling needs: pip install outlines."
     )
     MODEL_TYPE   = "image"
-    INPUTS       = InputSpec.PROMPT
+    INPUTS       = InputSpec.PROMPT | InputSpec.HF_TOKEN
     UI_SECTIONS  = [
         UISection.PROMPT,
         UISection.RESOLUTION, UISection.FRAMES,
@@ -40,11 +43,17 @@ class Ideogram4Plugin(ModelPlugin):
 
     def load(self, prefs, scene, **_kw):
         import torch
-        #import sdnq  # registers "sdnq" quantizer with diffusers/transformers before from_pretrained
         from sdnq import SDNQConfig # import sdnq to register it into diffusers and transformers
         from sdnq.common import use_torch_compile as triton_is_available
         from sdnq.loader import apply_sdnq_options_to_model
         from diffusers import Ideogram4Pipeline
+
+        from huggingface_hub import login
+        if prefs.hugginface_token:
+            try:
+                login(token=prefs.hugginface_token, add_to_git_credential=True)
+            except Exception as e:
+                raise RuntimeError(f"HuggingFace login failed: {e}")
 
         _cache_dir = prefs.hf_cache_dir or None
         dtype      = torch.bfloat16
@@ -68,16 +77,22 @@ class Ideogram4Plugin(ModelPlugin):
 
         pipe = Ideogram4Pipeline.from_pretrained(self.MODEL_ID, **load_kwargs)
 
-        # # Enable FP8 MatMul for AMD, Intel ARC and Nvidia GPUs:
-        # if triton_is_available and (torch.cuda.is_available() or torch.xpu.is_available()):
-        #     pipe.transformer = apply_sdnq_options_to_model(pipe.transformer, use_quantized_matmul=True)
-        #     pipe.unconditional_transformer = apply_sdnq_options_to_model(pipe.unconditional_transformer, use_quantized_matmul=True)
-        #     pipe.text_encoder = apply_sdnq_options_to_model(pipe.text_encoder, use_quantized_matmul=True)
+        # Enable FP8 MatMul for AMD, Intel ARC and Nvidia GPUs (only executed for SDNQ models to avoid crashes on official NF4/FP8 models)
+        if "SDNQ" in self.MODEL_ID and triton_is_available and (torch.cuda.is_available() or torch.xpu.is_available()):
+            pipe.transformer = apply_sdnq_options_to_model(pipe.transformer, use_quantized_matmul=True)
+            pipe.unconditional_transformer = apply_sdnq_options_to_model(pipe.unconditional_transformer, use_quantized_matmul=True)
+            pipe.text_encoder = apply_sdnq_options_to_model(pipe.text_encoder, use_quantized_matmul=True)
 
         if gfx_device == "mps":
             pipe.to("mps")
         else:
             pipe.enable_model_cpu_offload()
+            # Enable built-in VAE tiling and slicing to reduce memory spikes during decoding
+            if hasattr(pipe, "enable_vae_slicing"):
+                pipe.enable_vae_slicing()
+            if hasattr(pipe, "enable_vae_tiling"):
+                pipe.enable_vae_tiling()
+            
             # Ideogram4Pipeline calls text_encoder sub-modules directly inside
             # encode_prompt, bypassing the model_cpu_offload hook on text_encoder.
             # Patch encode_prompt to move text_encoder to CUDA for the duration of
@@ -93,6 +108,13 @@ class Ideogram4Plugin(ModelPlugin):
                     self.text_encoder.to("cpu")
                     torch.cuda.empty_cache()
             pipe.encode_prompt = types.MethodType(_encode_with_te_offload, pipe)
+
+        # Optional torch.compile block to speed up inference (can be enabled via user preferences)
+        use_compile = getattr(prefs, "enable_torch_compile", False)
+        if use_compile and torch.cuda.is_available():
+            print("Ideogram4: Compiling transformer blocks...")
+            pipe.transformer = torch.compile(pipe.transformer, mode="reduce-overhead", fullgraph=True)
+            pipe.unconditional_transformer = torch.compile(pipe.unconditional_transformer, mode="reduce-overhead", fullgraph=True)
 
         return {"pipe": pipe, "converter": None, "refiner": None, "preprocessor": None}
 

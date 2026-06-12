@@ -136,6 +136,18 @@ The generated media will be saved to the directory specified in the addon prefer
 
 ## Change Log
 
+2026-06-12: Fix: Ideogram 4 — switch default weights to `ideogram-ai/ideogram-4-nf4-diffusers` (~10.5 GB NF4) instead of the 17.9 GB SDNQ FP8 model. Adds HuggingFace token login before loading. Re-enables FP8 MatMul acceleration (SDNQ models only). Adds VAE tiling and slicing to reduce memory spikes during decoding. Adds optional `torch.compile` support for transformer blocks.
+
+2026-06-12: Fix: Progress phase display — queue job runner now correctly shows "Downloading model" only for byte-unit tqdm bars and "Loading model" for all other tqdm activity. Applies to both the threaded and main-thread job execution paths.
+
+2026-06-12: Add: Florence-2 → Mask Editor auto-routing — when Florence-2 mode is set to Box Json and "Send to Mask" is enabled, the generated JSON is automatically applied to the Mask Editor after text generation completes.
+
+2026-06-12: Fix: Box Editor sidebar tab switch now deferred via `bpy.app.timers` so the Image Editor area is fully initialised before the N-panel category is set. Adds "Boxes" label with mask icon to the layer list box. Simplifies layer detail display (removes redundant labels).
+
+2026-06-12: Change: Florence-2 "Ideogram 4" mode renamed to "Box Json" in the mode selector.
+
+2026-06-12: Fix: UI panel layout — `draw_post_seed_ui` and "Open Box Editor" button now draw after Batch Count; image model card and HF token fields moved to their correct position below the movie section.
+
 2026-06-09: Add: Claude agent integration via Blender MCP — `pallaidium_mcp_tools.py` provides a high-level Python API (`generate_image()`, `generate_video()`, `generate_audio()`, `queue_generate()`, `list_image_models()`, `list_styles()`, etc.) that Claude agents can call through the Blender MCP server (`execute_blender_code`). Load the helper once per session in Blender's Python Console, then ask Claude to generate, queue, or inspect content in natural language.
 
 2026-06-09: Fix: Marlin Video Captions — switched to SDNQ int8 quantized weights (`tintwotin/Marlin-2B-SDNQ-int8`), display name updated to "Marlin: Video Captions (SDNQ)". Inference now runs on the main thread for stability. Added `ctranslate2` to Windows and Linux requirements.

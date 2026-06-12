@@ -11,7 +11,7 @@ try:
             name="Mode",
             items=[
                 ("CAPTION",   "Caption",    "Detailed image caption as plain text"),
-                ("IDEOGRAM4", "Ideogram 4", "Extract structured Ideogram 4 prompt JSON"),
+                ("IDEOGRAM4", "Box Json", "Extract structured Ideogram 4 prompt JSON"),
             ],
             default="CAPTION",
         )

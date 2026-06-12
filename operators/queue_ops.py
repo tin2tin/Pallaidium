@@ -514,6 +514,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
                 _tqdm_std = None
 
             _active_bars: dict = {}   # id(bar) → [bytes_done, bytes_total]
+            _dl_bars: set = set()     # ids of bars that are actual network downloads (unit='B')
 
             if _tqdm_std is not None:
                 _orig_tqdm_init   = _tqdm_std.tqdm.__init__
@@ -523,6 +524,8 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
                     _orig_tqdm_init(tqdm_self, *a, **kw)
                     if not getattr(tqdm_self, "disable", False):
                         _active_bars[id(tqdm_self)] = [tqdm_self.n or 0, tqdm_self.total or 0]
+                        if getattr(tqdm_self, "unit", "it") == "B":
+                            _dl_bars.add(id(tqdm_self))
 
                 def _patched_tqdm_update(tqdm_self, n=1):
                     if cancel_event.is_set():
@@ -535,9 +538,10 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
                     total_b = sum(v[1] for v in _active_bars.values() if v[1] > 0)
                     done_b  = sum(v[0] for v in _active_bars.values())
                     dl_frac = (done_b / total_b) if total_b > 0 else 0.0
+                    phase = "Downloading model" if id(tqdm_self) in _dl_bars else "Loading model"
                     progress_store[job_id] = {
                         "progress": dl_frac,
-                        "phase":    "Downloading model",
+                        "phase":    phase,
                         "step":     max(0, int(done_b  / 1_048_576)),
                         "total":    max(1, int(total_b / 1_048_576)),
                     }
@@ -572,6 +576,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
                             _tqdm_std.tqdm.__init__ = _orig_tqdm_init
                             _tqdm_std.tqdm.update   = _orig_tqdm_update
                         _active_bars.clear()
+                        _dl_bars.clear()
                         _load_done.set()
                     return None  # don't re-register the timer
 
@@ -599,6 +604,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
                         _tqdm_std.tqdm.__init__ = _orig_tqdm_init
                         _tqdm_std.tqdm.update   = _orig_tqdm_update
                     _active_bars.clear()
+                    _dl_bars.clear()
 
             # If cancelled during load, stop here
             if cancel_event.is_set():
@@ -1619,6 +1625,7 @@ def _run_job_main_thread(scene, job) -> None:
             import tqdm.std as _tqdm_std_mt
 
             _active_bars_mt: dict = {}
+            _dl_bars_mt: set = set()     # ids of bars that are actual network downloads (unit='B')
             _orig_tqdm_init_mt   = _tqdm_std_mt.tqdm.__init__
             _orig_tqdm_update_mt = _tqdm_std_mt.tqdm.update
 
@@ -1626,6 +1633,8 @@ def _run_job_main_thread(scene, job) -> None:
                 _orig_tqdm_init_mt(tqdm_self, *a, **kw)
                 if not getattr(tqdm_self, "disable", False):
                     _active_bars_mt[id(tqdm_self)] = [tqdm_self.n or 0, tqdm_self.total or 0]
+                    if getattr(tqdm_self, "unit", "it") == "B":
+                        _dl_bars_mt.add(id(tqdm_self))
 
             def _patched_tqdm_update_mt(tqdm_self, n=1):
                 result = _orig_tqdm_update_mt(tqdm_self, n)
@@ -1636,14 +1645,15 @@ def _run_job_main_thread(scene, job) -> None:
                 total_b = sum(v[1] for v in _active_bars_mt.values() if v[1] > 0)
                 done_b  = sum(v[0] for v in _active_bars_mt.values())
                 dl_frac = (done_b / total_b) if total_b > 0 else 0.0
+                phase = "Downloading model" if id(tqdm_self) in _dl_bars_mt else "Loading model"
                 _progress_store[job_id] = {
                     "progress": dl_frac,
-                    "phase":    "Downloading model",
+                    "phase":    phase,
                     "step":     max(0, int(done_b  / 1_048_576)),
                     "total":    max(1, int(total_b / 1_048_576)),
                 }
                 job.progress = dl_frac
-                job.phase    = "Downloading model"
+                job.phase    = phase
                 return result
 
             _tqdm_std_mt.tqdm.__init__ = _patched_tqdm_init_mt
@@ -1664,6 +1674,7 @@ def _run_job_main_thread(scene, job) -> None:
                 _tqdm_std_mt.tqdm.__init__ = _orig_tqdm_init_mt
                 _tqdm_std_mt.tqdm.update   = _orig_tqdm_update_mt
                 _active_bars_mt.clear()
+                _dl_bars_mt.clear()
 
             if model_cache is not None and isinstance(loaded, dict):
                 model_cache.update(loaded)

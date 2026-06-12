@@ -486,15 +486,33 @@ def _open_mask_in_editor(mask, img) -> None:
         except Exception as exc:
             print(f"[Florence2Mask] view_all failed: {exc}")
 
-        # Switch N-panel to the Box Editor tab
-        try:
-            ui_region = next((r for r in image_ed.regions if r.type == "UI"), None)
-            if ui_region:
-                ui_region.active_panel_category = "Box Editor"
-                space.show_region_ui = True
-                print("[Florence2Mask] Box Editor tab selected")
-        except Exception as exc:
-            print(f"[Florence2Mask] Tab switch failed: {exc}")
+        # Defer sidebar/tab switch — area must be fully initialised first
+        def _open_sidebar():
+            try:
+                for win in bpy.context.window_manager.windows:
+                    for area in win.screen.areas:
+                        if area.type != "IMAGE_EDITOR":
+                            continue
+                        sp = area.spaces[0]
+                        if getattr(sp, "mode", "") != "MASK":
+                            continue
+                        ui_region = next(
+                            (r for r in area.regions if r.type == "UI"), None
+                        )
+                        sp.show_region_ui = True
+                        if ui_region:
+                            with bpy.context.temp_override(
+                                window=win, area=area, region=ui_region
+                            ):
+                                bpy.ops.wm.context_set_string(
+                                    data_path="space_data.active_panel_category",
+                                    value="Box Editor",
+                                )
+                        print("[Florence2Mask] Box Editor sidebar opened")
+            except Exception as exc:
+                print(f"[Florence2Mask] Tab switch failed: {exc}")
+
+        bpy.app.timers.register(_open_sidebar, first_interval=0.1)
         return
 
 
@@ -580,6 +598,7 @@ class FLORENCE2_PT_mask_panel(Panel):
 
         # ── One box: layer list + toolbar + active layer details ─────────────
         box = layout.box()
+        box.label(text="Boxes", icon="MOD_MASK")
 
         box.template_list(
             "MASK_UL_layers", "",
@@ -618,8 +637,7 @@ class FLORENCE2_PT_mask_panel(Panel):
         # ── Florence-2 metadata ───────────────────────────────────────────────
         ld = _get_layer_data(active, mask)
         if ld:
-            box.prop(ld, "f2_type", text="Type")
-            box.label(text="Description:")
+            box.prop(ld, "f2_type", text="")
             box.textbox(ld, "f2_desc", placeholder="Object description...")
             if ld.f2_type == "text":
                 box.label(text="Text Content:")
