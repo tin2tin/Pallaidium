@@ -31,10 +31,10 @@ class Ideogram4Plugin(ModelPlugin):
     INPUTS       = InputSpec.PROMPT | InputSpec.HF_TOKEN
     UI_SECTIONS  = [
         UISection.PROMPT,
-        UISection.RESOLUTION, UISection.FRAMES,
+        UISection.RESOLUTION, UISection.FRAMES, UISection.STEPS, UISection.GUIDANCE,
         UISection.SEED,
     ]
-    PARAMS            = ParamSpec(steps=40, guidance=7.0, width=1920, height=896)
+    PARAMS            = ParamSpec(steps=20, guidance=4.0)
     REQUIRED_PACKAGES = ["torch", "diffusers", "transformers", "outlines"]
     supports_inpaint      = False
     supports_img2img      = False
@@ -43,9 +43,9 @@ class Ideogram4Plugin(ModelPlugin):
 
     def load(self, prefs, scene, **_kw):
         import torch
-        from sdnq import SDNQConfig # import sdnq to register it into diffusers and transformers
-        from sdnq.common import use_torch_compile as triton_is_available
-        from sdnq.loader import apply_sdnq_options_to_model
+        #from sdnq import SDNQConfig # import sdnq to register it into diffusers and transformers
+        #from sdnq.common import use_torch_compile as triton_is_available
+        #from sdnq.loader import apply_sdnq_options_to_model
         from diffusers import Ideogram4Pipeline
 
         from huggingface_hub import login
@@ -78,10 +78,10 @@ class Ideogram4Plugin(ModelPlugin):
         pipe = Ideogram4Pipeline.from_pretrained(self.MODEL_ID, **load_kwargs)
 
         # Enable FP8 MatMul for AMD, Intel ARC and Nvidia GPUs (only executed for SDNQ models to avoid crashes on official NF4/FP8 models)
-        if "SDNQ" in self.MODEL_ID and triton_is_available and (torch.cuda.is_available() or torch.xpu.is_available()):
-            pipe.transformer = apply_sdnq_options_to_model(pipe.transformer, use_quantized_matmul=True)
-            pipe.unconditional_transformer = apply_sdnq_options_to_model(pipe.unconditional_transformer, use_quantized_matmul=True)
-            pipe.text_encoder = apply_sdnq_options_to_model(pipe.text_encoder, use_quantized_matmul=True)
+        # if "SDNQ" in self.MODEL_ID and triton_is_available and (torch.cuda.is_available() or torch.xpu.is_available()):
+        #     pipe.transformer = apply_sdnq_options_to_model(pipe.transformer, use_quantized_matmul=True)
+        #     pipe.unconditional_transformer = apply_sdnq_options_to_model(pipe.unconditional_transformer, use_quantized_matmul=True)
+        #     pipe.text_encoder = apply_sdnq_options_to_model(pipe.text_encoder, use_quantized_matmul=True)
 
         if gfx_device == "mps":
             pipe.to("mps")
