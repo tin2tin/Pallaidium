@@ -728,6 +728,9 @@ class LTX2MultiModalPipeline(LTX2ConditionPipeline):
         spatio_temporal_guidance_blocks: list[int] | None = None,
         noise_scale: float | None = None,
         audio_noise_scale: float = 0.0,
+        nag_scale: float = 0.0,
+        nag_threshold: float = 0.25,
+        nag_start_step: int = 0,
         num_videos_per_prompt: int | None = 1,
         generator: torch.Generator | list[torch.Generator] | None = None,
         latents: torch.Tensor | None = None,
@@ -800,6 +803,9 @@ class LTX2MultiModalPipeline(LTX2ConditionPipeline):
         self._audio_stg_scale = audio_stg_scale
         self._audio_modality_scale = audio_modality_scale
         self._audio_guidance_rescale = audio_guidance_rescale
+        self._nag_scale = nag_scale
+        self._nag_threshold = nag_threshold
+        self._nag_start_step = nag_start_step
 
         self._attention_kwargs = attention_kwargs
         self._interrupt = False
@@ -1117,6 +1123,10 @@ class LTX2MultiModalPipeline(LTX2ConditionPipeline):
 
                     noise_pred_audio_uncond_text, noise_pred_audio = noise_pred_audio.chunk(2)
                     noise_pred_audio = self.convert_velocity_to_x0(audio_latents, noise_pred_audio, i, audio_scheduler)
+                    # NAG: Normalized Amplitude Guidance — improves audio-visual sync (lipsync)
+                    if self._nag_scale > 0.0 and i >= self._nag_start_step:
+                        audio_rms = noise_pred_audio.std().clamp(min=self._nag_threshold)
+                        noise_pred_audio = noise_pred_audio / audio_rms * self._nag_scale
                     noise_pred_audio_uncond_text = self.convert_velocity_to_x0(
                         audio_latents, noise_pred_audio_uncond_text, i, audio_scheduler
                     )

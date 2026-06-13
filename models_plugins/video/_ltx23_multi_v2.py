@@ -376,11 +376,9 @@ class LTX2_3MultiV2Plugin(ModelPlugin):
         if audio_conditions is not None:
             stage1_kw["audio_conditions"] = audio_conditions
 
-        # Auto-STG when image+audio both present and user hasn't set audio_stg manually
-        if image_conditions is not None and audio_conditions is not None and _audio_stg_scale == 0.0:
-            stage1_kw["stg_scale"] = 1.0
+        # When user sets audio_stg manually, ensure the required blocks list is present
+        if _audio_stg_scale != 0.0:
             stage1_kw["spatio_temporal_guidance_blocks"] = [28]
-            stage1_kw["guidance_rescale"] = 0.7
 
         with torch.inference_mode(), torch.autocast("cuda", dtype=torch_dtype):
             outputs = pipe(**stage1_kw)
@@ -465,8 +463,16 @@ class LTX2_3MultiV2Plugin(ModelPlugin):
             refine_kw["image_conditions"] = image_conditions
         if audio_conditions is not None:
             refine_kw["audio_conditions"] = audio_conditions
+            # NAG (Normalized Amplitude Guidance) — matches ComfyUI workflow LTX2_NAG defaults
+            refine_kw["nag_scale"]      = 2.5
+            refine_kw["nag_threshold"]  = 0.25
+            refine_kw["nag_start_step"] = 11
         if audio_latent is not None:
             refine_kw["audio_latents"] = audio_latent.to(onload_device, dtype=torch_dtype)
+
+        # When user sets audio_stg manually, ensure the required blocks list is present
+        if _audio_stg_scale != 0.0:
+            refine_kw["spatio_temporal_guidance_blocks"] = [28]
 
         with torch.inference_mode(), torch.autocast("cuda", dtype=torch_dtype):
             outputs2 = refine_pipe(**refine_kw)

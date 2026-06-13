@@ -49,15 +49,14 @@ class LTX2_3MultiPlugin(ModelPlugin):
     INPUTS       = InputSpec.PROMPT | InputSpec.NEG_PROMPT | InputSpec.IMAGE | InputSpec.LORA | InputSpec.AUDIO_REF
     UI_SECTIONS  =[
         UISection.PROMPT, UISection.NEG_PROMPT, UISection.VIDEO_STRIP,
-        UISection.RESOLUTION, UISection.FRAMES, UISection.SEED, UISection.LORA,
+        UISection.RESOLUTION, UISection.FRAMES, UISection.SEED, UISection.LORA, #UISection.STEPS, UISection.GUIDANCE, 
     ]
     # Standard ParamSpec without unsupported UI fields
-    PARAMS            = ParamSpec(width=1920, height=896, frames=121, steps=8, guidance=1.0)
+    PARAMS            = ParamSpec(width=1280, height=704, frames=121, steps=8, guidance=1.0)
     REQUIRED_PACKAGES =["torch", "torchaudio", "soundfile", "av", "diffusers", "transformers", "sdnq"]
     supports_inpaint  = False
 
-    def draw_custom_ui(self, col, context) -> bool:
-        col.prop(context.scene, "ltx23m_modality_scale", text="Audio Influence (Modality Scale)")
+    def draw_custom_ui(self, _col, _context) -> bool:
         return False
 
     def load(self, prefs, scene, **kw):
@@ -94,8 +93,8 @@ class LTX2_3MultiPlugin(ModelPlugin):
 
         _cache_dir     = prefs.hf_cache_dir or None
         _lfo           = prefs.local_files_only
-        MODEL_PATH     = "OzzyGT/LTX-2.3-Distilled"
-        SDNQ_PATH      = "OzzyGT/LTX-2.3-Distilled-sdnq-dynamic-int4"
+        MODEL_PATH     = "OzzyGT/LTX-2.3-Distilled-1.1-sdnq-dynamic-int8"
+        SDNQ_PATH      = "OzzyGT/LTX-2.3-Distilled-1.1-sdnq-dynamic-int8"
         UPSAMPLER_PATH = "OzzyGT/LTX-2.3-upsampler-x2"
 
         torch_dtype    = torch.bfloat16
@@ -393,8 +392,8 @@ class LTX2_3MultiPlugin(ModelPlugin):
         pipe.enable_group_offload(
             onload_device=onload_device,
             offload_type="leaf_level",
-            use_stream=False,
-            low_cpu_mem_usage=False,
+            use_stream=True,
+            low_cpu_mem_usage=True,
         )
 
         stage1_kw = dict(
@@ -404,8 +403,9 @@ class LTX2_3MultiPlugin(ModelPlugin):
             num_frames=num_frames, frame_rate=fps,
             num_inference_steps=8, sigmas=DISTILLED_SIGMA_VALUES,
             guidance_scale=1.0, generator=generator,
+            control_downscale_factor=1, control_strength=1.0,
             output_type="latent", return_dict=False,
-            use_cross_timestep=True, # Critical for Audio+Image cross-attention mapping
+            use_cross_timestep=True,
             callback_on_step_end=self.step_callback(inputs),
         )
         
@@ -501,8 +501,8 @@ class LTX2_3MultiPlugin(ModelPlugin):
         refine_pipe.enable_group_offload(
             onload_device=onload_device,
             offload_type="leaf_level",
-            use_stream=False,
-            low_cpu_mem_usage=False,
+            use_stream=True,
+            low_cpu_mem_usage=True,
         )
 
         refine_kw = dict(

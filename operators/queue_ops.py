@@ -141,7 +141,7 @@ class RenderQueueJob(PropertyGroup):
     # Prefs snapshot
     hugginface_token: StringProperty()
     local_files_only: BoolProperty()
-    display_console:  BoolProperty()
+    display_console:  BoolProperty(default=False)
     generator_ai:     StringProperty()
     hf_cache_dir:     StringProperty()
 

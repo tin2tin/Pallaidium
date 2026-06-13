@@ -1075,7 +1075,6 @@ def _get_or_cache_active_mask():
         print(f"[F2Mask] resolved via single-mask fallback: {_active_mask_name!r}")
         return bpy.data.masks[0]
 
-    print("[F2Mask] could not resolve active mask")
     return None
 
 
