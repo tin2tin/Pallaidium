@@ -25,6 +25,68 @@ except Exception:
     pass
 
 
+_GENERIC_CAPTION_PREFIXES = (
+    "the image is a still from a movie or tv show. ",
+    "the image is a still from a movie or tv show, ",
+    "the image is a still from a movie or tv show ",
+    "the image is a still from ",
+    "the image shows a ",
+    "the image shows ",
+    "the image depicts a ",
+    "the image depicts ",
+    "the image features a ",
+    "the image features ",
+    "the image captures a ",
+    "the image captures ",
+    "the image contains a ",
+    "the image contains ",
+    "the image presents a ",
+    "the image presents ",
+    "the image is of a ",
+    "the image is of ",
+    "the image is ",
+    "this image shows a ",
+    "this image shows ",
+    "this image depicts a ",
+    "this image depicts ",
+    "this image features a ",
+    "this image features ",
+    "in the image, a ",
+    "in the image, ",
+    "in this image, a ",
+    "in this image, ",
+    "the image ",
+    "it shows a ",
+    "it shows ",
+    "it depicts a ",
+    "it depicts ",
+    "it features a ",
+    "it features ",
+    "it captures a ",
+    "it captures ",
+)
+
+
+def _strip_caption_prefix(text: str) -> str:
+    """Remove generic Florence-2 preamble so the unique content comes first.
+
+    Loops until no further prefix can be stripped, handling chained phrases
+    like "The image is a still from a movie or TV show. It shows a close-up…"
+    """
+    t = text.strip()
+    while True:
+        lower = t.lower()
+        matched = False
+        for prefix in _GENERIC_CAPTION_PREFIXES:
+            if lower.startswith(prefix):
+                t = t[len(prefix):].strip()
+                matched = True
+                break
+        if not matched:
+            break
+    return t[0].upper() + t[1:] if t else t
+
+
 class Florence2Plugin(ModelPlugin):
     MODEL_ID     = "florence-community/Florence-2-large"
     DISPLAY_NAME = "Image Captioning: Florence-2"
@@ -101,10 +163,98 @@ class Florence2Plugin(ModelPlugin):
     # ------------------------------------------------------------------
     # Mode: CAPTION
 
+    # Cinematographic angle terms, ordered from most-specific to least.
+    _ANGLE_RULES = [
+        (("over-the-shoulder", "over the shoulder"),            "over-the-shoulder shot"),
+        (("looking at the camera", "facing the camera",
+          "faces the camera", "facing forward",
+          "facing front", "full frontal"),                       "frontal shot"),
+        (("from behind", "seen from behind", "back view",
+          "rear view", "from the back", "their back",
+          "turned away"),                                        "rear shot"),
+        (("three-quarter", "three quarter",
+          "turned slightly", "angled"),                          "three-quarter shot"),
+        (("left profile", "right profile", "side profile",
+          "in profile", "from the side", "side view",
+          "profile view", "profile", "side"),                    "side-profile shot"),
+    ]
+
+    def _cinematic_angle(self, desc: str) -> str:
+        t = desc.lower()
+        for keywords, label in self._ANGLE_RULES:
+            if any(kw in t for kw in keywords):
+                return label
+        return ""
+
+    def _region_desc(self, model, processor, image, bbox_px) -> str:
+        W, H = image.width, image.height
+        x1, y1, x2, y2 = bbox_px
+        lx1 = round(x1 / W * 999); ly1 = round(y1 / H * 999)
+        lx2 = round(x2 / W * 999); ly2 = round(y2 / H * 999)
+        task = f"<REGION_TO_DESCRIPTION><loc_{lx1}><loc_{ly1}><loc_{lx2}><loc_{ly2}>"
+        return (self._run_task(model, processor, image, task)
+                .get("<REGION_TO_DESCRIPTION>", "") or "").strip()
+
     def _caption(self, model, processor, image, inputs) -> str:
+        _PERSON_LABELS = {"person", "man", "woman", "boy", "girl", "child", "human", "people"}
+
         self.set_phase(inputs, "Captioning")
-        parsed = self._run_task(model, processor, image, "<MORE_DETAILED_CAPTION>")
-        text = parsed["<MORE_DETAILED_CAPTION>"]
+        text = self._run_task(model, processor, image, "<MORE_DETAILED_CAPTION>").get(
+            "<MORE_DETAILED_CAPTION>", ""
+        )
+
+        self.set_phase(inputs, "Detecting persons")
+        od_data = self._run_task(model, processor, image, "<OD>").get("<OD>", {})
+        person_bboxes = [
+            bbox for bbox, label in zip(
+                od_data.get("bboxes", []), od_data.get("labels", [])
+            )
+            if label.lower().strip() in _PERSON_LABELS
+        ]
+
+        if person_bboxes:
+            person_notes = []  # (angle, gaze_desc)
+            for i, bbox_px in enumerate(person_bboxes[:3]):
+                self.set_phase(inputs, f"Person {i + 1}")
+                angle = gaze = ""
+                try:
+                    region = self._region_desc(model, processor, image, bbox_px)
+                    angle = self._cinematic_angle(region)
+                except Exception:
+                    pass
+                try:
+                    self.set_phase(inputs, f"Gaze {i + 1}")
+                    query = (
+                        "the object the person is looking at"
+                        if len(person_bboxes) == 1
+                        else f"the object person {i + 1} is looking at"
+                    )
+                    rec = self._run_task(
+                        model, processor, image,
+                        f"<REFERRING_EXPRESSION_COMPREHENSION>{query}",
+                    ).get("<REFERRING_EXPRESSION_COMPREHENSION>", {})
+                    gaze_bboxes = rec.get("bboxes", [])
+                    if gaze_bboxes:
+                        gaze = self._region_desc(model, processor, image, gaze_bboxes[0])
+                except Exception:
+                    pass
+                if angle or gaze:
+                    person_notes.append((angle, gaze))
+
+            extras = []
+            singular = len(person_bboxes) == 1
+            for i, (angle, gaze) in enumerate(person_notes):
+                prefix = "The person" if singular else f"Person {i + 1}"
+                parts = []
+                if angle:
+                    parts.append(f"seen from a {angle}")
+                if gaze:
+                    parts.append(f"looking at {gaze}")
+                if parts:
+                    extras.append(f"{prefix} is {', '.join(parts)}.")
+            if extras:
+                text = text.rstrip(".") + ". " + " ".join(extras)
+
         print("Florence-2 caption:", text)
         return text
 
@@ -214,6 +364,66 @@ class Florence2Plugin(ModelPlugin):
             if height_fraction > 0.03:
                 return "medium"
             return "small"
+
+        def detect_lighting(text: str):
+            """Return (direction, setting) inferred from caption keywords."""
+            t = text.lower()
+            # -- setting (most specific match wins) --
+            _setting_rules = [
+                ("golden hour",    "golden hour"),
+                ("magic hour",     "golden hour"),
+                ("sunset",         "golden hour"),
+                ("sunrise",        "golden hour"),
+                ("backlit",        "backlit"),
+                ("back light",     "backlit"),
+                ("silhouette",     "backlit"),
+                ("rim light",      "rim light"),
+                ("studio light",   "studio light"),
+                ("softbox",        "studio light"),
+                ("neon",           "neon light"),
+                ("candle",         "candlelight"),
+                ("firelight",      "candlelight"),
+                ("moonlight",      "moonlight"),
+                ("night",          "low-light"),
+                ("overcast",       "overcast"),
+                ("cloudy",         "overcast"),
+                ("diffuse",        "diffuse light"),
+                ("soft light",     "soft light"),
+                ("hard light",     "hard light"),
+                ("dramatic light", "dramatic light"),
+                ("chiaroscuro",    "dramatic light"),
+                ("sunlight",       "sunlight"),
+                ("daylight",       "daylight"),
+                ("window light",   "window light"),
+                ("indoor",         "indoor light"),
+                ("natural light",  "natural light"),
+            ]
+            setting = "natural light"
+            for keyword, label in _setting_rules:
+                if keyword in t:
+                    setting = label
+                    break
+
+            # -- direction from caption keywords --
+            _dir_rules = [
+                (("backlit", "silhouette", "back light", "rim light"),    "from behind"),
+                (("side lit", "side light", "rembrandt", "split light"),  "from side"),
+                (("overhead", "top light", "lit from above",
+                  "above", "skylight"),                                    "from above"),
+                (("underlighting", "lit from below", "from below"),       "from below"),
+                (("front lit", "frontal light", "flat light",
+                  "facing the light", "facing camera"),                    "frontal"),
+                (("three-quarter", "45 degree", "butterfly light"),       "three-quarter"),
+                (("window", "from the left", "left side"),                "from left"),
+                (("from the right", "right side"),                        "from right"),
+            ]
+            direction = "natural"
+            for keywords, label in _dir_rules:
+                if any(kw in t for kw in keywords):
+                    direction = label
+                    break
+
+            return direction, setting
 
         def to_ideogram(bbox_px):
             x1, y1, x2, y2 = bbox_px
@@ -330,12 +540,61 @@ class Florence2Plugin(ModelPlugin):
                     "desc": elem["desc"],
                 })
 
+        def detect_shot_type(elems):
+            """Return shot type from the largest detected subject bbox."""
+            obj_elems = [e for e in elems if e.get("type") == "obj"]
+            if not obj_elems:
+                return "wide shot"
+            largest = max(
+                obj_elems,
+                key=lambda e: (e["bbox"][2] - e["bbox"][0]) * (e["bbox"][3] - e["bbox"][1]),
+            )
+            b = largest["bbox"]  # [y1, x1, y2, x2] on 0-1000 scale
+            size = max((b[2] - b[0]) / 1000.0, (b[3] - b[1]) / 1000.0)
+            if size > 0.65:
+                return "close-up"
+            elif size > 0.35:
+                return "medium shot"
+            else:
+                return "wide shot"
+
+        # ---- Florence-2 light source detection ----
+        self.set_phase(inputs, "Light")
+        light_element = None
+        try:
+            rec_result = self._run_task(
+                model, processor, image,
+                "<REFERRING_EXPRESSION_COMPREHENSION>the main light source",
+            )
+            light_bbox_px = (rec_result.get("<REFERRING_EXPRESSION_COMPREHENSION>") or {}).get("bboxes", [[]])[0]
+            if light_bbox_px:
+                light_ib   = to_ideogram(light_bbox_px)
+                light_desc = region_description(light_bbox_px) or "light source"
+                light_dir, light_setting = detect_lighting(caption)
+                light_element = {
+                    "type": "obj",
+                    "bbox": light_ib,
+                    "desc": f"{light_desc} ({light_setting}, from {light_dir})",
+                }
+        except Exception:
+            pass
+        if light_element is None:
+            light_dir, light_setting = detect_lighting(caption)
+
+        shot_type  = detect_shot_type(ordered)
+        _unique = _strip_caption_prefix(caption) if caption else ""
+        _unique_lc = (_unique[0].lower() + _unique[1:]) if _unique else ""
+        scene_desc = f"{shot_type.capitalize()} of {_unique_lc}" if _unique_lc else shot_type.capitalize()
+        frame_element = {"type": "obj", "bbox": [0, 0, 1000, 1000], "desc": f"Frame – {shot_type}"}
+        extra = [light_element] if light_element else []
         result = {
-            "high_level_description": caption or "Image scene.",
+            "high_level_description": scene_desc,
             "style_description": infer_style(caption),
+            "light_direction": light_dir,
+            "light_setting":   light_setting,
             "compositional_deconstruction": {
                 "background": background or caption or "Background inferred from image.",
-                "elements":   ordered,
+                "elements":   [frame_element] + extra + ordered,
             },
         }
 

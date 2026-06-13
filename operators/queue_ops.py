@@ -762,9 +762,33 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             # pass content directly so _queue_insert_strip can create a TEXT strip.
             text_content = result
             fname = clean_filename(f"{snapshot['seed']}_{snapshot['prompt'][:40]}")
+            if snapshot.get("florence2_mode") == "IDEOGRAM4":
+                # Derive filename from scene description (shot type + unique content).
+                try:
+                    _desc = json.loads(result).get("high_level_description", "")
+                    if _desc:
+                        fname = clean_filename(_desc[:70])
+                except Exception:
+                    pass
+                # When sending to box editor: rename the rendered PNG to match the
+                # scene description so the image file and the JSON share the same name.
+                if snapshot.get("florence2_send_to_mask"):
+                    _src = snapshot.get("image_path") or snapshot.get("movie_path") or ""
+                    if _src and os.path.isfile(_src) and _src.lower().endswith(".png"):
+                        _new_src = os.path.join(os.path.dirname(_src), fname + ".png")
+                        if _new_src != _src:
+                            try:
+                                # os.replace overwrites existing destination (Windows-safe)
+                                os.replace(_src, _new_src)
+                                _src = _new_src
+                                print(f"[Queue] Florence2 PNG renamed → {_new_src!r}")
+                            except Exception as _rename_err:
+                                print(f"[Queue] Florence2 PNG rename failed: {_rename_err}")
+                    if _src:
+                        text_content = f"// image: {_src}\n" + text_content
             out_path = _queue_solve_path(fname + ".txt", generator_ai)
             with open(out_path, "w", encoding="utf-8") as _fh:
-                _fh.write(result)
+                _fh.write(text_content)
         elif result is not None and not isinstance(result, str):
             fname = clean_filename(f"{snapshot['seed']}_{snapshot['prompt']}")
             out_path = _queue_solve_path(fname + ".png", generator_ai)
@@ -948,6 +972,17 @@ class SEQUENCER_OT_add_to_queue(Operator):
             image_path = os.path.join(dirname, fname) if fname else ""
         elif strip.type == "MOVIE":
             movie_path = bpy.path.abspath(strip.filepath)
+        elif strip.type == "TEXT":
+            # Florence-2 output strips embed "// image: /path/to/file.png" as the
+            # first line of their text so they can be re-queued on the same image.
+            strip_text = getattr(strip, "text", "")
+            for _ln in strip_text.splitlines():
+                _ln = _ln.strip()
+                if _ln.startswith("// image:"):
+                    _candidate = _ln[len("// image:"):].strip()
+                    if _candidate and os.path.isfile(_candidate):
+                        image_path = _candidate
+                    break
         elif strip.type == "SOUND":
             # Assign to sound_path, NOT movie_path — otherwise _detect_mode
             # sees has_vid=True and incorrectly routes to vid2vid / img2vid.
@@ -1254,6 +1289,19 @@ class SEQUENCER_OT_add_to_queue(Operator):
                     else:
                         print(f"[Queue] SOUND trim failed, keeping raw: {sound_path!r}")
 
+                # Florence-2 (text) jobs: render the source strip to a single-frame
+                # PNG so the model and box editor both receive the correct trimmed
+                # first frame rather than the raw unclipped source file.
+                if otype == "text" and strip.type in ("IMAGE", "MOVIE") and (image_path or movie_path):
+                    from ..utils.helpers import render_strip_to_path
+                    _f2_rendered = render_strip_to_path(context, strip, image_output=True)
+                    if _f2_rendered:
+                        image_path = _f2_rendered
+                        movie_path = ""
+                        print(f"[Queue] Florence2 input rendered → {_f2_rendered!r}")
+                    else:
+                        print(f"[Queue] Florence2 input render failed, keeping raw")
+
                 # Compute audio start offset (seconds) from SOUND strip position in META
                 _audio_start_time = 0.0
                 if strip.type == "META" and sound_path:
@@ -1318,6 +1366,10 @@ class SEQUENCER_OT_add_to_queue(Operator):
                     # Also match when the plugin requires a strip (e.g. Stem Splitter).
                     _pi_req = _pi is not None and getattr(_pi, "requires_input_strip", False)
                     insert_dur = strip_dur if (audio_dur < 0 or _pi_req) else max(1, int(audio_dur))
+                elif otype == "text":
+                    # Text output (captions, transcriptions) always spans the full
+                    # input strip so it can be read/used for the strip's entire range.
+                    insert_dur = strip_dur
                 else:
                     insert_dur = gen_frames
                 # For SOUND strips generating audio or text (e.g. transcription):
@@ -1429,8 +1481,13 @@ class SEQUENCER_OT_add_to_queue(Operator):
 
                 # For TEXT strips: prepend the strip's text to the prompt,
                 # matching the non-queue behaviour: strip.text + ", " + base_prompt
+                # Strip // comment lines (Florence-2 metadata) before using as prompt.
                 if strip is not None and strip.type == "TEXT":
                     strip_text = getattr(strip, "text", "").strip()
+                    strip_text = "\n".join(
+                        ln for ln in strip_text.splitlines()
+                        if not ln.strip().startswith("//")
+                    ).strip()
                     if strip_text:
                         job.prompt = (strip_text + ", " + job.prompt) if job.prompt else strip_text
 
@@ -1904,8 +1961,15 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 except Exception:
                     pass
             if text_body:
+                # Use // comment-free text for the strip name so UIList looks clean,
+                # but keep // image: in strip.text so Florence-2 can recover the
+                # source image path when this strip is re-queued.
+                clean_name = "\n".join(
+                    ln for ln in text_body.splitlines()
+                    if not ln.strip().startswith("//")
+                ).strip()
                 new_strip = ed.strips.new_effect(
-                    name=text_body[:63],
+                    name=(clean_name or text_body)[:63],
                     type="TEXT",
                     frame_start=frame_start,
                     length=max(1, frame_end - frame_start),
@@ -1939,10 +2003,12 @@ def _queue_insert_strip(scene, result: dict) -> None:
     ):
         try:
             from .mask_florence2 import apply_florence_json_to_mask
-            apply_florence_json_to_mask(
-                result["text_content"],
-                result.get("florence2_source_image_path", ""),
-            )
+
+            # The worker already rendered the frame, ran Florence-2, built the
+            # name, renamed the PNG, and embedded "// image: <path>" in the JSON.
+            # Pass source_image_path="" so apply_florence_json_to_mask reads the
+            # path from the embedded comment instead of re-rendering here.
+            apply_florence_json_to_mask(result["text_content"], "")
         except Exception as _mex:
             print(f"[Queue] Florence2 mask creation failed: {_mex}")
 

@@ -279,40 +279,114 @@ def _spline_to_bbox(spline, W: int, H: int):
 
 
 # ---------------------------------------------------------------------------
-# Image loading (no operators)
+# Commented-JSON helpers  (// lines are treated as comments)
 # ---------------------------------------------------------------------------
 
-def _load_image(source_image_path: str):
-    if not source_image_path or not os.path.isfile(source_image_path):
-        print(f"[Florence2Mask] Image not found: {source_image_path!r}")
-        return None
-    abs_src = os.path.normcase(os.path.abspath(source_image_path))
-    for existing in bpy.data.images:
+def _parse_commented_json(text: str) -> "tuple[str, dict]":
+    """Strip // comment lines and return (clean_json_str, metadata_dict).
+
+    Lines whose first non-whitespace characters are ``//`` are treated as
+    comments and excluded from the JSON payload.  Key-value comments in the
+    form ``// key: value`` are collected into the returned metadata dict
+    (keys are lower-cased and stripped).
+    """
+    meta: dict = {}
+    json_lines: list = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("//"):
+            body = stripped[2:].strip()
+            if ":" in body:
+                k, _, v = body.partition(":")
+                meta[k.strip().lower()] = v.strip()
+        else:
+            json_lines.append(line)
+    return "\n".join(json_lines), meta
+
+
+# ---------------------------------------------------------------------------
+# Core: populate a mask from a parsed JSON dict
+# ---------------------------------------------------------------------------
+
+def _populate_mask_from_data(mask, data: dict, W: int, H: int) -> None:
+    """Write all props and layers from an Ideogram-4 data dict into *mask*."""
+    elements = data.get("compositional_deconstruction", {}).get("elements", [])
+
+    mp = mask.florence2_props
+    mp.f2_high_level_description = data.get("high_level_description", "")
+    mp.f2_background = data.get("compositional_deconstruction", {}).get("background", "")
+    style = data.get("style_description", {})
+    mp.f2_style_json = json.dumps(style, ensure_ascii=False)
+    mp.f2_is_photo   = "photo" in style
+    mp.f2_aesthetics = style.get("aesthetics", "")
+    mp.f2_lighting   = style.get("lighting", "")
+    mp.f2_photo      = style.get("photo", "")
+    mp.f2_medium     = style.get("medium", "")
+    mp.f2_art_style  = style.get("art_style", "")
+    _list_to_palette(mp.f2_style_palette, style.get("color_palette") or [])
+
+    for layer in list(mask.layers):
+        mask.layers.remove(layer)
+    _clear_layer_data(mask)
+
+    for elem in elements[:40]:
         try:
-            if os.path.normcase(os.path.abspath(bpy.path.abspath(existing.filepath))) == abs_src:
-                print(f"[Florence2Mask] Reusing existing image: {existing.name!r}")
-                return existing
-        except Exception:
-            pass
-    try:
-        img = bpy.data.images.load(source_image_path)
-        print(f"[Florence2Mask] Loaded image: {img.name!r}  size={img.size[:]}")
-        return img
-    except Exception as exc:
-        print(f"[Florence2Mask] Could not load image: {exc}")
-        return None
+            elem_type = elem.get("type", "obj")
+            desc      = (elem.get("desc") or "element").strip()
+            text_val  = (elem.get("text") or "").strip()
+            bbox      = elem.get("bbox") or [0, 0, 1000, 1000]
+
+            layer = mask.layers.new(name=_layer_name(elem_type, desc, text_val))
+            actual_name = layer.name
+            try:
+                layer.fill_color = _layer_fill_color(elem_type, desc)
+            except Exception:
+                pass
+            _add_layer_data(mask, actual_name, {
+                "type":  elem_type, "desc": desc, "text": text_val,
+                "color": elem.get("color", ""), "font": elem.get("font", ""), "bbox": bbox,
+            })
+            cx, cy, hx, hy = _bbox_to_mask(bbox, W, H)
+            hx = max(hx, 0.001)
+            hy = max(hy, 0.001)
+            spline = layer.splines.new()
+            spline.use_cyclic = True
+            spline.points.add(3)
+            corners = [
+                (cx - hx, cy - hy), (cx + hx, cy - hy),
+                (cx + hx, cy + hy), (cx - hx, cy + hy),
+            ]
+            for i, (px, py) in enumerate(corners):
+                pt = spline.points[i]
+                pt.co = pt.handle_left = pt.handle_right = (px, py)
+                pt.select_control_point = pt.select_left_handle = pt.select_right_handle = False
+                try:
+                    pt.handle_type = "VECTOR"
+                except AttributeError:
+                    pass
+            print(f"[Florence2Mask]   {actual_name!r}  {elem_type}  {bbox}")
+        except Exception as _elem_exc:
+            print(f"[Florence2Mask]   skipped element {elem.get('desc', '?')!r}: {_elem_exc}")
+
+    if mask.layers:
+        mask.active_layer_index = 0
 
 
 # ---------------------------------------------------------------------------
-# Core: build mask from JSON
+# Core: build mask from JSON  (generation callback — always creates new)
 # ---------------------------------------------------------------------------
 
 def apply_florence_json_to_mask(json_str: str, source_image_path: str) -> None:
-    """Parse Ideogram4 JSON, populate a Mask, open in Image Editor. Main thread."""
+    """Parse Ideogram4 JSON, populate a *new* Mask, open in Image Editor. Main thread."""
     print(f"[Florence2Mask] apply called, source={source_image_path!r}")
 
+    clean_json, meta = _parse_commented_json(json_str)
+    # Explicit arg wins; fall back to // image: comment embedded in the JSON.
+    if not source_image_path:
+        source_image_path = meta.get("image", "")
+
     try:
-        data = json.loads(json_str)
+        data = json.loads(clean_json)
     except Exception as exc:
         msg = f"JSON parse error: {exc}"
         print(f"[Florence2Mask] {msg}")
@@ -329,92 +403,31 @@ def apply_florence_json_to_mask(json_str: str, source_image_path: str) -> None:
     elements = data.get("compositional_deconstruction", {}).get("elements", [])
     print(f"[Florence2Mask] {len(elements)} element(s)")
 
-    img = _load_image(source_image_path)
+    # Always load a fresh image datablock (never reuse an existing one)
+    img = None
+    if source_image_path and os.path.isfile(source_image_path):
+        try:
+            img = bpy.data.images.load(source_image_path)
+            print(f"[Florence2Mask] Loaded image: {img.name!r}  size={img.size[:]}")
+        except Exception as exc:
+            print(f"[Florence2Mask] Could not load image: {exc}")
+    if img is None:
+        img = bpy.data.images.new("Box Editor", width=1920, height=1080)
+        print(f"[Florence2Mask] Created blank image: {img.name!r}")
+
     W = img.size[0] if img else 1920
     H = img.size[1] if img else 1080
 
-    # Get or create mask
-    if source_image_path:
-        mask_name = os.path.splitext(os.path.basename(source_image_path))[0][:63]
-    else:
-        mask_name = "Florence2"
-    mask = bpy.data.masks.get(mask_name) or bpy.data.masks.new(name=mask_name)
-    print(f"[Florence2Mask] Mask: {mask_name!r}")
+    # Always create a fresh mask; name it from the scene description.
+    mask_name = (data.get("high_level_description") or "Florence2")[:63]
+    mask = bpy.data.masks.new(name=mask_name)
+    # Give the image the same name so the panel can find it by mask.name lookup.
+    img.name = mask.name
+    print(f"[Florence2Mask] Mask/image: {mask.name!r}")
 
-    # Store mask-level props
-    mp = mask.florence2_props
-    mp.f2_high_level_description = data.get("high_level_description", "")
-    mp.f2_background = data.get("compositional_deconstruction", {}).get("background", "")
-    style = data.get("style_description", {})
-    mp.f2_style_json = json.dumps(style, ensure_ascii=False)  # legacy fallback
-    mp.f2_is_photo           = "photo" in style
-    mp.f2_aesthetics         = style.get("aesthetics", "")
-    mp.f2_lighting           = style.get("lighting", "")
-    mp.f2_photo              = style.get("photo", "")
-    mp.f2_medium             = style.get("medium", "")
-    mp.f2_art_style          = style.get("art_style", "")
-    _list_to_palette(mp.f2_style_palette, style.get("color_palette") or [])
-
-    # Clear everything
-    for layer in list(mask.layers):
-        mask.layers.remove(layer)
-    _clear_layer_data(mask)
-
-    # Add one layer per element
-    for elem in elements[:40]:
-        elem_type = elem.get("type", "obj")
-        desc      = (elem.get("desc") or "element").strip()
-        text_val  = (elem.get("text") or "").strip()
-        bbox      = elem.get("bbox") or [0, 0, 1000, 1000]
-
-        layer = mask.layers.new(name=_layer_name(elem_type, desc, text_val))
-        actual_name = layer.name
-
-        try:
-            layer.fill_color = _layer_fill_color(elem_type, desc)
-        except AttributeError:
-            pass
-
-        _add_layer_data(mask, actual_name, {
-            "type":  elem_type,
-            "desc":  desc,
-            "text":  text_val,
-            "color": elem.get("color", ""),
-            "font":  elem.get("font",  ""),
-            "bbox":  bbox,
-        })
-
-        cx, cy, hx, hy = _bbox_to_mask(bbox, W, H)
-        hx = max(hx, 0.001)
-        hy = max(hy, 0.001)
-        spline = layer.splines.new()
-        spline.use_cyclic = True
-        spline.points.add(3)
-        corners = [
-            (cx - hx, cy - hy),
-            (cx + hx, cy - hy),
-            (cx + hx, cy + hy),
-            (cx - hx, cy + hy),
-        ]
-        for i, (px, py) in enumerate(corners):
-            pt = spline.points[i]
-            pt.co           = (px, py)
-            pt.handle_left  = (px, py)
-            pt.handle_right = (px, py)
-            pt.select_control_point = False
-            pt.select_left_handle   = False
-            pt.select_right_handle  = False
-            try:
-                pt.handle_type = "VECTOR"
-            except AttributeError:
-                pass
-        print(f"[Florence2Mask]   {actual_name!r}  {elem_type}  {bbox}")
-
-    if mask.layers:
-        mask.active_layer_index = 0
-
+    _populate_mask_from_data(mask, data, W, H)
     _open_mask_in_editor(mask, img)
-    print(f"[Florence2Mask] Done — {len(elements)} layer(s) in {mask_name!r}")
+    print(f"[Florence2Mask] Done — {len(elements)} layer(s) in {mask.name!r}")
 
 
 # ---------------------------------------------------------------------------
@@ -429,12 +442,18 @@ def _open_mask_in_editor(mask, img) -> None:
         image_ed = next((a for a in areas if a.type == "IMAGE_EDITOR"), None)
 
         if image_ed is None:
+            # Prefer a dedicated PREVIEW area; fall back to any SEQUENCE_EDITOR.
             target = (
                 next(
                     (a for a in areas
                      if a.type == "SEQUENCE_EDITOR"
-                     and hasattr(a.spaces[0], "view_type")
-                     and a.spaces[0].view_type == "PREVIEW"),
+                     and getattr(a.spaces[0], "view_type", "") == "PREVIEW"),
+                    None,
+                )
+                or next(
+                    (a for a in areas
+                     if a.type == "SEQUENCE_EDITOR"
+                     and getattr(a.spaces[0], "view_type", "") == "SEQUENCER_PREVIEW"),
                     None,
                 )
                 or next((a for a in areas if a.type == "SEQUENCE_EDITOR"), None)
@@ -445,7 +464,17 @@ def _open_mask_in_editor(mask, img) -> None:
                 print("[Florence2Mask] No suitable area to split — open Image Editor manually.")
                 return
 
-            ids_before = {id(a) for a in areas}
+            # If target is the combined Sequencer+Preview, switch it to pure PREVIEW
+            # first so area_split doesn't unpack it into two separate panels.
+            if getattr(target.spaces[0], "view_type", "") == "SEQUENCER_PREVIEW":
+                try:
+                    target.spaces[0].view_type = "PREVIEW"
+                except Exception:
+                    pass
+
+            # Snapshot area coords before split; coord-based detection is more
+            # reliable than Python id() which can change after Blender reallocates.
+            coords_before = {(a.x, a.y, a.width, a.height) for a in screen.areas}
             try:
                 region = next(r for r in target.regions if r.type == "WINDOW")
                 with bpy.context.temp_override(window=window, area=target, region=region):
@@ -454,10 +483,15 @@ def _open_mask_in_editor(mask, img) -> None:
                 print(f"[Florence2Mask] Area split failed: {exc}")
                 return
 
-            image_ed = next((a for a in screen.areas if id(a) not in ids_before), None)
-            if image_ed is None:
+            new_areas = [
+                a for a in screen.areas
+                if (a.x, a.y, a.width, a.height) not in coords_before
+            ]
+            if not new_areas:
                 print("[Florence2Mask] Could not locate new area after split.")
                 return
+            # Take the rightmost new area (the split-off right half).
+            image_ed = max(new_areas, key=lambda a: a.x)
             image_ed.type = "IMAGE_EDITOR"
 
         space = image_ed.spaces[0]
@@ -563,6 +597,11 @@ class FLORENCE2_PT_mask_panel(Panel):
             return
 
         mp = mask.florence2_props
+
+        row = layout.row(align=True)
+        row.operator("florence2.new_box_editor", text="New",  icon="FILE_NEW")
+        row.operator("florence2.load_box_json",  text="Load", icon="FILEBROWSER")
+        row.operator("florence2.save_box_json",  text="Save", icon="FILE_TICK")
 
         # ── Scene-level description ──────────────────────────────────────────
         box = layout.box()
@@ -714,6 +753,189 @@ class FLORENCE2_OT_palette_remove(Operator):
 
 
 # ---------------------------------------------------------------------------
+# Shared serialization helper
+# ---------------------------------------------------------------------------
+
+def _mask_to_json_dict(mask, W: int = 1920, H: int = 1080) -> dict:
+    """Serialize a Box Editor mask to an Ideogram-4 JSON-compatible dict."""
+    mp = mask.florence2_props
+    elements = []
+    for layer in mask.layers:
+        ld = _get_layer_data(layer, mask)
+        if not ld:
+            continue
+        bbox = (_spline_to_bbox(layer.splines[0], W, H) if layer.splines
+                else json.loads(ld.f2_bbox or "[0,0,1000,1000]"))
+        cp = _palette_to_list(ld.f2_palette)
+        if not cp and ld.f2_type == "text":
+            hex_c = _color_to_hex(ld.f2_color)
+            if hex_c not in ("#FFFFFF", "#FEFEFE"):
+                cp = [hex_c]
+        if ld.f2_type == "text":
+            elem = {"type": "text", "bbox": bbox, "text": ld.f2_text, "desc": ld.f2_desc}
+            if cp:
+                elem["color_palette"] = cp
+        else:
+            elem = {"type": "obj", "bbox": bbox, "desc": ld.f2_desc}
+            if cp:
+                elem["color_palette"] = cp
+        elements.append(elem)
+
+    if mp.f2_aesthetics or mp.f2_lighting or mp.f2_medium:
+        style: dict = {}
+        if mp.f2_aesthetics: style["aesthetics"] = mp.f2_aesthetics
+        if mp.f2_lighting:   style["lighting"]   = mp.f2_lighting
+        if mp.f2_is_photo:
+            if mp.f2_photo:  style["photo"]  = mp.f2_photo
+            if mp.f2_medium: style["medium"] = mp.f2_medium
+        else:
+            if mp.f2_medium:    style["medium"]    = mp.f2_medium
+            if mp.f2_art_style: style["art_style"] = mp.f2_art_style
+        sp = _palette_to_list(mp.f2_style_palette)
+        if sp: style["color_palette"] = sp
+    else:
+        try:
+            style = json.loads(mp.f2_style_json) if mp.f2_style_json else {}
+        except Exception:
+            style = {}
+
+    return {
+        "high_level_description": mp.f2_high_level_description,
+        "style_description": style,
+        "compositional_deconstruction": {
+            "background": mp.f2_background,
+            "elements":   elements,
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# New / Load / Save operators
+# ---------------------------------------------------------------------------
+
+class FLORENCE2_OT_new_box_editor(Operator):
+    bl_idname      = "florence2.new_box_editor"
+    bl_label       = "New Box Editor"
+    bl_description = "Create a new empty Box Editor mask"
+    bl_options     = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        space = getattr(context, "space_data", None)
+        return space and space.type == "IMAGE_EDITOR"
+
+    def execute(self, _context):
+        bpy.ops.mask.new()
+        return {"FINISHED"}
+
+
+class FLORENCE2_OT_load_box_json(Operator):
+    bl_idname      = "florence2.load_box_json"
+    bl_label       = "Load JSON"
+    bl_description = "Load an Ideogram 4 JSON file into the Box Editor"
+    bl_options     = {"REGISTER", "UNDO"}
+
+    filepath:    StringProperty(subtype="FILE_PATH")
+    filter_glob: StringProperty(default="*.json", options={"HIDDEN"})
+
+    @classmethod
+    def poll(cls, context):
+        space = getattr(context, "space_data", None)
+        return space and space.type == "IMAGE_EDITOR"
+
+    def invoke(self, context, _event):
+        context.window_manager.fileselect_add(self)
+        return {"RUNNING_MODAL"}
+
+    def execute(self, context):
+        from pathlib import Path
+        try:
+            file_text = Path(self.filepath).read_text(encoding="utf-8")
+            clean, meta = _parse_commented_json(file_text)
+            data = json.loads(clean)
+        except Exception as exc:
+            self.report({"ERROR"}, f"Could not read/parse file: {exc}")
+            return {"CANCELLED"}
+
+        # Resolve background image from embedded // image: comment
+        img = None
+        img_path = meta.get("image", "")
+        if img_path:
+            img_abs = bpy.path.abspath(img_path)
+            if os.path.isfile(img_abs):
+                try:
+                    img = bpy.data.images.load(img_abs)
+                except Exception as exc:
+                    self.report({"WARNING"}, f"Could not load image: {exc}")
+            else:
+                self.report({"WARNING"}, f"Image not found: {img_path}")
+
+        bpy.ops.mask.new()
+        if img is None:
+            bpy.ops.image.new(name="Box Editor", width=1920, height=1080)
+
+        space = context.space_data
+        mask  = space.mask
+        if img is not None:
+            space.image = img
+        else:
+            img = space.image
+        W = img.size[0] if img else 1920
+        H = img.size[1] if img else 1080
+        _populate_mask_from_data(mask, data, W, H)
+        scene_name = (data.get("high_level_description") or "")[:63]
+        if scene_name:
+            mask.name = scene_name
+            if img:
+                img.name = mask.name
+        _open_mask_in_editor(mask, img)
+        return {"FINISHED"}
+
+
+class FLORENCE2_OT_save_box_json(Operator):
+    bl_idname      = "florence2.save_box_json"
+    bl_label       = "Save JSON"
+    bl_description = "Save the Box Editor layout to an Ideogram 4 JSON file"
+    bl_options     = {"REGISTER"}
+
+    filepath:     StringProperty(subtype="FILE_PATH")
+    filename_ext  = ".json"
+    filter_glob:  StringProperty(default="*.json", options={"HIDDEN"})
+
+    @classmethod
+    def poll(cls, context):
+        space = getattr(context, "space_data", None)
+        return space and space.type == "IMAGE_EDITOR" and getattr(space, "mask", None) is not None
+
+    def invoke(self, context, event):
+        mask = context.space_data.mask
+        self.filepath = (mask.name or "box_editor") + ".json"
+        context.window_manager.fileselect_add(self)
+        return {"RUNNING_MODAL"}
+
+    def execute(self, context):
+        from pathlib import Path
+        space = context.space_data
+        mask  = space.mask
+        img   = getattr(space, "image", None)
+        W     = img.size[0] if img else 1920
+        H     = img.size[1] if img else 1080
+        data      = _mask_to_json_dict(mask, W, H)
+        json_body = json.dumps(data, indent=2, ensure_ascii=False)
+        if img and getattr(img, "filepath", ""):
+            img_abs = bpy.path.abspath(img.filepath)
+            if os.path.isfile(img_abs):
+                json_body = f"// image: {img_abs}\n" + json_body
+        try:
+            Path(self.filepath).write_text(json_body, encoding="utf-8")
+        except Exception as exc:
+            self.report({"ERROR"}, f"Could not write file: {exc}")
+            return {"CANCELLED"}
+        self.report({"INFO"}, f"Saved: {self.filepath}")
+        return {"FINISHED"}
+
+
+# ---------------------------------------------------------------------------
 # Export operator
 # ---------------------------------------------------------------------------
 
@@ -735,72 +957,9 @@ class FLORENCE2_OT_export_strip(Operator):
         img   = getattr(space, "image", None)
         W     = img.size[0] if img else 1920
         H     = img.size[1] if img else 1080
-        mp    = mask.florence2_props
 
-        elements = []
-        for layer in mask.layers:
-            ld = _get_layer_data(layer, mask)
-            if not ld:
-                continue
-            bbox = (_spline_to_bbox(layer.splines[0], W, H) if layer.splines
-                    else json.loads(ld.f2_bbox or "[0,0,1000,1000]"))
-
-            # Per-element color_palette; for text fall back to f2_color if palette empty
-            cp = _palette_to_list(ld.f2_palette)
-            if not cp and ld.f2_type == "text":
-                hex_c = _color_to_hex(ld.f2_color)
-                if hex_c not in ("#FFFFFF", "#FEFEFE"):
-                    cp = [hex_c]
-
-            if ld.f2_type == "text":
-                # Schema key order: type, bbox, text, desc, color_palette
-                elem = {"type": "text", "bbox": bbox, "text": ld.f2_text, "desc": ld.f2_desc}
-                if cp:
-                    elem["color_palette"] = cp
-            else:
-                # Schema key order: type, bbox, desc, color_palette
-                elem = {"type": "obj", "bbox": bbox, "desc": ld.f2_desc}
-                if cp:
-                    elem["color_palette"] = cp
-            elements.append(elem)
-
-        # Build style_description from individual props; fall back to legacy JSON
-        if mp.f2_aesthetics or mp.f2_lighting or mp.f2_medium:
-            style = {}
-            if mp.f2_aesthetics:
-                style["aesthetics"] = mp.f2_aesthetics
-            if mp.f2_lighting:
-                style["lighting"] = mp.f2_lighting
-            if mp.f2_is_photo:
-                # key order: aesthetics, lighting, photo, medium, color_palette
-                if mp.f2_photo:
-                    style["photo"] = mp.f2_photo
-                if mp.f2_medium:
-                    style["medium"] = mp.f2_medium
-            else:
-                # key order: aesthetics, lighting, medium, art_style, color_palette
-                if mp.f2_medium:
-                    style["medium"] = mp.f2_medium
-                if mp.f2_art_style:
-                    style["art_style"] = mp.f2_art_style
-            sp = _palette_to_list(mp.f2_style_palette)
-            if sp:
-                style["color_palette"] = sp
-        else:
-            try:
-                style = json.loads(mp.f2_style_json) if mp.f2_style_json else {}
-            except Exception:
-                style = {}
-
-        result = {
-            "high_level_description": mp.f2_high_level_description,
-            "style_description": style,
-            "compositional_deconstruction": {
-                "background": mp.f2_background,
-                "elements":   elements,
-            },
-        }
-        json_str = json.dumps(result, separators=(",", ":"), ensure_ascii=False)
+        result   = _mask_to_json_dict(mask, W, H)
+        json_str = json.dumps(result, indent=2, ensure_ascii=False)
 
         seq_scene = getattr(context, "sequencer_scene", None) or context.scene
         if not seq_scene.sequence_editor:
@@ -990,6 +1149,77 @@ def _text_menu_draw(self, context):
 # ---------------------------------------------------------------------------
 
 _msgbus_owner = object()
+_last_mask_per_editor: dict = {}   # id(area) → last mask name; used by poll timer
+
+
+def _find_image_for_mask(mask):
+    """Find the background image for *mask* by trying several name forms."""
+    name = mask.name
+    # 1. exact datablock name (spaces, as set by img.name = mask.name)
+    img = bpy.data.images.get(name)
+    if img:
+        return img
+    # 2. underscores variant (clean_filename output)
+    name_under = name.replace(" ", "_")
+    img = bpy.data.images.get(name_under)
+    if img:
+        return img
+    # 3. with .png extension (Blender uses filename as initial datablock name)
+    img = bpy.data.images.get(name + ".png")
+    if img:
+        return img
+    img = bpy.data.images.get(name_under + ".png")
+    if img:
+        return img
+    # 4. match by filepath stem (most permissive — handles truncated names)
+    name_stem_lc = name_under.lower()
+    for img in bpy.data.images:
+        fp = img.filepath
+        if fp:
+            stem = os.path.splitext(os.path.basename(bpy.path.abspath(fp)))[0].lower()
+            if stem == name_stem_lc:
+                return img
+    return None
+
+
+def _auto_switch_image_for_mask():
+    """When the active mask changes, switch to the matching image (if it exists)."""
+    try:
+        for window in bpy.context.window_manager.windows:
+            for area in window.screen.areas:
+                if area.type != "IMAGE_EDITOR":
+                    continue
+                space = area.spaces[0]
+                mask = getattr(space, "mask", None)
+                if not mask:
+                    continue
+                img = _find_image_for_mask(mask)
+                if img and space.image is not img:
+                    space.image = img
+    except Exception:
+        pass
+
+
+def _poll_mask_change():
+    """Timer: poll every 0.25 s for mask changes and auto-switch the background image."""
+    try:
+        for window in bpy.context.window_manager.windows:
+            for area in window.screen.areas:
+                if area.type != "IMAGE_EDITOR":
+                    continue
+                space = area.spaces[0]
+                key = id(area)
+                mask = getattr(space, "mask", None)
+                mask_name = mask.name if mask else None
+                if _last_mask_per_editor.get(key) != mask_name:
+                    _last_mask_per_editor[key] = mask_name
+                    if mask:
+                        img = _find_image_for_mask(mask)
+                        if img and space.image is not img:
+                            space.image = img
+    except Exception:
+        pass
+    return 0.25
 
 
 def _tag_image_editors_redraw():
@@ -1078,41 +1308,15 @@ def _get_or_cache_active_mask():
     return None
 
 
-def _select_all_points_on_active_layer():
-    """msgbus callback: active_layer_index changed in UIList."""
-    try:
-        ctx_type = type(bpy.context).__name__
-        print(f"[F2SelectAll] called — context type={ctx_type!r}")
-
-        mask = _get_or_cache_active_mask()
-        print(f"[F2SelectAll] resolved mask={getattr(mask,'name',None)!r}")
-        if not mask:
-            print("[F2SelectAll] EARLY EXIT — no mask resolved by any method")
-            return
-
-        active = mask.layers.active
-        idx    = mask.active_layer_index
-        print(f"[F2SelectAll] layers.active={getattr(active,'name',None)!r}  active_layer_index={idx}")
-        if not active:
-            print("[F2SelectAll] EARLY EXIT — no active layer")
-            return
-
-        _do_select_all_on_active(mask)
-        _tag_image_editors_redraw()
-    except Exception as e:
-        import traceback
-        print(f"[F2SelectAll] ERROR: {e}")
-        traceback.print_exc()
-
-
 _last_selection_state   = None
 _last_active_layer_name = None   # tracks UIList / active-layer changes
+_suppress_select_all    = False  # True when active_layer_index was written by MethodB
 
 
 @bpy.app.handlers.persistent
 def _depsgraph_handler(scene, depsgraph=None):
     """Detect which layer the user clicked by scanning point selection state."""
-    global _last_selection_state, _last_active_layer_name, _active_mask_name
+    global _last_selection_state, _last_active_layer_name, _active_mask_name, _suppress_select_all
 
     # Resolve mask — also keeps _active_mask_name warm for msgbus callbacks
     mask = _get_or_cache_active_mask()
@@ -1127,8 +1331,11 @@ def _depsgraph_handler(scene, depsgraph=None):
     if cur_active_name != _last_active_layer_name:
         print(f"[F2Handler] active_layer changed: {_last_active_layer_name!r} -> {cur_active_name!r}")
         _last_active_layer_name = cur_active_name
-        if active_layer:
+        if active_layer and not _suppress_select_all:
+            # Only auto-select-all when the change came from a UIList click,
+            # not when _depsgraph_handler itself wrote active_layer_index (MethodB).
             _do_select_all_on_active(mask)
+        _suppress_select_all = False  # consume the flag regardless
         # Sync index in case Blender's active pointer is ahead of active_layer_index
         for i, layer in enumerate(mask.layers):
             if layer.name == cur_active_name and mask.active_layer_index != i:
@@ -1230,8 +1437,9 @@ def _depsgraph_handler(scene, depsgraph=None):
     for i, layer in enumerate(mask.layers):
         if layer.name == winner and mask.active_layer_index != i:
             print(f"[F2Handler] writing active_layer_index {mask.active_layer_index} -> {i}")
+            _suppress_select_all = True    # this write is programmatic — don't auto-select-all
             mask.active_layer_index = i
-            _last_active_layer_name = winner   # suppress the echo on next tick
+            _last_active_layer_name = winner
             break
 
     _tag_image_editors_redraw()
@@ -1247,6 +1455,9 @@ classes = [
     Florence2MaskProps,
     FLORENCE2_OT_palette_add,
     FLORENCE2_OT_palette_remove,
+    FLORENCE2_OT_new_box_editor,
+    FLORENCE2_OT_load_box_json,
+    FLORENCE2_OT_save_box_json,
     FLORENCE2_OT_export_strip,
     FLORENCE2_OT_layer_new_with_square,
     FLORENCE2_OT_open_box_editor,
@@ -1262,8 +1473,17 @@ def register():
         print(f"[Florence2Mask]   {cls.__name__}")
     bpy.types.Mask.florence2_props = PointerProperty(type=Florence2MaskProps)
 
-    # Ensure the "Send to Box Editor" scene toggle is always registered,
-    # even when the Florence-2 text captioning plugin has not been loaded.
+    # Ensure Florence-2 scene toggles are always registered so the panel
+    # can draw them even before the florence2.py plugin module is imported.
+    if not hasattr(bpy.types.Scene, "florence2_mode"):
+        bpy.types.Scene.florence2_mode = bpy.props.EnumProperty(
+            name="Mode",
+            items=[
+                ("CAPTION",   "Caption",  "Detailed image caption as plain text"),
+                ("IDEOGRAM4", "Box Json", "Extract structured Ideogram 4 prompt JSON"),
+            ],
+            default="CAPTION",
+        )
     if not hasattr(bpy.types.Scene, "florence2_send_to_mask"):
         bpy.types.Scene.florence2_send_to_mask = bpy.props.BoolProperty(
             name="Send to Box Editor",
@@ -1271,14 +1491,19 @@ def register():
             default=False,
         )
 
-    # When the user clicks a layer in the UIList, select all its points.
+    # Auto-switch background image when the user picks a different mask.
     bpy.msgbus.subscribe_rna(
-        key=(bpy.types.Mask, "active_layer_index"),
+        key=(bpy.types.SpaceImageEditor, "mask"),
         owner=_msgbus_owner,
         args=(),
-        notify=_select_all_points_on_active_layer,
+        notify=_auto_switch_image_for_mask,
     )
+
     # Redraw on layer select-flag or active-pointer changes.
+    # NOTE: active_layer_index is NOT subscribed here — writing it from the
+    # depsgraph handler's MethodB (canvas click) path would re-fire and call
+    # _do_select_all_on_active, clobbering the user's single-point selection.
+    # UIList-click detection is handled entirely inside _depsgraph_handler.
     for rna_key in (
         (bpy.types.MaskLayer, "select"),
         (bpy.types.MaskLayers, "active"),
@@ -1304,10 +1529,16 @@ def register():
 
     bpy.app.timers.register(_append_text_menu, first_interval=0.1)
 
+    # Poll timer: reliable fallback for mask→image auto-switch when msgbus misses events.
+    if not bpy.app.timers.is_registered(_poll_mask_change):
+        bpy.app.timers.register(_poll_mask_change, first_interval=1.0, persistent=True)
+
     print("[Florence2Mask] Registration complete")
 
 
 def unregister():
+    if bpy.app.timers.is_registered(_poll_mask_change):
+        bpy.app.timers.unregister(_poll_mask_change)
     if _depsgraph_handler in bpy.app.handlers.depsgraph_update_post:
         bpy.app.handlers.depsgraph_update_post.remove(_depsgraph_handler)
     try:
@@ -1317,6 +1548,8 @@ def unregister():
     bpy.msgbus.clear_by_owner(_msgbus_owner)
     if hasattr(bpy.types.Mask, "florence2_props"):
         del bpy.types.Mask.florence2_props
+    if hasattr(bpy.types.Scene, "florence2_mode"):
+        del bpy.types.Scene.florence2_mode
     if hasattr(bpy.types.Scene, "florence2_send_to_mask"):
         del bpy.types.Scene.florence2_send_to_mask
     for cls in reversed(classes):
