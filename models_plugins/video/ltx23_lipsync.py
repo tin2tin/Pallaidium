@@ -161,6 +161,12 @@ class LTX2_3LipSyncPlugin(ModelPlugin):
                 num_frames = max(9, ((inputs.frames - 1) // 8) * 8 + 1)
                 _audio_frames = int(((dur_s * fps + 7) // 8) * 8) + 1
                 if _audio_frames > num_frames + 8:
+                    print(f"[LTX23LipSync] WARN audio={_audio_frames} fr >> strip={num_frames} fr "
+                          f"(likely untrimmed MOVIE in META) — clamping to strip duration")
+                    dur_s = num_frames / fps
+                elif _audio_frames < num_frames - 8:
+                    print(f"[LTX23LipSync] WARN audio={_audio_frames} fr << strip={num_frames} fr "
+                          f"— audio shorter than strip, will be padded with silence")
                     dur_s = num_frames / fps
                 else:
                     dur_s = num_frames / fps
@@ -173,6 +179,12 @@ class LTX2_3LipSyncPlugin(ModelPlugin):
             num_frames = max(9, ((target - 1) // 8) * 8 + 1)
             dur_s = num_frames / fps
 
+        if inputs.frames > 0 and num_frames != inputs.frames:
+            print(f"[LTX23LipSync] Duration adjusted for 8n+1 alignment: "
+                  f"requested {inputs.frames} fr → {num_frames} fr ({num_frames / fps:.1f}s)")
+        elif inputs.frames == 0:
+            print(f"[LTX23LipSync] No strip selected — duration set by audio: "
+                  f"{num_frames} fr ({dur_s:.1f}s)")
         _flush()
 
         # ── Image Conditions ────────────────────────────────────────────────
@@ -206,6 +218,10 @@ class LTX2_3LipSyncPlugin(ModelPlugin):
                 except Exception as _e:
                     print(f"[LTX23LipSync] WARNING: skipping middle anchor {_mp!r}: {_e}")
             image_conditions.append(LTX2ImageCondition(image=last_input, frame=-1, strength=1.0))
+            _anchor_frames = [0] + [c.frame for c in image_conditions[1:-1]] + [num_frames - 1]
+            print(f"[LTX23LipSync] MODE: MULTI-ANCHOR — {len(image_conditions)} anchors at frames "
+                  f"{_anchor_frames} (of {num_frames})"
+                  + (f" [requested {inputs.frames}, adjusted for 8n+1]" if num_frames != inputs.frames else ""))
         elif image_input is not None and last_input is not None:
             image_conditions = [
                 LTX2ImageCondition(image=image_input, frame=0,  strength=1.0),

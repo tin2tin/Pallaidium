@@ -208,8 +208,12 @@ class LTX2_3MultiPlugin(ModelPlugin):
                 # Warn only when audio is genuinely much longer (trimming likely failed).
                 _audio_frames = int(((dur_s * fps + 7) // 8) * 8) + 1
                 if _audio_frames > num_frames + 8:
-                    print(f"[LTX23Multi] WARN audio={_audio_frames} fr >> requested={num_frames} fr "
-                          f"(likely untrimmed) — clamping dur_s")
+                    print(f"[LTX23Multi] WARN audio={_audio_frames} fr >> strip={num_frames} fr "
+                          f"(likely untrimmed MOVIE in META) — clamping to strip duration")
+                    dur_s = num_frames / fps
+                elif _audio_frames < num_frames - 8:
+                    print(f"[LTX23Multi] WARN audio={_audio_frames} fr << strip={num_frames} fr "
+                          f"— audio shorter than strip, will be padded with silence")
                     dur_s = num_frames / fps
                 else:
                     dur_s = num_frames / fps
@@ -222,7 +226,12 @@ class LTX2_3MultiPlugin(ModelPlugin):
             num_frames = max(9, ((target - 1) // 8) * 8 + 1)
             dur_s = num_frames / fps
             
-        # print(f"[DEBUG] Final Target Number of frames: {num_frames}")
+        if inputs.frames > 0 and num_frames != inputs.frames:
+            print(f"[LTX23Multi] Duration adjusted for 8n+1 alignment: "
+                  f"requested {inputs.frames} fr → {num_frames} fr ({num_frames / fps:.1f}s)")
+        elif inputs.frames == 0:
+            print(f"[LTX23Multi] No strip selected — duration set by audio: "
+                  f"{num_frames} fr ({dur_s:.1f}s)")
         _flush()
 
         # ── Parse Image Conditions (FLF / last-frame-only / single-frame) ─────
@@ -268,7 +277,10 @@ class LTX2_3MultiPlugin(ModelPlugin):
                 except Exception as _e:
                     print(f"[LTX23Multi] WARNING: skipping middle anchor {_mp!r}: {_e}")
             image_conditions.append(LTX2ImageCondition(image=last_input, frame=-1, strength=1.0))
-            print(f"[LTX23Multi] MODE: MULTI-ANCHOR — {len(image_conditions)} conditions, num_frames={num_frames}")
+            _anchor_frames = [0] + [c.frame for c in image_conditions[1:-1]] + [num_frames - 1]
+            print(f"[LTX23Multi] MODE: MULTI-ANCHOR — {len(image_conditions)} anchors at frames "
+                  f"{_anchor_frames} (of {num_frames})"
+                  + (f" [requested {inputs.frames}, adjusted for 8n+1]" if num_frames != inputs.frames else ""))
         elif image_input is not None and last_input is not None:
             # Mode A: FLF — hard anchor image 1 at start, soft keyframe image 2 at end
             image_conditions = [
@@ -509,7 +521,7 @@ class LTX2_3MultiPlugin(ModelPlugin):
             prompt_embeds=prompt_embeds.to(onload_device, dtype=torch_dtype),
             prompt_attention_mask=prompt_attention_mask.to(onload_device),
             latents=up_latent.to(onload_device, dtype=torch_dtype),
-            width=w, height=h, num_frames=num_frames,
+            width=w, height=h, num_frames=num_frames, frame_rate=fps,
             num_inference_steps=3,
             noise_scale=STAGE_2_DISTILLED_SIGMA_VALUES[0],
             sigmas=STAGE_2_DISTILLED_SIGMA_VALUES,
@@ -527,8 +539,17 @@ class LTX2_3MultiPlugin(ModelPlugin):
             if _modality_scale != 1.0:
                 refine_kw["modality_scale"] = _modality_scale
 
-        if audio_latent is not None:
-            refine_kw["audio_latents"] = audio_latent.to(onload_device, dtype=torch_dtype)
+        if image_conditions is not None and audio_conditions is not None:
+            refine_kw["stg_scale"] = 1.0
+            refine_kw["spatio_temporal_guidance_blocks"] = [28]
+            refine_kw["guidance_rescale"] = 0.7
+
+        # NOTE: do NOT pass audio_latents here. Supplying pre-encoded audio_latents
+        # makes the pipeline skip prepare_audio_latents_with_conditioning and zero out
+        # the audio conditioning mask, so Stage 2 stops attending to the locked source
+        # speech and washes out the lip sync from Stage 1. Re-deriving from
+        # audio_conditions re-locks the source speech (matching the single-stage lipsync
+        # plugin). The Stage-1 audio latent is still used as the final_a fallback below.
 
         with torch.inference_mode(), torch.autocast("cuda", dtype=torch_dtype):
             outputs2 = refine_pipe(**refine_kw)

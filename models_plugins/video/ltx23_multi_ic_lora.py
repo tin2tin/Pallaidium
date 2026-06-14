@@ -270,6 +270,12 @@ class LTX2_3MultiICLoRAPlugin(ModelPlugin):
                 num_frames = max(9, ((inputs.frames - 1) // 8) * 8 + 1)
                 _audio_frames = int(((dur_s * fps + 7) // 8) * 8) + 1
                 if _audio_frames > num_frames + 8:
+                    print(f"[LTX23ICLoRA] WARN audio={_audio_frames} fr >> strip={num_frames} fr "
+                          f"(likely untrimmed MOVIE in META) — clamping to strip duration")
+                    dur_s = num_frames / fps
+                elif _audio_frames < num_frames - 8:
+                    print(f"[LTX23ICLoRA] WARN audio={_audio_frames} fr << strip={num_frames} fr "
+                          f"— audio shorter than strip, will be padded with silence")
                     dur_s = num_frames / fps
                 else:
                     dur_s = num_frames / fps
@@ -282,6 +288,12 @@ class LTX2_3MultiICLoRAPlugin(ModelPlugin):
             num_frames = max(9, ((target - 1) // 8) * 8 + 1)
             dur_s = num_frames / fps
 
+        if inputs.frames > 0 and num_frames != inputs.frames:
+            print(f"[LTX23ICLoRA] Duration adjusted for 8n+1 alignment: "
+                  f"requested {inputs.frames} fr → {num_frames} fr ({num_frames / fps:.1f}s)")
+        elif inputs.frames == 0:
+            print(f"[LTX23ICLoRA] No strip selected — duration set by audio: "
+                  f"{num_frames} fr ({dur_s:.1f}s)")
         _flush()
 
         # ── Parse Image Conditions ──────────────────────────────────────────
