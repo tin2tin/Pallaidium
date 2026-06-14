@@ -539,17 +539,19 @@ class LTX2_3MultiPlugin(ModelPlugin):
             if _modality_scale != 1.0:
                 refine_kw["modality_scale"] = _modality_scale
 
-        if image_conditions is not None and audio_conditions is not None:
-            refine_kw["stg_scale"] = 1.0
-            refine_kw["spatio_temporal_guidance_blocks"] = [28]
-            refine_kw["guidance_rescale"] = 0.7
+        # NOTE: no STG / guidance_rescale in Stage 2. The real lip-sync fix was passing
+        # audio into Stage 2; the spatio-temporal guidance experiment added an extra
+        # forward pass per step (slow) and overcooked the image. Use pipeline defaults.
 
-        # NOTE: do NOT pass audio_latents here. Supplying pre-encoded audio_latents
-        # makes the pipeline skip prepare_audio_latents_with_conditioning and zero out
-        # the audio conditioning mask, so Stage 2 stops attending to the locked source
-        # speech and washes out the lip sync from Stage 1. Re-deriving from
-        # audio_conditions re-locks the source speech (matching the single-stage lipsync
-        # plugin). The Stage-1 audio latent is still used as the final_a fallback below.
+        # Audio into Stage 2:
+        #  - With input audio (audio_conditions set): re-lock the SOURCE audio via
+        #    audio_conditions (already added above) and do NOT pass audio_latents —
+        #    passing pre-encoded latents makes the pipeline ignore audio_conditions, so
+        #    Stage 2 would drift off the real speech and worsen lip sync.
+        #  - Without input audio: pass the Stage-1 generated audio latent so Stage 2
+        #    stays coherent with the audio the video was generated against.
+        if audio_conditions is None and audio_latent is not None:
+            refine_kw["audio_latents"] = audio_latent.to(onload_device, dtype=torch_dtype)
 
         with torch.inference_mode(), torch.autocast("cuda", dtype=torch_dtype):
             outputs2 = refine_pipe(**refine_kw)
