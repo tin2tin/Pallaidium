@@ -1274,14 +1274,14 @@ def _get_or_cache_active_mask():
     try:
         if hasattr(bpy.context, "edit_mask") and bpy.context.edit_mask is not None:
             _active_mask_name = bpy.context.edit_mask.name
-            print(f"[F2Mask] resolved via edit_mask: {_active_mask_name!r}")
+            _f2dbg(f"[F2Mask] resolved via edit_mask: {_active_mask_name!r}")
             return bpy.context.edit_mask
     except Exception:
         pass
 
     # 2. Name cache updated on every depsgraph tick
     if _active_mask_name and _active_mask_name in bpy.data.masks:
-        print(f"[F2Mask] resolved via name cache: {_active_mask_name!r}")
+        _f2dbg(f"[F2Mask] resolved via name cache: {_active_mask_name!r}")
         return bpy.data.masks[_active_mask_name]
 
     # 3. Walk all IMAGE_EDITOR areas in MASK mode
@@ -1294,7 +1294,7 @@ def _get_or_cache_active_mask():
                         m = getattr(space, "mask", None)
                         if m:
                             _active_mask_name = m.name
-                            print(f"[F2Mask] resolved via area scan: {_active_mask_name!r}")
+                            _f2dbg(f"[F2Mask] resolved via area scan: {_active_mask_name!r}")
                             return m
     except Exception:
         pass
@@ -1302,7 +1302,7 @@ def _get_or_cache_active_mask():
     # 4. Single-mask file shortcut
     if len(bpy.data.masks) == 1:
         _active_mask_name = bpy.data.masks[0].name
-        print(f"[F2Mask] resolved via single-mask fallback: {_active_mask_name!r}")
+        _f2dbg(f"[F2Mask] resolved via single-mask fallback: {_active_mask_name!r}")
         return bpy.data.masks[0]
 
     return None
@@ -1311,6 +1311,14 @@ def _get_or_cache_active_mask():
 _last_selection_state   = None
 _last_active_layer_name = None   # tracks UIList / active-layer changes
 _suppress_select_all    = False  # True when active_layer_index was written by MethodB
+
+# Set to True to print the verbose [F2Handler]/[F2Mask] layer-tracking trace.
+_F2_DEBUG = False
+
+
+def _f2dbg(*args, **kwargs):
+    if _F2_DEBUG:
+        print(*args, **kwargs)
 
 
 @bpy.app.handlers.persistent
@@ -1323,13 +1331,13 @@ def _depsgraph_handler(scene, depsgraph=None):
     if not mask:
         return
 
-    print(f"[F2Handler] TICK  mask={mask.name!r}  layers={len(mask.layers)}")
+    _f2dbg(f"[F2Handler] TICK  mask={mask.name!r}  layers={len(mask.layers)}")
 
     # ── UIList-click detection: active_layer pointer changed ──────────────────
     active_layer    = mask.layers.active
     cur_active_name = getattr(active_layer, "name", None)
     if cur_active_name != _last_active_layer_name:
-        print(f"[F2Handler] active_layer changed: {_last_active_layer_name!r} -> {cur_active_name!r}")
+        _f2dbg(f"[F2Handler] active_layer changed: {_last_active_layer_name!r} -> {cur_active_name!r}")
         _last_active_layer_name = cur_active_name
         if active_layer and not _suppress_select_all:
             # Only auto-select-all when the change came from a UIList click,
@@ -1339,7 +1347,7 @@ def _depsgraph_handler(scene, depsgraph=None):
         # Sync index in case Blender's active pointer is ahead of active_layer_index
         for i, layer in enumerate(mask.layers):
             if layer.name == cur_active_name and mask.active_layer_index != i:
-                print(f"[F2Handler] syncing active_layer_index -> {i}")
+                _f2dbg(f"[F2Handler] syncing active_layer_index -> {i}")
                 mask.active_layer_index = i
                 break
         _tag_image_editors_redraw()
@@ -1350,7 +1358,7 @@ def _depsgraph_handler(scene, depsgraph=None):
     # Method A: active_point on active layer
     active_splines  = active_layer.splines if active_layer else None
     active_point_ma = getattr(active_splines, "active_point", None)
-    print(f"[F2Handler] MethodA: active_layer={cur_active_name!r}  active_point={active_point_ma!r}")
+    _f2dbg(f"[F2Handler] MethodA: active_layer={cur_active_name!r}  active_point={active_point_ma!r}")
     if active_layer:
         active_spline = active_layer.splines.active
         active_point  = active_layer.splines.active_point
@@ -1370,10 +1378,10 @@ def _depsgraph_handler(scene, depsgraph=None):
     # Method B: scan select flags across ALL layers
     # (detects clicks on non-active layers — Blender marks the point selected
     #  but does NOT change mask.layers.active when clicking a foreign layer)
-    print(f"[F2Handler] MethodB: scanning {len(mask.layers)} layer(s)")
+    _f2dbg(f"[F2Handler] MethodB: scanning {len(mask.layers)} layer(s)")
     for layer in mask.layers:
         if layer.hide:
-            print(f"[F2Handler]   layer {layer.name!r} hidden, skipping")
+            _f2dbg(f"[F2Handler]   layer {layer.name!r} hidden, skipping")
             continue
         for sp_idx, spline in enumerate(layer.splines):
             for pt_idx, point in enumerate(spline.points):
@@ -1386,7 +1394,7 @@ def _depsgraph_handler(scene, depsgraph=None):
                         d["point_idx"]  == pt_idx
                         for d in current_selection
                     ):
-                        print(f"[F2Handler]   MethodB hit: layer={layer.name!r} sp={sp_idx} pt={pt_idx}")
+                        _f2dbg(f"[F2Handler]   MethodB hit: layer={layer.name!r} sp={sp_idx} pt={pt_idx}")
                         current_selection.append({
                             "layer_name": layer.name,
                             "spline_idx": sp_idx,
@@ -1396,10 +1404,10 @@ def _depsgraph_handler(scene, depsgraph=None):
 
     cur_summary  = [(d['layer_name'], d['is_active']) for d in current_selection]
     last_summary = [(d['layer_name'], d['is_active']) for d in (_last_selection_state or [])]
-    print(f"[F2Handler] current={cur_summary}  last={last_summary}")
+    _f2dbg(f"[F2Handler] current={cur_summary}  last={last_summary}")
 
     if current_selection == _last_selection_state:
-        print("[F2Handler] no change — skipping")
+        _f2dbg("[F2Handler] no change — skipping")
         return
 
     # Snapshot last_keys BEFORE updating state (winner logic reads it)
@@ -1421,22 +1429,22 @@ def _depsgraph_handler(scene, depsgraph=None):
         if (d["layer_name"], d["spline_idx"], d["point_idx"]) not in last_keys
            and not d["is_active"]   # MethodB entries only — ignore MethodA churn
     ]
-    print(f"[F2Handler] new_entries={[(d['layer_name'], d['point_idx']) for d in new_entries]}")
+    _f2dbg(f"[F2Handler] new_entries={[(d['layer_name'], d['point_idx']) for d in new_entries]}")
 
     if new_entries:
         winner = new_entries[0]["layer_name"]
-        print(f"[F2Handler] winner from new MethodB entry: {winner!r}")
+        _f2dbg(f"[F2Handler] winner from new MethodB entry: {winner!r}")
     else:
         winner = next(
             (d["layer_name"] for d in current_selection if d["is_active"]),
             current_selection[0]["layer_name"],
         )
-        print(f"[F2Handler] winner from existing selection: {winner!r}")
+        _f2dbg(f"[F2Handler] winner from existing selection: {winner!r}")
 
-    print(f"[F2Handler] winner={winner!r} current idx={mask.active_layer_index}")
+    _f2dbg(f"[F2Handler] winner={winner!r} current idx={mask.active_layer_index}")
     for i, layer in enumerate(mask.layers):
         if layer.name == winner and mask.active_layer_index != i:
-            print(f"[F2Handler] writing active_layer_index {mask.active_layer_index} -> {i}")
+            _f2dbg(f"[F2Handler] writing active_layer_index {mask.active_layer_index} -> {i}")
             _suppress_select_all = True    # this write is programmatic — don't auto-select-all
             mask.active_layer_index = i
             _last_active_layer_name = winner

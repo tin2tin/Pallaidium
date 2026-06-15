@@ -186,6 +186,7 @@ class RenderQueueJob(PropertyGroup):
     moss_temperature:     FloatProperty(default=1.7)
     moss_top_p:           FloatProperty(default=0.8)
     moss_top_k:           IntProperty(default=25)
+    moss_ref_audio_path:  StringProperty(default="")
 
     # Stem Splitter
     stem_split_model:  StringProperty(default="htdemucs_ft")
@@ -450,6 +451,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             moss_temperature      = snapshot.get("moss_temperature",      1.7),
             moss_top_p            = snapshot.get("moss_top_p",            0.8),
             moss_top_k            = snapshot.get("moss_top_k",            25),
+            moss_ref_audio_path   = snapshot.get("moss_ref_audio_path",   ""),
             florence2_mode         = snapshot.get("florence2_mode",         "CAPTION"),
             florence2_send_to_mask = snapshot.get("florence2_send_to_mask", False),
             klein_schematic_mode   = snapshot.get("klein_schematic_mode",   "DEPTH"),
@@ -865,6 +867,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             "moss_temperature":     snapshot.get("moss_temperature",     1.7),
             "moss_top_p":           snapshot.get("moss_top_p",           0.8),
             "moss_top_k":           snapshot.get("moss_top_k",           25),
+            "moss_ref_audio_path":  snapshot.get("moss_ref_audio_path",  ""),
         })
 
     except KeyboardInterrupt:
@@ -1230,6 +1233,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
             moss_temperature      = getattr(scene, "moss_temperature",      1.7),
             moss_top_p            = getattr(scene, "moss_top_p",            0.8),
             moss_top_k            = getattr(scene, "moss_top_k",            25),
+            moss_ref_audio_path   = getattr(scene, "moss_ref_audio_path",   ""),
             florence2_mode         = getattr(scene, "florence2_mode",         "CAPTION"),
             florence2_send_to_mask = getattr(scene, "florence2_send_to_mask", False),
             klein_schematic_mode   = getattr(scene, "klein_schematic_mode",   "DEPTH"),
@@ -1603,6 +1607,7 @@ def _queue_start_job(scene, job) -> None:
         "omnivoice_preprocess", "omnivoice_denoise", "omnivoice_postprocess",
         "moss_model_variant", "moss_language", "moss_duration_tokens",
         "moss_max_new_tokens", "moss_temperature", "moss_top_p", "moss_top_k",
+        "moss_ref_audio_path",
         "stem_split_model", "stem_split_vocals", "stem_split_drums",
         "stem_split_bass", "stem_split_other", "stem_split_guitar", "stem_split_piano",
         "qwen_strip_1_path", "qwen_strip_2_path", "qwen_strip_3_path",
@@ -2129,6 +2134,7 @@ def _queue_insert_strip(scene, result: dict) -> None:
                     ("moss_temperature",     1.7),
                     ("moss_top_p",           0.8),
                     ("moss_top_k",           25),
+                    ("moss_ref_audio_path",  ""),
                 ]:
                     _v = result.get(_k, _def)
                     # variant always written (identifies the run); others only if non-default
@@ -2414,6 +2420,7 @@ class SEQUENCER_OT_redo_from_job(Operator):
             scene.moss_temperature           = job.moss_temperature
             scene.moss_top_p                 = job.moss_top_p
             scene.moss_top_k                 = job.moss_top_k
+            scene.moss_ref_audio_path        = job.moss_ref_audio_path
 
         # Restore LoRA: scan full folder so all files appear in the UIList,
         # then apply saved enabled state and weights from the job snapshot.

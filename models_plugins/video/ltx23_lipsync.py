@@ -54,7 +54,11 @@ class LTX2_3LipSyncPlugin(ModelPlugin):
     REQUIRED_PACKAGES = ["torch", "torchaudio", "soundfile", "av", "diffusers", "transformers", "sdnq"]
     supports_inpaint  = False
 
-    def draw_custom_ui(self, _col, _context) -> bool:
+    def draw_custom_ui(self, col, context) -> bool:
+        # Expose the general ref_audio_path — the driving audio for lip sync.
+        row = col.row(align=True)
+        row.prop(context.scene, "ref_audio_path", text="Audio Ref.")
+        row.operator("sequencer.open_audio_filebrowser", text="", icon="FILEBROWSER")
         return False
 
     def load(self, prefs, scene, **kw):
@@ -245,12 +249,22 @@ class LTX2_3LipSyncPlugin(ModelPlugin):
             transformer=None, vae=None, audio_vae=None, vocoder=None, scheduler=None,
             torch_dtype=torch_dtype, cache_dir=_cache_dir, local_files_only=_lfo,
         )
-        embeds_pipe.to(onload_device)
+        # Stream Gemma3 leaf-by-leaf instead of residing the whole encoder on GPU.
+        # On low-VRAM cards (≤10 GB) a full .to(onload_device) makes text encoding the
+        # peak-memory step and OOMs at torch.stack(hidden_states) — especially on a
+        # second job where prior fragmentation leaves less headroom.
+        embeds_pipe.enable_group_offload(
+            onload_device=onload_device,
+            offload_type="leaf_level",
+            use_stream=True,
+            low_cpu_mem_usage=True,
+        )
         with torch.inference_mode():
             prompt_embeds, prompt_attention_mask, _, _ = embeds_pipe.encode_prompt(
                 prompt=inputs.prompt,
                 negative_prompt=inputs.neg_prompt,
                 do_classifier_free_guidance=False,
+                device=onload_device,
             )
         prompt_embeds         = prompt_embeds.detach().to(offload_device, copy=True)
         prompt_attention_mask = prompt_attention_mask.detach().to(offload_device, copy=True)

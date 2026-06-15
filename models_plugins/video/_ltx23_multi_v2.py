@@ -281,12 +281,22 @@ class LTX2_3MultiV2Plugin(ModelPlugin):
             scheduler=None,
             torch_dtype=torch_dtype, cache_dir=_cache_dir, local_files_only=_lfo,
         )
-        embeds_pipe.to(onload_device)
+        # Stream Gemma3 leaf-by-leaf instead of residing the whole encoder on GPU.
+        # On low-VRAM cards (≤10 GB) a full .to(onload_device) makes text encoding the
+        # peak-memory step and OOMs at torch.stack(hidden_states) — especially on a
+        # second job where prior fragmentation leaves less headroom.
+        embeds_pipe.enable_group_offload(
+            onload_device=onload_device,
+            offload_type="leaf_level",
+            use_stream=True,
+            low_cpu_mem_usage=True,
+        )
         with torch.inference_mode():
             prompt_embeds, prompt_attention_mask, neg_prompt_embeds, neg_prompt_attention_mask = embeds_pipe.encode_prompt(
                 prompt=inputs.prompt,
                 negative_prompt=inputs.neg_prompt or "",
                 do_classifier_free_guidance=True,
+                device=onload_device,
             )
         prompt_embeds               = prompt_embeds.detach().to(offload_device, copy=True)
         prompt_attention_mask       = prompt_attention_mask.detach().to(offload_device, copy=True)

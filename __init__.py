@@ -801,6 +801,16 @@ def register():
         soft_max=200,
         description="Audio top-k sampling cutoff (MOSS default 25; 0 disables top-k)",
     )
+    bpy.types.Scene.moss_ref_audio_path = bpy.props.StringProperty(
+        name="moss_ref_audio_path",
+        default="",
+        description=(
+            "Path to a speaker reference audio for MOSS voice cloning (v1.5). Use a "
+            "clean 24kHz+ mono clip. Ignored by VoiceGenerator, which designs a voice "
+            "from the prompt text."
+        ),
+        options={"TEXTEDIT_UPDATE"},
+    )
 
     # Fix read-only file attributes pip sometimes leaves on Windows.
     # Runs in a daemon thread so it doesn't slow down Blender startup.
@@ -996,7 +1006,8 @@ def unregister():
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
     for _prop in ("moss_model_variant", "moss_language", "moss_duration_tokens",
-                  "moss_max_new_tokens", "moss_temperature", "moss_top_p", "moss_top_k"):
+                  "moss_max_new_tokens", "moss_temperature", "moss_top_p", "moss_top_k",
+                  "moss_ref_audio_path"):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
     for _prop in (

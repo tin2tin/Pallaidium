@@ -43,7 +43,9 @@ class MossTTSPlugin(ModelPlugin):
         "duration control & inline pauses (OpenMOSS-Team/MOSS-TTS)"
     )
 
-    INPUTS       = InputSpec.PROMPT | InputSpec.AUDIO_REF
+    # MOSS reads its own moss_ref_audio_path (drawn in draw_custom_ui), so it does
+    # not use the shared AUDIO_REF / ref_audio_path collection path.
+    INPUTS       = InputSpec.PROMPT
     UI_SECTIONS  = [
         UISection.PROMPT,
         UISection.SEED,
@@ -232,7 +234,9 @@ class MossTTSPlugin(ModelPlugin):
             "temperature":     float(getattr(scene, "moss_temperature", 1.7)),
             "top_p":           float(getattr(scene, "moss_top_p",       0.8)),
             "top_k":           int(getattr(scene, "moss_top_k",         25)),
-            "ref_audio":       inputs.audio_ref or None,
+            # MOSS uses its own moss_ref_audio_path (independent of the shared
+            # ref_audio_path), carried through the queue like the other moss_* props.
+            "ref_audio":       (getattr(scene, "moss_ref_audio_path", "") or "").strip() or None,
         }
         # VoiceGenerator designs a voice from the text prompt — it takes no
         # reference audio, so ignore any stale Speaker Ref. value.
@@ -379,11 +383,14 @@ class MossTTSPlugin(ModelPlugin):
         col.separator()
 
         # Voice clone — reference audio. Hidden for VoiceGenerator, which designs
-        # a voice from the text prompt and takes no reference audio.
+        # a voice from the text prompt and takes no reference audio. MOSS uses its
+        # own moss_ref_audio_path, independent of the shared ref_audio_path.
         if variant != "voicegen":
             row = col.row(align=True)
-            row.prop(scene, "ref_audio_path", text="Speaker Ref.")
-            row.operator("sequencer.open_audio_filebrowser", text="", icon="FILEBROWSER")
+            row.prop(scene, "moss_ref_audio_path", text="Speaker Ref.")
+            row.operator(
+                "sequencer.open_audio_filebrowser", text="", icon="FILEBROWSER",
+            ).target_prop = "moss_ref_audio_path"
             col.separator()
 
         col.prop(scene, "moss_duration_tokens")

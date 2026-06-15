@@ -81,6 +81,10 @@ class LTX2_3MultiICLoRAPlugin(ModelPlugin):
 
     def draw_custom_ui(self, col, context) -> bool:
         scene = context.scene
+        # Expose the general ref_audio_path — the target audio condition.
+        row = col.row(align=True)
+        row.prop(scene, "ref_audio_path", text="Audio Ref.")
+        row.operator("sequencer.open_audio_filebrowser", text="", icon="FILEBROWSER")
         if scene.sequence_editor:
             col.prop_search(
                 scene, "ltx23ic_control_strip",
@@ -363,12 +367,22 @@ class LTX2_3MultiICLoRAPlugin(ModelPlugin):
             scheduler=None,
             torch_dtype=torch_dtype, cache_dir=_cache_dir, local_files_only=_lfo,
         )
-        embeds_pipe.to(onload_device)
+        # Stream Gemma3 leaf-by-leaf instead of residing the whole encoder on GPU.
+        # On low-VRAM cards (≤10 GB) a full .to(onload_device) makes text encoding the
+        # peak-memory step and OOMs at torch.stack(hidden_states) — especially on a
+        # second job where prior fragmentation leaves less headroom.
+        embeds_pipe.enable_group_offload(
+            onload_device=onload_device,
+            offload_type="leaf_level",
+            use_stream=True,
+            low_cpu_mem_usage=True,
+        )
         with torch.inference_mode():
             prompt_embeds, prompt_attention_mask, _, _ = embeds_pipe.encode_prompt(
                 prompt=inputs.prompt,
                 negative_prompt=inputs.neg_prompt,
                 do_classifier_free_guidance=False,
+                device=onload_device,
             )
         prompt_embeds         = prompt_embeds.detach().to(offload_device, copy=True)
         prompt_attention_mask = prompt_attention_mask.detach().to(offload_device, copy=True)

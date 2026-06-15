@@ -3025,6 +3025,7 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
             ("moss_temperature",     float),
             ("moss_top_p",           float),
             ("moss_top_k",           int),
+            ("moss_ref_audio_path",  str),
         ]:
             _v = _get(_attr)
             if _v is not None and hasattr(scene, _attr):

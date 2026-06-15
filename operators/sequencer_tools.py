@@ -19,6 +19,10 @@ class SequencerOpenAudioFile(Operator, ImportHelper):
         default="*.wav;",
         options={"HIDDEN"},
     )
+    # Which scene StringProperty to write the chosen path into. Defaults to the
+    # shared ref_audio_path; plugins with their own field (e.g. MOSS-TTS) pass
+    # their property name here.
+    target_prop: StringProperty(default="ref_audio_path", options={"HIDDEN"})
 
     def execute(self, context):
         scene = context.scene
@@ -27,7 +31,11 @@ class SequencerOpenAudioFile(Operator, ImportHelper):
             filename, extension = os.path.splitext(self.filepath)
             if extension.lower() in valid_extensions:
                 print("Selected audio file:", self.filepath)
-                scene.ref_audio_path = bpy.path.abspath(self.filepath)
+                target = self.target_prop or "ref_audio_path"
+                if hasattr(scene, target):
+                    setattr(scene, target, bpy.path.abspath(self.filepath))
+                else:
+                    scene.ref_audio_path = bpy.path.abspath(self.filepath)
             else:
                 print("Info: Only wav is allowed.")
         else:
