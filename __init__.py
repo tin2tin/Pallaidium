@@ -726,6 +726,82 @@ def register():
         description="Strip trailing silence from the generated audio output",
     )
 
+    # MOSS-TTS
+    from .utils.moss_tts_langs import MOSS_LANG_ITEMS as _MOSS_LANGS
+    bpy.types.Scene.moss_model_variant = bpy.props.EnumProperty(
+        name="Variant",
+        items=[
+            ("v1.5",     "MOSS-TTS-v1.5 (8B)",
+             "Flagship. Best quality, voice cloning + 31 languages (incl. Danish) + "
+             "duration control. Honours the Language setting and inline [pause Ns]. "
+             "Needs ~16GB+ VRAM. Recommended for non-English text."),
+            ("voicegen", "MOSS-VoiceGenerator (1.7B)",
+             "Designs a NEW voice from a text description in the prompt — no reference "
+             "audio (the Speaker Ref. field is hidden). Describe the voice, then the "
+             "line to speak, e.g. 'A calm young woman. Hello, welcome!'"),
+        ],
+        default="v1.5",
+        description="Which MOSS-TTS model variant to load (downloaded on first use)",
+    )
+    bpy.types.Scene.moss_language = bpy.props.EnumProperty(
+        name="Language",
+        items=_MOSS_LANGS,
+        default="AUTO",
+        description=(
+            "Output language. Setting it explicitly improves quality on v1.5/TTSD — "
+            "recommended whenever you know the language. AUTO lets the model infer it "
+            "from the prompt. NOTE: MOSS-TTS-Nano ignores this and always auto-detects."
+        ),
+    )
+    bpy.types.Scene.moss_duration_tokens = bpy.props.IntProperty(
+        name="Duration Tokens",
+        default=0,
+        min=0,
+        soft_max=2048,
+        description=(
+            "Token-level duration control. 0 = automatic length. A positive value "
+            "forces a target length (v1.5: audio tokens; Nano: audio frames) — higher "
+            "= longer. For precise pauses, prefer inline [pause 1.5s] markers in the "
+            "prompt (v1.5)."
+        ),
+    )
+    bpy.types.Scene.moss_max_new_tokens = bpy.props.IntProperty(
+        name="Max New Tokens",
+        default=4096,
+        min=64,
+        soft_max=8192,
+        description=(
+            "Upper bound on generated length, in audio tokens (v1.5/TTSD/VoiceGenerator). "
+            "Raise it for long passages. Nano uses 'Duration Tokens' as a frame count "
+            "instead and ignores this."
+        ),
+    )
+    bpy.types.Scene.moss_temperature = bpy.props.FloatProperty(
+        name="Temperature",
+        default=1.7,
+        min=0.0,
+        soft_max=2.0,
+        description=(
+            "Audio sampling temperature. 1.7 is the MOSS default. Lower (~0.8-1.2) = "
+            "steadier/cleaner; higher = more varied prosody but more artefacts. On v1.5, "
+            "0 switches to greedy (deterministic)."
+        ),
+    )
+    bpy.types.Scene.moss_top_p = bpy.props.FloatProperty(
+        name="Top-p",
+        default=0.8,
+        min=0.0,
+        max=1.0,
+        description="Audio nucleus-sampling probability mass (MOSS default 0.8)",
+    )
+    bpy.types.Scene.moss_top_k = bpy.props.IntProperty(
+        name="Top-k",
+        default=25,
+        min=0,
+        soft_max=200,
+        description="Audio top-k sampling cutoff (MOSS default 25; 0 disables top-k)",
+    )
+
     # Fix read-only file attributes pip sometimes leaves on Windows.
     # Runs in a daemon thread so it doesn't slow down Blender startup.
     import threading as _threading
@@ -917,6 +993,10 @@ def unregister():
             delattr(bpy.types.Scene, _prop)
     for _prop in ("omnivoice_language", "omnivoice_instruct", "omnivoice_preprocess",
                   "omnivoice_denoise", "omnivoice_postprocess"):
+        if hasattr(bpy.types.Scene, _prop):
+            delattr(bpy.types.Scene, _prop)
+    for _prop in ("moss_model_variant", "moss_language", "moss_duration_tokens",
+                  "moss_max_new_tokens", "moss_temperature", "moss_top_p", "moss_top_k"):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
     for _prop in (

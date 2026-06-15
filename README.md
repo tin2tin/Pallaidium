@@ -136,6 +136,8 @@ The generated media will be saved to the directory specified in the addon prefer
 
 ## Change Log
 
+2026-06-15: Add: MOSS-TTS (v1.5 + Voice Generator) — expressive multilingual text-to-speech (OpenMOSS-Team/MOSS-TTS family) with zero-shot voice cloning, 31 languages (incl. Danish), token-level duration control, and inline `[pause Ns]` markers. A **Variant** dropdown selects MOSS-TTS-v1.5 (8B, flagship voice cloning) or MOSS-VoiceGenerator (1.7B, designs a new voice from a text prompt — no reference audio). Language, duration tokens, max-new-tokens, temperature, top-p and top-k are exposed in the UI, carried through the Render Queue, written to strip metadata, and restored on redo. Runs on the existing transformers stack via `trust_remote_code` — no new dependencies. HF download and generation progress are shown in the queue. Also extends the AI-Metadata panel and "Redo from Metadata" to SOUND (audio) strips.
+
 2026-06-12: Fix: Ideogram 4 — switch default weights to `ideogram-ai/ideogram-4-nf4-diffusers` (~10.5 GB NF4) instead of the 17.9 GB SDNQ FP8 model. Adds HuggingFace token login before loading. Re-enables FP8 MatMul acceleration (SDNQ models only). Adds VAE tiling and slicing to reduce memory spikes during decoding. Adds optional `torch.compile` support for transformer blocks.
 
 2026-06-12: Fix: Progress phase display — queue job runner now correctly shows "Downloading model" only for byte-unit tqdm bars and "Loading model" for all other tqdm activity. Applies to both the threaded and main-thread job execution paths.
@@ -482,6 +484,7 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 ### Audio:
 - [Chatterbox / Chatterbox Turbo](https://github.com/resemble-ai/chatterbox)
 - [OmniVoice](https://github.com/k2-fsa/OmniVoice)
+- [MOSS-TTS-v1.5](https://huggingface.co/OpenMOSS-Team/MOSS-TTS-v1.5)
 - [MMAudio](https://github.com/hkchengrex/MMAudio)
 - [ACE Step](https://github.com/ace-step/ACE-Step)
 - [stabilityai/stable-audio-open-1.0](https://huggingface.co/stabilityai/stable-audio-open-1.0)

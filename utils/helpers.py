@@ -2917,11 +2917,19 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
         # Set typeselect + model first — input_strips_updated fires here and
         # overwrites x/y/frames with model defaults.  All explicit values
         # are written afterwards so they win over those defaults.
-        output_type = "movie" if strip.type == 'MOVIE' else "image"
+        if strip.type == 'MOVIE':
+            output_type = "movie"
+        elif strip.type == 'SOUND':
+            output_type = "audio"
+        else:
+            output_type = "image"
         scene.generatorai_typeselect = output_type
 
         model = _get("model")
-        model_attr = "movie_model_card" if output_type == "movie" else "image_model_card"
+        model_attr = {
+            "movie": "movie_model_card",
+            "audio": "audio_model_card",
+        }.get(output_type, "image_model_card")
         if model:
             try:
                 setattr(prefs, model_attr, str(model))
@@ -3008,6 +3016,23 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
                 except Exception:
                     pass
 
+        # MOSS-TTS params (audio strips)
+        for _attr, _cast in [
+            ("moss_model_variant",   str),
+            ("moss_language",        str),
+            ("moss_duration_tokens", int),
+            ("moss_max_new_tokens",  int),
+            ("moss_temperature",     float),
+            ("moss_top_p",           float),
+            ("moss_top_k",           int),
+        ]:
+            _v = _get(_attr)
+            if _v is not None and hasattr(scene, _attr):
+                try:
+                    setattr(scene, _attr, _cast(_v))
+                except Exception:
+                    pass
+
         # Restore LoRA: scan full folder so all files appear in the UIList,
         # then mark the saved (enabled) ones and restore their weights.
         lora_folder = _get("lora_folder")
@@ -3060,7 +3085,7 @@ class AI_Metadata_PT_Panel(bpy.types.Panel):
             seq_scene = getattr(context, 'sequencer_scene', None) or context.scene
             if seq_scene and seq_scene.sequence_editor:
                 active_strip = seq_scene.sequence_editor.active_strip
-                if active_strip and active_strip.type in {'IMAGE', 'MOVIE'}:
+                if active_strip and active_strip.type in {'IMAGE', 'MOVIE', 'SOUND'}:
                     return True
         return False
 

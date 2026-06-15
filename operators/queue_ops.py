@@ -178,6 +178,15 @@ class RenderQueueJob(PropertyGroup):
     omnivoice_denoise:     BoolProperty(default=True)
     omnivoice_postprocess: BoolProperty(default=True)
 
+    # MOSS-TTS
+    moss_model_variant:   StringProperty(default="v1.5")
+    moss_language:        StringProperty(default="AUTO")
+    moss_duration_tokens: IntProperty(default=0)
+    moss_max_new_tokens:  IntProperty(default=4096)
+    moss_temperature:     FloatProperty(default=1.7)
+    moss_top_p:           FloatProperty(default=0.8)
+    moss_top_k:           IntProperty(default=25)
+
     # Stem Splitter
     stem_split_model:  StringProperty(default="htdemucs_ft")
     stem_split_vocals: BoolProperty(default=True)
@@ -434,6 +443,13 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             omnivoice_preprocess  = snapshot.get("omnivoice_preprocess",  True),
             omnivoice_denoise     = snapshot.get("omnivoice_denoise",     True),
             omnivoice_postprocess = snapshot.get("omnivoice_postprocess", True),
+            moss_model_variant    = snapshot.get("moss_model_variant",    "v1.5"),
+            moss_language         = snapshot.get("moss_language",         "AUTO"),
+            moss_duration_tokens  = snapshot.get("moss_duration_tokens",  0),
+            moss_max_new_tokens   = snapshot.get("moss_max_new_tokens",   4096),
+            moss_temperature      = snapshot.get("moss_temperature",      1.7),
+            moss_top_p            = snapshot.get("moss_top_p",            0.8),
+            moss_top_k            = snapshot.get("moss_top_k",            25),
             florence2_mode         = snapshot.get("florence2_mode",         "CAPTION"),
             florence2_send_to_mask = snapshot.get("florence2_send_to_mask", False),
             klein_schematic_mode   = snapshot.get("klein_schematic_mode",   "DEPTH"),
@@ -841,6 +857,14 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             "ltx23ic_identity_guidance":   snapshot.get("ltx23ic_identity_guidance",   0.0),
             "florence2_send_to_mask":      snapshot.get("florence2_send_to_mask",      False),
             "florence2_source_image_path": snapshot.get("image_path") or snapshot.get("movie_path") or "",
+            # MOSS-TTS
+            "moss_model_variant":   snapshot.get("moss_model_variant",   "v1.5"),
+            "moss_language":        snapshot.get("moss_language",        "AUTO"),
+            "moss_duration_tokens": snapshot.get("moss_duration_tokens", 0),
+            "moss_max_new_tokens":  snapshot.get("moss_max_new_tokens",  4096),
+            "moss_temperature":     snapshot.get("moss_temperature",     1.7),
+            "moss_top_p":           snapshot.get("moss_top_p",           0.8),
+            "moss_top_k":           snapshot.get("moss_top_k",           25),
         })
 
     except KeyboardInterrupt:
@@ -1199,6 +1223,13 @@ class SEQUENCER_OT_add_to_queue(Operator):
             omnivoice_preprocess  = getattr(scene, "omnivoice_preprocess",  True),
             omnivoice_denoise     = getattr(scene, "omnivoice_denoise",     True),
             omnivoice_postprocess = getattr(scene, "omnivoice_postprocess", True),
+            moss_model_variant    = getattr(scene, "moss_model_variant",    "v1.5"),
+            moss_language         = getattr(scene, "moss_language",         "AUTO"),
+            moss_duration_tokens  = getattr(scene, "moss_duration_tokens",  0),
+            moss_max_new_tokens   = getattr(scene, "moss_max_new_tokens",   4096),
+            moss_temperature      = getattr(scene, "moss_temperature",      1.7),
+            moss_top_p            = getattr(scene, "moss_top_p",            0.8),
+            moss_top_k            = getattr(scene, "moss_top_k",            25),
             florence2_mode         = getattr(scene, "florence2_mode",         "CAPTION"),
             florence2_send_to_mask = getattr(scene, "florence2_send_to_mask", False),
             klein_schematic_mode   = getattr(scene, "klein_schematic_mode",   "DEPTH"),
@@ -1570,6 +1601,8 @@ def _queue_start_job(scene, job) -> None:
         "whisper_model_size", "whisper_language",
         "omnivoice_instruct", "omnivoice_language",
         "omnivoice_preprocess", "omnivoice_denoise", "omnivoice_postprocess",
+        "moss_model_variant", "moss_language", "moss_duration_tokens",
+        "moss_max_new_tokens", "moss_temperature", "moss_top_p", "moss_top_k",
         "stem_split_model", "stem_split_vocals", "stem_split_drums",
         "stem_split_bass", "stem_split_other", "stem_split_guitar", "stem_split_piano",
         "qwen_strip_1_path", "qwen_strip_2_path", "qwen_strip_3_path",
@@ -2085,6 +2118,22 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 _v = result.get(_k)
                 if _v is not None:
                     extra_meta[_k] = _v
+            # MOSS-TTS — write only when it was the model used, so other models'
+            # strips don't carry irrelevant TTS metadata.
+            if result.get("model_card", "") == "MOSS-TTS":
+                for _k, _def in [
+                    ("moss_model_variant",   "v1.5"),
+                    ("moss_language",        "AUTO"),
+                    ("moss_duration_tokens", 0),
+                    ("moss_max_new_tokens",  4096),
+                    ("moss_temperature",     1.7),
+                    ("moss_top_p",           0.8),
+                    ("moss_top_k",           25),
+                ]:
+                    _v = result.get(_k, _def)
+                    # variant always written (identifies the run); others only if non-default
+                    if _k == "moss_model_variant" or _v != _def:
+                        extra_meta[_k] = _v
 
             set_ai_metadata_from_dict(new_strip, {
                 "model":           result.get("model_card", ""),
@@ -2356,6 +2405,15 @@ class SEQUENCER_OT_redo_from_job(Operator):
             scene.whisper_model_size         = job.whisper_model_size
         if hasattr(scene, "whisper_language") and job.whisper_language:
             scene.whisper_language           = job.whisper_language
+        # MOSS-TTS
+        if hasattr(scene, "moss_model_variant"):
+            scene.moss_model_variant         = job.moss_model_variant
+            scene.moss_language              = job.moss_language
+            scene.moss_duration_tokens       = job.moss_duration_tokens
+            scene.moss_max_new_tokens        = job.moss_max_new_tokens
+            scene.moss_temperature           = job.moss_temperature
+            scene.moss_top_p                 = job.moss_top_p
+            scene.moss_top_k                 = job.moss_top_k
 
         # Restore LoRA: scan full folder so all files appear in the UIList,
         # then apply saved enabled state and weights from the job snapshot.
