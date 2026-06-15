@@ -223,7 +223,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         or image_model_card == "yuvraj108c/FLUX.1-Kontext-dev"
                         or (plugin is not None and getattr(plugin, "inpaint_uses_strength", False))
                     )
-                    if input == "input_strips" and _show_strength:
+                    if input == "input_strips" and _show_strength and getattr(plugin, "uses_strip_power", True):
                         col = col.column(heading="Use", align=True)
                         col.prop(context.scene, "image_power", text="Strip Power")
 

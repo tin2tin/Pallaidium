@@ -1,6 +1,17 @@
 import platform
 gfx_device = "cpu"
 os_platform = platform.system()
+
+
+# Set True to re-enable [render_meta_child_to_path] debug logging.
+_DEBUG = False
+
+
+def _dbg(*args, **kwargs):
+    if _DEBUG:
+        print(*args, **kwargs)
+
+
 import bpy
 from bpy_extras.io_utils import ExportHelper
 import ctypes
@@ -1777,20 +1788,26 @@ def render_meta_child_to_path(context, meta_strip, child_strip, image_output=Fal
                 os.path.join(rendered_dir, f"{safe_name}_{render_start:06d}_meta_audio.wav"))
             _fps_sound   = vse_scene.render.fps / max(1.0, getattr(vse_scene.render, 'fps_base', 1.0))
             _expected_s  = meta_strip.frame_final_duration / _fps_sound
-            _child_dur_s = child_strip.frame_final_duration / _fps_sound
-            _src_start_s = child_strip.frame_offset_start / _fps_sound
+            # How many seconds the META's trim clips from the child's beginning.
+            # When child starts before meta_final_start, that many seconds of the
+            # child are invisible; we must skip them in both the source read and
+            # the effective duration so the output WAV matches what Blender plays.
+            _meta_clip_s = max(0.0, (meta_strip.frame_final_start - child_strip.frame_final_start) / _fps_sound)
+            _src_start_s = child_strip.frame_offset_start / _fps_sound + _meta_clip_s
+            _child_dur_s = max(0.0, child_strip.frame_final_duration / _fps_sound - _meta_clip_s)
             _child_off_s = max(0.0, (child_strip.frame_final_start - meta_strip.frame_final_start) / _fps_sound)
             _src_path    = bpy.path.abspath(child_strip.sound.filepath)
 
-            print(f"[render_meta_child_to_path] ── SOUND IN ──────────────────────────")
+            _dbg(f"[render_meta_child_to_path] ── SOUND IN ──────────────────────────")
             print(f"  source file      : {_src_path!r}")
             print(f"  fps              : {_fps_sound:.4f}")
             print(f"  meta  frames     : {meta_strip.frame_final_start} – {meta_strip.frame_final_start + meta_strip.frame_final_duration - 1}  ({meta_strip.frame_final_duration} fr = {_expected_s:.3f}s)")
-            print(f"  child frames     : {child_strip.frame_final_start} – {child_strip.frame_final_start + child_strip.frame_final_duration - 1}  ({child_strip.frame_final_duration} fr = {_child_dur_s:.3f}s)")
-            print(f"  child offset_start (source skip): {child_strip.frame_offset_start} fr = {_src_start_s:.3f}s")
+            print(f"  child frames     : {child_strip.frame_final_start} – {child_strip.frame_final_start + child_strip.frame_final_duration - 1}  ({child_strip.frame_final_duration} fr = {child_strip.frame_final_duration / _fps_sound:.3f}s)")
+            print(f"  meta clip into child: {_meta_clip_s:.3f}s")
+            print(f"  child offset_start (source skip): {child_strip.frame_offset_start} fr + {_meta_clip_s:.3f}s meta clip = {_src_start_s:.3f}s total")
             print(f"  child offset in META : {_child_off_s:.3f}s")
             print(f"  will write       : {_child_dur_s:.3f}s of audio at +{_child_off_s:.3f}s into {_expected_s:.3f}s output")
-            print(f"[render_meta_child_to_path] ──────────────────────────────────────")
+            _dbg(f"[render_meta_child_to_path] ──────────────────────────────────────")
 
             # sound.mixdown ignores scene.frame_start/end and always exports the full
             # source file, so use soundfile directly for precise in/out control.
@@ -1802,7 +1819,7 @@ def render_meta_child_to_path(context, meta_strip, child_strip, image_output=Fal
                 _ch     = _info.channels
                 _s0     = int(_src_start_s * _sr)
                 _s1     = _s0 + int(_child_dur_s * _sr)
-                print(f"[render_meta_child_to_path] soundfile read: sr={_sr} ch={_ch} samples [{_s0}:{_s1}]")
+                _dbg(f"[render_meta_child_to_path] soundfile read: sr={_sr} ch={_ch} samples [{_s0}:{_s1}]")
                 _child_data, _ = _sf.read(_src_path, start=_s0, stop=_s1, always_2d=True)
                 _total_smp = int(_expected_s * _sr)
                 _off_smp   = int(_child_off_s * _sr)
@@ -1810,9 +1827,9 @@ def render_meta_child_to_path(context, meta_strip, child_strip, image_output=Fal
                 _end_smp   = min(_off_smp + len(_child_data), _total_smp)
                 _out_arr[_off_smp:_end_smp] = _child_data[:_end_smp - _off_smp]
                 _sf.write(output_path, _out_arr, _sr, subtype='PCM_16')
-                print(f"[render_meta_child_to_path] soundfile write OK")
+                _dbg(f"[render_meta_child_to_path] soundfile write OK")
             except Exception as _sf_err:
-                print(f"[render_meta_child_to_path] soundfile write failed: {_sf_err}")
+                _dbg(f"[render_meta_child_to_path] soundfile write failed: {_sf_err}")
                 import traceback as _tb; _tb.print_exc()
 
             if os.path.exists(output_path):
@@ -1820,14 +1837,14 @@ def render_meta_child_to_path(context, meta_strip, child_strip, image_output=Fal
                     import soundfile as _sf_chk
                     _info_chk = _sf_chk.info(output_path)
                     _actual_s = _info_chk.frames / _info_chk.samplerate
-                    print(f"[render_meta_child_to_path] ── WAV OUT ───────────────────────────")
+                    _dbg(f"[render_meta_child_to_path] ── WAV OUT ───────────────────────────")
                     print(f"  output file    : {output_path!r}")
                     print(f"  actual duration: {_actual_s:.3f}s  ({_info_chk.frames} samples @ {_info_chk.samplerate} Hz)")
                     print(f"  expected       : {_expected_s:.3f}s")
                     print(f"  delta          : {_actual_s - _expected_s:+.3f}s")
-                    print(f"[render_meta_child_to_path] ──────────────────────────────────────")
+                    _dbg(f"[render_meta_child_to_path] ──────────────────────────────────────")
                 except Exception as _chk_err:
-                    print(f"[render_meta_child_to_path] WAV OUT check failed: {_chk_err}")
+                    _dbg(f"[render_meta_child_to_path] WAV OUT check failed: {_chk_err}")
 
         elif image_output:
             base = os.path.abspath(
@@ -2011,6 +2028,119 @@ def render_strip_to_wav(context, strip):
         print(f"[render_strip_to_wav] post-trim failed: {_e_stw}")
 
     return output_path
+
+
+def render_meta_audio_to_path(context, meta_strip):
+    """Mix all SOUND children inside a META strip to a single WAV of the META's duration.
+
+    Each child is positioned at its correct offset within the META and trimmed via
+    frame_offset_start / frame_final_duration using soundfile — no Blender mixdown call
+    needed, so the frame-range is exact regardless of source length.
+
+    Returns the absolute path of the output WAV, or None on failure.
+    """
+    try:
+        import soundfile as _sf
+        import numpy as _np
+    except ImportError as _ie:
+        print(f"[render_meta_audio_to_path] soundfile/numpy unavailable: {_ie}")
+        return None
+
+    vse_scene = getattr(context, "sequencer_scene", context.scene)
+    if not vse_scene or not vse_scene.sequence_editor:
+        return None
+
+    sound_children = [c for c in meta_strip.strips if c.type == "SOUND"]
+    if not sound_children:
+        return None
+
+    fps          = vse_scene.render.fps / max(1.0, getattr(vse_scene.render, "fps_base", 1.0))
+    meta_start_f = meta_strip.frame_final_start
+    meta_dur_s   = meta_strip.frame_final_duration / fps
+
+    addon_prefs  = bpy.context.preferences.addons[ADDON_ID].preferences
+    rendered_dir = os.path.join(addon_prefs.generator_ai, str(date.today()), "Rendered_Strips")
+    os.makedirs(rendered_dir, exist_ok=True)
+    safe_name    = re.sub(r"[^\w]", "", meta_strip.name) or "meta"
+    render_start = int(meta_start_f)
+    output_path  = os.path.abspath(
+        os.path.join(rendered_dir, f"{safe_name}_{render_start:06d}_meta_audio_mix.wav"))
+
+    print(f"[render_meta_audio_to_path] ── META AUDIO MIX ────────────────────")
+    print(f"  meta     : {meta_strip.name!r}  {meta_strip.frame_final_duration} fr = {meta_dur_s:.3f}s")
+    print(f"  children : {len(sound_children)} SOUND strip(s)")
+
+    sr      = None
+    n_ch    = 2
+    out_arr = None
+    total_s = 0
+
+    for child in sound_children:
+        try:
+            src_path = bpy.path.abspath(child.sound.filepath)
+        except AttributeError:
+            print(f"  WARN: {child.name!r} has no sound.filepath, skipped")
+            continue
+        if not os.path.isfile(src_path):
+            print(f"  WARN: {child.name!r} file not found: {src_path!r}, skipped")
+            continue
+        try:
+            info     = _sf.info(src_path)
+            child_sr = info.samplerate
+
+            if sr is None:
+                sr      = child_sr
+                n_ch    = max(1, info.channels)
+                total_s = int(meta_dur_s * sr)
+                out_arr = _np.zeros((total_s, n_ch), dtype="float32")
+            elif child_sr != sr:
+                print(f"  WARN: {child.name!r} sr={child_sr} != output sr={sr}, skipped")
+                continue
+
+            # How many seconds the META's trim clips from the child's beginning.
+            meta_clip_s = max(0.0, (meta_start_f - child.frame_final_start) / fps)
+            src_start_s = child.frame_offset_start / fps + meta_clip_s
+            child_dur_s = max(0.0, child.frame_final_duration / fps - meta_clip_s)
+            child_off_s = max(0.0, (child.frame_final_start - meta_start_f) / fps)
+
+            s0   = int(src_start_s * sr)
+            s1   = s0 + int(child_dur_s * sr)
+            data, _ = _sf.read(src_path, start=s0, stop=s1, always_2d=True)
+
+            # Normalise channel count to match output array
+            if data.shape[1] < n_ch:
+                data = _np.tile(data, (1, n_ch // data.shape[1] + 1))[:, :n_ch]
+            elif data.shape[1] > n_ch:
+                data = data[:, :n_ch]
+
+            off_s = int(child_off_s * sr)
+            end_s = min(off_s + len(data), total_s)
+            out_arr[off_s:end_s] += data[: end_s - off_s]
+
+            print(f"  mixed {child.name!r}: {child_dur_s:.3f}s at +{child_off_s:.3f}s "
+                  f"(src skip {src_start_s:.3f}s, meta clip {meta_clip_s:.3f}s)")
+        except Exception as _e:
+            print(f"  WARN: failed to mix {child.name!r}: {_e}")
+            continue
+
+    if out_arr is None:
+        print("[render_meta_audio_to_path] no SOUND children could be mixed")
+        return None
+
+    # Prevent clipping from additive mixing
+    _peak = float(_np.abs(out_arr).max())
+    if _peak > 1.0:
+        out_arr /= _peak
+
+    try:
+        _sf.write(output_path, out_arr, sr, subtype="PCM_16")
+        _rendered_temp_paths.add(output_path)
+        print(f"  wrote {meta_dur_s:.3f}s mix → {output_path!r}")
+        print(f"[render_meta_audio_to_path] ─────────────────────────────────────")
+        return output_path
+    except Exception as _e:
+        print(f"[render_meta_audio_to_path] write failed: {_e}")
+        return None
 
 
 def decompose_meta(context, meta_strip, target_type="video"):
@@ -3008,6 +3138,18 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
             ("ltx23ic_control_downscale", int),
             ("ltx23ic_control_audio_str", float),
             ("ltx23ic_identity_guidance", float),
+        ]:
+            _v = _get(_attr)
+            if _v is not None and hasattr(scene, _attr):
+                try:
+                    setattr(scene, _attr, _cast(_v))
+                except Exception:
+                    pass
+
+        # ltx23_extend params
+        for _attr, _cast in [
+            ("ltx23ext_extend_frames", int),
+            ("ltx23ext_video_strength", float),
         ]:
             _v = _get(_attr)
             if _v is not None and hasattr(scene, _attr):

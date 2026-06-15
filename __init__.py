@@ -603,6 +603,17 @@ def register():
     bpy.types.Scene.ltx23ic_control_audio_str   = bpy.props.FloatProperty( name="Audio Ref Strength",   default=1.0, min=0.0, max=1.0,  description="Strength of IC-LoRA audio reference conditioning")
     bpy.types.Scene.ltx23ic_identity_guidance   = bpy.props.FloatProperty( name="Identity Guidance",    default=0.0, min=0.0, max=5.0,  description="Extra forward pass amplification for audio identity transfer")
 
+    # ltx23_extend — clip extension params
+    bpy.types.Scene.ltx23ext_extend_frames = bpy.props.IntProperty(
+        name="Extend (frames)", default=96, min=8, max=1200,
+        description="Number of new frames to generate after the source clip (8n+1 aligned)")
+    bpy.types.Scene.ltx23ext_video_strength = bpy.props.FloatProperty(
+        name="Source Lock", default=1.0, min=0.0, max=1.0,
+        description="Conditioning strength of the carried-over source clip (1.0 = fully locked)")
+    bpy.types.Scene.ltx23ext_audio_strip = bpy.props.StringProperty(
+        name="Audio Strip", default="",
+        description="Name of a SOUND strip whose audio drives the extended video (overrides the source clip's audio)")
+
     # The guidance number.
     bpy.types.Scene.img_guidance_scale = bpy.props.FloatProperty(
         name="img_guidance_scale",

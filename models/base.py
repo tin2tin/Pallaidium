@@ -239,6 +239,7 @@ class ModelPlugin:
     supports_img2img:          bool = True   # False → img2img conversion never activated
     requires_input_strip:      bool = False  # True  → generation always requires a selected strip
     uses_standard_input_strip: bool = True   # False → plugin provides its own strip input UI
+    uses_strip_power:          bool = True   # False → hide the "Strip Power" (image_power) slider
     show_enhance:              bool = True   # False → hide Quality/Speed/Upscale enhance row
     requires_main_thread:      bool = False  # True  → run generate() on main thread (bpy access needed)
 

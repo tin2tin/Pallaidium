@@ -230,6 +230,11 @@ class RenderQueueJob(PropertyGroup):
     ltx23ic_control_audio_str:   FloatProperty(default=1.0)
     ltx23ic_identity_guidance:   FloatProperty(default=0.0)
 
+    # ltx23_extend — clip extension params + resolved audio-strip path
+    ltx23ext_extend_frames:      IntProperty(default=96)
+    ltx23ext_video_strength:     FloatProperty(default=1.0)
+    ltx23ext_audio_path:         StringProperty(default="")
+
     # VRAM management — set at run-time based on the next queued job
     should_unload: BoolProperty(default=True)
 
@@ -424,6 +429,10 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             ltx23ic_control_downscale      = snapshot.get("ltx23ic_control_downscale",   1),
             ltx23ic_control_audio_str      = snapshot.get("ltx23ic_control_audio_str",   1.0),
             ltx23ic_identity_guidance      = snapshot.get("ltx23ic_identity_guidance",   0.0),
+            # ltx23_extend params
+            ltx23ext_extend_frames         = snapshot.get("ltx23ext_extend_frames",      96),
+            ltx23ext_video_strength        = snapshot.get("ltx23ext_video_strength",     1.0),
+            ltx23ext_audio_path            = snapshot.get("ltx23ext_audio_path",         ""),
             lora_files                     = enabled_items,
             lora_folder                    = snapshot.get("lora_folder", ""),
             render                         = types.SimpleNamespace(
@@ -857,6 +866,10 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             "ltx23ic_control_downscale":   snapshot.get("ltx23ic_control_downscale",   1),
             "ltx23ic_control_audio_str":   snapshot.get("ltx23ic_control_audio_str",   1.0),
             "ltx23ic_identity_guidance":   snapshot.get("ltx23ic_identity_guidance",   0.0),
+            # ltx23_extend
+            "ltx23ext_extend_frames":      snapshot.get("ltx23ext_extend_frames",      96),
+            "ltx23ext_video_strength":     snapshot.get("ltx23ext_video_strength",     1.0),
+            "ltx23ext_audio_path":         snapshot.get("ltx23ext_audio_path",         ""),
             "florence2_send_to_mask":      snapshot.get("florence2_send_to_mask",      False),
             "florence2_source_image_path": snapshot.get("image_path") or snapshot.get("movie_path") or "",
             # MOSS-TTS
@@ -1256,6 +1269,9 @@ class SEQUENCER_OT_add_to_queue(Operator):
             ltx23ic_control_downscale   = getattr(scene, "ltx23ic_control_downscale",   1),
             ltx23ic_control_audio_str   = getattr(scene, "ltx23ic_control_audio_str",   1.0),
             ltx23ic_identity_guidance   = getattr(scene, "ltx23ic_identity_guidance",   0.0),
+            # ltx23_extend params (ltx23ext_audio_path is resolved per-job below)
+            ltx23ext_extend_frames      = getattr(scene, "ltx23ext_extend_frames",      96),
+            ltx23ext_video_strength     = getattr(scene, "ltx23ext_video_strength",     1.0),
         )
 
         # ---- Decide which strips to iterate over -------------------------
@@ -1367,7 +1383,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
                 elif strip.type == "MOVIE" and control_video_path:
                     # Single MOVIE control strip: render trimmed version
                     _ctrl_strip_name = getattr(scene, "ltx23ic_control_strip", "")
-                    _ctrl_strip_obj  = scene.sequence_editor.sequences.get(_ctrl_strip_name) if _ctrl_strip_name and scene.sequence_editor else None
+                    _ctrl_strip_obj  = scene.sequence_editor.strips.get(_ctrl_strip_name) if _ctrl_strip_name and scene.sequence_editor else None
                     if _ctrl_strip_obj and _ctrl_strip_obj.type == "MOVIE":
                         from ..utils.helpers import render_strip_to_path
                         _trimmed_cv = render_strip_to_path(context, _ctrl_strip_obj, image_output=False)
@@ -1502,7 +1518,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
                 if not control_video_path:
                     _ctrl_name = getattr(scene, "ltx23ic_control_strip", "")
                     if _ctrl_name and se:
-                        _ctrl_s = se.sequences.get(_ctrl_name)
+                        _ctrl_s = se.strips.get(_ctrl_name)
                         if _ctrl_s and _ctrl_s.type == "MOVIE":
                             try:
                                 _cp = bpy.path.abspath(_ctrl_s.filepath)
@@ -1510,6 +1526,19 @@ class SEQUENCER_OT_add_to_queue(Operator):
                                     job.ltx23ic_control_video_path = _cp
                             except Exception:
                                 pass
+
+                # ltx23_extend: resolve the picked SOUND strip → file path for the worker.
+                job.ltx23ext_audio_path = ""
+                _ext_name = getattr(scene, "ltx23ext_audio_strip", "")
+                if _ext_name and se:
+                    _ext_s = se.strips.get(_ext_name)
+                    if _ext_s and _ext_s.type == "SOUND" and getattr(_ext_s, "sound", None):
+                        try:
+                            _ap = bpy.path.abspath(_ext_s.sound.filepath)
+                            if os.path.isfile(_ap):
+                                job.ltx23ext_audio_path = _ap
+                        except Exception:
+                            pass
 
                 for attr, val in common.items():
                     setattr(job, attr, val)
@@ -1624,6 +1653,8 @@ def _queue_start_job(scene, job) -> None:
         "ltx23ic_control_video_path", "ltx23ic_control_audio_path",
         "ltx23ic_control_strength", "ltx23ic_control_downscale",
         "ltx23ic_control_audio_str", "ltx23ic_identity_guidance",
+        # ltx23_extend params + resolved audio-strip path
+        "ltx23ext_extend_frames", "ltx23ext_video_strength", "ltx23ext_audio_path",
     )}
     _cancel_event.clear()
     _worker_thread = threading.Thread(
@@ -2110,10 +2141,16 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 ("ltx23m_audio_modality_scale", 1.0),
                 ("ltx23m_audio_noise_scale",    0.0),
                 ("ltx23m_audio_start_time",     0.0),
+                # ltx23_extend params
+                ("ltx23ext_extend_frames",      96),
+                ("ltx23ext_video_strength",     1.0),
             ]:
                 _v = result.get(_k, _def)
                 if _v != _def:
                     extra_meta[_k] = _v
+            # ltx23_extend — write the resolved audio-strip path when present
+            if result.get("ltx23ext_audio_path"):
+                extra_meta["ltx23ext_audio_path"] = result.get("ltx23ext_audio_path", "")
             # ltx23_multi_ic_lora — always write so redo-from-metadata can reconstruct paths
             for _k in (
                 "ltx23ic_control_video_path", "ltx23ic_control_audio_path",
