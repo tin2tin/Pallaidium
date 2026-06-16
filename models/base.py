@@ -242,6 +242,8 @@ class ModelPlugin:
     uses_strip_power:          bool = True   # False → hide the "Strip Power" (image_power) slider
     show_enhance:              bool = True   # False → hide Quality/Speed/Upscale enhance row
     requires_main_thread:      bool = False  # True  → run generate() on main thread (bpy access needed)
+    supports_batch:            bool = True   # False → hide "Batch Count" (deterministic single-output
+                                             #         models: captioning, transcription, stem split, …)
 
     # -----------------------------------------------------------------------
 

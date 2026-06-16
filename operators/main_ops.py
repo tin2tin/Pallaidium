@@ -47,6 +47,16 @@ from ..properties.scene_props import *
 from ..properties.preferences import *
 from ..ui.panels import *
 
+
+# Set True to re-enable [Florence2Mask] debug logging.
+_DEBUG = False
+
+
+def _dbg(*args, **kwargs):
+    if _DEBUG:
+        print(*args, **kwargs)
+
+
 _pallaidium_movie_model_cache = {
     "pipe": None,
     "refiner": None,
@@ -529,7 +539,16 @@ class SEQUENCER_OT_generate_audio(Operator):
                 and strip.type == "SOUND"
             )
             if is_vc:
-                audio_ref = os.path.join(bpy.path.abspath(strip.sound.filepath))
+                _trimmed_ref = render_strip_to_wav(context, strip)
+                audio_ref = _trimmed_ref if _trimmed_ref else bpy.path.abspath(strip.sound.filepath)
+            elif (
+                input_mode == "input_strips"
+                and strip is not None
+                and strip.type == "META"
+                and any(c.type == "SOUND" for c in strip.strips)
+            ):
+                _trimmed_ref = render_meta_audio_to_path(context, strip)
+                audio_ref = _trimmed_ref or None
             elif getattr(scene, "ref_audio_path", None):
                 audio_ref = bpy.path.abspath(scene.ref_audio_path)
             else:
@@ -1094,11 +1113,8 @@ class SEQUENCER_OT_generate_text(Operator):
             "processor": _pallaidium_text_model_cache["processor"],
             "tokenizer": _pallaidium_text_model_cache["tokenizer"],
         }
-        t_gen = bench_print(f"[{plugin.MODEL_ID}] generate start")
-        text = plugin.generate(pipe_obj, inputs, scene, addon_prefs)
-        bench_print(f"[{plugin.MODEL_ID}] generate done", t_gen)
 
-        # --- Create text strip ---
+        # Output strip placement (base position; batch copies are placed consecutively).
         if input_mode == "input_strips" and active_strip:
             start_frame  = int(getattr(active_strip, "left_handle", getattr(active_strip, "frame_final_start", 1)))
             strip_length = int(getattr(active_strip, "duration",    getattr(active_strip, "frame_final_duration", 100)))
@@ -1106,33 +1122,44 @@ class SEQUENCER_OT_generate_text(Operator):
             start_frame  = int(scene.frame_current)
             strip_length = 100
 
-        empty_channel = find_first_empty_channel(start_frame, start_frame + strip_length)
+        # Batch loop — only stochastic plugins (supports_batch) gain from >1.
+        batch = max(1, scene.movie_num_batch) if getattr(plugin, "supports_batch", True) else 1
 
-        if text:
-            new_strip = scene.sequence_editor.strips.new_effect(
-                name=str(text),
-                type="TEXT",
-                frame_start=start_frame,
-                length=strip_length,
-                channel=empty_channel,
-            )
-            if hasattr(new_strip, "right_handle"):
-                new_strip.right_handle = start_frame + strip_length
-            else:
-                new_strip.frame_final_end = start_frame + strip_length
+        text = None
+        for i in range(batch):
+            t_gen = bench_print(f"[{plugin.MODEL_ID}] generate start")
+            text = plugin.generate(pipe_obj, inputs, scene, addon_prefs)
+            bench_print(f"[{plugin.MODEL_ID}] generate done", t_gen)
 
-            new_strip.text        = text
-            new_strip.wrap_width  = 0.68
-            new_strip.font_size   = 16
-            new_strip.location[0] = 0.5
-            new_strip.location[1] = 0.2
-            new_strip.anchor_x    = "CENTER"
-            new_strip.anchor_y    = "TOP"
-            new_strip.alignment_x = "LEFT"
-            new_strip.use_shadow  = True
-            new_strip.use_box     = True
-            new_strip.box_color   = (0, 0, 0, 0.7)
-            scene.sequence_editor.active_strip = new_strip
+            # --- Create text strip ---
+            frame_start   = start_frame + i * strip_length
+            empty_channel = find_first_empty_channel(frame_start, frame_start + strip_length)
+
+            if text:
+                new_strip = scene.sequence_editor.strips.new_effect(
+                    name=str(text),
+                    type="TEXT",
+                    frame_start=frame_start,
+                    length=strip_length,
+                    channel=empty_channel,
+                )
+                if hasattr(new_strip, "right_handle"):
+                    new_strip.right_handle = frame_start + strip_length
+                else:
+                    new_strip.frame_final_end = frame_start + strip_length
+
+                new_strip.text        = text
+                new_strip.wrap_width  = 0.68
+                new_strip.font_size   = 16
+                new_strip.location[0] = 0.5
+                new_strip.location[1] = 0.2
+                new_strip.anchor_x    = "CENTER"
+                new_strip.anchor_y    = "TOP"
+                new_strip.alignment_x = "LEFT"
+                new_strip.use_shadow  = True
+                new_strip.use_box     = True
+                new_strip.box_color   = (0, 0, 0, 0.7)
+                scene.sequence_editor.active_strip = new_strip
 
         # --- Florence-2 → Mask Editor ---
         if (
@@ -1145,7 +1172,7 @@ class SEQUENCER_OT_generate_text(Operator):
                 from .mask_florence2 import apply_florence_json_to_mask
                 apply_florence_json_to_mask(text, source_path)
             except Exception as _mex:
-                print(f"[Florence2Mask] mask creation failed: {_mex}")
+                _dbg(f"[Florence2Mask] mask creation failed: {_mex}")
 
         # --- UI redraw ---
         for window in bpy.context.window_manager.windows:
@@ -1420,21 +1447,25 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                                             print(f"[LTX Multi META]     MOVIE WARN: no path found, skipped")
 
                                 elif _c.type == "SOUND":
-                                    print(f"[LTX Multi META]     SOUND: rendering trimmed audio through META...")
-                                    _rpath = render_meta_child_to_path(context, meta_strip, _c, image_output=False)
-                                    if _rpath:
-                                        _audio_path = _rpath
-                                        print(f"[LTX Multi META]     SOUND OK → {_rpath!r}")
+                                    if _audio_path is None:
+                                        # Mix ALL SOUND children in one pass.
+                                        print(f"[LTX Multi META]     SOUND: mixing all META audio children...")
+                                        _rpath = render_meta_audio_to_path(context, meta_strip)
+                                        if _rpath:
+                                            _audio_path = _rpath
+                                            print(f"[LTX Multi META]     SOUND MIX OK → {_rpath!r}")
+                                        else:
+                                            try:
+                                                _raw = bpy.path.abspath(_c.sound.filepath)
+                                                if _raw and os.path.isfile(_raw):
+                                                    _audio_path = _raw
+                                                    print(f"[LTX Multi META]     SOUND fallback (raw) → {_raw!r}")
+                                                else:
+                                                    print(f"[LTX Multi META]     SOUND WARN: no path found, skipped")
+                                            except Exception as _se:
+                                                print(f"[LTX Multi META]     SOUND WARN: error getting path: {_se}")
                                     else:
-                                        try:
-                                            _raw = bpy.path.abspath(_c.sound.filepath)
-                                            if _raw and os.path.isfile(_raw):
-                                                _audio_path = _raw
-                                                print(f"[LTX Multi META]     SOUND fallback (raw) → {_raw!r}")
-                                            else:
-                                                print(f"[LTX Multi META]     SOUND WARN: no path found, skipped")
-                                        except Exception as _se:
-                                            print(f"[LTX Multi META]     SOUND WARN: error getting path: {_se}")
+                                        print(f"[LTX Multi META]     SOUND {_c.name!r}: already mixed, skipped")
 
                                 else:
                                     print(f"[LTX Multi META]     type {_c.type!r} not handled, skipped")
@@ -1572,7 +1603,9 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                     run_generation = True
 
             # 3B. Intermediate Strip Handling
-            elif strip.type in {"SCENE", "MOVIE", "META", "SOUND", "TEXT", "IMAGE"}: 
+            elif strip.type in {"SCENE", "MOVIE", "META", "SOUND", "TEXT", "IMAGE"}:
+                _orig_strip_3b = strip  # preserved before get_render_strip reassigns it
+
                 if (target_type == "image" or target_type == "text") and strip.type not in {"TEXT", "IMAGE"}:
                     trim_frame = find_overlapping_frame(strip, current_frame)
                     if trim_frame and len(strips) == 1:
@@ -1597,8 +1630,27 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                         if intermediate_strip: delete_strip(intermediate_strip)
                     else:
                         temp_strip = strip = get_render_strip(self, context, strip)
+                elif strip.type == "SOUND" and target_type == "movie":
+                    # Render a properly-trimmed WAV before get_render_strip can fall
+                    # back to the potentially-full-length mixdown output.
+                    _trimmed_wav = render_strip_to_wav(context, strip)
+                    if _trimmed_wav:
+                        scene.sound_path = _trimmed_wav
+                        print(f"[3B SOUND] trimmed WAV → {_trimmed_wav!r}")
+                    temp_strip = strip = get_render_strip(self, context, strip)
                 elif strip.type not in {"TEXT", "IMAGE"}:
                     temp_strip = strip = get_render_strip(self, context, strip)
+
+                # META with SOUND children feeding a video model: render the full
+                # mixed audio of the META duration once, regardless of child count.
+                if (target_type == "movie"
+                        and _orig_strip_3b.type == "META"
+                        and not scene.sound_path
+                        and any(c.type == "SOUND" for c in _orig_strip_3b.strips)):
+                    _meta_wav = render_meta_audio_to_path(context, _orig_strip_3b)
+                    if _meta_wav:
+                        scene.sound_path = _meta_wav
+                        print(f"[3B META] audio mix → {_meta_wav!r}")
 
                 if strip is None:
                     continue
@@ -1653,8 +1705,14 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
                         file_path = bpy.path.abspath(strip.filepath)
                         scene.movie_path = file_path
                     elif strip.type == "SOUND":
-                        file_path = bpy.path.abspath(strip.sound.filepath)
-                        scene.sound_path = file_path
+                        # scene.sound_path is already a trimmed WAV when the original
+                        # strip went through render_strip_to_wav above; only fall back
+                        # to the rendered strip's filepath if nothing was set yet.
+                        if scene.sound_path:
+                            file_path = scene.sound_path
+                        else:
+                            file_path = bpy.path.abspath(strip.sound.filepath)
+                            scene.sound_path = file_path
                     run_generation = True
 
                     if strip.name:

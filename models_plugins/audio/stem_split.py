@@ -72,6 +72,7 @@ class StemSplitterPlugin(ModelPlugin):
     supports_img2img      = False
     show_enhance          = False
     requires_input_strip  = True
+    supports_batch        = False  # deterministic stem split → batch makes identical copies
 
     def load(self, prefs, scene, **kw):
         # demucs-onnx loads its ONNX model lazily on first separate() call.

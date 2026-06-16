@@ -482,9 +482,11 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 row.operator(
                     "wm.url_open", text="", icon="URL"
                 ).url = "https://huggingface.co/settings/tokens"
-        if type != "text" and not (
-            type == "movie" and "Hailuo/MiniMax/" in movie_model_card
-        ):
+        # Batch Count: shown only when the active plugin actually produces
+        # multiple distinct outputs per run. Deterministic single-output models
+        # (captioning, transcription, stem split, external single-shot APIs)
+        # set supports_batch=False so the control is hidden where it has no effect.
+        if plugin is None or getattr(plugin, "supports_batch", True):
             col = col.column()
             col.prop(context.scene, "movie_num_batch", text="Batch Count")
 

@@ -15,6 +15,7 @@ class _MiniMaxBase(ModelPlugin):
     PARAMS                  = ParamSpec(steps=1, guidance=1.0)
     REQUIRED_PACKAGES       = []
     uses_standard_input_strip = False
+    supports_batch          = False  # external API single-shot generation
 
     def load(self, prefs, scene, **kw):
         return {"pipe": None, "refiner": None, "last_model_card": self.MODEL_ID}

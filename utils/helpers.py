@@ -1637,6 +1637,9 @@ def render_strip_to_path(context, strip, image_output=False):
     orig_format     = vse_scene.render.image_settings.file_format
     orig_media      = getattr(vse_scene.render.image_settings, "media_type", None)
     orig_use_seq    = vse_scene.render.use_sequencer
+    orig_res_x      = vse_scene.render.resolution_x
+    orig_res_y      = vse_scene.render.resolution_y
+    orig_res_pct    = vse_scene.render.resolution_percentage
 
     seq_editor.use_prefetch = False
     seq_editor.use_cache_raw = False
@@ -1649,6 +1652,24 @@ def render_strip_to_path(context, strip, image_output=False):
 
     vse_scene.frame_start = render_start
     vse_scene.frame_end   = render_end
+
+    # Render IMAGE/MOVIE strips at their native resolution so the output fills
+    # the frame with no transparent margins. Otherwise a strip smaller than the
+    # scene render size composites centered with letterbox padding, which makes
+    # downstream consumers (Florence-2 Box Editor background, img2img/init
+    # frames) misalign with content that was analyzed/resized to fill.
+    target_res = None
+    if strip.type in ("IMAGE", "MOVIE"):
+        try:
+            elem = strip.elements[0]
+            if elem.orig_width and elem.orig_height:
+                target_res = (elem.orig_width, elem.orig_height)
+        except Exception:
+            target_res = None
+    if target_res:
+        vse_scene.render.resolution_x          = target_res[0]
+        vse_scene.render.resolution_y          = target_res[1]
+        vse_scene.render.resolution_percentage = 100
 
     addon_prefs  = bpy.context.preferences.addons[ADDON_ID].preferences
     rendered_dir = os.path.join(addon_prefs.generator_ai, str(date.today()), "Rendered_Strips")
@@ -1716,6 +1737,9 @@ def render_strip_to_path(context, strip, image_output=False):
             vse_scene.render.image_settings.media_type = orig_media
         vse_scene.render.image_settings.file_format = orig_format
         vse_scene.render.use_sequencer = orig_use_seq
+        vse_scene.render.resolution_x          = orig_res_x
+        vse_scene.render.resolution_y          = orig_res_y
+        vse_scene.render.resolution_percentage = orig_res_pct
 
     if output_path and os.path.exists(output_path):
         _rendered_temp_paths.add(output_path)

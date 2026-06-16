@@ -102,15 +102,24 @@ class LTX2_3MultiICLoRAPlugin(ModelPlugin):
 
     @staticmethod
     def _apply_loras(pipe, lora_folder, enabled_loras):
+        import warnings as _warnings
         names, weights = [], []
         for item in enabled_loras:
             name = clean_filename(item.name).replace(".", "")
             try:
-                pipe.load_lora_weights(
-                    lora_folder,
-                    weight_name=item.name + ".safetensors",
-                    adapter_name=name,
-                )
+                # peft warns "Already found a `peft_config` attribute" every time a
+                # 2nd adapter is added — benign here, each LoRA gets a distinct
+                # adapter_name and set_adapters() blends them by weight below.
+                with _warnings.catch_warnings():
+                    _warnings.filterwarnings(
+                        "ignore",
+                        message="Already found a `peft_config` attribute",
+                    )
+                    pipe.load_lora_weights(
+                        lora_folder,
+                        weight_name=item.name + ".safetensors",
+                        adapter_name=name,
+                    )
             except Exception as e:
                 print(f"  LoRA '{item.name}': load error — {e}")
                 continue
@@ -549,7 +558,12 @@ class LTX2_3MultiICLoRAPlugin(ModelPlugin):
             refine_kw["image_conditions"] = image_conditions
         if audio_conditions is not None:
             refine_kw["audio_conditions"] = audio_conditions
-        if audio_latent is not None:
+        # With input audio (audio_conditions set): re-lock the SOURCE audio via
+        # audio_conditions — do NOT also pass audio_latents, the pipeline would
+        # prioritise latents over conditions and Stage 2 would drift off the speech.
+        # Without input audio: pass the Stage-1 generated latent so Stage 2 stays
+        # coherent with the audio the video was generated against.
+        if audio_conditions is None and audio_latent is not None:
             refine_kw["audio_latents"] = audio_latent.to(onload_device, dtype=torch_dtype)
         if control_video_frames is not None:
             refine_kw["control_video"]            = control_video_frames

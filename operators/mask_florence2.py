@@ -25,6 +25,15 @@ from bpy.props import (
 from bpy.types import Operator, Panel, PropertyGroup
 
 
+# Set True to re-enable [Florence2Mask] debug logging.
+_DEBUG = False
+
+
+def _dbg(*args, **kwargs):
+    if _DEBUG:
+        print(*args, **kwargs)
+
+
 # ---------------------------------------------------------------------------
 # Property groups
 # ---------------------------------------------------------------------------
@@ -245,35 +254,52 @@ def _layer_name(elem_type: str, desc: str, text: str) -> str:
 # Coordinate helpers
 # ---------------------------------------------------------------------------
 
+def _mask_fit(W: int, H: int):
+    """Return (sx, sy, ox, oy) mapping the backdrop image into Blender's mask space.
+
+    Blender's image-editor mask coordinate space is isotropic (a square): one
+    unit on X equals one unit on Y on screen.  The backdrop image is fit into
+    this square by its LONGER edge (→ that axis spans [0,1]) while the shorter
+    edge is scaled by the aspect ratio and centered.  So for a landscape image
+    (W>=H): X spans [0,1], Y spans [(1-H/W)/2, (1+H/W)/2].
+    """
+    if not W or not H:
+        return 1.0, 1.0, 0.0, 0.0
+    if W >= H:
+        sx, sy = 1.0, H / W
+    else:
+        sx, sy = W / H, 1.0
+    return sx, sy, (1.0 - sx) / 2.0, (1.0 - sy) / 2.0
+
+
 def _bbox_to_mask(bbox, W: int, H: int):
     """Ideogram [y1,x1,y2,x2] 0-1000 → mask center + half-sizes.
 
-    Blender mask coordinate space (observed):
-      X: (x/1000 - 0.5)*aspect + 0.5  →  range [0.5-aspect/2, 0.5+aspect/2]
-      Y: 1 - y/1000                   →  lower-left origin, range [0, 1]
-    Ideogram y=0 is the image TOP, so Y must be flipped.
+    Ideogram x runs left→right, y runs top→bottom (y=0 is the image TOP).
+    Blender mask Y has a lower-left origin, so Y is flipped.  Coordinates are
+    fit to the backdrop via _mask_fit() so boxes overlay the image exactly.
     """
     y1, x1, y2, x2 = bbox
-    aspect = W / H if H else 1.0
-    cx = ((x1 + x2) / 2 / 1000 - 0.5) * aspect + 0.5   # X: centred+aspect, then +0.5 offset
-    cy = 1.0 - (y1 + y2) / 2 / 1000                    # Y: lower-left origin [0, 1]
-    hx = (x2 - x1) / 1000 / 2 * aspect
-    hy = (y2 - y1) / 1000 / 2
+    sx, sy, ox, oy = _mask_fit(W, H)
+    cx = ox + (x1 + x2) / 2 / 1000 * sx
+    cy = oy + (1.0 - (y1 + y2) / 2 / 1000) * sy
+    hx = (x2 - x1) / 1000 / 2 * sx
+    hy = (y2 - y1) / 1000 / 2 * sy
     return cx, cy, hx, hy
 
 
 def _spline_to_bbox(spline, W: int, H: int):
-    """Live spline corners → Ideogram [y1,x1,y2,x2] 0-1000."""
-    aspect = W / H if H else 1.0
+    """Live spline corners → Ideogram [y1,x1,y2,x2] 0-1000 (inverse of _bbox_to_mask)."""
+    sx, sy, ox, oy = _mask_fit(W, H)
     pts = [p.co for p in spline.points]
     if not pts:
         return [0, 0, 1000, 1000]
     xs = [p[0] for p in pts]
     ys = [p[1] for p in pts]
-    x1 = round(((min(xs) - 0.5) / aspect + 0.5) * 1000)
-    x2 = round(((max(xs) - 0.5) / aspect + 0.5) * 1000)
-    y1 = round((1.0 - max(ys)) * 1000)
-    y2 = round((1.0 - min(ys)) * 1000)
+    x1 = round((min(xs) - ox) / sx * 1000)
+    x2 = round((max(xs) - ox) / sx * 1000)
+    y1 = round((1.0 - (max(ys) - oy) / sy) * 1000)   # top    (larger mask Y)
+    y2 = round((1.0 - (min(ys) - oy) / sy) * 1000)   # bottom (smaller mask Y)
     clamp = lambda v: max(0, min(1000, v))
     return [clamp(y1), clamp(x1), clamp(y2), clamp(x2)]
 
@@ -364,9 +390,9 @@ def _populate_mask_from_data(mask, data: dict, W: int, H: int) -> None:
                     pt.handle_type = "VECTOR"
                 except AttributeError:
                     pass
-            print(f"[Florence2Mask]   {actual_name!r}  {elem_type}  {bbox}")
+            _dbg(f"[Florence2Mask]   {actual_name!r}  {elem_type}  {bbox}")
         except Exception as _elem_exc:
-            print(f"[Florence2Mask]   skipped element {elem.get('desc', '?')!r}: {_elem_exc}")
+            _dbg(f"[Florence2Mask]   skipped element {elem.get('desc', '?')!r}: {_elem_exc}")
 
     if mask.layers:
         mask.active_layer_index = 0
@@ -378,7 +404,7 @@ def _populate_mask_from_data(mask, data: dict, W: int, H: int) -> None:
 
 def apply_florence_json_to_mask(json_str: str, source_image_path: str) -> None:
     """Parse Ideogram4 JSON, populate a *new* Mask, open in Image Editor. Main thread."""
-    print(f"[Florence2Mask] apply called, source={source_image_path!r}")
+    _dbg(f"[Florence2Mask] apply called, source={source_image_path!r}")
 
     clean_json, meta = _parse_commented_json(json_str)
     # Explicit arg wins; fall back to // image: comment embedded in the JSON.
@@ -389,7 +415,7 @@ def apply_florence_json_to_mask(json_str: str, source_image_path: str) -> None:
         data = json.loads(clean_json)
     except Exception as exc:
         msg = f"JSON parse error: {exc}"
-        print(f"[Florence2Mask] {msg}")
+        _dbg(f"[Florence2Mask] {msg}")
         try:
             bpy.context.window_manager.popup_menu(
                 lambda self, _: self.layout.label(text=msg, icon="ERROR"),
@@ -401,19 +427,19 @@ def apply_florence_json_to_mask(json_str: str, source_image_path: str) -> None:
         return
 
     elements = data.get("compositional_deconstruction", {}).get("elements", [])
-    print(f"[Florence2Mask] {len(elements)} element(s)")
+    _dbg(f"[Florence2Mask] {len(elements)} element(s)")
 
     # Always load a fresh image datablock (never reuse an existing one)
     img = None
     if source_image_path and os.path.isfile(source_image_path):
         try:
             img = bpy.data.images.load(source_image_path)
-            print(f"[Florence2Mask] Loaded image: {img.name!r}  size={img.size[:]}")
+            _dbg(f"[Florence2Mask] Loaded image: {img.name!r}  size={img.size[:]}")
         except Exception as exc:
-            print(f"[Florence2Mask] Could not load image: {exc}")
+            _dbg(f"[Florence2Mask] Could not load image: {exc}")
     if img is None:
         img = bpy.data.images.new("Box Editor", width=1920, height=1080)
-        print(f"[Florence2Mask] Created blank image: {img.name!r}")
+        _dbg(f"[Florence2Mask] Created blank image: {img.name!r}")
 
     W = img.size[0] if img else 1920
     H = img.size[1] if img else 1080
@@ -423,11 +449,11 @@ def apply_florence_json_to_mask(json_str: str, source_image_path: str) -> None:
     mask = bpy.data.masks.new(name=mask_name)
     # Give the image the same name so the panel can find it by mask.name lookup.
     img.name = mask.name
-    print(f"[Florence2Mask] Mask/image: {mask.name!r}")
+    _dbg(f"[Florence2Mask] Mask/image: {mask.name!r}")
 
     _populate_mask_from_data(mask, data, W, H)
     _open_mask_in_editor(mask, img)
-    print(f"[Florence2Mask] Done — {len(elements)} layer(s) in {mask.name!r}")
+    _dbg(f"[Florence2Mask] Done — {len(elements)} layer(s) in {mask.name!r}")
 
 
 # ---------------------------------------------------------------------------
@@ -461,7 +487,7 @@ def _open_mask_in_editor(mask, img) -> None:
             )
 
             if target is None:
-                print("[Florence2Mask] No suitable area to split — open Image Editor manually.")
+                _dbg("[Florence2Mask] No suitable area to split — open Image Editor manually.")
                 return
 
             # If target is the combined Sequencer+Preview, switch it to pure PREVIEW
@@ -480,7 +506,7 @@ def _open_mask_in_editor(mask, img) -> None:
                 with bpy.context.temp_override(window=window, area=target, region=region):
                     bpy.ops.screen.area_split(direction="VERTICAL", factor=0.5)
             except Exception as exc:
-                print(f"[Florence2Mask] Area split failed: {exc}")
+                _dbg(f"[Florence2Mask] Area split failed: {exc}")
                 return
 
             new_areas = [
@@ -488,7 +514,7 @@ def _open_mask_in_editor(mask, img) -> None:
                 if (a.x, a.y, a.width, a.height) not in coords_before
             ]
             if not new_areas:
-                print("[Florence2Mask] Could not locate new area after split.")
+                _dbg("[Florence2Mask] Could not locate new area after split.")
                 return
             # Take the rightmost new area (the split-off right half).
             image_ed = max(new_areas, key=lambda a: a.x)
@@ -498,27 +524,27 @@ def _open_mask_in_editor(mask, img) -> None:
         try:
             space.mode = "MASK"
         except Exception as exc:
-            print(f"[Florence2Mask] Could not set MASK mode: {exc}")
+            _dbg(f"[Florence2Mask] Could not set MASK mode: {exc}")
         if img is not None:
             try:
                 space.image = img
-                print(f"[Florence2Mask] Background image: {img.name!r}")
+                _dbg(f"[Florence2Mask] Background image: {img.name!r}")
             except Exception:
                 pass
         try:
             space.mask = mask
-            print(f"[Florence2Mask] Mask set: {mask.name!r}")
+            _dbg(f"[Florence2Mask] Mask set: {mask.name!r}")
         except Exception as exc:
-            print(f"[Florence2Mask] Could not set mask: {exc}")
+            _dbg(f"[Florence2Mask] Could not set mask: {exc}")
 
         try:
             region = next((r for r in image_ed.regions if r.type == "WINDOW"), None)
             if region:
                 with bpy.context.temp_override(window=window, area=image_ed, region=region):
                     bpy.ops.image.view_all(fit_view=True)
-                print("[Florence2Mask] View fitted")
+                _dbg("[Florence2Mask] View fitted")
         except Exception as exc:
-            print(f"[Florence2Mask] view_all failed: {exc}")
+            _dbg(f"[Florence2Mask] view_all failed: {exc}")
 
         # Defer sidebar/tab switch — area must be fully initialised first
         def _open_sidebar():
@@ -534,7 +560,12 @@ def _open_mask_in_editor(mask, img) -> None:
                             (r for r in area.regions if r.type == "UI"), None
                         )
                         sp.show_region_ui = True
-                        if ui_region:
+                        # Switch the N-panel to the Box Editor tab.  Only attempt
+                        # it when the space actually exposes active_panel_category
+                        # — SpaceImageEditor does not, and calling the operator
+                        # with an invalid data_path spams a non-catchable
+                        # "context_path_validate error" to the console.
+                        if ui_region and hasattr(sp, "active_panel_category"):
                             with bpy.context.temp_override(
                                 window=win, area=area, region=ui_region
                             ):
@@ -542,9 +573,9 @@ def _open_mask_in_editor(mask, img) -> None:
                                     data_path="space_data.active_panel_category",
                                     value="Box Editor",
                                 )
-                        print("[Florence2Mask] Box Editor sidebar opened")
+                        _dbg("[Florence2Mask] Box Editor sidebar opened")
             except Exception as exc:
-                print(f"[Florence2Mask] Tab switch failed: {exc}")
+                _dbg(f"[Florence2Mask] Tab switch failed: {exc}")
 
         bpy.app.timers.register(_open_sidebar, first_interval=0.1)
         return
@@ -988,7 +1019,7 @@ class FLORENCE2_OT_export_strip(Operator):
 class FLORENCE2_OT_layer_new_with_square(Operator):
     bl_idname      = "florence2.layer_new_with_square"
     bl_label       = "New Box Layer"
-    bl_description = "Add a new Box Editor layer with a centered square spline"
+    bl_description = "Add a new Box Editor layer with a square spline at the 2D cursor"
     bl_options     = {"REGISTER", "UNDO"}
 
     @classmethod
@@ -1007,13 +1038,27 @@ class FLORENCE2_OT_layer_new_with_square(Operator):
         W     = img.size[0] if img else 1920
         H     = img.size[1] if img else 1080
 
+        # Anchor the square at the 2D cursor (image UV space, 0-1, lower-left
+        # origin); fall back to the image centre when no cursor is available.
+        cursor = getattr(space, "cursor_location", None)
+        cu = float(cursor[0]) if cursor is not None and len(cursor) >= 2 else 0.5
+        cv = float(cursor[1]) if cursor is not None and len(cursor) >= 2 else 0.5
+        cu = min(max(cu, 0.0), 1.0)
+        cv = min(max(cv, 0.0), 1.0)
+        # Ideogram bbox [y1,x1,y2,x2] (0-1000, y from top) for a 200-unit square.
+        idx = cu * 1000.0
+        idy = (1.0 - cv) * 1000.0
+        _clamp = lambda v: max(0, min(1000, int(round(v))))
+        anchor_bbox = [_clamp(idy - 100), _clamp(idx - 100),
+                       _clamp(idy + 100), _clamp(idx + 100)]
+
         layer = mask.layers.new(name="New Layer")
 
         # Register Box Editor metadata BEFORE activating the layer, so the
         # depsgraph handler never sees it without f2_layers data.
         _add_layer_data(mask, layer.name, {
             "type": "obj", "desc": "", "text": "",
-            "color": "", "font": "", "bbox": [400, 400, 600, 600],
+            "color": "", "font": "", "bbox": anchor_bbox,
         })
 
         try:
@@ -1030,8 +1075,8 @@ class FLORENCE2_OT_layer_new_with_square(Operator):
                 mask.active_layer_index = i
                 break
 
-        # Centered square: bbox [y1,x1,y2,x2] = [400,400,600,600] on 0-1000 scale
-        cx, cy, hx, hy = _bbox_to_mask([400, 400, 600, 600], W, H)
+        # Square at the anchor bbox, mapped to mask space.
+        cx, cy, hx, hy = _bbox_to_mask(anchor_bbox, W, H)
         hx = max(hx, 0.001)
         hy = max(hy, 0.001)
 
@@ -1475,10 +1520,10 @@ classes = [
 
 
 def register():
-    print("[Florence2Mask] Registering...")
+    _dbg("[Florence2Mask] Registering...")
     for cls in classes:
         bpy.utils.register_class(cls)
-        print(f"[Florence2Mask]   {cls.__name__}")
+        _dbg(f"[Florence2Mask]   {cls.__name__}")
     bpy.types.Mask.florence2_props = PointerProperty(type=Florence2MaskProps)
 
     # Ensure Florence-2 scene toggles are always registered so the panel
@@ -1498,7 +1543,6 @@ def register():
             description="After generation, open the result as mask layers in the Box Editor",
             default=False,
         )
-
     # Auto-switch background image when the user picks a different mask.
     bpy.msgbus.subscribe_rna(
         key=(bpy.types.SpaceImageEditor, "mask"),
@@ -1530,9 +1574,9 @@ def register():
     def _append_text_menu():
         try:
             bpy.types.TEXT_MT_edit.append(_text_menu_draw)
-            print("[Florence2Mask] TEXT_MT_edit menu item appended")
+            _dbg("[Florence2Mask] TEXT_MT_edit menu item appended")
         except Exception as exc:
-            print(f"[Florence2Mask] TEXT_MT_edit append failed: {exc}")
+            _dbg(f"[Florence2Mask] TEXT_MT_edit append failed: {exc}")
         return None  # run once
 
     bpy.app.timers.register(_append_text_menu, first_interval=0.1)
@@ -1541,7 +1585,7 @@ def register():
     if not bpy.app.timers.is_registered(_poll_mask_change):
         bpy.app.timers.register(_poll_mask_change, first_interval=1.0, persistent=True)
 
-    print("[Florence2Mask] Registration complete")
+    _dbg("[Florence2Mask] Registration complete")
 
 
 def unregister():
@@ -1565,4 +1609,4 @@ def unregister():
             bpy.utils.unregister_class(cls)
         except Exception:
             pass
-    print("[Florence2Mask] Unregistered")
+    _dbg("[Florence2Mask] Unregistered")

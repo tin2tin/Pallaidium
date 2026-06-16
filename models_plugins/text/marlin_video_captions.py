@@ -168,6 +168,7 @@ class MarlinVideoCaptionsPlugin(ModelPlugin):
     REQUIRED_PACKAGES    = ["qwen_vl_utils", "sdnq"]
     requires_input_strip = True
     requires_main_thread = True
+    supports_batch       = False  # deterministic caption → batch makes identical copies
 
     def load(self, prefs, scene, **kw) -> dict:
         import torch

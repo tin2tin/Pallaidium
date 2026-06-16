@@ -182,6 +182,7 @@ class FasterWhisperTranscribePlugin(ModelPlugin):
 
     requires_input_strip = True   # user must select a strip
     requires_main_thread = True   # generate() calls bpy directly
+    supports_batch       = False  # deterministic transcription → batch makes identical copies
 
     def load(self, prefs, scene, **kw) -> dict:
         return {}

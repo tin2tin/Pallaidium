@@ -1,6 +1,7 @@
 """Image captioning and Ideogram-4 prompt extraction via Florence-2."""
 
 import json
+import re
 
 from ...models.base import ModelPlugin, InputSpec, ParamSpec, ModelInputs
 
@@ -99,6 +100,7 @@ class Florence2Plugin(ModelPlugin):
     REQUIRED_PACKAGES = ["torch", "PIL", "transformers"]
 
     requires_input_strip = True
+    supports_batch       = False   # deterministic caption → batch makes identical copies
 
     def load(self, prefs, scene, **kw):
         from transformers import AutoProcessor, Florence2ForConditionalGeneration
@@ -139,9 +141,16 @@ class Florence2Plugin(ModelPlugin):
             early_stopping=False,
         )
         generated_text = processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
+        # post_process_generation matches `task` by EXACT key and returns the
+        # result keyed by it.  Tasks that carry inline arguments (a region's
+        # <loc_*> tokens, a grounding phrase, …) must be reduced to their bare
+        # <TOKEN> here, or parsing falls back to pure_text and the result is
+        # stored under the wrong key — silently dropping bboxes/descriptions.
+        m = re.match(r"<[^>]+>", task)
+        task_token = m.group(0) if m else task
         return processor.post_process_generation(
             generated_text,
-            task=task,
+            task=task_token,
             image_size=(image.width, image.height),
         )
 
@@ -168,16 +177,64 @@ class Florence2Plugin(ModelPlugin):
         (("over-the-shoulder", "over the shoulder"),            "over-the-shoulder shot"),
         (("looking at the camera", "facing the camera",
           "faces the camera", "facing forward",
-          "facing front", "full frontal"),                       "frontal shot"),
+          "facing front", "full frontal",
+          "looking toward the camera", "looking forward"),       "frontal shot"),
         (("from behind", "seen from behind", "back view",
           "rear view", "from the back", "their back",
-          "turned away"),                                        "rear shot"),
+          "his back", "her back", "back to the camera",
+          "back turned", "back is turned", "facing away",
+          "from the rear", "turned away"),                       "rear shot"),
         (("three-quarter", "three quarter",
           "turned slightly", "angled"),                          "three-quarter shot"),
         (("left profile", "right profile", "side profile",
           "in profile", "from the side", "side view",
           "profile view", "profile", "side"),                    "side-profile shot"),
     ]
+
+    # Human-readable facing phrase per cinematic-angle label.
+    _FACING_PHRASE = {
+        "over-the-shoulder shot": "over-the-shoulder",
+        "frontal shot":           "facing the camera",
+        "rear shot":              "seen from behind",
+        "three-quarter shot":     "three-quarter view",
+        "side-profile shot":      "in profile",
+    }
+
+    # Gender-cue words (whole-word matched).
+    _MALE_WORDS   = ("man", "male", "gentleman", "boy", "he", "his", "him",
+                     "father", "husband", "businessman", "guy")
+    _FEMALE_WORDS = ("woman", "female", "lady", "girl", "she", "her",
+                     "mother", "wife", "businesswoman")
+
+    def _facing_phrase(self, desc: str) -> str:
+        """Return a human-readable facing phrase ('seen from behind', …) or ''."""
+        return self._FACING_PHRASE.get(self._cinematic_angle(desc), "")
+
+    # Gaze: capture a "looking …" / "gazing …" clause (direction or target).
+    _GAZE_RE = re.compile(r"\b(?:looking|gazing|staring|glancing)\b[^.,;]*", re.IGNORECASE)
+
+    def _looking_note(self, text: str) -> str:
+        """Extract a concise gaze phrase ('looking at the man', 'looking to the
+        left', 'looking down', …) from a description, or '' if none."""
+        if not text:
+            return ""
+        m = self._GAZE_RE.search(text)
+        if not m:
+            return ""
+        note = re.sub(r"\s+(?:with|and|who|while|as|in|on)\b.*$", "",
+                      m.group(0).strip().lower()).strip()
+        return note[:60]
+
+    def _infer_gender(self, text: str) -> str:
+        """Infer 'man' / 'woman' from description text, or '' if ambiguous."""
+        t = (text or "").lower()
+        male   = any(re.search(rf"\b{w}\b", t) for w in self._MALE_WORDS)
+        female = any(re.search(rf"\b{w}\b", t) for w in self._FEMALE_WORDS)
+        if male and not female:
+            return "man"
+        if female and not male:
+            return "woman"
+        return ""
 
     def _cinematic_angle(self, desc: str) -> str:
         t = desc.lower()
@@ -186,14 +243,68 @@ class Florence2Plugin(ModelPlugin):
                 return label
         return ""
 
+    @staticmethod
+    def _clean_desc(text: str) -> str:
+        """Strip leftover model tokens (<loc_*>, <s>, …) and tidy whitespace."""
+        cleaned = re.sub(r"<[^>]*>", "", text or "")
+        return re.sub(r"\s+", " ", cleaned).strip(" ,.;")
+
+    @staticmethod
+    def _detect_panels(image):
+        """Detect a storyboard/collage grid from its uniform gutter lines.
+
+        Returns a list of Ideogram bboxes [y1,x1,y2,x2] (0-1000), one per panel,
+        or [] when no clear multi-panel grid is found.  Gutters are detected as
+        full-width/full-height near-uniform lines; this works best for clean
+        grids with solid separators (heavily letterboxed stills may split).
+        """
+        try:
+            import numpy as np
+            g = np.asarray(image.convert("L"), dtype=np.float32)
+        except Exception:
+            return []
+        H, W = g.shape
+        if H < 60 or W < 60:
+            return []
+
+        col_sep = g.std(axis=0) < 10.0   # uniform full-height column = gutter
+        row_sep = g.std(axis=1) < 10.0   # uniform full-width  row    = gutter
+
+        def content_spans(sep, n):
+            min_len = max(8, int(n * 0.12))   # ignore bands thinner than 12 %
+            spans, i = [], 0
+            while i < n:
+                if not sep[i]:
+                    j = i
+                    while j < n and not sep[j]:
+                        j += 1
+                    if j - i >= min_len:
+                        spans.append((i, j))
+                    i = j
+                else:
+                    i += 1
+            return spans
+
+        cols = content_spans(col_sep, W)
+        rows = content_spans(row_sep, H)
+        n_panels = len(cols) * len(rows)
+        if n_panels < 2 or n_panels > 24:
+            return []   # not a grid (or implausibly many cells)
+
+        return [
+            [round(y1 / H * 1000), round(x1 / W * 1000),
+             round(y2 / H * 1000), round(x2 / W * 1000)]
+            for (y1, y2) in rows for (x1, x2) in cols
+        ]
+
     def _region_desc(self, model, processor, image, bbox_px) -> str:
         W, H = image.width, image.height
         x1, y1, x2, y2 = bbox_px
         lx1 = round(x1 / W * 999); ly1 = round(y1 / H * 999)
         lx2 = round(x2 / W * 999); ly2 = round(y2 / H * 999)
         task = f"<REGION_TO_DESCRIPTION><loc_{lx1}><loc_{ly1}><loc_{lx2}><loc_{ly2}>"
-        return (self._run_task(model, processor, image, task)
-                .get("<REGION_TO_DESCRIPTION>", "") or "").strip()
+        return self._clean_desc(
+            self._run_task(model, processor, image, task).get("<REGION_TO_DESCRIPTION>", ""))
 
     def _caption(self, model, processor, image, inputs) -> str:
         _PERSON_LABELS = {"person", "man", "woman", "boy", "girl", "child", "human", "people"}
@@ -290,10 +401,21 @@ class Florence2Plugin(ModelPlugin):
         )
 
         # ---- helpers ----
-        _FACE_LABELS = {"person", "man", "woman", "boy", "girl", "child", "face", "human", "people"}
+        _PERSON_LABELS = {"person", "man", "woman", "boy", "girl", "child", "people", "human"}
+
+        def is_person_label(label: str) -> bool:
+            return label.lower().strip() in _PERSON_LABELS
 
         def is_face_label(label: str) -> bool:
-            return label.lower().strip() in _FACE_LABELS
+            l = label.lower().strip()
+            return l == "head" or "face" in l
+
+        def bbox_contains_center(outer_ib, inner_ib) -> bool:
+            """True if the center of inner_ib falls inside outer_ib ([y1,x1,y2,x2])."""
+            cy = (inner_ib[0] + inner_ib[2]) / 2
+            cx = (inner_ib[1] + inner_ib[3]) / 2
+            return (outer_ib[0] <= cy <= outer_ib[2]
+                    and outer_ib[1] <= cx <= outer_ib[3])
 
         def region_description(bbox_px) -> str:
             """Run <REGION_TO_DESCRIPTION> for a pixel bbox; return description string."""
@@ -306,7 +428,7 @@ class Florence2Plugin(ModelPlugin):
             task = f"<REGION_TO_DESCRIPTION><loc_{lx1}><loc_{ly1}><loc_{lx2}><loc_{ly2}>"
             try:
                 result = self._run_task(model, processor, image, task)
-                return (result.get("<REGION_TO_DESCRIPTION>", "") or "").strip()
+                return self._clean_desc(result.get("<REGION_TO_DESCRIPTION>", ""))
             except Exception:
                 return ""
 
@@ -455,29 +577,152 @@ class Florence2Plugin(ModelPlugin):
 
         # ---- build elements from OD, enriched by dense descriptions ----
         elements = []
+        person_infos = []   # {ib, gender, facing} for face/body-part association
         od_bboxes = od_data.get("bboxes", [])
         od_labels = od_data.get("labels", [])
         if od_bboxes:
-            face_pass = 0
-            for bbox_px, label in zip(od_bboxes, od_labels):
+            od_items = list(zip(od_bboxes, od_labels))
+            persons = [(b, l) for b, l in od_items if is_person_label(l)]
+            faces   = [(b, l) for b, l in od_items if is_face_label(l)]
+            others  = [(b, l) for b, l in od_items
+                       if not is_person_label(l) and not is_face_label(l)]
+
+            # Budget for <REGION_TO_DESCRIPTION> calls (each is a model pass).
+            region_budget = 8
+
+            # Detected face boxes — a person box with NO face inside it is the
+            # most reliable signal that the figure is turned away (back to camera);
+            # Florence's region captions rarely state orientation explicitly.
+            face_ibs = [to_ideogram(b) for b, _ in faces]
+
+            def _articled(text: str) -> str:
+                return text if re.match(r"^(a |an |the )", text.lower()) else f"a {text}"
+
+            # Pre-pass: which person boxes own a face (face center inside them)?
+            person_ibs      = [to_ideogram(b) for b, _ in persons]
+            person_has_face = [
+                any(bbox_contains_center(pib, fib) for fib in face_ibs)
+                for pib in person_ibs
+            ]
+
+            def _is_back(idx: int) -> bool:
+                """Faceless figure = back to camera, unless it's just an overlapping
+                duplicate of another facing person (e.g. a desk/lower-body crop)."""
+                if person_has_face[idx]:
+                    return False
+                pib = person_ibs[idx]
+                for j, pjb in enumerate(person_ibs):
+                    if j != idx and person_has_face[j] and iou(pib, pjb) > 0.3:
+                        return False
+                return True
+
+            # ---- persons: enrich with gender + facing + region detail ----
+            for p_idx, (bbox_px, label) in enumerate(persons):
+                ib   = person_ibs[p_idx]
+                rich = ""
+                if region_budget > 0:
+                    region_budget -= 1
+                    self.set_phase(inputs, f"Person {len(person_infos) + 1}")
+                    rich = region_description(bbox_px)
+                gender = (label.lower().strip()
+                          if label.lower().strip() in ("man", "woman", "boy", "girl")
+                          else (self._infer_gender(rich) or "person"))
+
+                back = _is_back(p_idx)
+                facing = "seen from behind" if back else self._facing_phrase(rich)
+
+                base = rich or gender
+                if gender != "person" and not re.search(rf"\b{gender}\b", base.lower()):
+                    base = f"{gender}, {base}"
+                if back:
+                    detail = f"the back of {_articled(base)}"
+                else:
+                    detail = base
+                    if facing and not self._cinematic_angle(detail):
+                        detail = f"{detail}, {facing}"
+                    # Surface gaze ('looking at the man', 'looking to the left').
+                    gaze = self._looking_note(rich)
+                    if gaze and "look" not in detail.lower():
+                        detail = f"{detail}, {gaze}"
+                person_infos.append({"ib": ib, "gender": gender, "facing": facing, "back": back})
+                elements.append({"type": "obj", "bbox": ib, "desc": detail, "label": label})
+
+            # ---- faces: reuse the containing person's gender/facing when possible ----
+            for bbox_px, label in faces:
+                ib = to_ideogram(bbox_px)
+                match, best_ov = None, 0.0
+                for pi in person_infos:
+                    if bbox_contains_center(pi["ib"], ib):
+                        ov = iou(pi["ib"], ib)
+                        if match is None or ov > best_ov:
+                            match, best_ov = pi, ov
+                gender = match["gender"] if match else ""
+                facing = match["facing"] if match else ""
+                rich   = ""
+                if not gender and region_budget > 0:
+                    region_budget -= 1
+                    self.set_phase(inputs, "Face")
+                    rich   = region_description(bbox_px)
+                    gender = self._infer_gender(rich)
+                    facing = self._facing_phrase(rich)
+                head = f"{gender}'s face" if gender in ("man", "woman", "boy", "girl") else "face"
+                parts = [head]
+                if facing:
+                    parts.append(facing)
+                if rich and "face" not in rich.lower()[:16]:
+                    parts.append(rich)
+                elements.append({"type": "obj", "bbox": ib, "desc": ", ".join(parts), "label": label})
+
+            # ---- other objects: enrich from dense region captions ----
+            for bbox_px, label in others:
                 ib   = to_ideogram(bbox_px)
                 desc = label
-                if is_face_label(label) and face_pass < 6:
-                    face_pass += 1
-                    self.set_phase(inputs, f"Face {face_pass}")
-                    rich = region_description(bbox_px)
-                    if rich:
-                        desc = rich
-                elif dense_items:
+                if dense_items:
                     best = max(dense_items, key=lambda d: iou(ib, d["bbox"]))
                     if iou(ib, best["bbox"]) > 0.2:
                         desc = best["description"]
+                # Clothing/items sitting inside a back-turned person inherit "back of".
+                if any(pi["back"] and bbox_contains_center(pi["ib"], ib)
+                       for pi in person_infos):
+                    desc = f"the back of {_articled(desc)}"
                 elements.append({"type": "obj", "bbox": ib, "desc": desc, "label": label})
         elif dense_items:
             elements = [
                 {"type": "obj", "bbox": d["bbox"], "desc": d["description"], "label": d["description"]}
                 for d in dense_items[:20]
             ]
+
+        # ---- body parts: always locate eyes / hands / feet ----
+        # Open-vocabulary detection per part is more reliable than grounding a
+        # multi-phrase caption.  Run one query each and tag with the owner.
+        self.set_phase(inputs, "Body parts")
+        _PART_QUERIES = (("eye", "human eye"), ("hand", "human hand"), ("foot", "human foot"))
+        for part, query in _PART_QUERIES:
+            try:
+                pr = self._run_task(
+                    model, processor, image,
+                    f"<OPEN_VOCABULARY_DETECTION>{query}",
+                )
+                pdata = pr.get("<OPEN_VOCABULARY_DETECTION>") or {}
+            except Exception:
+                pdata = {}
+            p_bboxes = pdata.get("bboxes", [])
+            p_labels = pdata.get("bboxes_labels", pdata.get("labels", []))
+            for bbox_px, label in zip(p_bboxes, p_labels or [part] * len(p_bboxes)):
+                lab = (label or part).lower()
+                if part not in lab and lab not in part:
+                    continue              # keep only the queried part
+                ib = to_ideogram(bbox_px)
+                if area(ib) < 4:          # drop degenerate boxes
+                    continue
+                owner = next(
+                    (pi for pi in person_infos if bbox_contains_center(pi["ib"], ib)),
+                    None,
+                )
+                desc = (f"{owner['gender']}'s {part}"
+                        if owner and owner["gender"] in ("man", "woman", "boy", "girl")
+                        else part)
+                elements.append({"type": "obj", "bbox": ib, "desc": desc, "label": part})
 
         # ---- deduplicate ----
         deduped = []
@@ -585,7 +830,18 @@ class Florence2Plugin(ModelPlugin):
         _unique = _strip_caption_prefix(caption) if caption else ""
         _unique_lc = (_unique[0].lower() + _unique[1:]) if _unique else ""
         scene_desc = f"{shot_type.capitalize()} of {_unique_lc}" if _unique_lc else shot_type.capitalize()
-        frame_element = {"type": "obj", "bbox": [0, 0, 1000, 1000], "desc": f"Frame – {shot_type}"}
+        # Frame outline(s): one per storyboard/collage panel when a grid is
+        # detected, otherwise a single full-image frame.
+        panels = self._detect_panels(image)
+        if len(panels) >= 2:
+            frame_elements = [
+                {"type": "obj", "bbox": pb, "desc": f"Storyboard panel {i + 1}"}
+                for i, pb in enumerate(panels)
+            ]
+        else:
+            frame_elements = [
+                {"type": "obj", "bbox": [0, 0, 1000, 1000], "desc": f"Frame – {shot_type}"}
+            ]
         extra = [light_element] if light_element else []
         result = {
             "high_level_description": scene_desc,
@@ -594,7 +850,7 @@ class Florence2Plugin(ModelPlugin):
             "light_setting":   light_setting,
             "compositional_deconstruction": {
                 "background": background or caption or "Background inferred from image.",
-                "elements":   [frame_element] + extra + ordered,
+                "elements":   frame_elements + extra + ordered,
             },
         }
 

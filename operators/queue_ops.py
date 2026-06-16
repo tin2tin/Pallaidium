@@ -1308,7 +1308,13 @@ class SEQUENCER_OT_add_to_queue(Operator):
         strip_list = selected if (input_mode == "input_strips" and selected) else [None]
 
         inpaint_strip = getattr(scene, "inpaint_selected_strip", "")
-        batch_count = max(1, getattr(scene, "movie_num_batch", 1))
+        # Deterministic single-output plugins (supports_batch=False) gain nothing
+        # from batching — the UI hides Batch Count for them, so clamp to 1 here
+        # to avoid enqueuing identical duplicate jobs from a stale movie_num_batch.
+        if _pi is not None and not getattr(_pi, "supports_batch", True):
+            batch_count = 1
+        else:
+            batch_count = max(1, getattr(scene, "movie_num_batch", 1))
         added = 0
 
         for strip in strip_list:

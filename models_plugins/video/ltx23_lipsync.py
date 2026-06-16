@@ -290,15 +290,24 @@ class LTX2_3LipSyncPlugin(ModelPlugin):
         _enabled_loras = [item for item in getattr(scene, "lora_files", []) if item.enabled]
         _lora_names, _lora_weights = [], []
         if _enabled_loras and _lora_folder:
+            import warnings as _warnings
             print(f"LTX-2.3 LipSync: loading {len(_enabled_loras)} LoRA(s) from {_lora_folder}")
             for _item in _enabled_loras:
                 _name = clean_filename(_item.name).replace(".", "")
                 try:
-                    pipe.load_lora_weights(
-                        _lora_folder,
-                        weight_name=_item.name + ".safetensors",
-                        adapter_name=_name,
-                    )
+                    # peft warns "Already found a `peft_config` attribute" every time a
+                    # 2nd adapter is added — benign here, each LoRA gets a distinct
+                    # adapter_name and set_adapters() blends them by weight below.
+                    with _warnings.catch_warnings():
+                        _warnings.filterwarnings(
+                            "ignore",
+                            message="Already found a `peft_config` attribute",
+                        )
+                        pipe.load_lora_weights(
+                            _lora_folder,
+                            weight_name=_item.name + ".safetensors",
+                            adapter_name=_name,
+                        )
                 except Exception as _e:
                     print(f"  LoRA '{_item.name}': load error — {_e}")
                     continue
