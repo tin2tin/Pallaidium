@@ -213,6 +213,7 @@ class RenderQueueJob(PropertyGroup):
     ip_adapter_style_folder: StringProperty(default="")
     openpose_use_bones:    BoolProperty(default=False)
     use_scribble_image:    BoolProperty(default=False)
+    ideogram_prompt_upsampling: BoolProperty(default=False)
 
     # ltx23_multi_v2 — independent audio/modality guidance
     ltx23m_modality_scale:       FloatProperty(default=1.0)
@@ -234,6 +235,12 @@ class RenderQueueJob(PropertyGroup):
     ltx23ext_extend_frames:      IntProperty(default=96)
     ltx23ext_video_strength:     FloatProperty(default=1.0)
     ltx23ext_audio_path:         StringProperty(default="")
+
+    # ltx23 staged — stage-mode enum
+    ltx23_stage_mode:            StringProperty(default="FULL")
+
+    # Maxine VSR
+    maxine_quality:              StringProperty(default="HIGH")
 
     # VRAM management — set at run-time based on the next queued job
     should_unload: BoolProperty(default=True)
@@ -415,6 +422,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             light_direction                = snapshot.get("light_direction", ""),
             openpose_use_bones             = snapshot.get("openpose_use_bones", False),
             use_scribble_image             = snapshot.get("use_scribble_image", False),
+            ideogram_prompt_upsampling     = snapshot.get("ideogram_prompt_upsampling", False),
             # ltx23_multi_v2 guidance params
             ltx23m_modality_scale          = snapshot.get("ltx23m_modality_scale",       1.0),
             ltx23m_audio_guidance          = snapshot.get("ltx23m_audio_guidance",       1.0),
@@ -433,6 +441,8 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             ltx23ext_extend_frames         = snapshot.get("ltx23ext_extend_frames",      96),
             ltx23ext_video_strength        = snapshot.get("ltx23ext_video_strength",     1.0),
             ltx23ext_audio_path            = snapshot.get("ltx23ext_audio_path",         ""),
+            ltx23_stage_mode               = snapshot.get("ltx23_stage_mode",            "FULL"),
+            maxine_quality                 = snapshot.get("maxine_quality",              "HIGH"),
             lora_files                     = enabled_items,
             lora_folder                    = snapshot.get("lora_folder", ""),
             render                         = types.SimpleNamespace(
@@ -498,12 +508,14 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
         # A cache built for one mode cannot serve another mode of the same
         # model, so we include `last_mode` in the hit check.
         _schematic_mode = snapshot.get("klein_schematic_mode", "")
-        _cache_skip = {"last_model_card", "last_mode", "last_schematic_mode"}
+        _lora_key = snapshot.get("lora_files_json", "[]")
+        _cache_skip = {"last_model_card", "last_mode", "last_schematic_mode", "last_lora_key"}
         cache_hit = (
             model_cache is not None
             and model_cache.get("last_model_card") == model_card
             and model_cache.get("last_mode") == mode
             and model_cache.get("last_schematic_mode", "") == _schematic_mode
+            and model_cache.get("last_lora_key", "[]") == _lora_key
             and any(v is not None for k, v in model_cache.items() if k not in _cache_skip)
         )
 
@@ -647,6 +659,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
                 model_cache["last_model_card"] = model_card
                 model_cache["last_mode"] = mode
                 model_cache["last_schematic_mode"] = _schematic_mode
+                model_cache["last_lora_key"] = _lora_key
                 pipe_obj = model_cache
             else:
                 pipe_obj = loaded
@@ -852,6 +865,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             "ip_adapter_style_folder": snapshot.get("ip_adapter_style_folder", ""),
             "openpose_use_bones":     snapshot.get("openpose_use_bones", False),
             "use_scribble_image":     snapshot.get("use_scribble_image", False),
+            "ideogram_prompt_upsampling": snapshot.get("ideogram_prompt_upsampling", False),
             # ltx23_multi_v2
             "ltx23m_modality_scale":       snapshot.get("ltx23m_modality_scale",       1.0),
             "ltx23m_audio_guidance":       snapshot.get("ltx23m_audio_guidance",       1.0),
@@ -870,6 +884,8 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             "ltx23ext_extend_frames":      snapshot.get("ltx23ext_extend_frames",      96),
             "ltx23ext_video_strength":     snapshot.get("ltx23ext_video_strength",     1.0),
             "ltx23ext_audio_path":         snapshot.get("ltx23ext_audio_path",         ""),
+            "ltx23_stage_mode":            snapshot.get("ltx23_stage_mode",            "FULL"),
+            "maxine_quality":              snapshot.get("maxine_quality",              "HIGH"),
             "florence2_send_to_mask":      snapshot.get("florence2_send_to_mask",      False),
             "florence2_source_image_path": snapshot.get("image_path") or snapshot.get("movie_path") or "",
             # MOSS-TTS
@@ -1258,6 +1274,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
             ip_adapter_style_folder = bpy.path.abspath(getattr(scene, "ip_adapter_style_folder", "") or ""),
             openpose_use_bones     = getattr(scene, "openpose_use_bones",     False),
             use_scribble_image     = getattr(scene, "use_scribble_image",     False),
+            ideogram_prompt_upsampling = getattr(scene, "ideogram_prompt_upsampling", False),
             # ltx23_multi_v2 guidance params
             ltx23m_modality_scale       = getattr(scene, "ltx23m_modality_scale",       1.0),
             ltx23m_audio_guidance       = getattr(scene, "ltx23m_audio_guidance",       1.0),
@@ -1272,6 +1289,8 @@ class SEQUENCER_OT_add_to_queue(Operator):
             # ltx23_extend params (ltx23ext_audio_path is resolved per-job below)
             ltx23ext_extend_frames      = getattr(scene, "ltx23ext_extend_frames",      96),
             ltx23ext_video_strength     = getattr(scene, "ltx23ext_video_strength",     1.0),
+            ltx23_stage_mode            = getattr(scene, "ltx23_stage_mode",            "FULL"),
+            maxine_quality              = getattr(scene, "maxine_quality",              "HIGH"),
         )
 
         # ---- Decide which strips to iterate over -------------------------
@@ -1652,6 +1671,7 @@ def _queue_start_job(scene, job) -> None:
         "img_guidance_scale", "illumination_style", "light_direction",
         "ip_adapter_face_folder", "ip_adapter_style_folder",
         "openpose_use_bones", "use_scribble_image",
+        "ideogram_prompt_upsampling",
         # ltx23_multi_v2 guidance params
         "ltx23m_modality_scale", "ltx23m_audio_guidance", "ltx23m_audio_stg_scale",
         "ltx23m_audio_modality_scale", "ltx23m_audio_noise_scale", "ltx23m_audio_start_time",
@@ -1661,6 +1681,7 @@ def _queue_start_job(scene, job) -> None:
         "ltx23ic_control_audio_str", "ltx23ic_identity_guidance",
         # ltx23_extend params + resolved audio-strip path
         "ltx23ext_extend_frames", "ltx23ext_video_strength", "ltx23ext_audio_path",
+        "ltx23_stage_mode",
     )}
     _cancel_event.clear()
     _worker_thread = threading.Thread(
@@ -2139,6 +2160,8 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 extra_meta["openpose_use_bones"] = result.get("openpose_use_bones", False)
             if result.get("use_scribble_image"):
                 extra_meta["use_scribble_image"] = result.get("use_scribble_image", False)
+            if result.get("ideogram_prompt_upsampling"):
+                extra_meta["ideogram_prompt_upsampling"] = result.get("ideogram_prompt_upsampling", False)
             # ltx23_multi_v2 — only write non-default values to keep metadata compact
             for _k, _def in [
                 ("ltx23m_modality_scale",       1.0),
@@ -2150,6 +2173,10 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 # ltx23_extend params
                 ("ltx23ext_extend_frames",      96),
                 ("ltx23ext_video_strength",     1.0),
+                # ltx23 staged
+                ("ltx23_stage_mode",            "FULL"),
+                # Maxine VSR
+                ("maxine_quality",              "HIGH"),
             ]:
                 _v = result.get(_k, _def)
                 if _v != _def:
@@ -2454,6 +2481,9 @@ class SEQUENCER_OT_redo_from_job(Operator):
             scene.whisper_model_size         = job.whisper_model_size
         if hasattr(scene, "whisper_language") and job.whisper_language:
             scene.whisper_language           = job.whisper_language
+        # ltx23 staged
+        if hasattr(scene, "ltx23_stage_mode"):
+            scene.ltx23_stage_mode           = job.ltx23_stage_mode
         # MOSS-TTS
         if hasattr(scene, "moss_model_variant"):
             scene.moss_model_variant         = job.moss_model_variant

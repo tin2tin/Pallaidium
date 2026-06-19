@@ -614,6 +614,33 @@ def register():
         name="Audio Strip", default="",
         description="Name of a SOUND strip whose audio drives the extended video (overrides the source clip's audio)")
 
+    # Maxine VSR quality level
+    bpy.types.Scene.maxine_quality = bpy.props.EnumProperty(
+        name="Quality",
+        items=[
+            ("HIGH",    "High",    "AI upscaling, quality-favoring (default)"),
+            ("ULTRA",   "Ultra",   "AI upscaling, maximum detail preservation"),
+            ("MEDIUM",  "Medium",  "AI upscaling, balanced speed/quality"),
+            ("LOW",     "Low",     "AI upscaling, speed-optimized"),
+            ("DENOISE_MEDIUM", "Denoise", "Remove noise and compression artifacts (same resolution)"),
+            ("DEBLUR_MEDIUM",  "Deblur",  "Sharpen blurry or out-of-focus footage (same resolution)"),
+        ],
+        default="HIGH",
+        description="Maxine VSR processing mode",
+    )
+
+    # ltx23 staged — shared stage-mode enum for the *_staged plugin variants
+    bpy.types.Scene.ltx23_stage_mode = bpy.props.EnumProperty(
+        name="Stages",
+        items=[
+            ("FULL",  "Full (Both Steps)", "Run both stages — base generation + refinement"),
+            ("STEP1", "Step 1",            "Only base generation — fast half-resolution preview"),
+            ("STEP2", "Step 2 (input video)", "Skip generation; refine the input video via upsample + Stage 2"),
+        ],
+        default="FULL",
+        description="Which stages of the two-stage LTX pipeline to run",
+    )
+
     # The guidance number.
     bpy.types.Scene.img_guidance_scale = bpy.props.FloatProperty(
         name="img_guidance_scale",
@@ -1027,6 +1054,8 @@ def unregister():
         "ltx23m_audio_modality_scale", "ltx23m_audio_noise_scale", "ltx23m_audio_start_time",
         "ltx23ic_control_strip", "ltx23ic_control_strength", "ltx23ic_control_downscale",
         "ltx23ic_control_audio_str", "ltx23ic_identity_guidance",
+        "ltx23_stage_mode",
+        "maxine_quality",
     ):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)

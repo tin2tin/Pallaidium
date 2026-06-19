@@ -1141,6 +1141,7 @@ class DependencyManager:
                 "git+https://github.com/hkchengrex/MMAudio.git",
                 #"https://github.com/woct0rdho/triton-windows/releases/download/empty/triton-3.4.0-py3-none-any.whl",
                 #"triton-windows<3.3",
+                "nvidia-vfx",
             ])
         elif self.os_platform == "Linux":
             reqs.extend([
@@ -1218,6 +1219,7 @@ def input_strips_updated(self, context):
 
     # Movie Type Handling
     elif scene_type == "movie":
+        _p = None
         try:
             from ..models import get_plugin as _gp
             _p = _gp(movie_model)
@@ -1229,7 +1231,9 @@ def input_strips_updated(self, context):
                 scene.generate_movie_frames = _p.PARAMS.frames
         except Exception:
             pass
-        if (
+        if _p and getattr(_p, "requires_input_strip", False) and scene.input_strips != "input_strips":
+            scene.input_strips = "input_strips"
+        elif (
             movie_model in {
                 "Hailuo/MiniMax/img2vid",
                 "Hailuo/MiniMax/subject2vid"
@@ -3139,6 +3143,9 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
         v = _get("use_scribble_image")
         if v is not None and hasattr(scene, "use_scribble_image"):
             scene.use_scribble_image = str(v).lower() in ("true", "1", "yes")
+        v = _get("ideogram_prompt_upsampling")
+        if v is not None and hasattr(scene, "ideogram_prompt_upsampling"):
+            scene.ideogram_prompt_upsampling = str(v).lower() in ("true", "1", "yes")
 
         # ltx23_multi_v2 guidance params
         for _attr, _cast in [
@@ -3181,6 +3188,14 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
                     setattr(scene, _attr, _cast(_v))
                 except Exception:
                     pass
+
+        # Maxine VSR
+        _v = _get("maxine_quality")
+        if _v is not None and hasattr(scene, "maxine_quality"):
+            try:
+                scene.maxine_quality = str(_v)
+            except Exception:
+                pass
 
         # MOSS-TTS params (audio strips)
         for _attr, _cast in [
