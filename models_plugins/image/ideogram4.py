@@ -1,14 +1,14 @@
 """Text-to-image via Ideogram 4.
 
-Uses official ideogram-ai weights or pre-quantized SDNQ weights loaded 
+Uses official ideogram-ai weights or pre-quantized SDNQ weights loaded
 through the standard diffusers Ideogram4Pipeline.
 
 Supported  : prompt, height/width (up to 2048), steps, guidance_scale, seed,
-             local prompt upsampling (requires 'outlines' package).
+             local prompt upsampling (requires 'outlines' package),
+             LoRA (requires diffusers >= PR#13921 with Ideogram4LoraLoaderMixin).
 Unsupported: negative_prompt  - model uses a fixed unconditional_transformer.
              img2img / inpaint - not in Ideogram4Pipeline.
              reference images  - not supported.
-             LoRA              - not documented / not supported.
 """
 
 from ...models.base import ModelPlugin, InputSpec, UISection, ParamSpec, ModelInputs
@@ -21,18 +21,19 @@ class Ideogram4Plugin(ModelPlugin):
     # Fallback to original FP8/SDNQ weights if preferred:
     # MODEL_ID     = "Disty0/Ideogram-4-SDNQ-FP8"
     # MODEL_ID     = "Disty0/Ideogram-4-SDNQ-4bit-dynamic-hadamard"
-    
+
     DISPLAY_NAME = "Image: Ideogram 4"
     DESCRIPTION  = (
         "Text-to-image via Ideogram 4 (~10.5 GB NF4 / ~17.9 GB FP8). "
         "Optional local prompt upsampling needs: pip install outlines."
     )
     MODEL_TYPE   = "image"
-    INPUTS       = InputSpec.PROMPT | InputSpec.HF_TOKEN
+    INPUTS       = InputSpec.PROMPT | InputSpec.HF_TOKEN | InputSpec.LORA
     UI_SECTIONS  = [
         UISection.PROMPT,
         UISection.RESOLUTION, UISection.FRAMES, UISection.STEPS, UISection.GUIDANCE,
         UISection.SEED,
+        UISection.LORA,
     ]
     PARAMS            = ParamSpec(steps=20, guidance=4.0)
     REQUIRED_PACKAGES = ["torch", "diffusers", "transformers", "outlines"]
@@ -41,7 +42,88 @@ class Ideogram4Plugin(ModelPlugin):
 
     _ENHANCER = "diffusers/qwen3-vl-8b-instruct-lm-head"
 
-    def load(self, prefs, scene, **_kw):
+    @staticmethod
+    def _inject_lora_mixin(pipe):
+        """Give *pipe* the standard load_lora_weights / set_adapters API.
+
+        Uses the same LoraBaseMixin infrastructure that Klein/Flux2 rely on.
+        Once diffusers ships Ideogram4LoraLoaderMixin this becomes a no-op.
+        """
+        from diffusers.loaders.lora_base import LoraBaseMixin, _fetch_state_dict
+        from diffusers.loaders.lora_pipeline import TRANSFORMER_NAME
+        from diffusers.utils import USE_PEFT_BACKEND
+        _LOW_CPU = False
+        try:
+            from diffusers.loaders.lora_pipeline import _LOW_CPU_MEM_USAGE_DEFAULT_LORA
+            _LOW_CPU = _LOW_CPU_MEM_USAGE_DEFAULT_LORA
+        except ImportError:
+            pass
+
+        class _Ideogram4LoraLoader(LoraBaseMixin):
+            _lora_loadable_modules = ["transformer"]
+            transformer_name = TRANSFORMER_NAME
+
+            @classmethod
+            def lora_state_dict(cls, pretrained_model_name_or_path_or_dict, **kwargs):
+                weight_name = kwargs.pop("weight_name", None)
+                use_safetensors = kwargs.pop("use_safetensors", None)
+                local_files_only = kwargs.pop("local_files_only", None)
+                cache_dir = kwargs.pop("cache_dir", None)
+                force_download = kwargs.pop("force_download", False)
+                proxies = kwargs.pop("proxies", None)
+                token = kwargs.pop("token", None)
+                revision = kwargs.pop("revision", None)
+                subfolder = kwargs.pop("subfolder", None)
+                return_lora_metadata = kwargs.pop("return_lora_metadata", False)
+                allow_pickle = False
+                if use_safetensors is None:
+                    use_safetensors = True
+                    allow_pickle = True
+                state_dict, metadata = _fetch_state_dict(
+                    pretrained_model_name_or_path_or_dict=pretrained_model_name_or_path_or_dict,
+                    weight_name=weight_name,
+                    use_safetensors=use_safetensors,
+                    local_files_only=local_files_only,
+                    cache_dir=cache_dir,
+                    force_download=force_download,
+                    proxies=proxies,
+                    token=token,
+                    revision=revision,
+                    subfolder=subfolder,
+                    user_agent={"file_type": "attn_procs_weights", "framework": "pytorch"},
+                    allow_pickle=allow_pickle,
+                )
+                state_dict = {k: v for k, v in state_dict.items() if "dora_scale" not in k}
+                if not any(k.startswith("transformer.") for k in state_dict):
+                    state_dict = {f"transformer.{k}": v for k, v in state_dict.items()}
+                return (state_dict, metadata) if return_lora_metadata else state_dict
+
+            def load_lora_weights(self, pretrained_model_name_or_path_or_dict,
+                                  adapter_name=None, hotswap=False, **kwargs):
+                if not USE_PEFT_BACKEND:
+                    raise ValueError("PEFT backend is required for LoRA.")
+                low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", _LOW_CPU)
+                if isinstance(pretrained_model_name_or_path_or_dict, dict):
+                    pretrained_model_name_or_path_or_dict = pretrained_model_name_or_path_or_dict.copy()
+                kwargs["return_lora_metadata"] = True
+                state_dict, metadata = self.lora_state_dict(
+                    pretrained_model_name_or_path_or_dict, **kwargs)
+                is_correct = all("lora" in k for k in state_dict)
+                if not is_correct:
+                    raise ValueError("Invalid LoRA checkpoint.")
+                self.transformer.load_lora_adapter(
+                    state_dict, adapter_name=adapter_name, metadata=metadata,
+                    _pipeline=self, low_cpu_mem_usage=low_cpu_mem_usage,
+                    hotswap=hotswap,
+                )
+
+        pipe.__class__ = type(
+            pipe.__class__.__name__,
+            (_Ideogram4LoraLoader, pipe.__class__),
+            {},
+        )
+
+    def load(self, prefs, scene, **kw):
         import torch
         #from sdnq import SDNQConfig # import sdnq to register it into diffusers and transformers
         #from sdnq.common import use_torch_compile as triton_is_available
@@ -56,6 +138,8 @@ class Ideogram4Plugin(ModelPlugin):
                 raise RuntimeError(f"HuggingFace login failed: {e}")
 
         _cache_dir = prefs.hf_cache_dir or None
+        mode = kw.get("mode", "txt2img")
+        print(f"Loading {self.MODEL_ID} ({mode})…")
         dtype      = torch.bfloat16
         print(f"Loading {self.MODEL_ID}…")
 
@@ -76,6 +160,24 @@ class Ideogram4Plugin(ModelPlugin):
                 print(f"Ideogram4: prompt enhancer head failed ({e}); skipping")
 
         pipe = Ideogram4Pipeline.from_pretrained(self.MODEL_ID, **load_kwargs)
+
+        enabled_items = kw.get("enabled_items", [])
+        if enabled_items:
+            if not hasattr(pipe, "load_lora_weights"):
+                self._inject_lora_mixin(pipe)
+            from ...utils.helpers import clean_filename, bpy
+            lora_folder = getattr(bpy.context.scene, "lora_folder", "")
+            names, weights = [], []
+            for item in enabled_items:
+                name = clean_filename(item.name).replace(".", "")
+                names.append(name)
+                weights.append(item.weight_value)
+                pipe.load_lora_weights(
+                    bpy.path.abspath(lora_folder),
+                    weight_name=item.name + ".safetensors",
+                    adapter_name=name,
+                )
+            pipe.set_adapters(names, adapter_weights=weights)
 
         # Enable FP8 MatMul for AMD, Intel ARC and Nvidia GPUs (only executed for SDNQ models to avoid crashes on official NF4/FP8 models)
         # if "SDNQ" in self.MODEL_ID and triton_is_available and (torch.cuda.is_available() or torch.xpu.is_available()):

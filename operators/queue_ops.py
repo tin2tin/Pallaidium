@@ -178,6 +178,9 @@ class RenderQueueJob(PropertyGroup):
     omnivoice_denoise:     BoolProperty(default=True)
     omnivoice_postprocess: BoolProperty(default=True)
 
+    # Chatterbox Multilingual
+    chatterbox_mtl_language: StringProperty(default="en")
+
     # MOSS-TTS
     moss_model_variant:   StringProperty(default="v1.5")
     moss_language:        StringProperty(default="AUTO")
@@ -241,6 +244,10 @@ class RenderQueueJob(PropertyGroup):
 
     # Maxine VSR
     maxine_quality:              StringProperty(default="HIGH")
+
+    # Marlin Video Captions
+    marlin_mode:        StringProperty(default="CAPTION")
+    marlin_find_query:  StringProperty(default="")
 
     # VRAM management — set at run-time based on the next queued job
     should_unload: BoolProperty(default=True)
@@ -443,6 +450,9 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             ltx23ext_audio_path            = snapshot.get("ltx23ext_audio_path",         ""),
             ltx23_stage_mode               = snapshot.get("ltx23_stage_mode",            "FULL"),
             maxine_quality                 = snapshot.get("maxine_quality",              "HIGH"),
+            marlin_mode                    = snapshot.get("marlin_mode",                 "CAPTION"),
+            marlin_find_query              = snapshot.get("marlin_find_query",           ""),
+            marlin_last_query              = "",
             lora_files                     = enabled_items,
             lora_folder                    = snapshot.get("lora_folder", ""),
             render                         = types.SimpleNamespace(
@@ -463,6 +473,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             omnivoice_preprocess  = snapshot.get("omnivoice_preprocess",  True),
             omnivoice_denoise     = snapshot.get("omnivoice_denoise",     True),
             omnivoice_postprocess = snapshot.get("omnivoice_postprocess", True),
+            chatterbox_mtl_language = snapshot.get("chatterbox_mtl_language", "en"),
             moss_model_variant    = snapshot.get("moss_model_variant",    "v1.5"),
             moss_language         = snapshot.get("moss_language",         "AUTO"),
             moss_duration_tokens  = snapshot.get("moss_duration_tokens",  0),
@@ -888,6 +899,8 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             "maxine_quality":              snapshot.get("maxine_quality",              "HIGH"),
             "florence2_send_to_mask":      snapshot.get("florence2_send_to_mask",      False),
             "florence2_source_image_path": snapshot.get("image_path") or snapshot.get("movie_path") or "",
+            # Chatterbox Multilingual
+            "chatterbox_mtl_language": snapshot.get("chatterbox_mtl_language", "en"),
             # MOSS-TTS
             "moss_model_variant":   snapshot.get("moss_model_variant",   "v1.5"),
             "moss_language":        snapshot.get("moss_language",        "AUTO"),
@@ -1255,6 +1268,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
             omnivoice_preprocess  = getattr(scene, "omnivoice_preprocess",  True),
             omnivoice_denoise     = getattr(scene, "omnivoice_denoise",     True),
             omnivoice_postprocess = getattr(scene, "omnivoice_postprocess", True),
+            chatterbox_mtl_language = getattr(scene, "chatterbox_mtl_language", "en"),
             moss_model_variant    = getattr(scene, "moss_model_variant",    "v1.5"),
             moss_language         = getattr(scene, "moss_language",         "AUTO"),
             moss_duration_tokens  = getattr(scene, "moss_duration_tokens",  0),
@@ -1291,6 +1305,8 @@ class SEQUENCER_OT_add_to_queue(Operator):
             ltx23ext_video_strength     = getattr(scene, "ltx23ext_video_strength",     1.0),
             ltx23_stage_mode            = getattr(scene, "ltx23_stage_mode",            "FULL"),
             maxine_quality              = getattr(scene, "maxine_quality",              "HIGH"),
+            marlin_mode                 = getattr(scene, "marlin_mode",                 "CAPTION"),
+            marlin_find_query           = getattr(scene, "marlin_find_query",           ""),
         )
 
         # ---- Decide which strips to iterate over -------------------------
@@ -1659,6 +1675,7 @@ def _queue_start_job(scene, job) -> None:
         "whisper_model_size", "whisper_language",
         "omnivoice_instruct", "omnivoice_language",
         "omnivoice_preprocess", "omnivoice_denoise", "omnivoice_postprocess",
+        "chatterbox_mtl_language",
         "moss_model_variant", "moss_language", "moss_duration_tokens",
         "moss_max_new_tokens", "moss_temperature", "moss_top_p", "moss_top_k",
         "moss_ref_audio_path",
@@ -1682,6 +1699,7 @@ def _queue_start_job(scene, job) -> None:
         # ltx23_extend params + resolved audio-strip path
         "ltx23ext_extend_frames", "ltx23ext_video_strength", "ltx23ext_audio_path",
         "ltx23_stage_mode",
+        "marlin_mode", "marlin_find_query",
     )}
     _cancel_event.clear()
     _worker_thread = threading.Thread(
@@ -2193,6 +2211,10 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 _v = result.get(_k)
                 if _v is not None:
                     extra_meta[_k] = _v
+            # Chatterbox Multilingual
+            if result.get("model_card", "") == "ChatterboxMultilingual":
+                _v = result.get("chatterbox_mtl_language", "en")
+                extra_meta["chatterbox_mtl_language"] = _v
             # MOSS-TTS — write only when it was the model used, so other models'
             # strips don't carry irrelevant TTS metadata.
             if result.get("model_card", "") == "MOSS-TTS":
@@ -2484,6 +2506,9 @@ class SEQUENCER_OT_redo_from_job(Operator):
         # ltx23 staged
         if hasattr(scene, "ltx23_stage_mode"):
             scene.ltx23_stage_mode           = job.ltx23_stage_mode
+        # Chatterbox Multilingual
+        if hasattr(scene, "chatterbox_mtl_language"):
+            scene.chatterbox_mtl_language    = job.chatterbox_mtl_language
         # MOSS-TTS
         if hasattr(scene, "moss_model_variant"):
             scene.moss_model_variant         = job.moss_model_variant

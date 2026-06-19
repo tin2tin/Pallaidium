@@ -167,7 +167,6 @@ class MarlinVideoCaptionsPlugin(ModelPlugin):
 
     REQUIRED_PACKAGES    = ["qwen_vl_utils", "sdnq"]
     requires_input_strip = True
-    requires_main_thread = True
     supports_batch       = False  # deterministic caption → batch makes identical copies
 
     def load(self, prefs, scene, **kw) -> dict:
@@ -250,6 +249,11 @@ class MarlinVideoCaptionsPlugin(ModelPlugin):
                 except ImportError:
                     pass
 
+                if not triton_available:
+                    from sdnq.dequantizer import dequantize_sdnq_model
+                    marlin = dequantize_sdnq_model(marlin)
+                    print("Marlin: dequantized to fp16 (no Triton)")
+
                 _ = marlin.processor
                 sdnq_used = "quantization_config" in attempt_kwargs and isinstance(attempt_kwargs["quantization_config"], SDNQConfig)
                 used = f"SDPA+{'SDNQ-int8' if sdnq_used else 'fallback'}"
@@ -268,6 +272,26 @@ class MarlinVideoCaptionsPlugin(ModelPlugin):
             col.prop(scene, "marlin_find_query", text="Find")
         return False
 
+    @staticmethod
+    def _run_on_main_thread(fn):
+        """Schedule *fn* on Blender's main thread, block until it returns."""
+        import bpy, threading
+        done   = threading.Event()
+        result = {}
+        def _wrapper():
+            try:
+                result["value"] = fn()
+            except Exception as exc:
+                result["error"] = exc
+            finally:
+                done.set()
+            return None
+        bpy.app.timers.register(_wrapper, first_interval=0)
+        done.wait()
+        if "error" in result:
+            raise result["error"]
+        return result.get("value")
+
     def generate(self, pipe, inputs: ModelInputs, scene, prefs):
         import bpy
         import torch
@@ -279,12 +303,8 @@ class MarlinVideoCaptionsPlugin(ModelPlugin):
         mode  = getattr(scene, "marlin_mode",       "CAPTION")
         query = getattr(scene, "marlin_find_query", "").strip()
 
-        # - Step 1: locate MOVIE strip ------------------------------------
+        # - Step 1: locate MOVIE strip (resolved on main thread) ----------
         self.set_phase(inputs, "Step 1: Locating video strip")
-        seq_editor = scene.sequence_editor
-        if not seq_editor:
-            print("Marlin: No sequence editor found.")
-            return None
 
         _scene_fps = scene.render.fps / scene.render.fps_base
         fps = _scene_fps
@@ -301,40 +321,57 @@ class MarlinVideoCaptionsPlugin(ModelPlugin):
             except Exception:
                 trim_dur_s = 0.0
             if trim_dur_s <= 0.0:
-                trim_dur_s = max(1.0, scene.frame_end - strip_start_frame) / fps
+                _frame_end = getattr(scene, "frame_end", strip_start_frame + int(fps * 10))
+                trim_dur_s = max(1.0, _frame_end - strip_start_frame) / fps
             trim_end_s = trim_start_s + trim_dur_s
-            print(f"Marlin: source - {video_path} (queue mode, start_frame={strip_start_frame})")
+            print(f"Marlin: source - {video_path} (start_frame={strip_start_frame})")
         else:
-            def _usable_movie(s):
-                if s.type != "MOVIE":
-                    return False
-                p = bpy.path.abspath(s.filepath)
-                return bool(p) and os.path.isfile(p) and (s.frame_final_duration / _scene_fps) >= 1.0
+            _fs = inputs.insert_frame_start
+            _fe = getattr(inputs, "insert_frame_end", _fs + int(fps * 10))
 
-            def _is_source(s):
-                if not _usable_movie(s):
-                    return False
-                return "Pallaidium_Media" not in bpy.path.abspath(s.filepath)
-
-            candidate = seq_editor.active_strip
-            if not candidate or not _usable_movie(candidate):
-                ref_frame = int(candidate.frame_final_start) if candidate else int(scene.frame_current)
-                sources = [s for s in seq_editor.strips_all if _is_source(s)]
-                if not sources:
-                    print("Marlin: No usable source MOVIE strip found.")
+            def _resolve():
+                _sc = bpy.context.scene
+                _ed = _sc.sequence_editor
+                if not _ed:
                     return None
-                overlapping = [s for s in sources
-                               if s.frame_final_start <= ref_frame
-                               < s.frame_final_start + s.frame_final_duration]
-                candidate = max(overlapping if overlapping else sources,
-                                key=lambda s: s.frame_final_duration)
+                def _usable(s):
+                    if s.type != "MOVIE":
+                        return False
+                    p = bpy.path.abspath(s.filepath)
+                    return bool(p) and os.path.isfile(p) and (s.frame_final_duration / _scene_fps) >= 1.0
+                def _is_src(s):
+                    return _usable(s) and "Pallaidium_Media" not in bpy.path.abspath(s.filepath)
 
-            active     = candidate
-            video_path = bpy.path.abspath(active.filepath)
-            strip_start_frame = int(active.frame_final_start)
-            trim_start_s      = getattr(active, "frame_offset_start", 0) / fps
-            trim_dur_s        = active.frame_final_duration / fps
+                candidate = _ed.active_strip
+                if not candidate or not _usable(candidate):
+                    sources = [s for s in _ed.strips_all if _is_src(s)]
+                    if not sources:
+                        return None
+                    overlapping = [
+                        s for s in sources
+                        if s.frame_final_start < _fe
+                        and (s.frame_final_start + s.frame_final_duration) > _fs
+                    ]
+                    candidate = max(overlapping if overlapping else sources,
+                                    key=lambda s: s.frame_final_duration)
+                return {
+                    "video_path":  bpy.path.abspath(candidate.filepath),
+                    "frame_start": int(candidate.frame_final_start),
+                    "trim_start":  getattr(candidate, "frame_offset_start", 0) / _scene_fps,
+                    "trim_dur":    candidate.frame_final_duration / _scene_fps,
+                }
+
+            resolved = self._run_on_main_thread(_resolve)
+            if not resolved:
+                print("Marlin: No usable source MOVIE strip found.")
+                return None
+
+            video_path        = resolved["video_path"]
+            strip_start_frame = resolved["frame_start"]
+            trim_start_s      = resolved["trim_start"]
+            trim_dur_s        = resolved["trim_dur"]
             trim_end_s        = trim_start_s + trim_dur_s
+            print(f"Marlin: resolved video - {video_path} (start_frame={strip_start_frame})")
 
         if mode == "FIND":
             if not query:
@@ -382,27 +419,30 @@ class MarlinVideoCaptionsPlugin(ModelPlugin):
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
 
+        # - Step 3: inference (runs in worker thread) ---------------------
         try:
             if mode == "FIND":
                 self.set_phase(inputs, f"Step 3: Finding — {query}")
-                old = [m for m in scene.timeline_markers if m.name.startswith("MARLIN:")]
-                for m in old:
-                    scene.timeline_markers.remove(m)
 
                 print(f"Marlin: Find {query!r}  file={clip_path!r}")
                 t0 = time.time()
                 find_result = marlin.find(clip_path, event=query, max_new_tokens=64)
                 print(f"Marlin: find completed in {time.time() - t0:.1f}s  result={find_result}")
                 span = find_result.get("span") if find_result else None
-                if not span or not find_result.get("format_ok"):
-                    scene.marlin_last_query = query
-                    return None
 
-                t_start = float(span[0])
-                frame   = strip_start_frame + int((t_start - clip_start) * fps)
-                frame   = max(frame, strip_start_frame)
-                scene.timeline_markers.new(name=f"MARLIN: {query[:30]}", frame=frame)
-                scene.marlin_last_query = query
+                def _insert_markers():
+                    _sc = bpy.context.scene
+                    old = [m for m in _sc.timeline_markers if m.name.startswith("MARLIN:")]
+                    for m in old:
+                        _sc.timeline_markers.remove(m)
+                    if span and find_result.get("format_ok"):
+                        t_start = float(span[0])
+                        frame   = strip_start_frame + int((t_start - clip_start) * fps)
+                        frame   = max(frame, strip_start_frame)
+                        _sc.timeline_markers.new(name=f"MARLIN: {query[:30]}", frame=frame)
+                    _sc.marlin_last_query = query
+
+                self._run_on_main_thread(_insert_markers)
                 return None
 
             else:
@@ -428,7 +468,7 @@ class MarlinVideoCaptionsPlugin(ModelPlugin):
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
-        # - Step 4: insert VSE strips -------------------------------------
+        # - Step 4: insert VSE strips (on main thread) --------------------
         self.set_phase(inputs, "Step 4: Inserting VSE strips")
         scene_text = (result.get("scene") or "").strip()
         events     = result.get("events") or []
@@ -439,42 +479,52 @@ class MarlinVideoCaptionsPlugin(ModelPlugin):
             return None
 
         clip_end_frame = strip_start_frame + int(trim_dur_s * fps)
-        need_ch  = 2 if scene_text else 1
         _ch_hint = inputs.insert_channel if inputs.insert_channel > 0 else 1
-        channels = _find_free_channels(seq_editor, strip_start_frame, clip_end_frame + 2,
-                                       need_ch, start_ch=_ch_hint)
-        events_ch = channels[0]
-        scene_ch  = channels[1] if need_ch == 2 else None
 
-        if scene_ch and scene_text:
-            ov = seq_editor.strips.new_effect(
-                name=scene_text[:63],
-                type="TEXT",
-                frame_start=strip_start_frame,
-                length=max(1, int(clip_end_frame - strip_start_frame)),
-                channel=scene_ch,
-            )
-            ov.text = _format_two_lines(scene_text)
-            _apply_text_strip_style(ov, font_size=12, y=0.95)
+        def _insert_strips():
+            _sc = bpy.context.scene
+            _ed = _sc.sequence_editor
+            if not _ed:
+                print("Marlin: No sequence editor on main thread.")
+                return
 
-        created = 0
-        for ev in events:
-            ev_start = strip_start_frame + int((ev["start"] - clip_start) * fps)
-            ev_end   = strip_start_frame + int((ev["end"]   - clip_start) * fps)
-            ev_start = max(ev_start, strip_start_frame)
-            ev_end   = min(ev_end,   int(clip_end_frame))
-            disp     = _format_two_lines(ev["description"])
+            need_ch  = 2 if scene_text else 1
+            channels = _find_free_channels(_ed, strip_start_frame, clip_end_frame + 2,
+                                           need_ch, start_ch=_ch_hint)
+            events_ch = channels[0]
+            scene_ch  = channels[1] if need_ch == 2 else None
 
-            s = seq_editor.strips.new_effect(
-                name=disp[:63],
-                type="TEXT",
-                frame_start=ev_start,
-                length=max(1, ev_end - ev_start),
-                channel=events_ch,
-            )
-            s.text = disp
-            _apply_text_strip_style(s)
-            created += 1
+            if scene_ch and scene_text:
+                ov = _ed.strips.new_effect(
+                    name=scene_text[:63],
+                    type="TEXT",
+                    frame_start=strip_start_frame,
+                    length=max(1, int(clip_end_frame - strip_start_frame)),
+                    channel=scene_ch,
+                )
+                ov.text = _format_two_lines(scene_text)
+                _apply_text_strip_style(ov, font_size=12, y=0.95)
 
-        print(f"Marlin: Done — {created} event strip(s) on channel {events_ch}.")
+            created = 0
+            for ev in events:
+                ev_start = strip_start_frame + int((ev["start"] - clip_start) * fps)
+                ev_end   = strip_start_frame + int((ev["end"]   - clip_start) * fps)
+                ev_start = max(ev_start, strip_start_frame)
+                ev_end   = min(ev_end,   int(clip_end_frame))
+                disp     = _format_two_lines(ev["description"])
+
+                s = _ed.strips.new_effect(
+                    name=disp[:63],
+                    type="TEXT",
+                    frame_start=ev_start,
+                    length=max(1, ev_end - ev_start),
+                    channel=events_ch,
+                )
+                s.text = disp
+                _apply_text_strip_style(s)
+                created += 1
+
+            print(f"Marlin: Done — {created} event strip(s) on channel {events_ch}.")
+
+        self._run_on_main_thread(_insert_strips)
         return None

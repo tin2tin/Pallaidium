@@ -141,6 +141,11 @@ class SEQUENCER_OT_ai_strip_picker(Operator):
             if find_strip_by_name(scene, strip.name):
                 context.scene.klein_strip_3 = strip.name
 
+        elif self.action == "ltx23ic_control_select":
+            self.report({"INFO"}, f"Picked '{strip.name}'")
+            if find_strip_by_name(scene, strip.name):
+                context.scene.ltx23ic_control_strip = strip.name
+
         elif self.action == "ltx23ext_audio_select":
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):

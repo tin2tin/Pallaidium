@@ -669,6 +669,36 @@ def register():
         max=1,
         description="Chatterbox Pace",
     )
+    bpy.types.Scene.chatterbox_mtl_language = bpy.props.EnumProperty(
+        name="Language",
+        items=[
+            ("ar", "Arabic",     ""),
+            ("da", "Danish",     ""),
+            ("de", "German",     ""),
+            ("el", "Greek",      ""),
+            ("en", "English",    ""),
+            ("es", "Spanish",    ""),
+            ("fi", "Finnish",    ""),
+            ("fr", "French",     ""),
+            ("he", "Hebrew",     ""),
+            ("hi", "Hindi",      ""),
+            ("it", "Italian",    ""),
+            ("ja", "Japanese",   ""),
+            ("ko", "Korean",     ""),
+            ("ms", "Malay",      ""),
+            ("nl", "Dutch",      ""),
+            ("no", "Norwegian",  ""),
+            ("pl", "Polish",     ""),
+            ("pt", "Portuguese", ""),
+            ("ru", "Russian",    ""),
+            ("sv", "Swedish",    ""),
+            ("sw", "Swahili",    ""),
+            ("tr", "Turkish",    ""),
+            ("zh", "Chinese",    ""),
+        ],
+        default="en",
+        description="Chatterbox Multilingual output language",
+    )
     bpy.types.Scene.kontext_strip_1 = bpy.props.StringProperty(
         name="kontext_strip_1", options={"TEXTEDIT_UPDATE"}, default=""
     )
@@ -1046,6 +1076,9 @@ def unregister():
     for _prop in ("moss_model_variant", "moss_language", "moss_duration_tokens",
                   "moss_max_new_tokens", "moss_temperature", "moss_top_p", "moss_top_k",
                   "moss_ref_audio_path"):
+        if hasattr(bpy.types.Scene, _prop):
+            delattr(bpy.types.Scene, _prop)
+    for _prop in ("chatterbox_mtl_language",):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
     for _prop in (

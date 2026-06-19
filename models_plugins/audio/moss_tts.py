@@ -53,7 +53,7 @@ class MossTTSPlugin(ModelPlugin):
     PARAMS = ParamSpec()
     # MOSS runs via transformers trust_remote_code; both libs are already pinned
     # in requirements.  No MOSS pip package is required.
-    REQUIRED_PACKAGES = ["transformers", "soundfile"]
+    REQUIRED_PACKAGES = ["transformers", "soundfile", "bitsandbytes"]
 
     # ------------------------------------------------------------------ helpers
 
@@ -74,6 +74,20 @@ class MossTTSPlugin(ModelPlugin):
             dtype = torch.float32
         else:
             dtype = torch.bfloat16
+
+        # 4-bit quantization for large variants via bitsandbytes (saves ~12 GB VRAM).
+        bnb_config = None
+        if use_cuda and variant not in _FP32_VARIANTS:
+            try:
+                from transformers import BitsAndBytesConfig
+                bnb_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_compute_dtype=dtype,
+                    bnb_4bit_quant_type="nf4",
+                )
+                print(f"MOSS-TTS: using 4-bit NF4 quantization (compute in {dtype})")
+            except ImportError:
+                print("MOSS-TTS: bitsandbytes not available, falling back to bf16")
 
         local_only = bool(getattr(prefs, "local_files_only", False))
         print(f"Loading MOSS-TTS '{repo_id}' ({variant}) on {device} as {dtype} "
@@ -98,7 +112,7 @@ class MossTTSPlugin(ModelPlugin):
         # but transformers 5.9 does `list | set` (set-union) which raises TypeError.
         # Patch _adjust_missing_and_unexpected_keys to convert list→set before the
         # union, then restore. Wraps both processor (it loads the audio tokenizer)
-        # and model loading. Also use `dtype` (not deprecated `torch_dtype`).
+        # and model loading.
         import transformers.modeling_utils as _mu
         _orig_adjust = _mu.PreTrainedModel._adjust_missing_and_unexpected_keys
 
@@ -119,9 +133,18 @@ class MossTTSPlugin(ModelPlugin):
             return AutoProcessor.from_pretrained(src, trust_remote_code=True, **_extra)
 
         def _load_model(src):
-            return AutoModel.from_pretrained(
-                src, trust_remote_code=True, dtype=dtype, **_extra,
-            ).to(device)
+            kw = dict(trust_remote_code=True, **_extra)
+            if bnb_config is not None:
+                kw["quantization_config"] = bnb_config
+                kw["device_map"] = "auto"
+            else:
+                kw["dtype"] = dtype
+            m = AutoModel.from_pretrained(src, **kw)
+            if bnb_config is None:
+                if variant not in _FP32_VARIANTS:
+                    m = m.to(dtype)
+                m = m.to(device)
+            return m
 
         _mu.PreTrainedModel._adjust_missing_and_unexpected_keys = _patched_adjust
         try:
@@ -137,7 +160,8 @@ class MossTTSPlugin(ModelPlugin):
                 local_dir = snapshot_download(repo_id, local_files_only=local_only)
                 processor = _load_processor(local_dir)
 
-            # The audio tokenizer is a separate module that must live on the device.
+            # The audio tokenizer processes raw fp32 waveforms — keep it fp32
+            # but move it to the compute device.
             if hasattr(processor, "audio_tokenizer") and processor.audio_tokenizer is not None:
                 processor.audio_tokenizer = processor.audio_tokenizer.to(device)
 
@@ -172,6 +196,9 @@ class MossTTSPlugin(ModelPlugin):
             pass
 
         model.eval()
+        p = next(model.parameters(), None)
+        if p is not None:
+            print(f"MOSS-TTS loaded: dtype={p.dtype}, device={p.device}")
         return processor, model, device
 
     def load(self, prefs, scene, **kw):

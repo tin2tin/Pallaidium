@@ -1,9 +1,19 @@
-"""LTX-2.3 IC-LoRA — reference-video/audio style transfer — with selectable stage mode.
+"""LTX-2.3 IC-LoRA — reference-video/audio style transfer via IC-LoRA token conditioning.
 
-Copy of ltx23_multi_ic_lora.py with a stage-mode enum:
-  FULL  — Stage 1 + upsample + Stage 2 (default, identical to the original)
-  STEP1 — Stage 1 only → half-res preview clip
-  STEP2 — VAE-encode input video → upsample + Stage 2 → full-res refined clip
+Workflow:
+  Input strip  → META strip containing:
+                   1st MOVIE child  = image-condition source (first frame used)
+                   2nd MOVIE child  = IC-LoRA control reference video (pre-trimmed at queue time)
+                   1st SOUND child  = driving audio condition for inference (audio_conditions)
+                   2nd SOUND child  = IC-LoRA control reference audio (control_audio, optional)
+  OR single-file:
+                 ltx23ic_control_strip scene prop → MOVIE strip used as control_video
+
+IMAGE / AUDIO_REF inputs provide the driving first-frame image and the target audio condition.
+A MOVIE with embedded audio can serve as both image source and audio driver (auto-detected via av).
+
+Fallback IC-LoRA: if no LoRA is loaded, Lightricks/LTX-2.3-22b-IC-LoRA-Union-Control is
+auto-downloaded so generation still proceeds.
 """
 
 import os
@@ -47,14 +57,14 @@ def vae_temporal_decode_streaming(vae, latents_cpu, *, decode_device, temb=None)
 _IC_LORA_FALLBACK = "Lightricks/LTX-2.3-22b-IC-LoRA-Union-Control"
 
 
-class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
-    MODEL_ID     = "LTX-2.3 IC-LoRA Staged"
-    DISPLAY_NAME = "Video: LTX-2.3 IC-LoRA (Staged)"
+class LTX2_3MultiICLoRAPlugin(ModelPlugin):
+    MODEL_ID     = "LTX-2.3 IC-LoRA"
+    DISPLAY_NAME = "Video: LTX-2.3 (IC-LoRA)"
     MODEL_TYPE   = "video"
     DESCRIPTION  = (
-        "IC-LoRA video/audio style transfer with selectable stage mode (Step 1 / Step 2 / Full). "
-        "Use a META strip whose 1st MOVIE child is the image-condition source and 2nd MOVIE child "
-        "is the IC-LoRA control reference."
+        "IC-LoRA video/audio style transfer. Use a META strip whose 1st MOVIE child is the "
+        "image-condition source and 2nd MOVIE child is the IC-LoRA control reference. "
+        "Available IC-LoRA models: Union-Control (default), HDR, LipDub, Outpaint."
     )
 
     INPUTS       = InputSpec.PROMPT | InputSpec.NEG_PROMPT | InputSpec.IMAGE | InputSpec.LORA | InputSpec.AUDIO_REF
@@ -71,6 +81,7 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
 
     def draw_custom_ui(self, col, context) -> bool:
         scene = context.scene
+        # Expose the general ref_audio_path — the target audio condition.
         row = col.row(align=True)
         row.prop(scene, "ref_audio_path", text="Audio Ref.")
         row.operator("sequencer.open_audio_filebrowser", text="", icon="FILEBROWSER")
@@ -91,9 +102,6 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
         col.prop(scene, "ltx23ic_identity_guidance")
         return False
 
-    def draw_post_seed_ui(self, col, context):
-        col.prop(context.scene, "ltx23_stage_mode")
-
     @staticmethod
     def _apply_loras(pipe, lora_folder, enabled_loras):
         import warnings as _warnings
@@ -101,6 +109,9 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
         for item in enabled_loras:
             name = clean_filename(item.name).replace(".", "")
             try:
+                # peft warns "Already found a `peft_config` attribute" every time a
+                # 2nd adapter is added — benign here, each LoRA gets a distinct
+                # adapter_name and set_adapters() blends them by weight below.
                 with _warnings.catch_warnings():
                     _warnings.filterwarnings(
                         "ignore",
@@ -130,14 +141,15 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
 
     @staticmethod
     def _ensure_ic_lora(pipe, lora_folder, enabled_loras, cache_dir, lfo):
+        """Load user LoRAs; if none match, auto-download the Union-Control fallback."""
         names = []
         if enabled_loras and lora_folder:
-            names = LTX2_3MultiICLoRAStagedPlugin._apply_loras(pipe, lora_folder, enabled_loras)
+            names = LTX2_3MultiICLoRAPlugin._apply_loras(pipe, lora_folder, enabled_loras)
 
         if not names:
             loaded = {a for v in pipe.get_list_adapters().values() for a in v}
             if not loaded:
-                print(f"[LTX23ICLoRAStaged] No LoRA loaded — auto-loading fallback: {_IC_LORA_FALLBACK}")
+                print(f"[LTX23ICLoRA] No LoRA loaded — auto-loading fallback: {_IC_LORA_FALLBACK}")
                 try:
                     pipe.load_lora_weights(
                         _IC_LORA_FALLBACK,
@@ -147,10 +159,10 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
                         local_files_only=lfo,
                     )
                     pipe.set_adapters(["ic_lora_fallback"], adapter_weights=[1.0])
-                    print("[LTX23ICLoRAStaged] Fallback IC-LoRA loaded.")
+                    print("[LTX23ICLoRA] Fallback IC-LoRA loaded.")
                     names = ["ic_lora_fallback"]
                 except Exception as _e:
-                    print(f"[LTX23ICLoRAStaged] WARNING: Fallback IC-LoRA load failed ({_e}). Proceeding without IC-LoRA.")
+                    print(f"[LTX23ICLoRA] WARNING: Fallback IC-LoRA load failed ({_e}). Proceeding without IC-LoRA.")
         return names
 
     def generate(self, pipe_obj, inputs: ModelInputs, scene, prefs) -> str:
@@ -176,8 +188,6 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
                 load_audio, load_video,
             )
 
-        from diffusers.pipelines.ltx2.pipeline_ltx2_condition import retrieve_latents
-
         _cache_dir     = prefs.hf_cache_dir or None
         _lfo           = prefs.local_files_only
         MODEL_PATH     = "OzzyGT/LTX-2.3-Distilled"
@@ -191,7 +201,6 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
 
         seed = inputs.seed or torch.randint(0, 2**32, (1,)).item()
         generator = torch.Generator(device="cpu").manual_seed(seed)
-        _stage_mode = getattr(scene, "ltx23_stage_mode", "FULL")
 
         # ── IC-LoRA control params from scene_proxy ─────────────────────────
         _ctrl_video_path  = getattr(scene, "ltx23ic_control_video_path", "")
@@ -254,13 +263,6 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
                     except Exception:
                         pass
 
-        # ── STEP2: validate input video ─────────────────────────────────────
-        if _stage_mode == "STEP2" and not vid_path:
-            raise RuntimeError(
-                "Step 2 mode requires an input video strip. Select a MOVIE strip "
-                "and try again."
-            )
-
         # ── Frame Count Calculation ─────────────────────────────────────────
         if sound_path:
             dur_s = None
@@ -285,11 +287,11 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
                 num_frames = max(9, ((inputs.frames - 1) // 8) * 8 + 1)
                 _audio_frames = int(((dur_s * fps + 7) // 8) * 8) + 1
                 if _audio_frames > num_frames + 8:
-                    print(f"[LTX23ICLoRAStaged] WARN audio={_audio_frames} fr >> strip={num_frames} fr "
-                          f"— clamping to strip duration")
+                    print(f"[LTX23ICLoRA] WARN audio={_audio_frames} fr >> strip={num_frames} fr "
+                          f"(likely untrimmed MOVIE in META) — clamping to strip duration")
                     dur_s = num_frames / fps
                 elif _audio_frames < num_frames - 8:
-                    print(f"[LTX23ICLoRAStaged] WARN audio={_audio_frames} fr << strip={num_frames} fr "
+                    print(f"[LTX23ICLoRA] WARN audio={_audio_frames} fr << strip={num_frames} fr "
                           f"— audio shorter than strip, will be padded with silence")
                     dur_s = num_frames / fps
                 else:
@@ -304,10 +306,10 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
             dur_s = num_frames / fps
 
         if inputs.frames > 0 and num_frames != inputs.frames:
-            print(f"[LTX23ICLoRAStaged] Duration adjusted for 8n+1 alignment: "
+            print(f"[LTX23ICLoRA] Duration adjusted for 8n+1 alignment: "
                   f"requested {inputs.frames} fr → {num_frames} fr ({num_frames / fps:.1f}s)")
         elif inputs.frames == 0:
-            print(f"[LTX23ICLoRAStaged] No strip selected — duration set by audio: "
+            print(f"[LTX23ICLoRA] No strip selected — duration set by audio: "
                   f"{num_frames} fr ({dur_s:.1f}s)")
         _flush()
 
@@ -340,7 +342,7 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
                     _mid_pil = _load_image(_mp).convert("RGB").resize((inputs.width, inputs.height))
                     image_conditions.append(LTX2ImageCondition(image=_mid_pil, frame=_frame_idx, strength=1.0))
                 except Exception as _e:
-                    print(f"[LTX23ICLoRAStaged] WARNING: skipping middle anchor {_mp!r}: {_e}")
+                    print(f"[LTX23ICLoRA] WARNING: skipping middle anchor {_mp!r}: {_e}")
             image_conditions.append(LTX2ImageCondition(image=last_input, frame=-1, strength=1.0))
         elif image_input is not None and last_input is not None:
             image_conditions = [
@@ -353,14 +355,16 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
             image_conditions = [LTX2ImageCondition(image=image_input, frame=0, strength=1.0)]
 
         # ── Load control reference material ────────────────────────────────
+        # Paths were pre-trimmed at queue time via render_meta_child_to_path()
         control_video_frames = None
         if _ctrl_video_path and os.path.isfile(_ctrl_video_path):
             try:
                 control_video_frames = load_video(_ctrl_video_path)
-                print(f"[LTX23ICLoRAStaged] Control video loaded: {len(control_video_frames)} frames from {_ctrl_video_path!r}")
+                print(f"[LTX23ICLoRA] Control video loaded: {len(control_video_frames)} frames from {_ctrl_video_path!r}")
             except Exception as _e:
-                print(f"[LTX23ICLoRAStaged] WARNING: failed to load control video ({_e})")
+                print(f"[LTX23ICLoRA] WARNING: failed to load control video ({_e})")
 
+        # control_audio_wave loaded after pipe is built (needs audio_vae sample_rate)
         _ctrl_audio_wave = None
 
         # ── Step 0: Text encoding ───────────────────────────────────────────
@@ -376,6 +380,10 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
             scheduler=None,
             torch_dtype=torch_dtype, cache_dir=_cache_dir, local_files_only=_lfo,
         )
+        # Stream Gemma3 leaf-by-leaf instead of residing the whole encoder on GPU.
+        # On low-VRAM cards (≤10 GB) a full .to(onload_device) makes text encoding the
+        # peak-memory step and OOMs at torch.stack(hidden_states) — especially on a
+        # second job where prior fragmentation leaves less headroom.
         import sys, io, logging as _logging
         _devnull = io.StringIO()
         _old_out, _old_err = sys.stdout, sys.stderr
@@ -405,276 +413,198 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
         del embeds_pipe, text_encoder
         _flush()
 
-        # ── Shared: SDNQ transformer path ──────────────────────────────────
+        # ── Stage 1 ─────────────────────────────────────────────────────────
+        self.set_phase(inputs, f"Stage 1: generating {stage1_w}×{stage1_h}")
         import os as _os
         from huggingface_hub import snapshot_download as _snap
         from sdnq.loader import load_sdnq_model as _load_sdnq
         _sdnq_transformer_path = _os.path.join(
             _snap(SDNQ_PATH, cache_dir=_cache_dir, local_files_only=_lfo), "transformer"
         )
+        transformer = _load_sdnq(
+            model_path=_sdnq_transformer_path, model_cls=LTX2VideoTransformer3DModel,
+            dtype=torch_dtype, device="cpu",
+        )
+        pipe = LTX2MultiModalPipeline.from_pretrained(
+            MODEL_PATH,
+            transformer=transformer,
+            text_encoder=None, tokenizer=None,
+            torch_dtype=torch_dtype, cache_dir=_cache_dir, local_files_only=_lfo,
+        )
+        pipe.scheduler = FlowMatchEulerDiscreteScheduler.from_config(
+            pipe.scheduler.config, use_dynamic_shifting=False, shift_terminal=None,
+        )
 
-        # ── Shared: LoRA config ─────────────────────────────────────────────
         from ...utils.helpers import bpy as _bpy
         _lora_folder   = _bpy.path.abspath(getattr(scene, "lora_folder", ""))
         _enabled_loras = [item for item in getattr(scene, "lora_files", []) if item.enabled]
 
-        audio_latent = None
-        audio_conditions = None
+        if _enabled_loras and _lora_folder:
+            print(f"LTX-2.3 IC-LoRA Stage 1: loading {len(_enabled_loras)} LoRA(s)")
+        self._ensure_ic_lora(pipe, _lora_folder, _enabled_loras, _cache_dir, _lfo)
 
-        # ====================================================================
-        # STEP2: VAE-encode input video instead of running Stage 1
-        # ====================================================================
-        if _stage_mode == "STEP2":
-            self.set_phase(inputs, "Encoding input video")
-            encode_pipe = LTX2MultiModalPipeline.from_pretrained(
-                MODEL_PATH,
-                transformer=None, text_encoder=None, tokenizer=None, scheduler=None,
-                torch_dtype=torch_dtype, cache_dir=_cache_dir, local_files_only=_lfo,
-            )
-            vae = encode_pipe.vae
-            try:
-                vae.disable_tiling()
-            except Exception:
-                vae.use_tiling = False
-            vae = vae.to(onload_device)
-
-            frames = load_video(vid_path)
-            video_proc = encode_pipe.video_processor
-            pixels = video_proc.preprocess_video(frames, stage1_h, stage1_w, resize_mode="crop")
-            cur_f = pixels.size(2)
-            if cur_f < num_frames:
-                pad = torch.zeros(pixels.size(0), pixels.size(1), num_frames - cur_f,
-                                  pixels.size(3), pixels.size(4), dtype=pixels.dtype)
-                pixels = torch.cat([pixels, pad], dim=2)
-            elif cur_f > num_frames:
-                pixels = pixels[:, :, :num_frames]
-            _nf = pixels.size(2)
-            _target_8n1 = max(9, ((_nf - 1 + 7) // 8) * 8 + 1)
-            if _target_8n1 > _nf:
-                pixels = torch.nn.functional.pad(pixels, (0, 0, 0, 0, 0, _target_8n1 - _nf))
-            elif _nf > _target_8n1:
-                pixels = pixels[:, :, :_target_8n1]
-            print(f"[LTX23ICLoRAStaged] STEP2: encoding {_nf} frames (aligned to {pixels.size(2)})")
-            pixels = pixels.to(dtype=vae.dtype, device=onload_device)
-            with torch.inference_mode():
-                video_latent = retrieve_latents(vae.encode(pixels), generator=generator, sample_mode="argmax")
-            _target_latent_f = (num_frames - 1) // 8 + 1
-            if video_latent.size(2) > _target_latent_f:
-                video_latent = video_latent[:, :, :_target_latent_f, :, :]
-            video_latent = video_latent.detach().to(offload_device, copy=True)
-
-            del encode_pipe, vae, pixels, frames
-            _flush()
-            print(f"[LTX23ICLoRAStaged] STEP2: encoded input video → latent {tuple(video_latent.shape)}")
-
-        # ====================================================================
-        # FULL / STEP1: Stage 1 generation
-        # ====================================================================
-        if _stage_mode != "STEP2":
-            self.set_phase(inputs, f"Stage 1: generating {stage1_w}×{stage1_h}")
-            transformer = _load_sdnq(
-                model_path=_sdnq_transformer_path, model_cls=LTX2VideoTransformer3DModel,
-                dtype=torch_dtype, device="cpu",
-            )
-            pipe = LTX2MultiModalPipeline.from_pretrained(
-                MODEL_PATH,
-                transformer=transformer,
-                text_encoder=None, tokenizer=None,
-                torch_dtype=torch_dtype, cache_dir=_cache_dir, local_files_only=_lfo,
-            )
-            pipe.scheduler = FlowMatchEulerDiscreteScheduler.from_config(
-                pipe.scheduler.config, use_dynamic_shifting=False, shift_terminal=None,
-            )
-
-            if _enabled_loras and _lora_folder:
-                print(f"LTX-2.3 IC-LoRA Stage 1: loading {len(_enabled_loras)} LoRA(s)")
-            self._ensure_ic_lora(pipe, _lora_folder, _enabled_loras, _cache_dir, _lfo)
-
-            if _ctrl_audio_path and os.path.isfile(_ctrl_audio_path):
-                if hasattr(pipe, "audio_vae") and pipe.audio_vae:
-                    target_sr = pipe.audio_vae.config.sample_rate
-                    try:
-                        _ctrl_audio_wave = load_audio(_ctrl_audio_path, target_sample_rate=target_sr, seconds=dur_s)
-                        print(f"[LTX23ICLoRAStaged] Control audio loaded from {_ctrl_audio_path!r}")
-                    except Exception as _e:
-                        print(f"[LTX23ICLoRAStaged] WARNING: failed to load control audio ({_e})")
-
-            if sound_path and hasattr(pipe, "audio_vae") and pipe.audio_vae:
+        # Load control audio (needs audio_vae sample rate)
+        if _ctrl_audio_path and os.path.isfile(_ctrl_audio_path):
+            if hasattr(pipe, "audio_vae") and pipe.audio_vae:
                 target_sr = pipe.audio_vae.config.sample_rate
                 try:
-                    waveform = load_audio(sound_path, target_sample_rate=target_sr, seconds=dur_s)
-                    audio_conditions = [LTX2AudioCondition(
-                        audio=waveform, strength=1.0, start_time=_audio_start_time,
-                    )]
-                except Exception:
-                    import traceback; traceback.print_exc()
+                    _ctrl_audio_wave = load_audio(_ctrl_audio_path, target_sample_rate=target_sr, seconds=dur_s)
+                    print(f"[LTX23ICLoRA] Control audio loaded from {_ctrl_audio_path!r}")
+                except Exception as _e:
+                    print(f"[LTX23ICLoRA] WARNING: failed to load control audio ({_e})")
 
-            pipe.enable_group_offload(
-                onload_device=onload_device,
-                offload_type="leaf_level",
-                use_stream=True,
-                low_cpu_mem_usage=True,
-            )
+        # Parse driving audio conditions (target audio)
+        audio_conditions = None
+        if sound_path and hasattr(pipe, "audio_vae") and pipe.audio_vae:
+            target_sr = pipe.audio_vae.config.sample_rate
+            try:
+                waveform = load_audio(sound_path, target_sample_rate=target_sr, seconds=dur_s)
+                audio_conditions = [LTX2AudioCondition(
+                    audio=waveform, strength=1.0, start_time=_audio_start_time,
+                )]
+            except Exception:
+                import traceback; traceback.print_exc()
 
-            stage1_kw = dict(
-                prompt_embeds=prompt_embeds.to(onload_device, dtype=torch_dtype),
-                prompt_attention_mask=prompt_attention_mask.to(onload_device),
-                width=stage1_w, height=stage1_h,
-                num_frames=num_frames, frame_rate=fps,
-                num_inference_steps=8, sigmas=DISTILLED_SIGMA_VALUES,
-                guidance_scale=1.0, generator=generator,
-                output_type="latent", return_dict=False,
-                use_cross_timestep=True,
-                identity_guidance_scale=_identity_guid,
-                callback_on_step_end=self.step_callback(inputs),
-            )
+        pipe.enable_group_offload(
+            onload_device=onload_device,
+            offload_type="leaf_level",
+            use_stream=True,
+            low_cpu_mem_usage=True,
+        )
 
-            if image_conditions is not None:
-                stage1_kw["image_conditions"] = image_conditions
-            if audio_conditions is not None:
-                stage1_kw["audio_conditions"] = audio_conditions
-            if control_video_frames is not None:
-                stage1_kw["control_video"]            = control_video_frames
-                stage1_kw["control_strength"]         = _ctrl_strength
-                stage1_kw["control_downscale_factor"] = _ctrl_downscale
-            if _ctrl_audio_wave is not None:
-                stage1_kw["control_audio"]         = _ctrl_audio_wave
-                stage1_kw["control_audio_strength"] = _ctrl_audio_str
+        stage1_kw = dict(
+            prompt_embeds=prompt_embeds.to(onload_device, dtype=torch_dtype),
+            prompt_attention_mask=prompt_attention_mask.to(onload_device),
+            width=stage1_w, height=stage1_h,
+            num_frames=num_frames, frame_rate=fps,
+            num_inference_steps=8, sigmas=DISTILLED_SIGMA_VALUES,
+            guidance_scale=1.0, generator=generator,
+            output_type="latent", return_dict=False,
+            use_cross_timestep=True,
+            identity_guidance_scale=_identity_guid,
+            callback_on_step_end=self.step_callback(inputs),
+        )
 
-            if image_conditions is not None and audio_conditions is not None:
-                stage1_kw["stg_scale"] = 1.0
-                stage1_kw["spatio_temporal_guidance_blocks"] = [28]
-                stage1_kw["guidance_rescale"] = 0.7
+        if image_conditions is not None:
+            stage1_kw["image_conditions"] = image_conditions
+        if audio_conditions is not None:
+            stage1_kw["audio_conditions"] = audio_conditions
+        if control_video_frames is not None:
+            stage1_kw["control_video"]            = control_video_frames
+            stage1_kw["control_strength"]         = _ctrl_strength
+            stage1_kw["control_downscale_factor"] = _ctrl_downscale
+        if _ctrl_audio_wave is not None:
+            stage1_kw["control_audio"]         = _ctrl_audio_wave
+            stage1_kw["control_audio_strength"] = _ctrl_audio_str
 
-            with torch.inference_mode(), torch.autocast("cuda", dtype=torch_dtype):
-                outputs = pipe(**stage1_kw)
+        # Auto-STG when image + audio driving conditions are present
+        if image_conditions is not None and audio_conditions is not None:
+            stage1_kw["stg_scale"] = 1.0
+            stage1_kw["spatio_temporal_guidance_blocks"] = [28]
+            stage1_kw["guidance_rescale"] = 0.7
 
-            if isinstance(outputs, (tuple, list)):
-                video_latent = outputs[0].detach().to(offload_device, copy=True)
-                audio_latent = outputs[1].detach().to(offload_device, copy=True) if len(outputs) > 1 and outputs[1] is not None else None
-            else:
-                video_latent = outputs.detach().to(offload_device, copy=True)
-                audio_latent = None
+        with torch.inference_mode(), torch.autocast("cuda", dtype=torch_dtype):
+            outputs = pipe(**stage1_kw)
 
-            del pipe, transformer, stage1_kw
-            _flush()
+        if isinstance(outputs, (tuple, list)):
+            video_latent = outputs[0].detach().to(offload_device, copy=True)
+            audio_latent = outputs[1].detach().to(offload_device, copy=True) if len(outputs) > 1 and outputs[1] is not None else None
+        else:
+            video_latent = outputs.detach().to(offload_device, copy=True)
+            audio_latent = None
 
-        # ====================================================================
-        # STEP1: skip upsample + Stage 2, jump straight to decode
-        # ====================================================================
-        if _stage_mode == "STEP1":
-            final_v = video_latent
+        del pipe, transformer, stage1_kw
+        _flush()
+
+        # ── Latent upsampling ───────────────────────────────────────────────
+        self.set_phase(inputs, "Stage 1.5: latent upsampling ×2")
+        upsampler = LTX2LatentUpsamplerModel.from_pretrained(
+            UPSAMPLER_PATH, torch_dtype=torch_dtype, cache_dir=_cache_dir, local_files_only=_lfo,
+        ).to(onload_device)
+        with torch.inference_mode():
+            up_latent = upsampler(video_latent.to(onload_device, dtype=torch_dtype))
+        up_latent = up_latent.detach().to(offload_device, copy=True)
+        del upsampler, video_latent
+        _flush()
+
+        # ── Stage 2: Refinement ─────────────────────────────────────────────
+        self.set_phase(inputs, f"Stage 2: refinement {w}×{h}")
+        transformer2 = _load_sdnq(
+            model_path=_sdnq_transformer_path, model_cls=LTX2VideoTransformer3DModel,
+            dtype=torch_dtype, device="cpu",
+        )
+        refine_pipe = LTX2MultiModalPipeline.from_pretrained(
+            MODEL_PATH,
+            transformer=transformer2,
+            text_encoder=None, tokenizer=None,
+            torch_dtype=torch_dtype, cache_dir=_cache_dir, local_files_only=_lfo,
+        )
+        refine_pipe.scheduler = FlowMatchEulerDiscreteScheduler.from_config(
+            refine_pipe.scheduler.config, use_dynamic_shifting=False, shift_terminal=None,
+        )
+
+        if _enabled_loras and _lora_folder:
+            print(f"LTX-2.3 IC-LoRA Stage 2: loading {len(_enabled_loras)} LoRA(s)")
+        self._ensure_ic_lora(refine_pipe, _lora_folder, _enabled_loras, _cache_dir, _lfo)
+
+        refine_pipe.enable_group_offload(
+            onload_device=onload_device,
+            offload_type="leaf_level",
+            use_stream=True,
+            low_cpu_mem_usage=True,
+        )
+
+        refine_kw = dict(
+            prompt_embeds=prompt_embeds.to(onload_device, dtype=torch_dtype),
+            prompt_attention_mask=prompt_attention_mask.to(onload_device),
+            latents=up_latent.to(onload_device, dtype=torch_dtype),
+            width=w, height=h, num_frames=num_frames,
+            num_inference_steps=3,
+            noise_scale=STAGE_2_DISTILLED_SIGMA_VALUES[0],
+            sigmas=STAGE_2_DISTILLED_SIGMA_VALUES,
+            guidance_scale=1.0, generator=generator,
+            output_type="latent", return_dict=False,
+            use_cross_timestep=True,
+            identity_guidance_scale=_identity_guid,
+            callback_on_step_end=self.step_callback(inputs),
+        )
+
+        if image_conditions is not None:
+            refine_kw["image_conditions"] = image_conditions
+        if audio_conditions is not None:
+            refine_kw["audio_conditions"] = audio_conditions
+        # With input audio (audio_conditions set): re-lock the SOURCE audio via
+        # audio_conditions — do NOT also pass audio_latents, the pipeline would
+        # prioritise latents over conditions and Stage 2 would drift off the speech.
+        # Without input audio: pass the Stage-1 generated latent so Stage 2 stays
+        # coherent with the audio the video was generated against.
+        if audio_conditions is None and audio_latent is not None:
+            refine_kw["audio_latents"] = audio_latent.to(onload_device, dtype=torch_dtype)
+        if control_video_frames is not None:
+            refine_kw["control_video"]            = control_video_frames
+            refine_kw["control_strength"]         = _ctrl_strength
+            refine_kw["control_downscale_factor"] = _ctrl_downscale
+        if _ctrl_audio_wave is not None:
+            refine_kw["control_audio"]         = _ctrl_audio_wave
+            refine_kw["control_audio_strength"] = _ctrl_audio_str
+
+        if image_conditions is not None and audio_conditions is not None:
+            refine_kw["stg_scale"] = 1.0
+            refine_kw["spatio_temporal_guidance_blocks"] = [28]
+            refine_kw["guidance_rescale"] = 0.7
+
+        with torch.inference_mode(), torch.autocast("cuda", dtype=torch_dtype):
+            outputs2 = refine_pipe(**refine_kw)
+
+        if isinstance(outputs2, (tuple, list)):
+            final_v = outputs2[0].detach().to(offload_device, copy=True)
+            final_a = outputs2[1].detach().to(offload_device, copy=True) if len(outputs2) > 1 and outputs2[1] is not None else audio_latent
+        else:
+            final_v = outputs2.detach().to(offload_device, copy=True)
             final_a = audio_latent
-            print(f"[LTX23ICLoRAStaged] STEP1: skipping upsample + Stage 2")
 
-        # ====================================================================
-        # FULL / STEP2: Latent upsampling (2×) + Stage 2 refinement
-        # ====================================================================
-        if _stage_mode != "STEP1":
-            self.set_phase(inputs, "Stage 1.5: latent upsampling ×2")
-            upsampler = LTX2LatentUpsamplerModel.from_pretrained(
-                UPSAMPLER_PATH, torch_dtype=torch_dtype, cache_dir=_cache_dir, local_files_only=_lfo,
-            ).to(onload_device)
-            with torch.inference_mode():
-                up_latent = upsampler(video_latent.to(onload_device, dtype=torch_dtype))
-            up_latent = up_latent.detach().to(offload_device, copy=True)
-            del upsampler, video_latent
-            _flush()
-
-            self.set_phase(inputs, f"Stage 2: refinement {w}×{h}")
-            transformer2 = _load_sdnq(
-                model_path=_sdnq_transformer_path, model_cls=LTX2VideoTransformer3DModel,
-                dtype=torch_dtype, device="cpu",
-            )
-            refine_pipe = LTX2MultiModalPipeline.from_pretrained(
-                MODEL_PATH,
-                transformer=transformer2,
-                text_encoder=None, tokenizer=None,
-                torch_dtype=torch_dtype, cache_dir=_cache_dir, local_files_only=_lfo,
-            )
-            refine_pipe.scheduler = FlowMatchEulerDiscreteScheduler.from_config(
-                refine_pipe.scheduler.config, use_dynamic_shifting=False, shift_terminal=None,
-            )
-
-            if _enabled_loras and _lora_folder:
-                print(f"LTX-2.3 IC-LoRA Stage 2: loading {len(_enabled_loras)} LoRA(s)")
-            self._ensure_ic_lora(refine_pipe, _lora_folder, _enabled_loras, _cache_dir, _lfo)
-
-            # STEP2: load audio from input video since Stage 1 was skipped
-            if _stage_mode == "STEP2":
-                if _ctrl_audio_path and os.path.isfile(_ctrl_audio_path):
-                    if hasattr(refine_pipe, "audio_vae") and refine_pipe.audio_vae:
-                        target_sr = refine_pipe.audio_vae.config.sample_rate
-                        try:
-                            _ctrl_audio_wave = load_audio(_ctrl_audio_path, target_sample_rate=target_sr, seconds=dur_s)
-                            print(f"[LTX23ICLoRAStaged] STEP2: Control audio loaded from {_ctrl_audio_path!r}")
-                        except Exception as _e:
-                            print(f"[LTX23ICLoRAStaged] STEP2: WARNING: failed to load control audio ({_e})")
-
-                if sound_path and hasattr(refine_pipe, "audio_vae") and refine_pipe.audio_vae:
-                    target_sr = refine_pipe.audio_vae.config.sample_rate
-                    try:
-                        waveform = load_audio(sound_path, target_sample_rate=target_sr, seconds=dur_s)
-                        audio_conditions = [LTX2AudioCondition(
-                            audio=waveform, strength=1.0, start_time=_audio_start_time,
-                        )]
-                        print(f"[LTX23ICLoRAStaged] STEP2: Audio conditions loaded from input video")
-                    except Exception:
-                        import traceback; traceback.print_exc()
-
-            refine_pipe.enable_group_offload(
-                onload_device=onload_device,
-                offload_type="leaf_level",
-                use_stream=True,
-                low_cpu_mem_usage=True,
-            )
-
-            refine_kw = dict(
-                prompt_embeds=prompt_embeds.to(onload_device, dtype=torch_dtype),
-                prompt_attention_mask=prompt_attention_mask.to(onload_device),
-                latents=up_latent.to(onload_device, dtype=torch_dtype),
-                width=w, height=h, num_frames=num_frames, frame_rate=fps,
-                num_inference_steps=3,
-                noise_scale=STAGE_2_DISTILLED_SIGMA_VALUES[0],
-                sigmas=STAGE_2_DISTILLED_SIGMA_VALUES,
-                guidance_scale=1.0, generator=generator,
-                output_type="latent", return_dict=False,
-                use_cross_timestep=True,
-                identity_guidance_scale=_identity_guid,
-                callback_on_step_end=self.step_callback(inputs),
-            )
-
-            if image_conditions is not None:
-                refine_kw["image_conditions"] = image_conditions
-            if audio_conditions is not None:
-                refine_kw["audio_conditions"] = audio_conditions
-            if audio_conditions is None and audio_latent is not None:
-                refine_kw["audio_latents"] = audio_latent.to(onload_device, dtype=torch_dtype)
-            if control_video_frames is not None:
-                refine_kw["control_video"]            = control_video_frames
-                refine_kw["control_strength"]         = _ctrl_strength
-                refine_kw["control_downscale_factor"] = _ctrl_downscale
-            if _ctrl_audio_wave is not None:
-                refine_kw["control_audio"]         = _ctrl_audio_wave
-                refine_kw["control_audio_strength"] = _ctrl_audio_str
-
-            if image_conditions is not None and audio_conditions is not None:
-                refine_kw["stg_scale"] = 1.0
-                refine_kw["spatio_temporal_guidance_blocks"] = [28]
-                refine_kw["guidance_rescale"] = 0.7
-
-            with torch.inference_mode(), torch.autocast("cuda", dtype=torch_dtype):
-                outputs2 = refine_pipe(**refine_kw)
-
-            if isinstance(outputs2, (tuple, list)):
-                final_v = outputs2[0].detach().to(offload_device, copy=True)
-                final_a = outputs2[1].detach().to(offload_device, copy=True) if len(outputs2) > 1 and outputs2[1] is not None else audio_latent
-            else:
-                final_v = outputs2.detach().to(offload_device, copy=True)
-                final_a = audio_latent
-
-            del refine_pipe, transformer2, up_latent, prompt_embeds, prompt_attention_mask, refine_kw
-            _flush()
+        del refine_pipe, transformer2, up_latent, prompt_embeds, prompt_attention_mask, refine_kw
+        _flush()
 
         # ── Decode ──────────────────────────────────────────────────────────
         self.set_phase(inputs, "Decoding")
@@ -725,9 +655,9 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
                 _mono = _wav.mean(0).float()
                 _use_audio    = _mono.unsqueeze(-1).expand(-1, 2).contiguous()
                 _use_audio_sr = int(_sr)
-                print(f"[LTX23ICLoRAStaged] Muxing input audio: {_sr} Hz → {dur_s:.2f}s")
+                print(f"[LTX23ICLoRA] Muxing input audio: {_sr} Hz → {dur_s:.2f}s")
             except Exception as _ae:
-                print(f"[LTX23ICLoRAStaged] Input audio mux failed ({_ae}), falling back to model audio.")
+                print(f"[LTX23ICLoRA] Input audio mux failed ({_ae}), falling back to model audio.")
                 if audio_out is not None:
                     _use_audio    = audio_out[0].float().cpu()
                     _use_audio_sr = audio_sr
@@ -747,5 +677,5 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
                 fps=fps, output_path=dst_path,
             )
 
-        print(f"LTX-2.3 IC-LoRA Staged ({_stage_mode}) saved: {dst_path}")
+        print(f"LTX-2.3 IC-LoRA saved: {dst_path}")
         return dst_path
