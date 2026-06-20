@@ -1,5 +1,5 @@
 # --- Core Utilities & IO ---
-setuptools
+setuptools<70.0.0
 filelock
 importlib_metadata
 importlib-resources

@@ -190,8 +190,7 @@ class SEQUENCER_OT_generate_movie(Operator):
 
         if should_load:
             clear_cuda_cache()
-            if addon_prefs.hf_cache_dir:
-                os.environ["HF_HUB_CACHE"] = addon_prefs.hf_cache_dir
+            apply_hf_env(addon_prefs)
             t_load = bench_print(f"[{plugin.MODEL_ID}] load start")
             pipe_obj = plugin.load(
                 addon_prefs, scene,
@@ -474,8 +473,7 @@ class SEQUENCER_OT_generate_audio(Operator):
 
         if should_load:
             clear_cuda_cache()
-            if addon_prefs.hf_cache_dir:
-                os.environ["HF_HUB_CACHE"] = addon_prefs.hf_cache_dir
+            apply_hf_env(addon_prefs)
             t_load = bench_print(f"[{plugin.MODEL_ID}] load start")
             pipe_obj = plugin.load(addon_prefs, scene)
             bench_print(f"[{plugin.MODEL_ID}] load done", t_load)
@@ -745,8 +743,7 @@ class SEQUENCER_OT_generate_image(Operator):
 
         if should_load:
             clear_cuda_cache()
-            if addon_prefs.hf_cache_dir:
-                os.environ["HF_HUB_CACHE"] = addon_prefs.hf_cache_dir
+            apply_hf_env(addon_prefs)
             print("Loading: " + image_model_card + " (" + mode + ")")
             t_load = bench_print(f"[{plugin.MODEL_ID}] load start")
             try:
@@ -1078,8 +1075,7 @@ class SEQUENCER_OT_generate_text(Operator):
 
         if should_load:
             clear_cuda_cache()
-            if addon_prefs.hf_cache_dir:
-                os.environ["HF_HUB_CACHE"] = addon_prefs.hf_cache_dir
+            apply_hf_env(addon_prefs)
             t_load = bench_print(f"[{plugin.MODEL_ID}] load start")
             pipe_data = plugin.load(addon_prefs, scene, gfx_device=gfx_device)
             bench_print(f"[{plugin.MODEL_ID}] load done", t_load)

@@ -327,6 +327,7 @@ See SDXL handling most of the styles here: https://stable-diffusion-art.com/sdxl
 ## Tips:
 - If your playback stutters, then select a Movie strip > Menu > Strip > Movie Strip > Set Render Size.
 - If you get the message that CUDA is out of memory, restart Blender to free up memory and make it stable again - and try with another model.
+- If model **downloads stall or hang** on the large weight files, your network is likely blocking Hugging Face's Xet/CAS transport. Enable **Disable HF Xet/CAS Transport** in the add-on preferences to fall back to plain `huggingface.co` HTTPS. If you are behind a proxy, also set the standard `HTTP_PROXY` / `HTTPS_PROXY` environment variables before launching Blender — `huggingface_hub` honors them automatically, so no further configuration is needed.
 - New to Blender? Watch this tutorial: https://youtu.be/4_MIaxzjh5Y?feature=shared
 
 ![image](https://github.com/user-attachments/assets/a5c44a7e-c670-49ef-941f-86e521568637)

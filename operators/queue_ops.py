@@ -38,6 +38,7 @@ from bpy.types import Operator, PropertyGroup
 
 from ..utils.helpers import (
     ADDON_ID,
+    apply_hf_env,
     clean_filename,
     clear_cuda_cache,
     closest_divisible_32,
@@ -541,8 +542,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
                          or model_cache.get("last_schematic_mode", "") != _schematic_mode)):
                 release_model_cache(model_cache)
             clear_cuda_cache()
-            if prefs_proxy.hf_cache_dir:
-                os.environ["HF_HUB_CACHE"] = prefs_proxy.hf_cache_dir
+            apply_hf_env(prefs_proxy)
 
             # Set initial state before load
             progress_store[job_id] = {
@@ -1759,8 +1759,7 @@ def _run_job_main_thread(scene, job) -> None:
         mode = job.mode
         prefs = bpy.context.preferences.addons[ADDON_ID].preferences
 
-        if prefs.hf_cache_dir:
-            os.environ["HF_HUB_CACHE"] = prefs.hf_cache_dir
+        apply_hf_env(prefs)
 
         # Load model (or reuse cache)
         _schematic_mode_mt = getattr(job, "klein_schematic_mode", "")

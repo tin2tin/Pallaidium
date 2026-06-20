@@ -68,6 +68,25 @@ dir_path = os.path.join(bpy.utils.user_resource("DATAFILES"), "Pallaidium Media"
 
 os.makedirs(dir_path, exist_ok=True)
 
+
+def apply_hf_env(prefs):
+    """Apply HuggingFace-related env vars from addon preferences.
+
+    Sets HF_HUB_CACHE so weights are stored/loaded from the user's chosen folder,
+    and HF_HUB_DISABLE_XET when the user has opted out of the Xet/CAS transport
+    (which stalls on some restricted networks). Safe to call repeatedly and from
+    worker threads, since both are plain os.environ writes.
+    """
+    if prefs is None:
+        return
+    cache_dir = getattr(prefs, "hf_cache_dir", "")
+    if cache_dir:
+        os.environ["HF_HUB_CACHE"] = cache_dir
+    if getattr(prefs, "disable_hf_xet", False):
+        os.environ["HF_HUB_DISABLE_XET"] = "1"
+    else:
+        os.environ.pop("HF_HUB_DISABLE_XET", None)
+
 def _prune_stale_blender_paths():
     # Remove sys.path entries from other Blender installs that have permission
     # issues. Python raises PermissionError when reading .py files from a locked

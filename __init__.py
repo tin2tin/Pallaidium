@@ -905,11 +905,36 @@ def register():
     if _reset_dep_state not in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.append(_reset_dep_state)
 
+    # Apply HuggingFace env vars (cache dir, Xet/CAS toggle) before any model
+    # download can import huggingface_hub.  Re-applied on file load in case a
+    # loaded .blend carried different preferences.
+    _apply_hf_env_from_prefs()
+    if _apply_hf_env_from_prefs not in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.append(_apply_hf_env_from_prefs)
+
     try:
         from .operators.mask_florence2 import register as _mf_register
         _mf_register()
     except Exception as _mfe:
         print(f"[Pallaidium] mask_florence2 register failed: {_mfe}")
+
+def _apply_hf_env_from_prefs(_=None):
+    """Set HF_HUB_CACHE / HF_HUB_DISABLE_XET from saved preferences.
+
+    HF_HUB_DISABLE_XET is read by huggingface_hub at import time, so applying it
+    here (at register and on file load) ensures it is in place before any plugin
+    lazily imports huggingface_hub for a download.
+    """
+    try:
+        prefs = bpy.context.preferences.addons[__package__].preferences
+    except (AttributeError, KeyError):
+        return
+    try:
+        from .utils.helpers import apply_hf_env
+        apply_hf_env(prefs)
+    except Exception as _e:
+        print(f"[Pallaidium] apply_hf_env failed: {_e}")
+
 
 def _reset_dep_state(_=None):
     """Clear stale dep-install runtime flags on every startup/file-load.
@@ -1004,6 +1029,8 @@ def unregister():
         bpy.app.handlers.load_post.remove(_reset_queue_state)
     if _reset_dep_state in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.remove(_reset_dep_state)
+    if _apply_hf_env_from_prefs in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.remove(_apply_hf_env_from_prefs)
     from .operators.queue_ops import _queue_tick, _queue_stop
     try:
         if bpy.app.timers.is_registered(_queue_tick):

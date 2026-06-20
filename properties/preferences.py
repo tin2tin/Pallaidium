@@ -118,6 +118,13 @@ def _hf_cache_dir_update(self, context):
         os.environ["HF_HUB_CACHE"] = cache_dir
 
 
+def _disable_hf_xet_update(self, context):
+    if self.disable_hf_xet:
+        os.environ["HF_HUB_DISABLE_XET"] = "1"
+    else:
+        os.environ.pop("HF_HUB_DISABLE_XET", None)
+
+
 class GeneratorAddonPreferences(AddonPreferences):
     bl_idname = __package__.rsplit(".", 1)[0]
     soundselect: EnumProperty(
@@ -198,6 +205,14 @@ class GeneratorAddonPreferences(AddonPreferences):
     local_files_only: BoolProperty(
         name="Use Local Files Only",
         default=False,
+    )
+    disable_hf_xet: BoolProperty(
+        name="Disable HF Xet/CAS Transport",
+        description="Force plain huggingface.co HTTPS downloads instead of the Xet/CAS "
+                    "backend. Enable this if model downloads stall on a restricted "
+                    "network (corporate/VPN). Honors HTTP_PROXY/HTTPS_PROXY.",
+        default=False,
+        update=_disable_hf_xet_update,
     )
     display_console: BoolProperty(
         name="Display System Console",
@@ -309,6 +324,12 @@ class GeneratorAddonPreferences(AddonPreferences):
         row_row = box.row(align=True)
         row_row.label(text="Use Local Files Only:")
         row_row.prop(self, "local_files_only", text="")
+        row_row.label(text="")
+        row_row.label(text="")
+        row_row.label(text="")
+        row_row = box.row(align=True)
+        row_row.label(text="Disable HF Xet/CAS Transport:")
+        row_row.prop(self, "disable_hf_xet", text="")
         row_row.label(text="")
         row_row.label(text="")
         row_row.label(text="")
