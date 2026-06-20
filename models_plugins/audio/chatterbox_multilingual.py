@@ -3,32 +3,6 @@
 from ...models.base import ModelPlugin, InputSpec, UISection, ParamSpec, ModelInputs
 from ...utils.helpers import solve_path, clean_filename, split_text_for_tts
 
-_LANGUAGES = [
-    ("ar", "Arabic",     ""),
-    ("da", "Danish",     ""),
-    ("de", "German",     ""),
-    ("el", "Greek",      ""),
-    ("en", "English",    ""),
-    ("es", "Spanish",    ""),
-    ("fi", "Finnish",    ""),
-    ("fr", "French",     ""),
-    ("he", "Hebrew",     ""),
-    ("hi", "Hindi",      ""),
-    ("it", "Italian",    ""),
-    ("ja", "Japanese",   ""),
-    ("ko", "Korean",     ""),
-    ("ms", "Malay",      ""),
-    ("nl", "Dutch",      ""),
-    ("no", "Norwegian",  ""),
-    ("pl", "Polish",     ""),
-    ("pt", "Portuguese", ""),
-    ("ru", "Russian",    ""),
-    ("sv", "Swedish",    ""),
-    ("sw", "Swahili",    ""),
-    ("tr", "Turkish",    ""),
-    ("zh", "Chinese",    ""),
-]
-
 
 class ChatterboxMultilingualPlugin(ModelPlugin):
     MODEL_ID     = "ChatterboxMultilingual"
