@@ -136,60 +136,60 @@ The generated media will be saved to the directory specified in the addon prefer
 
 ## Change Log
 
-2026-06-19: Add: NVIDIA Maxine Super Resolution — AI-powered video/image upscaling via the NVIDIA Maxine VFX SDK (`nvidia-vfx`). Two plugins: "Image: Maxine Super Resolution" (single-frame upscale, returns PIL image) and "Video: Maxine Super Resolution" (frame-by-frame video upscale with progress reporting and source audio muxing). A **Quality** dropdown exposes six modes: High (default), Ultra, Medium, Low, Denoise, and Deblur. Quality level, target resolution, and seed are carried through the Render Queue, written to strip metadata, and restored on redo. Requires an NVIDIA GPU with Tensor Cores; the `nvidia-vfx` dependency is installed automatically via Install Dependencies. Selecting either Maxine plugin auto-switches the Input dropdown to Strips.
+2026-06-20: Add: Chatterbox Multilingual — text-to-speech and voice cloning in 23 languages via Chatterbox V3. Select a language from the dropdown, optionally provide a speaker reference audio for voice cloning.
 
-2026-06-19: Fix: LTX-2.3 VAE temporal tiling — force even tile sizes after `enable_tiling()` to prevent the encoder's stride-2 temporal downsampler from crashing on odd-sized tiles. Fixes `RuntimeError: unflatten` in Step 2 / Staged modes. Applied to ltx23_multi_staged, ltx23_extend, and ltx23_extend_staged.
+2026-06-19: Add: NVIDIA Maxine Super Resolution — AI-powered video and image upscaling via the Maxine VFX SDK. Six quality modes (Ultra, High, Medium, Low, Denoise, Deblur). Requires an NVIDIA GPU with Tensor Cores.
 
-2026-06-15: Add: LTX-2.3 Extend ("Video: LTX-2.3 (Extend)") — extend an existing video clip. The selected video strip is locked at the start of the output timeline (carried over in full as an `LTX2VideoCondition` at latent index 0) and LTX-2.3 (SDNQ) generates a continuation after it. A new **Extend (frames)** control sets how many new frames to append (total length = source frames + extension, 8n+1 aligned), and **Source Lock** sets the conditioning strength of the carried-over clip. Audio is carried-and-extended: an **Audio Strip** picker (sequencer dropdown + eyedropper) drives the extended video's audio, overriding the source clip's embedded track; the model generates continuation audio for the new tail. The VAE condition-encode is tiled (spatial + temporal) to keep the full-resolution Stage 2 pass within VRAM. Params and the resolved audio path are carried through the Render Queue, written to strip metadata, and restored on redo. Adds a `uses_strip_power` capability flag so the unused "Strip Power" slider and the standard Frames control are hidden for this model. Also fixes a Blender 5.2 crash in the IC-LoRA single-file control path (`SequenceEditor.sequences` → `.strips`).
+2026-06-19: Fix: LTX-2.3 VAE temporal tiling — fixed `RuntimeError: unflatten` crash in Step 2 / Staged modes caused by odd-sized tiles.
 
-2026-06-15: Add: MOSS-TTS (v1.5 + Voice Generator) — expressive multilingual text-to-speech (OpenMOSS-Team/MOSS-TTS family) with zero-shot voice cloning, 31 languages (incl. Danish), token-level duration control, and inline `[pause Ns]` markers. A **Variant** dropdown selects MOSS-TTS-v1.5 (8B, flagship voice cloning) or MOSS-VoiceGenerator (1.7B, designs a new voice from a text prompt — no reference audio). Language, duration tokens, max-new-tokens, temperature, top-p and top-k are exposed in the UI, carried through the Render Queue, written to strip metadata, and restored on redo. Runs on the existing transformers stack via `trust_remote_code` — no new dependencies. HF download and generation progress are shown in the queue. Also extends the AI-Metadata panel and "Redo from Metadata" to SOUND (audio) strips.
+2026-06-15: Add: LTX-2.3 Extend — extend an existing video clip by appending AI-generated continuation frames. Supports audio carry-over via an Audio Strip picker.
 
-2026-06-12: Fix: Ideogram 4 — switch default weights to `ideogram-ai/ideogram-4-nf4-diffusers` (~10.5 GB NF4) instead of the 17.9 GB SDNQ FP8 model. Adds HuggingFace token login before loading. Re-enables FP8 MatMul acceleration (SDNQ models only). Adds VAE tiling and slicing to reduce memory spikes during decoding. Adds optional `torch.compile` support for transformer blocks.
-
-2026-06-12: Fix: Progress phase display — queue job runner now correctly shows "Downloading model" only for byte-unit tqdm bars and "Loading model" for all other tqdm activity. Applies to both the threaded and main-thread job execution paths.
-
-2026-06-12: Add: Florence-2 → Mask Editor auto-routing — when Florence-2 mode is set to Box Json and "Send to Mask" is enabled, the generated JSON is automatically applied to the Mask Editor after text generation completes.
-
-2026-06-12: Fix: Box Editor sidebar tab switch now deferred via `bpy.app.timers` so the Image Editor area is fully initialised before the N-panel category is set. Adds "Boxes" label with mask icon to the layer list box. Simplifies layer detail display (removes redundant labels).
-
-2026-06-12: Change: Florence-2 "Ideogram 4" mode renamed to "Box Json" in the mode selector.
-
-2026-06-12: Fix: UI panel layout — `draw_post_seed_ui` and "Open Box Editor" button now draw after Batch Count; image model card and HF token fields moved to their correct position below the movie section.
-
-2026-06-09: Add: Claude agent integration via Blender MCP — `pallaidium_mcp_tools.py` provides a high-level Python API (`generate_image()`, `generate_video()`, `generate_audio()`, `queue_generate()`, `list_image_models()`, `list_styles()`, etc.) that Claude agents can call through the Blender MCP server (`execute_blender_code`). Load the helper once per session in Blender's Python Console, then ask Claude to generate, queue, or inspect content in natural language.
-
-2026-06-09: Fix: Marlin Video Captions — switched to SDNQ int8 quantized weights (`tintwotin/Marlin-2B-SDNQ-int8`), display name updated to "Marlin: Video Captions (SDNQ)". Inference now runs on the main thread for stability. Added `ctranslate2` to Windows and Linux requirements.
-
-2026-06-09: Add: 20+ new prompt styles — Flux Klein / High-Fidelity Realism, LTX Video / Motion Still, Character Sheet, Storyboard, and a full set of Ads, Art (Vintage Pencil Sketch, Deconstructed Collage, Lithography variants, Folk Art, Sci-Fi Scale, 1980s Editorial, Storyboard Technical Study), Atmosphere (Volumetric Dispersion, Light Catching Particles), and Look (Clean Commercial, Dynamic Action, High-Performance Technical) templates.
-
-2026-06-08: Change: Python dependencies location — packages are now installed into the Blender user data directory (`%APPDATA%\Blender Foundation\Blender\5.2\datafiles\Pallaidium\site-packages` on Windows; `~/.config/blender/5.2/datafiles/Pallaidium/site-packages` on Linux) instead of the Blender executable folder. A computer restart is still required after installing dependencies. Running Blender as Administrator is no longer needed.
-
-2026-06-07: Add: LTX-2.3 Multi-Input N-Anchor mode — place **3 or more** Image strips inside a Meta strip to pin the generated video at multiple points in time. Each image's position within the Meta strip determines its frame anchor: the first image locks frame 0, the last image locks the final frame, and every image in between is mapped proportionally to the corresponding frame index. Works with the interactive generator and the Render Queue.
-
-2026-06-07: Add: Display System Console preference — a new checkbox in add-on preferences (after "Use Local Files Only") controls whether the Windows system console is shown when generation starts. Unchecking it suppresses `show_system_console` and `set_system_console_topmost` across all four interactive operators (video, audio, image, text) and both queue execution paths.
-
-2026-06-07: Fix: Local Files Only — `local_files_only` is now consistently applied to every `from_pretrained` and `hf_hub_download` call across all model plugins. When the setting is enabled and weights are not cached, a clear error is shown: "Weights missing. Uncheck 'Use Local Files Only' in Preferences to download."
-
-2026-06-03: Add: FLUX.2 Klein 9B Schematic — transform images into depth, normal, pose, and segmentation maps via nomadoor schematic LoRAs.
-
-2026-06-03: Add: OmniVoice — multilingual text-to-speech with broad language support.
-
-2026-06-03: Add: Stem Splitter — separate audio tracks into stems (vocals, drums, bass, etc.) using AI source separation.
-
-2026-05-31: Refactor: Complete plugin architecture — models are auto-discovered from models_plugins/. Drop a single .py file to register any new HuggingFace model. Unsupported models moved to unsupported_models_plugins/.
-
-2026-05-31: Add: Blender 5.2 support.
-
-2026-06-06: Add: Faster Whisper Transcription — multilingual speech-to-text with word-level timestamps directly into VSE subtitle strips. Select a SOUND strip, choose model size (tiny → large-v3) and language (or auto-detect), click Generate.
-
-2026-06-06: Add: Redo buttons — a Redo button (↺) on each Render Queue job reloads its generation settings (prompt, model, steps, guidance, seed, dimensions, toggles) back into the Pallaidium panel. A matching Redo button in the AI Metadata panel does the same from any completed strip's stored metadata.
-
-2026-06-05: Add: LTX-2.3 Multi-Input First Frame + Last Frame (FLF) mode — place two Image strips inside a Meta strip to anchor the first and last frames of the generated video. A single Image strip placed after all other children acts as a last-frame-only keyframe.
+2026-06-15: Add: MOSS-TTS — expressive multilingual TTS with zero-shot voice cloning, 31 languages, and inline `[pause Ns]` markers. Two variants: v1.5 (8B, cloning) and VoiceGenerator (1.7B, voice design from text prompt).
 
 <details>
 <summary><strong>Older Changes</strong></summary>
 
-2026-06-03: Fix: Qwen Image Edit — reference images from pickers now correctly rendered through the VSE pipeline at queue time (handles video, meta, and transformed strips). Switched to SDNQ uint4 pre-quantized weights (Disty0/Qwen-Image-Edit-2511-SDNQ-uint4-svd-r32) for better quality. Removed Lightning LoRA, raised default steps to 50. Exposed resolution controls. Fixed black bars on reference images. Fixed playhead not moving when queuing. Fixed width/height passed to inference.
+2026-06-12: Fix: Ideogram 4 — switched to smaller NF4 weights (~10.5 GB). Added VAE tiling to reduce VRAM spikes.
+
+2026-06-12: Fix: Progress phase display — queue now correctly distinguishes "Downloading model" from "Loading model" status.
+
+2026-06-12: Add: Florence-2 → Mask Editor auto-routing — Box Json results can be sent directly to the Mask Editor.
+
+2026-06-12: Fix: Box Editor and UI panel layout improvements.
+
+2026-06-12: Change: Florence-2 "Ideogram 4" mode renamed to "Box Json".
+
+2026-06-09: Add: Claude agent integration via Blender MCP — call `generate_image()`, `generate_video()`, `generate_audio()`, etc. from Claude agents through the MCP server.
+
+2026-06-09: Fix: Marlin Video Captions — switched to SDNQ int8 quantized weights for stability.
+
+2026-06-09: Add: 20+ new prompt styles — Realism, Motion Still, Character Sheet, Storyboard, and various art/atmosphere/look templates.
+
+2026-06-08: Change: Dependencies now install to the Blender user data directory. Running Blender as Administrator is no longer needed.
+
+2026-06-07: Add: LTX-2.3 N-Anchor mode — place 3+ Image strips in a Meta strip to pin video generation at multiple time points.
+
+2026-06-07: Add: Display System Console preference — toggle console visibility during generation.
+
+2026-06-07: Fix: Local Files Only — now consistently applied across all plugins with a clear error when weights are missing.
+
+2026-06-06: Add: Faster Whisper Transcription — speech-to-text with word-level timestamps into VSE subtitle strips.
+
+2026-06-06: Add: Redo buttons — reload generation settings from any queue job or completed strip's metadata.
+
+2026-06-05: Add: LTX-2.3 First Frame + Last Frame (FLF) mode — anchor first and last frames using two Image strips in a Meta strip.
+
+2026-06-03: Add: FLUX.2 Klein 9B Schematic — generate depth, normal, pose, and segmentation maps from images.
+
+2026-06-03: Add: OmniVoice — multilingual text-to-speech.
+
+2026-06-03: Add: Stem Splitter — separate audio into stems (vocals, drums, bass, etc.).
+
+2026-05-31: Refactor: Plugin architecture — models auto-discovered from `models_plugins/`. Drop a .py file to register a new model.
+
+2026-05-31: Add: Blender 5.2 support.
+
+2026-06-03: Fix: Qwen Image Edit — switched to SDNQ uint4 weights for better quality, fixed reference image rendering and resolution handling.
 
 2026-05-31: Add: Render Queue — async batch generation with per-job status tracking (PENDING / RUNNING / COMPLETED / FAILED). Start / Stop / Cancel controls.
 
