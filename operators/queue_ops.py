@@ -93,6 +93,7 @@ class RenderQueueJob(PropertyGroup):
     error_message:        StringProperty()
     error_traceback:      StringProperty()
     output_path:          StringProperty()
+    tokens_info:          StringProperty()   # human-readable usage note (e.g. token cost)
 
     # Insertion point — calculated at add-time so user actions cannot
     # displace the intended location.
@@ -141,6 +142,7 @@ class RenderQueueJob(PropertyGroup):
 
     # Prefs snapshot
     hugginface_token: StringProperty()
+    gemini_api_key:   StringProperty()
     local_files_only: BoolProperty()
     display_console:  BoolProperty(default=False)
     generator_ai:     StringProperty()
@@ -167,6 +169,19 @@ class RenderQueueJob(PropertyGroup):
     klein_strip_1_path:   StringProperty()   # Klein reference image 1
     klein_strip_2_path:   StringProperty()   # Klein reference image 2
     klein_strip_3_path:   StringProperty()   # Klein reference image 3
+    nano_banana_ref_strip_1_path: StringProperty()  # Nano Banana reference image 1
+    nano_banana_ref_strip_2_path: StringProperty()  # Nano Banana reference image 2
+    nano_banana_ref_strip_3_path: StringProperty()  # Nano Banana reference image 3
+    veo_ref_strip_1_path: StringProperty()   # Veo 3.1 reference image 1
+    veo_ref_strip_2_path: StringProperty()   # Veo 3.1 reference image 2
+    veo_ref_strip_3_path: StringProperty()   # Veo 3.1 reference image 3
+    # Source strip names (persisted to metadata so Redo can re-render the refs)
+    nano_banana_ref_strip_1: StringProperty()
+    nano_banana_ref_strip_2: StringProperty()
+    nano_banana_ref_strip_3: StringProperty()
+    veo_ref_strip_1: StringProperty()
+    veo_ref_strip_2: StringProperty()
+    veo_ref_strip_3: StringProperty()
 
     # Faster Whisper Transcription
     whisper_model_size: StringProperty(default="large-v3-turbo")
@@ -245,6 +260,19 @@ class RenderQueueJob(PropertyGroup):
 
     # Maxine VSR
     maxine_quality:              StringProperty(default="HIGH")
+
+    # Google Nano Banana (Gemini image)
+    nano_banana_model:           StringProperty(default="gemini-2.5-flash-image")
+    nano_banana_aspect:          StringProperty(default="1:1")
+    nano_banana_resolution:      StringProperty(default="1K")
+
+    # Google Veo (video)
+    veo_model:                   StringProperty(default="veo-3.1-fast-generate-preview")
+    veo_aspect:                  StringProperty(default="16:9")
+    veo_resolution:              StringProperty(default="720p")
+    veo_duration:                StringProperty(default="8")
+    veo_person_generation:       StringProperty(default="allow_adult")
+    veo_image_mode:              StringProperty(default="AUTO")
 
     # Marlin Video Captions
     marlin_mode:        StringProperty(default="CAPTION")
@@ -372,6 +400,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
         # ---- Proxy objects — every field comes from the snapshot ----------
         prefs_proxy = types.SimpleNamespace(
             hugginface_token = snapshot.get("hugginface_token", ""),
+            gemini_api_key   = snapshot.get("gemini_api_key", ""),
             local_files_only = snapshot.get("local_files_only", False),
             generator_ai     = snapshot.get("generator_ai", ""),
             hf_cache_dir     = snapshot.get("hf_cache_dir", ""),
@@ -451,6 +480,16 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             ltx23ext_audio_path            = snapshot.get("ltx23ext_audio_path",         ""),
             ltx23_stage_mode               = snapshot.get("ltx23_stage_mode",            "FULL"),
             maxine_quality                 = snapshot.get("maxine_quality",              "HIGH"),
+            # Google Nano Banana / Veo cloud settings
+            nano_banana_model              = snapshot.get("nano_banana_model",      "gemini-2.5-flash-image"),
+            nano_banana_aspect             = snapshot.get("nano_banana_aspect",     "1:1"),
+            nano_banana_resolution         = snapshot.get("nano_banana_resolution", "1K"),
+            veo_model                      = snapshot.get("veo_model",              "veo-3.1-fast-generate-preview"),
+            veo_aspect                     = snapshot.get("veo_aspect",             "16:9"),
+            veo_resolution                 = snapshot.get("veo_resolution",         "720p"),
+            veo_duration                   = snapshot.get("veo_duration",           "8"),
+            veo_person_generation          = snapshot.get("veo_person_generation",  "allow_adult"),
+            veo_image_mode                 = snapshot.get("veo_image_mode",         "AUTO"),
             marlin_mode                    = snapshot.get("marlin_mode",                 "CAPTION"),
             marlin_find_query              = snapshot.get("marlin_find_query",           ""),
             marlin_last_query              = "",
@@ -490,6 +529,12 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             klein_strip_1_path     = snapshot.get("klein_strip_1_path",     ""),
             klein_strip_2_path     = snapshot.get("klein_strip_2_path",     ""),
             klein_strip_3_path     = snapshot.get("klein_strip_3_path",     ""),
+            nano_banana_ref_strip_1_path = snapshot.get("nano_banana_ref_strip_1_path", ""),
+            nano_banana_ref_strip_2_path = snapshot.get("nano_banana_ref_strip_2_path", ""),
+            nano_banana_ref_strip_3_path = snapshot.get("nano_banana_ref_strip_3_path", ""),
+            veo_ref_strip_1_path   = snapshot.get("veo_ref_strip_1_path",   ""),
+            veo_ref_strip_2_path   = snapshot.get("veo_ref_strip_2_path",   ""),
+            veo_ref_strip_3_path   = snapshot.get("veo_ref_strip_3_path",   ""),
         )
 
         mode = snapshot["mode"]
@@ -851,6 +896,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             "status":               "COMPLETED",
             "output_path":          out_path or "",
             "text_content":         text_content or "",
+            "result_note":          getattr(inputs, "usage_note", "") or "",
             "output_type":          otype,
             "frame_start":          snapshot["insert_frame_start"],
             "frame_end":            snapshot["insert_frame_end"],
@@ -897,6 +943,29 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             "ltx23ext_audio_path":         snapshot.get("ltx23ext_audio_path",         ""),
             "ltx23_stage_mode":            snapshot.get("ltx23_stage_mode",            "FULL"),
             "maxine_quality":              snapshot.get("maxine_quality",              "HIGH"),
+            # Google Nano Banana / Veo cloud settings
+            "nano_banana_model":           snapshot.get("nano_banana_model",      "gemini-2.5-flash-image"),
+            "nano_banana_aspect":          snapshot.get("nano_banana_aspect",     "1:1"),
+            "nano_banana_resolution":      snapshot.get("nano_banana_resolution", "1K"),
+            "veo_model":                   snapshot.get("veo_model",              "veo-3.1-fast-generate-preview"),
+            "veo_aspect":                  snapshot.get("veo_aspect",             "16:9"),
+            "veo_resolution":              snapshot.get("veo_resolution",         "720p"),
+            "veo_duration":                snapshot.get("veo_duration",           "8"),
+            "veo_person_generation":       snapshot.get("veo_person_generation",  "allow_adult"),
+            "veo_image_mode":              snapshot.get("veo_image_mode",         "AUTO"),
+            # Reference strips — names (drive Redo) + resolved paths (record)
+            "nano_banana_ref_strip_1":      snapshot.get("nano_banana_ref_strip_1",      ""),
+            "nano_banana_ref_strip_2":      snapshot.get("nano_banana_ref_strip_2",      ""),
+            "nano_banana_ref_strip_3":      snapshot.get("nano_banana_ref_strip_3",      ""),
+            "veo_ref_strip_1":              snapshot.get("veo_ref_strip_1",              ""),
+            "veo_ref_strip_2":              snapshot.get("veo_ref_strip_2",              ""),
+            "veo_ref_strip_3":              snapshot.get("veo_ref_strip_3",              ""),
+            "nano_banana_ref_strip_1_path": snapshot.get("nano_banana_ref_strip_1_path", ""),
+            "nano_banana_ref_strip_2_path": snapshot.get("nano_banana_ref_strip_2_path", ""),
+            "nano_banana_ref_strip_3_path": snapshot.get("nano_banana_ref_strip_3_path", ""),
+            "veo_ref_strip_1_path":         snapshot.get("veo_ref_strip_1_path",         ""),
+            "veo_ref_strip_2_path":         snapshot.get("veo_ref_strip_2_path",         ""),
+            "veo_ref_strip_3_path":         snapshot.get("veo_ref_strip_3_path",         ""),
             "florence2_send_to_mask":      snapshot.get("florence2_send_to_mask",      False),
             "florence2_source_image_path": snapshot.get("image_path") or snapshot.get("movie_path") or "",
             # Chatterbox Multilingual
@@ -1231,6 +1300,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
             ref_audio_path    = bpy.path.abspath(getattr(scene, "ref_audio_path", "") or ""),
             ref_text          = getattr(scene, "ref_text", ""),
             hugginface_token  = getattr(prefs, "hugginface_token", ""),
+            gemini_api_key    = getattr(prefs, "gemini_api_key", ""),
             local_files_only  = getattr(prefs, "local_files_only", False),
             display_console   = getattr(prefs, "display_console", True),
             generator_ai      = getattr(prefs, "generator_ai", "") or os.path.join(
@@ -1254,6 +1324,19 @@ class SEQUENCER_OT_add_to_queue(Operator):
             klein_strip_1_path    = self._render_named_strip_image(context, scene, getattr(scene, "klein_strip_1", "")),
             klein_strip_2_path    = self._render_named_strip_image(context, scene, getattr(scene, "klein_strip_2", "")),
             klein_strip_3_path    = self._render_named_strip_image(context, scene, getattr(scene, "klein_strip_3", "")),
+            nano_banana_ref_strip_1_path = self._render_named_strip_image(context, scene, getattr(scene, "nano_banana_ref_strip_1", "")),
+            nano_banana_ref_strip_2_path = self._render_named_strip_image(context, scene, getattr(scene, "nano_banana_ref_strip_2", "")),
+            nano_banana_ref_strip_3_path = self._render_named_strip_image(context, scene, getattr(scene, "nano_banana_ref_strip_3", "")),
+            veo_ref_strip_1_path  = self._render_named_strip_image(context, scene, getattr(scene, "veo_ref_strip_1", "")),
+            veo_ref_strip_2_path  = self._render_named_strip_image(context, scene, getattr(scene, "veo_ref_strip_2", "")),
+            veo_ref_strip_3_path  = self._render_named_strip_image(context, scene, getattr(scene, "veo_ref_strip_3", "")),
+            # Source strip names (carried through to metadata for Redo)
+            nano_banana_ref_strip_1 = getattr(scene, "nano_banana_ref_strip_1", ""),
+            nano_banana_ref_strip_2 = getattr(scene, "nano_banana_ref_strip_2", ""),
+            nano_banana_ref_strip_3 = getattr(scene, "nano_banana_ref_strip_3", ""),
+            veo_ref_strip_1       = getattr(scene, "veo_ref_strip_1", ""),
+            veo_ref_strip_2       = getattr(scene, "veo_ref_strip_2", ""),
+            veo_ref_strip_3       = getattr(scene, "veo_ref_strip_3", ""),
             whisper_model_size = getattr(scene, "whisper_model_size", "large-v3-turbo"),
             whisper_language   = getattr(scene, "whisper_language",   ""),
             stem_split_model  = getattr(scene, "stem_split_model",  "htdemucs_ft"),
@@ -1305,6 +1388,16 @@ class SEQUENCER_OT_add_to_queue(Operator):
             ltx23ext_video_strength     = getattr(scene, "ltx23ext_video_strength",     1.0),
             ltx23_stage_mode            = getattr(scene, "ltx23_stage_mode",            "FULL"),
             maxine_quality              = getattr(scene, "maxine_quality",              "HIGH"),
+            # Google Nano Banana / Veo cloud settings
+            nano_banana_model           = getattr(scene, "nano_banana_model",      "gemini-2.5-flash-image"),
+            nano_banana_aspect          = getattr(scene, "nano_banana_aspect",     "1:1"),
+            nano_banana_resolution      = getattr(scene, "nano_banana_resolution", "1K"),
+            veo_model                   = getattr(scene, "veo_model",              "veo-3.1-fast-generate-preview"),
+            veo_aspect                  = getattr(scene, "veo_aspect",             "16:9"),
+            veo_resolution              = getattr(scene, "veo_resolution",         "720p"),
+            veo_duration                = getattr(scene, "veo_duration",           "8"),
+            veo_person_generation       = getattr(scene, "veo_person_generation",  "allow_adult"),
+            veo_image_mode              = getattr(scene, "veo_image_mode",         "AUTO"),
             marlin_mode                 = getattr(scene, "marlin_mode",                 "CAPTION"),
             marlin_find_query           = getattr(scene, "marlin_find_query",           ""),
         )
@@ -1666,7 +1759,7 @@ def _queue_start_job(scene, job) -> None:
         "chat_temperature", "fps", "music_bpm", "music_lyrics",
         "music_key_scale", "music_time_signature",
         "image_path", "movie_path", "sound_path", "last_image_path", "middle_images_json", "ref_audio_path",
-        "ref_text", "hugginface_token", "local_files_only", "display_console",
+        "ref_text", "hugginface_token", "gemini_api_key", "local_files_only", "display_console",
         "generator_ai", "hf_cache_dir", "lora_files_json", "lora_folder",
         "insert_frame_start", "insert_frame_end",
         "insert_channel", "insert_duration",
@@ -1683,6 +1776,10 @@ def _queue_start_job(scene, job) -> None:
         "stem_split_bass", "stem_split_other", "stem_split_guitar", "stem_split_piano",
         "qwen_strip_1_path", "qwen_strip_2_path", "qwen_strip_3_path",
         "klein_strip_1_path", "klein_strip_2_path", "klein_strip_3_path",
+        "nano_banana_ref_strip_1_path", "nano_banana_ref_strip_2_path", "nano_banana_ref_strip_3_path",
+        "veo_ref_strip_1_path", "veo_ref_strip_2_path", "veo_ref_strip_3_path",
+        "nano_banana_ref_strip_1", "nano_banana_ref_strip_2", "nano_banana_ref_strip_3",
+        "veo_ref_strip_1", "veo_ref_strip_2", "veo_ref_strip_3",
         "florence2_mode", "florence2_send_to_mask",
         "klein_schematic_mode", "klein_schematic_target",
         "img_guidance_scale", "illumination_style", "light_direction",
@@ -1699,6 +1796,10 @@ def _queue_start_job(scene, job) -> None:
         # ltx23_extend params + resolved audio-strip path
         "ltx23ext_extend_frames", "ltx23ext_video_strength", "ltx23ext_audio_path",
         "ltx23_stage_mode",
+        # Google Nano Banana / Veo cloud settings
+        "nano_banana_model", "nano_banana_aspect", "nano_banana_resolution",
+        "veo_model", "veo_aspect", "veo_resolution", "veo_duration",
+        "veo_person_generation", "veo_image_mode",
         "marlin_mode", "marlin_find_query",
     )}
     _cancel_event.clear()
@@ -2194,10 +2295,31 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 ("ltx23_stage_mode",            "FULL"),
                 # Maxine VSR
                 ("maxine_quality",              "HIGH"),
+                # Google Nano Banana (Gemini image)
+                ("nano_banana_model",      "gemini-2.5-flash-image"),
+                ("nano_banana_aspect",     "1:1"),
+                ("nano_banana_resolution", "1K"),
+                # Google Veo (video)
+                ("veo_model",              "veo-3.1-fast-generate-preview"),
+                ("veo_aspect",             "16:9"),
+                ("veo_resolution",         "720p"),
+                ("veo_duration",           "8"),
+                ("veo_person_generation",  "allow_adult"),
+                ("veo_image_mode",         "AUTO"),
             ]:
                 _v = result.get(_k, _def)
                 if _v != _def:
                     extra_meta[_k] = _v
+            # Google Nano Banana / Veo reference strips — write names (for Redo)
+            # and resolved paths (record) only when a slot was actually used.
+            for _k in (
+                "nano_banana_ref_strip_1", "nano_banana_ref_strip_2", "nano_banana_ref_strip_3",
+                "veo_ref_strip_1", "veo_ref_strip_2", "veo_ref_strip_3",
+                "nano_banana_ref_strip_1_path", "nano_banana_ref_strip_2_path", "nano_banana_ref_strip_3_path",
+                "veo_ref_strip_1_path", "veo_ref_strip_2_path", "veo_ref_strip_3_path",
+            ):
+                if result.get(_k):
+                    extra_meta[_k] = result.get(_k)
             # ltx23_extend — write the resolved audio-strip path when present
             if result.get("ltx23ext_audio_path"):
                 extra_meta["ltx23ext_audio_path"] = result.get("ltx23ext_audio_path", "")
@@ -2288,6 +2410,7 @@ def _queue_tick() -> float | None:
                     job.progress = 0.0
                 elif status == "COMPLETED":
                     job.output_path = result.get("output_path", "")
+                    job.tokens_info = result.get("result_note", "")
                     job.status      = "COMPLETED"
                     job.progress    = 1.0
                     _queue_insert_strip(scene, result)
@@ -2505,6 +2628,26 @@ class SEQUENCER_OT_redo_from_job(Operator):
         # ltx23 staged
         if hasattr(scene, "ltx23_stage_mode"):
             scene.ltx23_stage_mode           = job.ltx23_stage_mode
+        # Google Nano Banana (Gemini image)
+        if hasattr(scene, "nano_banana_model"):
+            scene.nano_banana_model          = job.nano_banana_model
+            scene.nano_banana_aspect         = job.nano_banana_aspect
+            scene.nano_banana_resolution     = job.nano_banana_resolution
+        # Google Veo (video)
+        if hasattr(scene, "veo_model"):
+            scene.veo_model                  = job.veo_model
+            scene.veo_aspect                 = job.veo_aspect
+            scene.veo_resolution             = job.veo_resolution
+            scene.veo_duration               = job.veo_duration
+            scene.veo_person_generation      = job.veo_person_generation
+            scene.veo_image_mode             = job.veo_image_mode
+        # Reference strips (re-rendered from the restored names at queue time)
+        for _attr in (
+            "nano_banana_ref_strip_1", "nano_banana_ref_strip_2", "nano_banana_ref_strip_3",
+            "veo_ref_strip_1", "veo_ref_strip_2", "veo_ref_strip_3",
+        ):
+            if hasattr(scene, _attr):
+                setattr(scene, _attr, getattr(job, _attr, ""))
         # Chatterbox Multilingual
         if hasattr(scene, "chatterbox_mtl_language"):
             scene.chatterbox_mtl_language    = job.chatterbox_mtl_language

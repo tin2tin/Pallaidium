@@ -182,6 +182,13 @@ class GeneratorAddonPreferences(AddonPreferences):
         default="hugginface_token",
         subtype="PASSWORD",
     )
+    gemini_api_key: bpy.props.StringProperty(
+        name="Google Gemini API Key",
+        description="API key for Google Gemini cloud models (Nano Banana image, Veo video). "
+                    "Falls back to the GEMINI_API_KEY environment variable if left empty.",
+        default="",
+        subtype="PASSWORD",
+    )
     text_model_card: EnumProperty(
         name="Text Model",
         items=_text_enum_items,
@@ -307,6 +314,11 @@ class GeneratorAddonPreferences(AddonPreferences):
             box.prop(self, "audio_model_card")
         except:
             pass
+        row = box.row(align=True)
+        row.prop(self, "gemini_api_key")
+        row.operator(
+            "wm.url_open", text="", icon="URL"
+        ).url = "https://aistudio.google.com/apikey"
         box.prop(self, "generator_ai")
         box.prop(self, "hf_cache_dir")
         row = box.row(align=True)

@@ -13,8 +13,9 @@ class ChatterboxMultilingualPlugin(ModelPlugin):
     INPUTS       = InputSpec.PROMPT | InputSpec.AUDIO_REF
     UI_SECTIONS  = [
         UISection.PROMPT,
-        UISection.AUDIO_DURATION,
+        # UISection.AUDIO_DURATION,
         UISection.AUDIO_REF,
+        UISection.CHAT_PARAMS,
         UISection.SEED,
     ]
     PARAMS       = ParamSpec()
@@ -81,6 +82,9 @@ class ChatterboxMultilingualPlugin(ModelPlugin):
                         chunk,
                         language_id=language_id,
                         audio_prompt_path=inputs.audio_ref,
+                        exaggeration=inputs.exaggeration,
+                        cfg_weight=inputs.pace,
+                        temperature=inputs.temperature,
                     )
                     all_chunks.append(wav_chunk.flatten())
                 except Exception as e:

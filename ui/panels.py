@@ -134,6 +134,8 @@ def _draw_queue(layout, context):
         elif job.status == "PENDING":
             info = f"{job.output_type.title()} · {job.model_card.split('/')[-1][:28]}"
             box.label(text=info, icon="TIME")
+        elif job.status == "COMPLETED" and getattr(job, "tokens_info", ""):
+            box.label(text=job.tokens_info, icon="RNA")
         elif job.status == "FAILED":
             box.label(text=f"Error: {job.error_message[:58]}", icon="ERROR")
 

@@ -1,0 +1,229 @@
+"""Cloud text-to-image / image-editing via Google Gemini ("Nano Banana").
+
+Three selectable variants (scene.nano_banana_model):
+  - gemini-2.5-flash-image      (Nano Banana, fast)
+  - gemini-3-pro-image-preview  (Nano Banana Pro, up to 4K)
+  - imagen-4.0-generate-001     (Imagen 4)
+
+The API key comes from the addon preference ``gemini_api_key`` (falls back to the
+GEMINI_API_KEY environment variable).  Image strips (including META strips bundling
+first/last/middle frames) are passed as references for editing / composition.
+"""
+
+import os
+from ...models.base import ModelPlugin, InputSpec, UISection, ParamSpec, ModelInputs
+from ...utils.helpers import find_strip_by_name, load_strip_as_pil
+
+_REF_ATTRS = ["nano_banana_ref_strip_1", "nano_banana_ref_strip_2", "nano_banana_ref_strip_3"]
+
+
+class GoogleNanoBananaPlugin(ModelPlugin):
+    MODEL_ID     = "google/nano-banana"
+    DISPLAY_NAME = "Image: Google Nano Banana (cloud)"
+    MODEL_TYPE   = "image"
+    DESCRIPTION  = "Cloud text-to-image / image editing via the Google Gemini API"
+
+    # Gemini image models are non-deterministic (no seed) and have no separate
+    # negative-prompt parameter, so neither is exposed — every shown control works.
+    INPUTS       = InputSpec.PROMPT | InputSpec.IMAGE | InputSpec.API_KEY
+    UI_SECTIONS  = [UISection.PROMPT]
+    PARAMS       = ParamSpec(width=1024, height=1024)
+    REQUIRED_PACKAGES = ["google.genai", "PIL"]
+
+    supports_inpaint = False
+    supports_img2img = True    # image editing / composition from reference strips
+    show_enhance     = False   # local Quality/Speed/Upscale toggles don't apply to cloud
+    uses_strip_power = False    # Gemini editing has no img2img "strength" parameter
+    supports_batch   = True     # batch count → multiple separate API calls
+
+    # ---- UI ---------------------------------------------------------------
+    def draw_custom_ui(self, col, context) -> bool:
+        # Klein-style reference-image pickers (composition / editing).  Imagen is
+        # text-to-image only, so image inputs are hidden when it is selected.
+        scene = context.scene
+        model = getattr(scene, "nano_banana_model", "gemini-2.5-flash-image")
+        if model.startswith("imagen"):
+            return True
+        try:
+            col.prop(scene, "input_strips", text="Input")
+        except Exception:
+            pass
+        if scene.sequence_editor is None:
+            return True
+        for i, attr in enumerate(_REF_ATTRS, 1):
+            row = col.row(align=True)
+            row.prop_search(scene, attr, scene.sequence_editor, "strips",
+                            text="Ref.", icon="FILE_IMAGE")
+            row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = f"nano_banana_select{i}"
+        return True
+
+    def draw_post_seed_ui(self, col, context):
+        scene = context.scene
+        model = getattr(scene, "nano_banana_model", "gemini-2.5-flash-image")
+        col.prop(scene, "nano_banana_model")
+        col.prop(scene, "nano_banana_aspect")
+        # 2K/4K (image_size) is honoured only by Nano Banana Pro.
+        if model == "gemini-3-pro-image-preview":
+            col.prop(scene, "nano_banana_resolution")
+
+    # ---- Lifecycle --------------------------------------------------------
+    def load(self, prefs, scene, **kw):
+        # No client here — load() is cached across runs and the key may change.
+        return {"pipe": None, "last_model_card": self.MODEL_ID}
+
+    def _get_api_key(self, prefs):
+        key = getattr(prefs, "gemini_api_key", "") or ""
+        key = key.strip()
+        if not key:
+            key = os.environ.get("GEMINI_API_KEY", "").strip()
+        return key
+
+    @staticmethod
+    def _friendly_error(e) -> RuntimeError:
+        """Translate a google.genai API error into a concise, actionable message."""
+        code = getattr(e, "code", None)
+        msg = (getattr(e, "message", None) or str(e)).strip()
+        if code == 429:
+            return RuntimeError(
+                "Google API quota exceeded (429). Image generation is not on the free "
+                "tier (limit 0) or you hit a rate limit — enable billing on your Google "
+                "AI Studio / Cloud project, or wait and retry. " + msg[:200]
+            )
+        if code in (401, 403):
+            return RuntimeError(
+                f"Google API auth error ({code}). Check the Gemini API key in the "
+                "add-on preferences (and that the project has the API enabled). " + msg[:160]
+            )
+        if code:
+            return RuntimeError(f"Google API error {code}: {msg[:300]}")
+        return RuntimeError(str(e)[:400])
+
+    @staticmethod
+    def _usage_note(response) -> str:
+        """Short token-usage string from a response's usage_metadata, or ''."""
+        um = getattr(response, "usage_metadata", None)
+        total = getattr(um, "total_token_count", None) if um is not None else None
+        try:
+            return f"{int(total):,} tokens" if total else ""
+        except Exception:
+            return ""
+
+    def _collect_ref_images(self, inputs: ModelInputs, scene):
+        """Return PIL reference images from the picker strips (+ any primary image).
+
+        Each picker resolves via its add-time path (queue) or, failing that, the
+        strip name (interactive) — mirroring FLUX Kontext/Klein.
+        """
+        from PIL import Image
+        refs = []
+        if inputs.image is not None:
+            refs.append(inputs.image)
+        for attr in _REF_ATTRS:
+            img = None
+            path = getattr(scene, attr + "_path", "") or ""
+            if path and os.path.isfile(path):
+                try:
+                    img = Image.open(path).convert("RGB")
+                except Exception as e:
+                    print(f"[Nano Banana] Could not open reference {path!r}: {e}")
+            if img is None:
+                name = getattr(scene, attr, "") or ""
+                if name:
+                    strip = find_strip_by_name(scene, name)
+                    if strip:
+                        try:
+                            img = load_strip_as_pil(strip)
+                        except Exception as e:
+                            print(f"[Nano Banana] Could not load reference strip {name!r}: {e}")
+            if img is not None:
+                refs.append(img)
+        return refs
+
+    # ---- Generation -------------------------------------------------------
+    def generate(self, pipe_obj, inputs: ModelInputs, scene, prefs):
+        import io
+        from google import genai
+        from google.genai import types
+        from google.genai import errors as genai_errors
+        from PIL import Image
+
+        api_key = self._get_api_key(prefs)
+        if not api_key:
+            raise RuntimeError(
+                "Google Gemini API key is missing. Set it in the Pallaidium add-on "
+                "preferences (Google Gemini API Key) or the GEMINI_API_KEY env var."
+            )
+
+        model       = getattr(scene, "nano_banana_model", "gemini-2.5-flash-image")
+        aspect      = getattr(scene, "nano_banana_aspect", "1:1")
+        resolution  = getattr(scene, "nano_banana_resolution", "1K")
+
+        client = genai.Client(api_key=api_key)
+        self.set_phase(inputs, "Submitting to cloud")
+
+        # ── Imagen models use a different endpoint ─────────────────────────
+        if model.startswith("imagen"):
+            cfg = types.GenerateImagesConfig(
+                number_of_images=1,
+                aspect_ratio=aspect,
+            )
+            try:
+                resp = client.models.generate_images(
+                    model=model, prompt=inputs.prompt, config=cfg,
+                )
+            except genai_errors.APIError as e:
+                raise self._friendly_error(e)
+            inputs.usage_note = self._usage_note(resp)
+            self.set_phase(inputs, "Saving")
+            for gen in (resp.generated_images or []):
+                img = gen.image
+                # SDK may expose a PIL image directly or raw bytes.
+                pil = getattr(img, "_pil_image", None)
+                if pil is not None:
+                    return pil
+                data = getattr(img, "image_bytes", None)
+                if data:
+                    return Image.open(io.BytesIO(data)).convert("RGB")
+            raise RuntimeError("Imagen API did not return any image data.")
+
+        # ── Gemini image models (generate_content) ─────────────────────────
+        contents = [inputs.prompt] + self._collect_ref_images(inputs, scene)
+
+        # Build image_config defensively — aspect_ratio is widely supported;
+        # image_size (2K/4K) is honoured only by Nano Banana Pro.  Skip "1K"
+        # so the Flash model (which rejects image_size) keeps working.
+        image_config = None
+        try:
+            image_config = types.ImageConfig(aspect_ratio=aspect)
+            # image_size (2K/4K) is honoured only by Nano Banana Pro; never send
+            # it for the Flash model, which rejects it.
+            if resolution in ("2K", "4K") and model == "gemini-3-pro-image-preview":
+                try:
+                    image_config.image_size = resolution
+                except Exception:
+                    print(f"[Nano Banana] image_size={resolution!r} unsupported; ignored.")
+        except Exception:
+            print("[Nano Banana] ImageConfig unsupported by this SDK; using defaults.")
+
+        cfg_kwargs = {"response_modalities": ["IMAGE"]}
+        if image_config is not None:
+            cfg_kwargs["image_config"] = image_config
+        cfg = types.GenerateContentConfig(**cfg_kwargs)
+        try:
+            response = client.models.generate_content(
+                model=model, contents=contents, config=cfg,
+            )
+        except genai_errors.APIError as e:
+            raise self._friendly_error(e)
+
+        inputs.usage_note = self._usage_note(response)
+        self.set_phase(inputs, "Saving")
+        candidates = getattr(response, "candidates", None) or []
+        for cand in candidates:
+            content = getattr(cand, "content", None)
+            for part in (getattr(content, "parts", None) or []):
+                inline = getattr(part, "inline_data", None)
+                if inline is not None and getattr(inline, "data", None):
+                    return Image.open(io.BytesIO(inline.data)).convert("RGB")
+
+        raise RuntimeError("Google Gemini API did not return any image data.")

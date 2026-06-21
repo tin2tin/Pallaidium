@@ -198,6 +198,10 @@ class ModelInputs:
     # Signature: phase_fn(label: str) → None
     phase_fn:         Optional[Any] = None
 
+    # Result note — a short, human-readable string a plugin may set during
+    # generate() (e.g. token usage / cost).  Surfaced on the completed queue job.
+    usage_note:       str = ""
+
 
 # ---------------------------------------------------------------------------
 # ModelPlugin — base class every plugin must subclass

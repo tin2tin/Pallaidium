@@ -56,7 +56,7 @@ class LTX2_3ExtendStagedPlugin(ModelPlugin):
         UISection.PROMPT, UISection.NEG_PROMPT, UISection.VIDEO_STRIP,
         UISection.RESOLUTION, UISection.SEED, UISection.LORA,
     ]
-    PARAMS            = ParamSpec(width=1280, height=704, frames=121, steps=8, guidance=1.0)
+    PARAMS            = ParamSpec(steps=8, guidance=1.0)
     REQUIRED_PACKAGES =["torch", "torchaudio", "soundfile", "av", "diffusers", "transformers", "sdnq"]
     supports_inpaint  = False
     uses_strip_power  = False

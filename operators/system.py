@@ -28,6 +28,7 @@ from ..utils.helpers import (
     run_pip_streaming,
     install_requirements_binary_only,
     install_requirements_allow_source,
+    repair_clobbered_namespace_packages,
     write_requirements_file,
 )
 
@@ -413,6 +414,20 @@ def _run_install(snapshot: dict, cancel_event: threading.Event):
 
                 done_pkgs += len(batch)
                 state["progress"] = min(done_pkgs / max(1, total_pkgs), 1.0)
+
+        # Repair namespace packages (e.g. google/*) that an earlier batch may
+        # have clobbered when a later batch reinstalled a sibling. Runs here,
+        # after every batch, so nothing reinstalls afterward to re-clobber.
+        if not cancel_event.is_set():
+            state["phase"] = "Verifying namespace packages..."
+            try:
+                # Clear read-only attrs first so the repair's reinstall can
+                # delete the existing (pip-marked read-only) .pyd files.
+                _fix_site_packages_permissions(site_packages_dir)
+                if repair_clobbered_namespace_packages(pybin, on_line=on_line):
+                    _fix_site_packages_permissions(site_packages_dir)
+            except Exception as exc:
+                on_line(f"PALLAIDIUM repair: skipped ({exc})")
 
         print("\n" + "=" * 60, flush=True)
         if _dep_failed_batches:

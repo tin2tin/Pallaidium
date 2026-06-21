@@ -187,6 +187,9 @@ confection
 conformer
 
 # --- Google / Cloud ---
+google-genai
+tenacity
+distro
 google-api-core
 google-auth
 google-cloud-core

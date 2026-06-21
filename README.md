@@ -136,6 +136,8 @@ The generated media will be saved to the directory specified in the addon prefer
 
 ## Change Log
 
+2026-06-22: Add: Google cloud plugins — Nano Banana (Gemini image: text-to-image, editing, up to 3 reference-image strips) and Veo (video: text/image-to-video, first/last-frame interpolation, Veo 3.1 reference images). Set the API key in add-on preferences. Reference strips persist to metadata and restore on Redo; model-specific controls hide when not applicable.
+
 2026-06-20: Add: Chatterbox Multilingual — text-to-speech and voice cloning in 23 languages via Chatterbox V3. Select a language from the dropdown, optionally provide a speaker reference audio for voice cloning.
 
 2026-06-19: Add: NVIDIA Maxine Super Resolution — AI-powered video and image upscaling via the Maxine VFX SDK. Six quality modes (Ultra, High, Medium, Low, Denoise, Deblur). Requires an NVIDIA GPU with Tensor Cores.

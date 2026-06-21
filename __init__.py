@@ -16,6 +16,13 @@ else:
 from .operators.queue_ops import queue_classes as _queue_classes
 
 import os
+
+# transformers parallelizes weight materialization across a ThreadPoolExecutor.
+# On Blender's bundled torch_cpu.dll (Win) this races and faults with an
+# EXCEPTION_ACCESS_VIOLATION inside _materialize_copy worker threads. Force
+# synchronous loading process-wide; setdefault keeps it overridable.
+os.environ.setdefault("HF_DEACTIVATE_ASYNC_LOAD", "1")
+
 from .utils.helpers import load_styles, filter_updated, input_strips_updated, get_enum_items, update_folder_callback
 # from .utils.helpers import *
 from .properties import *
@@ -641,6 +648,122 @@ def register():
         description="Which stages of the two-stage LTX pipeline to run",
     )
 
+    # ── Google Nano Banana (Gemini image) cloud plugin settings ────────────
+    bpy.types.Scene.nano_banana_model = bpy.props.EnumProperty(
+        name="Variant",
+        items=[
+            ("gemini-2.5-flash-image",     "Nano Banana (Flash)",  "Gemini 2.5 Flash Image — fast, low cost"),
+            ("gemini-3-pro-image-preview", "Nano Banana Pro",      "Gemini 3 Pro Image — highest quality, up to 4K"),
+            ("imagen-4.0-generate-001",    "Imagen 4",             "Imagen 4 text-to-image"),
+        ],
+        default="gemini-2.5-flash-image",
+        description="Which Google image model to use",
+    )
+    bpy.types.Scene.nano_banana_aspect = bpy.props.EnumProperty(
+        name="Aspect",
+        items=[
+            ("1:1",  "1:1",  "Square"),
+            ("16:9", "16:9", "Landscape"),
+            ("9:16", "9:16", "Portrait"),
+            ("4:3",  "4:3",  "Landscape"),
+            ("3:4",  "3:4",  "Portrait"),
+            ("21:9", "21:9", "Ultrawide"),
+        ],
+        default="1:1",
+        description="Output aspect ratio",
+    )
+    bpy.types.Scene.nano_banana_resolution = bpy.props.EnumProperty(
+        name="Resolution",
+        items=[
+            ("1K", "1K", "1024px"),
+            ("2K", "2K", "2048px (Nano Banana Pro)"),
+            ("4K", "4K", "4096px (Nano Banana Pro)"),
+        ],
+        default="1K",
+        description="Output resolution tier (2K/4K require Nano Banana Pro)",
+    )
+
+    # ── Google Veo (video) cloud plugin settings ───────────────────────────
+    bpy.types.Scene.veo_model = bpy.props.EnumProperty(
+        name="Variant",
+        items=[
+            ("veo-3.1-generate-preview",      "Veo 3.1",       "Veo 3.1 — highest quality, native audio"),
+            ("veo-3.1-fast-generate-preview", "Veo 3.1 Fast",  "Veo 3.1 Fast — faster, lower cost"),
+            ("veo-3.0-generate-preview",      "Veo 3.0",       "Veo 3.0"),
+        ],
+        default="veo-3.1-fast-generate-preview",
+        description="Which Google Veo model to use",
+    )
+    bpy.types.Scene.veo_aspect = bpy.props.EnumProperty(
+        name="Aspect",
+        items=[
+            ("16:9", "16:9", "Landscape"),
+            ("9:16", "9:16", "Portrait"),
+        ],
+        default="16:9",
+        description="Output aspect ratio",
+    )
+    bpy.types.Scene.veo_resolution = bpy.props.EnumProperty(
+        name="Resolution",
+        items=[
+            ("720p",  "720p",  "1280×720"),
+            ("1080p", "1080p", "1920×1080 (16:9 only)"),
+        ],
+        default="720p",
+        description="Output resolution",
+    )
+    bpy.types.Scene.veo_duration = bpy.props.EnumProperty(
+        name="Duration",
+        items=[
+            ("4", "4s", "4 seconds"),
+            ("6", "6s", "6 seconds"),
+            ("8", "8s", "8 seconds"),
+        ],
+        default="8",
+        description="Clip duration in seconds",
+    )
+    bpy.types.Scene.veo_person_generation = bpy.props.EnumProperty(
+        name="People",
+        items=[
+            ("allow_adult", "Adults Only",  "Allow generation of adults only"),
+            ("dont_allow",  "Don't Allow",  "Disallow generation of people"),
+        ],
+        default="allow_adult",
+        description="Policy for generating people in the video "
+                    "(the Developer API does not support allowing children)",
+    )
+    bpy.types.Scene.veo_image_mode = bpy.props.EnumProperty(
+        name="Image Mode",
+        items=[
+            ("AUTO",        "Auto",               "Reference images if picked, else first+last frame, else first frame, else text-only"),
+            ("FIRST",       "First Frame",        "Use the selected strip as the starting frame (image-to-video)"),
+            ("INTERPOLATE", "First + Last Frame", "Interpolate between the first and last frame of a META strip (Veo 3.1)"),
+            ("REFERENCE",   "Reference Images",   "Use the Ref. image pickers as subject/style ingredients (Veo 3.1)"),
+        ],
+        default="AUTO",
+        description="How image inputs are interpreted by Veo",
+    )
+
+    # Reference-image strip pickers (Nano Banana composition / Veo 3.1 ingredients)
+    bpy.types.Scene.nano_banana_ref_strip_1 = bpy.props.StringProperty(
+        name="nano_banana_ref_strip_1", options={"TEXTEDIT_UPDATE"}, default=""
+    )
+    bpy.types.Scene.nano_banana_ref_strip_2 = bpy.props.StringProperty(
+        name="nano_banana_ref_strip_2", options={"TEXTEDIT_UPDATE"}, default=""
+    )
+    bpy.types.Scene.nano_banana_ref_strip_3 = bpy.props.StringProperty(
+        name="nano_banana_ref_strip_3", options={"TEXTEDIT_UPDATE"}, default=""
+    )
+    bpy.types.Scene.veo_ref_strip_1 = bpy.props.StringProperty(
+        name="veo_ref_strip_1", options={"TEXTEDIT_UPDATE"}, default=""
+    )
+    bpy.types.Scene.veo_ref_strip_2 = bpy.props.StringProperty(
+        name="veo_ref_strip_2", options={"TEXTEDIT_UPDATE"}, default=""
+    )
+    bpy.types.Scene.veo_ref_strip_3 = bpy.props.StringProperty(
+        name="veo_ref_strip_3", options={"TEXTEDIT_UPDATE"}, default=""
+    )
+
     # The guidance number.
     bpy.types.Scene.img_guidance_scale = bpy.props.FloatProperty(
         name="img_guidance_scale",
@@ -1116,6 +1239,12 @@ def unregister():
         "ltx23ic_control_audio_str", "ltx23ic_identity_guidance",
         "ltx23_stage_mode",
         "maxine_quality",
+        "nano_banana_model", "nano_banana_aspect", "nano_banana_resolution",
+        "veo_model", "veo_aspect", "veo_resolution", "veo_duration",
+        "veo_person_generation",
+        "veo_image_mode",
+        "nano_banana_ref_strip_1", "nano_banana_ref_strip_2", "nano_banana_ref_strip_3",
+        "veo_ref_strip_1", "veo_ref_strip_2", "veo_ref_strip_3",
     ):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)

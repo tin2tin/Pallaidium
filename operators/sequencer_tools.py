@@ -141,7 +141,19 @@ class SEQUENCER_OT_ai_strip_picker(Operator):
             if find_strip_by_name(scene, strip.name):
                 context.scene.klein_strip_3 = strip.name
 
-        elif self.action == "ltx23ic_control_select":
+        for _i in range(1, 4):
+            if self.action == f"nano_banana_select{_i}":
+                self.report({"INFO"}, f"Picked '{strip.name}'")
+                if find_strip_by_name(scene, strip.name):
+                    setattr(context.scene, f"nano_banana_ref_strip_{_i}", strip.name)
+                break
+            if self.action == f"veo_select{_i}":
+                self.report({"INFO"}, f"Picked '{strip.name}'")
+                if find_strip_by_name(scene, strip.name):
+                    setattr(context.scene, f"veo_ref_strip_{_i}", strip.name)
+                break
+
+        if self.action == "ltx23ic_control_select":
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):
                 context.scene.ltx23ic_control_strip = strip.name

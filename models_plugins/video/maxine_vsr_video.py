@@ -59,7 +59,7 @@ class MaxineVSRVideoPlugin(ModelPlugin):
 
     INPUTS      = InputSpec.VIDEO
     UI_SECTIONS = [UISection.VIDEO_STRIP, UISection.RESOLUTION, UISection.SEED]
-    PARAMS      = ParamSpec(width=1920, height=1080)
+    PARAMS      = ParamSpec()
 
     REQUIRED_PACKAGES          = ["torch", "nvvfx"]
     supports_inpaint           = False

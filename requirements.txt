@@ -188,6 +188,9 @@ confection==0.1.5
 conformer==0.3.2
 
 # --- Google / Cloud ---
+google-genai
+tenacity
+distro
 google-api-core==2.28.1
 google-auth==2.43.0
 google-cloud-core==2.5.0

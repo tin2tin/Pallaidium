@@ -899,6 +899,105 @@ def run_pip_streaming(cmd: list, on_line=None, cancel_event=None) -> bool:
         return False
 
 
+# Top-level directory names that several unrelated wheels ship by coincidence;
+# never a real shared runtime namespace, so excluded from clobber grouping.
+_NS_GENERIC_DIRS = frozenset({
+    "tests", "test", "docs", "doc", "examples", "example", "data",
+    "include", "share", "samples", "benchmarks",
+})
+
+
+def repair_clobbered_namespace_packages(pybin, on_line=None):
+    """Reinstall packages clobbered out of a shared namespace directory.
+
+    ``pip install --target --upgrade`` rebuilds a shared namespace directory
+    (e.g. the ``google/`` PEP-420 namespace used by protobuf + google-cloud-* +
+    googleapis-common-protos) so it holds only the packages named in that one pip
+    command, wiping siblings installed by an earlier command. When such siblings
+    land in separate batches, a later batch deletes an earlier one's files while
+    its ``.dist-info`` survives — so pip still believes the package is installed
+    and never self-heals within the run.
+
+    Detect every top-level directory shared by 2+ distributions where some
+    owning package's recorded files are now missing, then reinstall all packages
+    sharing each such directory together in one ``--upgrade --force-reinstall``
+    command (the only invocation that merges the namespace whole). Runs after the
+    main install so nothing reinstalls afterward to re-clobber. Returns True if a
+    repair ran and succeeded, False on pip failure, None if nothing needed it.
+    """
+    log = on_line or print
+    sp = site_packages_dir
+    if not sp or not os.path.isdir(sp):
+        return None
+
+    dir_to_pkgs: dict = {}       # shared top dir -> {"name==version", ...}
+    dirs_with_missing: set = set()  # shared top dirs that lost files
+
+    for entry in os.listdir(sp):
+        if not entry.endswith(".dist-info"):
+            continue
+        record = os.path.join(sp, entry, "RECORD")
+        if not os.path.exists(record):
+            continue
+        base = entry[: -len(".dist-info")]
+        if "-" not in base:
+            continue
+        name, version = base.rsplit("-", 1)
+        spec = f"{name}=={version}"
+
+        try:
+            with open(record, encoding="utf-8") as fh:
+                rec_lines = fh.read().splitlines()
+        except Exception:
+            continue
+        for rec in rec_lines:
+            rel = rec.split(",")[0].strip()
+            if not rel or "/" not in rel.replace("\\", "/"):
+                continue
+            norm = rel.replace("\\", "/")
+            if norm.startswith("__pycache__") or ".dist-info" in norm:
+                continue
+            if "/bin/" in norm or "/Scripts/" in norm or norm.startswith("../"):
+                continue
+            top = norm.split("/")[0]
+            if top in _NS_GENERIC_DIRS:
+                continue
+            dir_to_pkgs.setdefault(top, set()).add(spec)
+            if not os.path.exists(os.path.join(sp, os.path.normpath(rel))):
+                dirs_with_missing.add(top)
+
+    # A directory clobbers only when 2+ distributions share it; single-owner
+    # dirs with missing files are ordinary broken installs, left to is_installed.
+    repair_set: set = set()
+    clobbered_dirs = []
+    for top in dirs_with_missing:
+        pkgs = dir_to_pkgs.get(top, set())
+        if len(pkgs) >= 2:
+            repair_set |= pkgs
+            clobbered_dirs.append(top)
+
+    if not repair_set:
+        return None
+
+    repair_list = sorted(repair_set)
+    log(f"PALLAIDIUM repair: namespace dir(s) {sorted(clobbered_dirs)} clobbered; "
+        f"reinstalling {len(repair_list)} package(s) together: {', '.join(repair_list)}")
+
+    cmd = [
+        pybin, "-m", "pip", "install",
+        "--upgrade",
+        "--force-reinstall",
+        "--disable-pip-version-check",
+        "--no-warn-script-location",
+        "--no-cache-dir",
+        "--no-deps",
+        "--target", sp,
+    ] + repair_list
+    ok = run_pip_streaming(cmd, on_line=on_line)
+    log("PALLAIDIUM repair: complete." if ok else "PALLAIDIUM repair: pip reinstall failed.")
+    return ok
+
+
 def write_requirements_file(filename, lines):
     with open(filename, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
@@ -1245,9 +1344,9 @@ def input_strips_updated(self, context):
             if _p:
                 scene.movie_num_inference_steps = _p.PARAMS.steps
                 scene.movie_num_guidance = _p.PARAMS.guidance
-                scene.generate_movie_x = _p.PARAMS.width
-                scene.generate_movie_y = _p.PARAMS.height
-                scene.generate_movie_frames = _p.PARAMS.frames
+                #scene.generate_movie_x = _p.PARAMS.width
+                #scene.generate_movie_y = _p.PARAMS.height
+                #scene.generate_movie_frames = _p.PARAMS.frames
         except Exception:
             pass
         if _p and getattr(_p, "requires_input_strip", False) and scene.input_strips != "input_strips":
@@ -1348,9 +1447,9 @@ def output_strips_updated(self, context):
             from ..models import get_plugin as _gp
             _p = _gp(movie_model)
             if _p:
-                movie_res_x = _p.PARAMS.width
-                movie_res_y = _p.PARAMS.height
-                movie_frames = _p.PARAMS.frames
+                #movie_res_x = _p.PARAMS.width
+                #movie_res_y = _p.PARAMS.height
+                #movie_frames = _p.PARAMS.frames
                 movie_inference = _p.PARAMS.steps
                 movie_guidance = _p.PARAMS.guidance
         except Exception:
@@ -1382,9 +1481,9 @@ def output_strips_updated(self, context):
             bpy.ops.lora.refresh_files()
 
     if type == "movie":
-        scene.generate_movie_x = movie_res_x
-        scene.generate_movie_y = movie_res_y
-        scene.generate_movie_frames = movie_frames
+        #scene.generate_movie_x = movie_res_x
+        #scene.generate_movie_y = movie_res_y
+        #scene.generate_movie_frames = movie_frames
         scene.movie_num_inference_steps = movie_inference
         scene.movie_num_guidance = movie_guidance
 
@@ -3215,6 +3314,23 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
                 scene.maxine_quality = str(_v)
             except Exception:
                 pass
+
+        # Google Nano Banana / Veo cloud settings (enum string props) plus the
+        # reference-strip names — restoring the names lets the queue re-render
+        # the reference images from the source strips on Redo.
+        for _attr in [
+            "nano_banana_model", "nano_banana_aspect", "nano_banana_resolution",
+            "veo_model", "veo_aspect", "veo_resolution", "veo_duration",
+            "veo_person_generation", "veo_image_mode",
+            "nano_banana_ref_strip_1", "nano_banana_ref_strip_2", "nano_banana_ref_strip_3",
+            "veo_ref_strip_1", "veo_ref_strip_2", "veo_ref_strip_3",
+        ]:
+            _v = _get(_attr)
+            if _v is not None and hasattr(scene, _attr):
+                try:
+                    setattr(scene, _attr, str(_v))
+                except Exception:
+                    pass
 
         # MOSS-TTS params (audio strips)
         for _attr, _cast in [
