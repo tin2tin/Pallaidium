@@ -88,7 +88,12 @@
       "Bash(awk 'NR>=2050 && NR<=2400 && \\(/^def _/ || /reference_images/ || /not supported/\\) {print NR\": \"$0}' models.py)",
       "Bash(\"/c/Users/peter/AppData/Local/Programs/Python/Python311/python.exe\" -m py_compile models_plugins/video/google_veo.py)",
       "Bash(\"/c/Users/peter/AppData/Local/Programs/Python/Python311/python.exe\" -m py_compile operators/queue_ops.py utils/helpers.py)",
-      "Bash(\"/c/Users/peter/AppData/Local/Programs/Python/Python311/python.exe\" -m py_compile models_plugins/video/google_veo.py models_plugins/image/google_nano_banana.py operators/queue_ops.py utils/helpers.py __init__.py)"
+      "Bash(\"/c/Users/peter/AppData/Local/Programs/Python/Python311/python.exe\" -m py_compile models_plugins/video/google_veo.py models_plugins/image/google_nano_banana.py operators/queue_ops.py utils/helpers.py __init__.py)",
+      "Bash(python -c \"import ast,sys; ast.parse\\(open\\(r'c:/Users/peter/AppData/Roaming/Blender Foundation/Blender/5.2/extensions/user_default/pallaidium_generative_ai/models_plugins/image/google_nano_banana.py',encoding='utf-8'\\).read\\(\\)\\); print\\('OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(r'c:/Users/peter/AppData/Roaming/Blender Foundation/Blender/5.2/extensions/user_default/pallaidium_generative_ai/models_plugins/image/google_nano_banana.py',encoding='utf-8'\\).read\\(\\)\\); print\\('OK'\\)\")",
+      "Bash(git log *)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(r'c:/Users/peter/AppData/Roaming/Blender Foundation/Blender/5.2/extensions/user_default/pallaidium_generative_ai/ui/panels.py',encoding='utf-8'\\).read\\(\\)\\); print\\('panels OK'\\)\")",
+      "Bash(python -m py_compile utils/helpers.py)"
     ],
     "additionalDirectories": [
       "c:\\Users\\peter\\.claude\\projects\\c--Users-peter-AppData-Roaming-Blender-Foundation-Blender-5-2-extensions-user-default-pallaidium-generative-ai\\memory",

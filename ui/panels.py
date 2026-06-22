@@ -18,6 +18,9 @@ from datetime import date
 import pathlib
 import gc
 import time
+
+# Throttle key for the one-shot Strip-Power gate diagnostic (see draw()).
+_STRIP_POWER_DBG_LAST = None
 from bpy_extras.io_utils import ImportHelper
 from bpy.types import Operator, Panel, AddonPreferences, UIList, PropertyGroup
 from bpy.props import (
@@ -225,7 +228,24 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         or image_model_card == "yuvraj108c/FLUX.1-Kontext-dev"
                         or (plugin is not None and getattr(plugin, "inpaint_uses_strength", False))
                     )
-                    if input == "input_strips" and _show_strength and getattr(plugin, "uses_strip_power", True):
+                    _usp = getattr(plugin, "uses_strip_power", True)
+                    # ── Strip-Power gate diagnostic (throttled: prints only when the
+                    #    decision changes, so it never spams the redraw loop) ──────────
+                    if type == "image":
+                        global _STRIP_POWER_DBG_LAST
+                        _sig = (image_model_card, input, bool(_show_strength), bool(_usp),
+                                getattr(scene, "inpaint_selected_strip", ""))
+                        if _sig != _STRIP_POWER_DBG_LAST:
+                            _STRIP_POWER_DBG_LAST = _sig
+                            _shown = (input == "input_strips" and _show_strength and _usp)
+                            print(f"[Strip Power gate] model={image_model_card!r} "
+                                  f"plugin={type(plugin).__name__ if plugin else None} "
+                                  f"input={input!r} (need 'input_strips') "
+                                  f"show_strength={bool(_show_strength)} "
+                                  f"uses_strip_power={bool(_usp)} "
+                                  f"inpaint_mask={getattr(scene, 'inpaint_selected_strip', '')!r} "
+                                  f"=> Strip Power {'SHOWN' if _shown else 'HIDDEN'}")
+                    if input == "input_strips" and _show_strength and _usp:
                         col = col.column(heading="Use", align=True)
                         col.prop(context.scene, "image_power", text="Strip Power")
 

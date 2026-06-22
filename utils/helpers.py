@@ -1632,6 +1632,56 @@ def copy_struct(source, target):
             # Handles issues like attempting to write to collection properties
             pass
 
+def run_sound_mixdown_sync(output_path, timeout=600.0):
+    """Run bpy.ops.sound.mixdown and block until the file is fully written.
+
+    Blender 5.2 runs sound mixdown as an asynchronous WM job
+    (sound_mixdown_startjob → do_job_thread). The job thread builds an
+    aud::Sequence from the scene's sequence editor while the operator returns
+    immediately. If the caller then mutates the sequencer (restoring strip
+    mute states / frame ranges, inserting strips from the render-queue timer,
+    etc.) before the job finishes, the job reads freed/mutated data and Blender
+    crashes with EXCEPTION_ACCESS_VIOLATION in aud::Sequence::setSpecs.
+
+    Calling this on the main thread keeps the event loop (and therefore every
+    bpy.app.timers callback and operator) blocked while the background job
+    writes the WAV, so nothing touches the sequencer until the file is complete.
+    The job thread runs independently and is unaffected by this busy-wait.
+    """
+    import time
+
+    # Remove any stale file so size-based completion detection is reliable.
+    try:
+        if os.path.exists(output_path):
+            os.remove(output_path)
+    except OSError:
+        pass
+
+    bpy.ops.sound.mixdown(filepath=output_path, container="WAV", codec="PCM")
+
+    # Poll until the file exists and its size has been stable across several
+    # consecutive checks (the WAV header is 44 bytes; require more than that).
+    start        = time.time()
+    last_size    = -1
+    stable_since = None
+    STABLE_FOR   = 0.4   # seconds the size must stay unchanged to be "done"
+    POLL         = 0.1
+    while time.time() - start < timeout:
+        size = os.path.getsize(output_path) if os.path.exists(output_path) else -1
+        if size > 44 and size == last_size:
+            if stable_since is None:
+                stable_since = time.time()
+            elif time.time() - stable_since >= STABLE_FOR:
+                return True
+        else:
+            stable_since = None
+            last_size = size
+        time.sleep(POLL)
+
+    print(f"[run_sound_mixdown_sync] timed out waiting for {output_path!r}")
+    return os.path.exists(output_path)
+
+
 def get_render_strip(self, context, strip, meta_strip=None):
     """Render selected strip to hard-disk. Returns the new strip object or None."""
     
@@ -1676,7 +1726,7 @@ def get_render_strip(self, context, strip, meta_strip=None):
     try:
         if strip.type == "SOUND":
             output_path = os.path.abspath(os.path.join(rendered_dir, f"{safe_name}_{render_start:06d}.wav"))
-            bpy.ops.sound.mixdown(filepath=output_path, container='WAV', codec='PCM')
+            run_sound_mixdown_sync(output_path)
         else:
             output_path = os.path.abspath(os.path.join(rendered_dir, f"{safe_name}_{render_start:06d}.mp4"))
             vse_scene.render.filepath = output_path
@@ -1803,7 +1853,7 @@ def render_strip_to_path(context, strip, image_output=False):
         if strip.type == "SOUND":
             output_path = os.path.abspath(
                 os.path.join(rendered_dir, f"{safe_name}_{render_start:06d}.wav"))
-            bpy.ops.sound.mixdown(filepath=output_path, container='WAV', codec='PCM')
+            run_sound_mixdown_sync(output_path)
 
         elif image_output:
             base = os.path.abspath(
@@ -2110,7 +2160,7 @@ def render_strip_to_wav(context, strip):
     print(f"[render_strip_to_wav] ──────────────────────────────────────")
 
     try:
-        bpy.ops.sound.mixdown(filepath=output_path, container="WAV", codec="PCM")
+        run_sound_mixdown_sync(output_path)
     finally:
         for s, state in orig_mute_states.items():
             if s:

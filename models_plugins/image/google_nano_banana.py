@@ -108,6 +108,62 @@ class GoogleNanoBananaPlugin(ModelPlugin):
         except Exception:
             return ""
 
+    @staticmethod
+    def _enum_name(v):
+        """Best-effort readable name for an SDK enum / value (or None)."""
+        if v is None:
+            return None
+        return getattr(v, "name", None) or str(v)
+
+    @classmethod
+    def _diagnose_response(cls, response) -> str:
+        """Summarise a response that yielded no image: finish reasons, prompt
+        block reasons, safety ratings and any text the model returned instead.
+
+        Returns a one-line human-readable summary (also printed in full)."""
+        bits = []
+        # Prompt-level block (request rejected before any candidate).
+        pf = getattr(response, "prompt_feedback", None)
+        if pf is not None:
+            br = cls._enum_name(getattr(pf, "block_reason", None))
+            if br:
+                bits.append(f"prompt blocked: {br}")
+            bmsg = getattr(pf, "block_reason_message", None)
+            if bmsg:
+                bits.append(f"block message: {bmsg}")
+
+        candidates = getattr(response, "candidates", None) or []
+        if not candidates:
+            bits.append("no candidates returned")
+        for i, cand in enumerate(candidates):
+            fr = cls._enum_name(getattr(cand, "finish_reason", None))
+            if fr:
+                bits.append(f"candidate[{i}] finish_reason={fr}")
+            fm = getattr(cand, "finish_message", None)
+            if fm:
+                bits.append(f"candidate[{i}] finish_message={fm}")
+            # Surface any safety ratings that actually tripped.
+            for sr in (getattr(cand, "safety_ratings", None) or []):
+                if getattr(sr, "blocked", False):
+                    cat = cls._enum_name(getattr(sr, "category", None))
+                    prob = cls._enum_name(getattr(sr, "probability", None))
+                    bits.append(f"candidate[{i}] safety blocked: {cat} ({prob})")
+            # Collect any text parts (the model often explains a refusal here).
+            content = getattr(cand, "content", None)
+            for part in (getattr(content, "parts", None) or []):
+                txt = getattr(part, "text", None)
+                if txt:
+                    bits.append(f"candidate[{i}] text: {txt.strip()[:300]}")
+
+        summary = "; ".join(bits) if bits else "response contained no image and no diagnostic info"
+        print("[Nano Banana] empty-image diagnostics: " + summary)
+        # Full repr is invaluable when the structured fields above come up empty.
+        try:
+            print("[Nano Banana] raw response repr (truncated):\n" + repr(response)[:2000])
+        except Exception:
+            pass
+        return summary
+
     def _collect_ref_images(self, inputs: ModelInputs, scene):
         """Return PIL reference images from the picker strips (+ any primary image).
 
@@ -175,7 +231,10 @@ class GoogleNanoBananaPlugin(ModelPlugin):
                 raise self._friendly_error(e)
             inputs.usage_note = self._usage_note(resp)
             self.set_phase(inputs, "Saving")
-            for gen in (resp.generated_images or []):
+            gens = resp.generated_images or []
+            print(f"[Nano Banana] Imagen request: model={model} aspect={aspect} "
+                  f"prompt={inputs.prompt[:120]!r} -> {len(gens)} image(s)")
+            for gen in gens:
                 img = gen.image
                 # SDK may expose a PIL image directly or raw bytes.
                 pil = getattr(img, "_pil_image", None)
@@ -184,10 +243,29 @@ class GoogleNanoBananaPlugin(ModelPlugin):
                 data = getattr(img, "image_bytes", None)
                 if data:
                     return Image.open(io.BytesIO(data)).convert("RGB")
-            raise RuntimeError("Imagen API did not return any image data.")
+            # Imagen reports content filtering per-image and overall.
+            reasons = []
+            for gen in gens:
+                rai = getattr(gen, "rai_filtered_reason", None)
+                if rai:
+                    reasons.append(str(rai))
+            filt = getattr(resp, "positive_prompt_safety_attributes", None)
+            print("[Nano Banana] Imagen empty-image diagnostics: "
+                  + (("; ".join(reasons)) if reasons else "no images and no filter reason")
+                  + (f"; safety_attributes={filt}" if filt is not None else ""))
+            try:
+                print("[Nano Banana] Imagen raw response repr (truncated):\n" + repr(resp)[:2000])
+            except Exception:
+                pass
+            detail = "; ".join(reasons) if reasons else "no images returned (likely content-filtered)"
+            raise RuntimeError("Imagen API returned no image data — " + detail)
 
         # ── Gemini image models (generate_content) ─────────────────────────
-        contents = [inputs.prompt] + self._collect_ref_images(inputs, scene)
+        ref_images = self._collect_ref_images(inputs, scene)
+        contents = [inputs.prompt] + ref_images
+        print(f"[Nano Banana] request: model={model} aspect={aspect} "
+              f"resolution={resolution} ref_images={len(ref_images)} "
+              f"prompt={inputs.prompt[:120]!r}")
 
         # Build image_config defensively — aspect_ratio is widely supported;
         # image_size (2K/4K) is honoured only by Nano Banana Pro.  Skip "1K"
@@ -226,4 +304,6 @@ class GoogleNanoBananaPlugin(ModelPlugin):
                 if inline is not None and getattr(inline, "data", None):
                     return Image.open(io.BytesIO(inline.data)).convert("RGB")
 
-        raise RuntimeError("Google Gemini API did not return any image data.")
+        # No image part — surface *why* (safety block, text-only reply, etc.).
+        detail = self._diagnose_response(response)
+        raise RuntimeError("Google Gemini API returned no image data — " + detail)
