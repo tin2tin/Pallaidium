@@ -239,7 +239,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                             _STRIP_POWER_DBG_LAST = _sig
                             _shown = (input == "input_strips" and _show_strength and _usp)
                             print(f"[Strip Power gate] model={image_model_card!r} "
-                                  f"plugin={type(plugin).__name__ if plugin else None} "
+                                  f"plugin={plugin.__class__.__name__ if plugin else None} "
                                   f"input={input!r} (need 'input_strips') "
                                   f"show_strength={bool(_show_strength)} "
                                   f"uses_strip_power={bool(_usp)} "

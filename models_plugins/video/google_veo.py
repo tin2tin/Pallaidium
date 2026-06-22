@@ -79,7 +79,6 @@ class GoogleVeoPlugin(ModelPlugin):
         col.prop(scene, "veo_aspect")
         col.prop(scene, "veo_resolution")
         col.prop(scene, "veo_duration")
-        col.prop(scene, "veo_person_generation")
 
     # ---- Lifecycle --------------------------------------------------------
     def load(self, prefs, scene, **kw):
@@ -177,7 +176,6 @@ class GoogleVeoPlugin(ModelPlugin):
         aspect       = getattr(scene, "veo_aspect", "16:9")
         resolution   = getattr(scene, "veo_resolution", "720p")
         duration     = int(getattr(scene, "veo_duration", "8"))
-        person_gen   = getattr(scene, "veo_person_generation", "allow_adult")
         image_mode   = getattr(scene, "veo_image_mode", "AUTO")
 
         # 1080p is only valid for 16:9 — fall back to 720p for portrait.
@@ -212,6 +210,11 @@ class GoogleVeoPlugin(ModelPlugin):
         # The Gemini Developer API (the API-key path used here) rejects several
         # Vertex/Enterprise-only fields (seed, generate_audio, enhance_prompt),
         # so they are not sent. Veo 3 generates audio by default on this API.
+        # People policy is always as permissive as the API allows (no UI control).
+        # Text-to-video accepts "allow_all"; image-conditioned modes only allow
+        # "allow_adult".  If even this is rejected it is dropped (see _DROPPABLE),
+        # falling back to the API default, which still permits people.
+        person_gen = "allow_all" if image_mode == "TEXT" else "allow_adult"
         optional = {
             "person_generation": person_gen,
         }

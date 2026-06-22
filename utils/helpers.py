@@ -738,6 +738,38 @@ def clear_cuda_cache():
     except (ImportError, AttributeError, PermissionError, OSError):
         pass
 
+from contextlib import contextmanager
+
+@contextmanager
+def suppress_text_encoder_warnings():
+    """Silence the two benign warnings emitted while loading/running the LTX-2
+    Gemma3 text encoder.
+
+    LTX loads Gemma3 as the full multimodal model (`Gemma3ForConditionalGeneration`)
+    but only ever runs its text path via `encode_prompt`. The unused vision tower
+    causes two harmless warnings that have nothing to do with LoRAs or model
+    quality:
+
+      * transformers — "MISSING ... newly initialized because missing from the
+        checkpoint" (the SDNQ text_encoder checkpoint omits the vision-tower
+        weights, so they get randomly initialized — but they are never read).
+      * diffusers group-offload — "some layers were not executed during the
+        forward pass" / "lazy prefetching with automatic tracing" (the vision
+        tower never executes during text-only encoding).
+
+    Bumps the `transformers` and `diffusers` loggers to ERROR for the wrapped
+    block only; real failures still raise exceptions.
+    """
+    loggers = [logging.getLogger("transformers"), logging.getLogger("diffusers")]
+    prev = [lg.level for lg in loggers]
+    for lg in loggers:
+        lg.setLevel(logging.ERROR)
+    try:
+        yield
+    finally:
+        for lg, lv in zip(loggers, prev):
+            lg.setLevel(lv)
+
 def release_model_cache(cache: dict) -> None:
     import gc
     skip = {"last_model_card"}
@@ -2470,6 +2502,11 @@ class LORABROWSER_UL_files(UIList):
         split.prop(item, "weight_value", text="", emboss=False)
 
 def update_folder_callback(self, context):
+    # Only refresh when a folder is actually set; otherwise the operator
+    # reports "No folder selected" (harmless but noisy — fires when the queue
+    # restores scene state with an empty lora_folder).
+    if not getattr(context.scene, "lora_folder", ""):
+        return
     try:
         bpy.ops.lora.refresh_files()
     except RuntimeError:

@@ -23,6 +23,14 @@ import os
 # synchronous loading process-wide; setdefault keeps it overridable.
 os.environ.setdefault("HF_DEACTIVATE_ASYNC_LOAD", "1")
 
+# Reduce CUDA VRAM fragmentation across consecutive render-queue jobs. Without
+# this, a second run of a heavy model can OOM even with GiB free ("12 GiB free
+# but can't allocate 248 MiB"). PyTorch only reads this when its CUDA allocator
+# first initializes, so it MUST be set before torch is imported — the plugins
+# that set it inside generate() do so too late to have any effect. setdefault
+# keeps it overridable.
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
 from .utils.helpers import load_styles, filter_updated, input_strips_updated, get_enum_items, update_folder_callback
 # from .utils.helpers import *
 from .properties import *

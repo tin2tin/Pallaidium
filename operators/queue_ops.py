@@ -836,7 +836,37 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
         )
 
         # ---- Generate ---------------------------------------------------
-        result = plugin.generate(pipe_obj, inputs, scene_proxy, prefs_proxy)
+        # Some plugins (e.g. SDNQ-quantized LTX-2.3) load their model weights
+        # inside generate() rather than load(). On Blender 5.2's bundled
+        # torch_cpu, materializing those tensors on a background worker thread
+        # faults with EXCEPTION_ACCESS_VIOLATION (the same non-main-thread torch
+        # instability that HF_DEACTIVATE_ASYNC_LOAD only fixes for transformers).
+        # Such plugins opt into running generate() on the main thread — identical
+        # to non-queue generation, which never crashes — while the worker blocks
+        # here until it finishes. The UI is frozen for the duration, exactly as
+        # it is during a direct (non-queue) generation of the same model.
+        if getattr(plugin, "requires_main_thread_for_generate", False):
+            _gen_done   = threading.Event()
+            _gen_result = {}
+
+            def _main_thread_generate():
+                try:
+                    _gen_result["value"] = plugin.generate(
+                        pipe_obj, inputs, scene_proxy, prefs_proxy
+                    )
+                except BaseException as _exc:  # propagate every failure to the worker
+                    _gen_result["error"] = _exc
+                finally:
+                    _gen_done.set()
+                return None  # one-shot timer
+
+            bpy.app.timers.register(_main_thread_generate, first_interval=0)
+            _gen_done.wait()
+            if "error" in _gen_result:
+                raise _gen_result["error"]
+            result = _gen_result["value"]
+        else:
+            result = plugin.generate(pipe_obj, inputs, scene_proxy, prefs_proxy)
 
         if cancel_event.is_set():
             result_queue.put({"job_id": job_id, "status": "CANCELLED"})
@@ -1007,10 +1037,15 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
     finally:
         pipe_obj = None
         gc.collect()
-        if snapshot.get("should_unload", True):
-            if model_cache is not None:
-                release_model_cache(model_cache)
-            clear_cuda_cache()
+        if snapshot.get("should_unload", True) and model_cache is not None:
+            release_model_cache(model_cache)
+        # Always trim the CUDA cache between jobs, even when the model is kept
+        # loaded for the next same-model job: empty_cache() only returns unused
+        # reserved blocks to the driver (it never frees still-referenced model
+        # tensors), so it reduces fragmentation that otherwise OOMs a 2nd run.
+        # Plugins that load inside generate() (stub load()) cache nothing, so
+        # this is their only between-job cleanup on the queue side.
+        clear_cuda_cache()
         _progress_store.pop(job_id, None)
 
 

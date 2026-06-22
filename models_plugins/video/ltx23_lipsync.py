@@ -54,6 +54,15 @@ class LTX2_3LipSyncPlugin(ModelPlugin):
     REQUIRED_PACKAGES = ["torch", "torchaudio", "soundfile", "av", "diffusers", "transformers", "sdnq"]
     supports_inpaint  = False
 
+    # Async (worker-thread) generation re-enabled: the two real render-queue
+    # crashes are fixed elsewhere — the audio-mixdown race
+    # (run_sound_mixdown_sync in helpers.py) and the second-run CUDA OOM
+    # (per-job clear_cuda_cache in queue_ops.py). Off-thread SDNQ loading never
+    # reproduced a torch_cpu fault on its own. Running generate() on the worker
+    # keeps the UI responsive and lets the download/processing progress bars
+    # update live. Flip back to True if the access-violation ever returns.
+    requires_main_thread_for_generate = False
+
     def draw_custom_ui(self, col, context) -> bool:
         # Expose the general ref_audio_path — the driving audio for lip sync.
         row = col.row(align=True)
@@ -239,33 +248,35 @@ class LTX2_3LipSyncPlugin(ModelPlugin):
         # ── Step 0: Text encoding (encode then unload — keeps vision tower off the inference graph) ──
         self.set_phase(inputs, "Text encoding")
         from transformers import Gemma3ForConditionalGeneration
-        text_encoder = Gemma3ForConditionalGeneration.from_pretrained(
-            MODEL_PATH, subfolder="text_encoder",
-            torch_dtype=torch_dtype, cache_dir=_cache_dir, local_files_only=_lfo,
-        )
-        embeds_pipe = LTX2MultiModalPipeline.from_pretrained(
-            MODEL_PATH,
-            text_encoder=text_encoder,
-            transformer=None, vae=None, audio_vae=None, vocoder=None, scheduler=None,
-            torch_dtype=torch_dtype, cache_dir=_cache_dir, local_files_only=_lfo,
-        )
-        # Stream Gemma3 leaf-by-leaf instead of residing the whole encoder on GPU.
-        # On low-VRAM cards (≤10 GB) a full .to(onload_device) makes text encoding the
-        # peak-memory step and OOMs at torch.stack(hidden_states) — especially on a
-        # second job where prior fragmentation leaves less headroom.
-        embeds_pipe.enable_group_offload(
-            onload_device=onload_device,
-            offload_type="leaf_level",
-            use_stream=True,
-            low_cpu_mem_usage=True,
-        )
-        with torch.inference_mode():
-            prompt_embeds, prompt_attention_mask, _, _ = embeds_pipe.encode_prompt(
-                prompt=inputs.prompt,
-                negative_prompt=inputs.neg_prompt,
-                do_classifier_free_guidance=False,
-                device=onload_device,
+        from ...utils.helpers import suppress_text_encoder_warnings
+        with suppress_text_encoder_warnings():
+            text_encoder = Gemma3ForConditionalGeneration.from_pretrained(
+                MODEL_PATH, subfolder="text_encoder",
+                torch_dtype=torch_dtype, cache_dir=_cache_dir, local_files_only=_lfo,
             )
+            embeds_pipe = LTX2MultiModalPipeline.from_pretrained(
+                MODEL_PATH,
+                text_encoder=text_encoder,
+                transformer=None, vae=None, audio_vae=None, vocoder=None, scheduler=None,
+                torch_dtype=torch_dtype, cache_dir=_cache_dir, local_files_only=_lfo,
+            )
+            # Stream Gemma3 leaf-by-leaf instead of residing the whole encoder on GPU.
+            # On low-VRAM cards (≤10 GB) a full .to(onload_device) makes text encoding the
+            # peak-memory step and OOMs at torch.stack(hidden_states) — especially on a
+            # second job where prior fragmentation leaves less headroom.
+            embeds_pipe.enable_group_offload(
+                onload_device=onload_device,
+                offload_type="leaf_level",
+                use_stream=True,
+                low_cpu_mem_usage=True,
+            )
+            with torch.inference_mode():
+                prompt_embeds, prompt_attention_mask, _, _ = embeds_pipe.encode_prompt(
+                    prompt=inputs.prompt,
+                    negative_prompt=inputs.neg_prompt,
+                    do_classifier_free_guidance=False,
+                    device=onload_device,
+                )
         prompt_embeds         = prompt_embeds.detach().to(offload_device, copy=True)
         prompt_attention_mask = prompt_attention_mask.detach().to(offload_device, copy=True)
         del embeds_pipe, text_encoder
