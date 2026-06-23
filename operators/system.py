@@ -332,6 +332,118 @@ def _ensure_python_headers_linux(on_line):
         return False
 
 
+def _ensure_python_headers_windows(on_line):
+    """Provision Python.h + python3xy.lib into Blender's embedded Python on Windows.
+
+    Portable Blender ships a minimized Python without the development files
+    (Include/*.h and libs/python3xy.lib), so any package that JIT-compiles a
+    C/CUDA extension — Triton in particular — fails to link.  We cannot assume
+    the user has an official Python of the same version installed, so we fetch
+    the matching files from the NuGet ``python`` package (the PSF-published
+    redistributable), which bundles ``tools/include/`` and ``tools/libs/`` and
+    is a plain zip downloadable with urllib.
+
+      1. If Python.h *and* python3xy.lib already exist — nothing to do.
+      2. Pick the NuGet version: exact x.y.z match, else newest x.y.* .
+      3. Download the .nupkg and extract tools/include/* and tools/libs/*.lib.
+
+    Prints progress through on_line().  Never raises — logs a warning and
+    returns False so the caller can continue (and print manual steps).
+    """
+    import sys, sysconfig, zipfile, json, urllib.request, tempfile, shutil
+
+    ver = sys.version_info
+    exact     = f"{ver.major}.{ver.minor}.{ver.micro}"
+    mm        = f"{ver.major}.{ver.minor}"
+    include_dir = sysconfig.get_path("include")          # ...\python\Include
+    libs_dir    = os.path.join(sys.base_prefix, "libs")  # ...\python\libs
+    lib_name    = f"python{ver.major}{ver.minor}.lib"    # python313.lib
+
+    if not include_dir:
+        on_line("PALLAIDIUM headers: could not determine Python include path — skipping")
+        return False
+
+    python_h   = os.path.join(include_dir, "Python.h")
+    import_lib = os.path.join(libs_dir, lib_name)
+    if os.path.exists(python_h) and os.path.exists(import_lib):
+        return True  # already provisioned
+
+    on_line(f"PALLAIDIUM headers: dev files missing (Python.h / {lib_name}) — fetching from NuGet")
+
+    try:
+        # --- pick a version available on NuGet ---
+        idx_url = "https://api.nuget.org/v3-flatcontainer/python/index.json"
+        with urllib.request.urlopen(idx_url, timeout=30) as r:
+            versions = json.load(r).get("versions", [])
+        if exact in versions:
+            chosen = exact
+        else:
+            def _vkey(v):
+                parts = []
+                for p in v.split("-")[0].split("."):
+                    parts.append(int(p) if p.isdigit() else 0)
+                return parts
+            cand = sorted((v for v in versions if v.startswith(mm + ".") and "-" not in v),
+                          key=_vkey)
+            chosen = cand[-1] if cand else None
+        if not chosen:
+            on_line(f"PALLAIDIUM headers: no NuGet python package for {mm}.* — aborting")
+            on_line("  Manual fix: https://github.com/tin2tin/Pallaidium#triton-windows")
+            return False
+        if chosen != exact:
+            on_line(f"PALLAIDIUM headers: exact {exact} unavailable, using NuGet python {chosen}")
+
+        nupkg_url = f"https://api.nuget.org/v3-flatcontainer/python/{chosen}/python.{chosen}.nupkg"
+        on_line(f"PALLAIDIUM headers: downloading {nupkg_url} ...")
+
+        os.makedirs(include_dir, exist_ok=True)
+        os.makedirs(libs_dir, exist_ok=True)
+
+        with tempfile.TemporaryDirectory(prefix="pallaidium_pywin_") as tmp:
+            nupkg_path = os.path.join(tmp, "python.nupkg")
+
+            def _reporthook(count, block, total):
+                if total > 0 and count % 400 == 0:
+                    mb = count * block / 1_048_576
+                    on_line(f"PALLAIDIUM headers: downloaded {mb:.1f} MB / {total/1_048_576:.1f} MB")
+            urllib.request.urlretrieve(nupkg_url, nupkg_path, reporthook=_reporthook)
+            on_line("PALLAIDIUM headers: download complete, extracting dev files ...")
+
+            inc_copied = lib_copied = 0
+            with zipfile.ZipFile(nupkg_path) as zf:
+                for member in zf.namelist():
+                    norm = member.replace("\\", "/")
+                    low  = norm.lower()
+                    if norm.endswith("/"):
+                        continue
+                    if low.startswith("tools/include/"):
+                        rel = norm[len("tools/include/"):]
+                        dst = os.path.join(include_dir, *rel.split("/"))
+                        os.makedirs(os.path.dirname(dst), exist_ok=True)
+                        with zf.open(member) as src, open(dst, "wb") as out:
+                            shutil.copyfileobj(src, out)
+                        inc_copied += 1
+                    elif low.startswith("tools/libs/") and low.endswith(".lib"):
+                        dst = os.path.join(libs_dir, os.path.basename(norm))
+                        with zf.open(member) as src, open(dst, "wb") as out:
+                            shutil.copyfileobj(src, out)
+                        lib_copied += 1
+
+            on_line(f"PALLAIDIUM headers: copied {inc_copied} header files, {lib_copied} import libs")
+
+        if os.path.exists(python_h) and os.path.exists(import_lib):
+            on_line(f"PALLAIDIUM headers: dev files installed (Include + {lib_name})")
+            return True
+        on_line("PALLAIDIUM headers: expected files missing after extract — aborting")
+        return False
+
+    except Exception as exc:
+        on_line(f"PALLAIDIUM headers: failed — {exc}")
+        on_line("  Manual fix: install Python 3.13 and copy libs/python313.lib + include/ "
+                "into Blender's python folder")
+        return False
+
+
 def _run_install(snapshot: dict, cancel_event: threading.Event):
     import sys, traceback, platform as _plat
     state     = _dep_state
@@ -348,10 +460,16 @@ def _run_install(snapshot: dict, cancel_event: threading.Event):
         batch_output_lines.append(line)
 
     try:
-        # Linux pre-flight: ensure Python.h is present so compiled extensions work
+        # Pre-flight: ensure Python dev files are present so JIT-compiled
+        # extensions (Triton, etc.) can link against the embedded Python.
         if _plat.system() == "Linux":
             state["phase"] = "Checking Python headers..."
             _ensure_python_headers_linux(on_line)
+            if cancel_event.is_set():
+                return
+        elif _plat.system() == "Windows":
+            state["phase"] = "Checking Python headers..."
+            _ensure_python_headers_windows(on_line)
             if cancel_event.is_set():
                 return
 

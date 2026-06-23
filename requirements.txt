@@ -98,6 +98,7 @@ jaxlib==0.8.1
 onnx==1.19.1
 torchsde==0.2.6
 torchcodec==0.8.1
+triton-windows==3.7.1.post27  # Windows-only; Triton JIT kernels (needs python313.lib + Include, provisioned at install time)
 
 # --- Audio Codecs & Tools ---
 faster-whisper

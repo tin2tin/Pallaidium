@@ -31,12 +31,130 @@ os.environ.setdefault("HF_DEACTIVATE_ASYNC_LOAD", "1")
 # keeps it overridable.
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
-# NOTE: do NOT force SDNQ_USE_TORCH_COMPILE=1 here. SDNQ's torch.compile path
-# needs Triton to JIT a CUDA driver shim, which requires Python dev headers
-# (Python.h) + python313.lib that Blender's embedded Python does not ship — the
-# build fails ("'Python.h' file not found") and aborts generation. SDNQ's own
-# has_triton() self-test correctly detects this and falls back to eager dequant,
-# so leave it to auto-detect (works on machines that do have a usable Triton).
+
+def _find_msvc_cl():
+    """Return the path to the highest-version MSVC cl.exe, or None.
+
+    Locates it via vswhere (authoritative for VS / Build Tools) then falls back
+    to globbing the default Program Files install layout. Never raises.
+    """
+    import glob as _glob
+    import subprocess as _sp
+    pf86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+    pf64 = os.environ.get("ProgramW6432", r"C:\Program Files")
+    candidates = []
+    vswhere = os.path.join(pf86, "Microsoft Visual Studio", "Installer", "vswhere.exe")
+    if os.path.exists(vswhere):
+        try:
+            inst = _sp.run(
+                [vswhere, "-latest", "-prerelease", "-products", "*",
+                 "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+                 "-property", "installationPath"],
+                capture_output=True, text=True, timeout=15,
+            ).stdout.strip()
+        except Exception:
+            inst = ""
+        if inst:
+            candidates += _glob.glob(os.path.join(
+                inst, "VC", "Tools", "MSVC", "*", "bin", "Hostx64", "x64", "cl.exe"))
+    if not candidates:
+        for pf in (pf64, pf86):
+            candidates += _glob.glob(os.path.join(
+                pf, "Microsoft Visual Studio", "*", "*",
+                "VC", "Tools", "MSVC", "*", "bin", "Hostx64", "x64", "cl.exe"))
+    candidates = [c for c in candidates if os.path.exists(c)]
+    return sorted(candidates)[-1] if candidates else None
+
+
+def _configure_triton_build():
+    """Either enable Triton's JIT via MSVC, or fully disable build-dependent
+    fast paths so an incomplete toolchain degrades to eager instead of crashing.
+
+    Installing `triton-windows` (via requirements.txt) makes `import triton`
+    succeed on Windows. That alone is unsafe: code that probes `has_triton()`
+    may then attempt a JIT build that fails at *runtime* when any of these is
+    missing —
+      - a usable compiler: Triton picks clang.exe off PATH, but clang treats the
+        positional `.lib` args Triton emits (cuda.lib / python3xy.lib) as CWD
+        input files (it only searches -L for -l flags) → link error. Only MSVC's
+        cl.exe searches /LIBPATH: for positional .lib names and works unaided.
+      - Python dev files (Python.h + python3xy.lib) in Blender's embedded Python,
+        provisioned at install by operators/system.py::_ensure_python_headers_windows
+        (absent if that download failed or deps were never installed).
+      - CUDA dev lib (cuda.lib) from an installed CUDA Toolkit.
+
+    Windows only; never raises. CUDA-centric (ROCm/CPU machines fall to the safe
+    "disabled" branch, i.e. eager — never a crash). All env writes use setdefault
+    so an advanced user can override every decision.
+    """
+    import sys
+    if sys.platform != "win32":
+        return  # Linux/macOS: gcc/clang build normally; don't touch their compile paths
+    try:
+        import sysconfig as _sc
+        import glob as _glob
+
+        pf86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+        pf64 = os.environ.get("ProgramW6432", r"C:\Program Files")
+
+        # 1. Compiler: respect an explicit/dev-prompt CC, else find MSVC cl.exe.
+        cc = os.environ.get("CC") or _find_msvc_cl()
+
+        # 2. Python dev files (provisioned at install time).
+        inc = _sc.get_path("include")
+        ver = f"{sys.version_info.major}{sys.version_info.minor}"
+        has_py_h   = bool(inc) and os.path.exists(os.path.join(inc, "Python.h"))
+        has_py_lib = os.path.exists(os.path.join(sys.base_prefix, "libs", f"python{ver}.lib"))
+
+        # 3. CUDA dev lib (cuda.lib) from a CUDA Toolkit install.
+        def _has_cuda_lib():
+            for var in ("CUDA_PATH", "CUDA_HOME"):
+                p = os.environ.get(var)
+                if p and os.path.exists(os.path.join(p, "lib", "x64", "cuda.lib")):
+                    return True
+            for pf in (pf64, pf86):
+                if _glob.glob(os.path.join(pf, "NVIDIA GPU Computing Toolkit",
+                                           "CUDA", "v*", "lib", "x64", "cuda.lib")):
+                    return True
+            return False
+        has_cuda_lib = _has_cuda_lib()
+
+        buildable = bool(cc) and has_py_h and has_py_lib and has_cuda_lib
+
+        if buildable:
+            # Steer Triton onto MSVC and make link.exe + toolchain DLLs resolvable.
+            if not os.environ.get("CC"):
+                os.environ["CC"] = cc
+                os.environ["PATH"] = os.path.dirname(cc) + os.pathsep + os.environ.get("PATH", "")
+            print(f"PALLAIDIUM: Triton JIT enabled — compiling with MSVC ({cc})", flush=True)
+        else:
+            # Incomplete toolchain → disable every build-dependent fast path so a
+            # missing element can only cost speed, never crash a generation.
+            os.environ.setdefault("TORCHDYNAMO_DISABLE", "1")   # torch.compile → eager no-op
+            os.environ.setdefault("SDNQ_USE_TORCH_COMPILE", "0")
+            os.environ.setdefault("SDNQ_USE_TRITON_MM", "0")    # direct Triton matmul kernels off
+            missing = []
+            if not cc:           missing.append("MSVC cl.exe")
+            if not has_py_h:     missing.append("Python.h")
+            if not has_py_lib:   missing.append(f"python{ver}.lib")
+            if not has_cuda_lib: missing.append("cuda.lib (CUDA Toolkit)")
+            print("PALLAIDIUM: Triton JIT disabled, using eager fallback — missing: "
+                  + ", ".join(missing) + " (reinstall deps and/or install MSVC + CUDA Toolkit to enable)",
+                  flush=True)
+    except Exception as exc:
+        # Last-ditch safety net: if the probe itself failed, assume not buildable
+        # and disable rather than risk a runtime compile crash.
+        for _k, _v in (("TORCHDYNAMO_DISABLE", "1"),
+                       ("SDNQ_USE_TORCH_COMPILE", "0"),
+                       ("SDNQ_USE_TRITON_MM", "0")):
+            try:
+                os.environ.setdefault(_k, _v)
+            except Exception:
+                pass
+        print(f"PALLAIDIUM: Triton build-env probe failed, JIT disabled — {exc}", flush=True)
+
+
+_configure_triton_build()
 
 from .utils.helpers import load_styles, filter_updated, input_strips_updated, get_enum_items, update_folder_callback
 # from .utils.helpers import *
