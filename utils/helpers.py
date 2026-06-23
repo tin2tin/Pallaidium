@@ -1266,9 +1266,19 @@ class DependencyManager:
 
     # for installing branch: git+https://github.com/huggingface/diffusers.git@ltx2-i2v-lora-mixin-fix
 
+    def get_phase_diffusers_git(self):
+        """diffusers, always pulled fresh from git.
+
+        Returned as its own phase so GENERATOR_OT_install can force-reinstall it on
+        every "Install Dependencies" press (bypassing the normal skip-if-present
+        logic). The newest model plugins (e.g. Krea2) need classes from diffusers
+        main, and a plain --upgrade no-ops against an already-installed .dev0 build.
+        To pin a branch: git+https://github.com/huggingface/diffusers.git@branch-name
+        """
+        return ["git+https://github.com/huggingface/diffusers.git"]
+
     def get_phase_3_git_and_extensions(self):
         reqs = [
-            "git+https://github.com/huggingface/diffusers.git",
             #"git+https://github.com/SWivid/F5-TTS.git",
             "faster-qwen3-tts",
             #"git+https://github.com/QwenLM/Qwen3-TTS.git",

@@ -482,7 +482,7 @@ def _run_install(snapshot: dict, cancel_event: threading.Event):
         if cancel_event.is_set():
             return
 
-        for phase_name, only_binary, lines in batches:
+        for phase_name, only_binary, force_reinstall, lines in batches:
             BATCH_SIZE = 5
             for i in range(0, len(lines), BATCH_SIZE):
                 if cancel_event.is_set():
@@ -509,6 +509,8 @@ def _run_install(snapshot: dict, cancel_event: threading.Event):
                 ]
                 if only_binary:
                     cmd.insert(-2, "--only-binary=:all:")
+                if force_reinstall:
+                    cmd.insert(-2, "--force-reinstall")
 
                 success = run_pip_streaming(cmd, on_line=on_line, cancel_event=cancel_event)
                 if os.path.exists(temp_req):
@@ -681,7 +683,7 @@ class GENERATOR_OT_install(Operator):
             safe = BlenderInternalManager.filter_list(raw)
             lines = safe if self.force_reinstall else SmartSkipManager.filter_existing(safe)
             if lines:
-                batches.append(("Base", _use_binary_only, lines))
+                batches.append(("Base", _use_binary_only, False, lines))
 
         for phase_name, phase_lines in [
             ("SourceLibs", mgr.get_phase_1_5_source_libs()),
@@ -691,7 +693,15 @@ class GENERATOR_OT_install(Operator):
             safe = BlenderInternalManager.filter_list(phase_lines)
             lines = safe if self.force_reinstall else SmartSkipManager.filter_existing(safe)
             if lines:
-                batches.append((phase_name, False, lines))
+                batches.append((phase_name, False, False, lines))
+
+        # diffusers: always installed with --force-reinstall on every press, so the
+        # latest diffusers main lands even when an older .dev0 build is present (a
+        # plain --upgrade no-ops against an equal version string, and the git URL
+        # would otherwise be skipped as "already installed"). Bypasses filter_existing.
+        diffusers_lines = BlenderInternalManager.filter_list(mgr.get_phase_diffusers_git())
+        if diffusers_lines:
+            batches.append(("Diffusers", False, True, diffusers_lines))
 
         # Linux: thinc/spacy must be installed as binary wheels (Python 3.13 Cython compat)
         if _plat.system() == "Linux":
@@ -699,9 +709,9 @@ class GENERATOR_OT_install(Operator):
             safe_bin = BlenderInternalManager.filter_list(linux_bin)
             bin_lines = safe_bin if self.force_reinstall else SmartSkipManager.filter_existing(safe_bin)
             if bin_lines:
-                batches.append(("LinuxBinary", True, bin_lines))
+                batches.append(("LinuxBinary", True, False, bin_lines))
 
-        total_pkgs = sum(len(b[2]) for b in batches)
+        total_pkgs = sum(len(b[3]) for b in batches)
 
         _dep_cancel_event.clear()
         _dep_failed_batches.clear()

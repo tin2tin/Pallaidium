@@ -59,6 +59,17 @@ try:
             default="",
             options={"HIDDEN"},
         )
+    if not hasattr(_bpy.types.Scene, "marlin_speed"):
+        _bpy.types.Scene.marlin_speed = _bpy.props.EnumProperty(
+            name="Speed",
+            description="Quality vs speed — lower frame resolution / token budget runs faster",
+            items=[
+                ("QUALITY",  "Quality",  "Higher frame resolution, full caption length"),
+                ("BALANCED", "Balanced", "Default frame resolution and caption length"),
+                ("FAST",     "Fast",     "Lower frame resolution and shorter captions"),
+            ],
+            default="BALANCED",
+        )
 except Exception:
     pass
 
@@ -224,7 +235,10 @@ class MarlinVideoCaptionsPlugin(ModelPlugin):
             bnb_4bit_use_double_quant=True,
         )
 
-        # Loading loop prioritizing SDNQ and SDPA for Windows/Blender stability.
+        # Loading loop prioritizing SDNQ + SDPA for Windows/Blender stability.
+        # NOTE: FlashAttention-2 was tried as the preferred path but ran ~5-10x
+        # SLOWER on this Windows/torch-2.9.1 build (562s vs. seconds for a short
+        # clip), so SDPA stays first — do not re-add flash_attention_2 here.
         for attempt_kwargs in [
             dict(trust_remote_code=True, quantization_config=sdnq_config,
                  torch_dtype=torch.float16, attn_implementation="sdpa",
@@ -256,7 +270,8 @@ class MarlinVideoCaptionsPlugin(ModelPlugin):
 
                 _ = marlin.processor
                 sdnq_used = "quantization_config" in attempt_kwargs and isinstance(attempt_kwargs["quantization_config"], SDNQConfig)
-                used = f"SDPA+{'SDNQ-int8' if sdnq_used else 'fallback'}"
+                _attn = attempt_kwargs.get("attn_implementation", "?")
+                used = f"{_attn}+{'SDNQ-int8' if sdnq_used else 'fallback'}"
                 print(f"Marlin: loaded ({used})")
                 return {"model": marlin}
             except Exception as e:
@@ -267,7 +282,8 @@ class MarlinVideoCaptionsPlugin(ModelPlugin):
 
     def draw_custom_ui(self, col, context) -> bool:
         scene = context.scene
-        col.prop(scene, "marlin_mode", expand=True)
+        col.prop(scene, "marlin_mode", text="Mode")
+        col.prop(scene, "marlin_speed", text="Speed")
         if scene.marlin_mode == "FIND":
             col.prop(scene, "marlin_find_query", text="Find")
         return False
@@ -409,11 +425,24 @@ class MarlinVideoCaptionsPlugin(ModelPlugin):
             clip_start = 0.0
 
         clip_end = clip_start + trim_dur_s
-        max_frames  = str(int(trim_dur_s * _SAMPLE_FPS) + 4)
-        cap_new_tok = max(768, int(trim_dur_s * 15))
 
-        _prev_max_frames = os.environ.get("FPS_MAX_FRAMES")
-        os.environ["FPS_MAX_FRAMES"] = max_frames
+        # Quality/speed preset: scale frame resolution (the dominant prefill
+        # cost — vision tokens grow ~quadratically with resolution) and the
+        # caption token floor. BALANCED reproduces the prior hardcoded defaults.
+        _speed = getattr(scene, "marlin_speed", "BALANCED")
+        _video_max_pixels, _tok_floor = {
+            "QUALITY":  (200704, 768),
+            "BALANCED": (100352, 768),
+            "FAST":     (50176,  512),
+        }.get(_speed, (100352, 768))
+
+        max_frames  = str(int(trim_dur_s * _SAMPLE_FPS) + 4)
+        cap_new_tok = max(_tok_floor, int(trim_dur_s * 15))
+
+        _prev_max_frames   = os.environ.get("FPS_MAX_FRAMES")
+        _prev_video_pixels = os.environ.get("VIDEO_MAX_PIXELS")
+        os.environ["FPS_MAX_FRAMES"]   = max_frames
+        os.environ["VIDEO_MAX_PIXELS"] = str(_video_max_pixels)
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -459,6 +488,10 @@ class MarlinVideoCaptionsPlugin(ModelPlugin):
                 os.environ.pop("FPS_MAX_FRAMES", None)
             else:
                 os.environ["FPS_MAX_FRAMES"] = _prev_max_frames
+            if _prev_video_pixels is None:
+                os.environ.pop("VIDEO_MAX_PIXELS", None)
+            else:
+                os.environ["VIDEO_MAX_PIXELS"] = _prev_video_pixels
             if _tmp_path:
                 try:
                     os.remove(_tmp_path)
