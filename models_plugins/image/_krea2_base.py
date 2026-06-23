@@ -5,7 +5,7 @@ from ...utils.helpers import gfx_device, low_vram
 
 
 class Krea2BasePlugin(ModelPlugin):
-    MODEL_ID     = "CalamitousFelicitousness/Krea-2-Base-Diffusers"
+    MODEL_ID     = "ethanfel/Krea-2-Base-Diffusers"
     DISPLAY_NAME = "Image: Krea 2"
     DESCRIPTION  = "High-quality text-to-image via Krea 2 (12.9B MMDiT, CFG-guided)"
     MODEL_TYPE   = "image"
@@ -39,17 +39,22 @@ class Krea2BasePlugin(ModelPlugin):
         q_t = DBnB(load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=dtype)
         q_e = TBnB(load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=dtype)
 
-        # Use device_map="cpu" rather than a chained .to("cpu"): for bnb on-the-fly
-        # 4-bit loading, from_pretrained dispatches via accelerate and a follow-up
-        # .to() raises "Cannot copy out of meta tensor". This mirrors the Klein path.
+        # On-the-fly bnb quant: use a chained .to("cpu"), NOT device_map="cpu".
+        # With device_map="cpu", accelerate quantizes each weight on the CPU via
+        # bitsandbytes' pure-PyTorch default backend, whose argmin step allocates
+        # multi-GB temporaries per shard (OOM/crash, ~132 s/it). .to("cpu") leaves
+        # the params unquantized on CPU and defers quantization to the fast native
+        # CUDA kernel when enable_model_cpu_offload moves each module to the GPU.
+        # (Klein uses device_map="cpu" safely only because its repos are PRE-
+        # quantized — no kernel runs there. This mirrors the Qwen-Image img2img path.)
         transformer = Krea2Transformer2DModel.from_pretrained(
             self.MODEL_ID, subfolder="transformer", quantization_config=q_t,
-            torch_dtype=dtype, device_map="cpu", cache_dir=_cache_dir, local_files_only=_lfo,
-        )
+            torch_dtype=dtype, cache_dir=_cache_dir, local_files_only=_lfo,
+        ).to("cpu")
         text_encoder = Qwen3VLModel.from_pretrained(
             self.MODEL_ID, subfolder="text_encoder", quantization_config=q_e,
-            torch_dtype=dtype, device_map="cpu", cache_dir=_cache_dir, local_files_only=_lfo,
-        )
+            torch_dtype=dtype, cache_dir=_cache_dir, local_files_only=_lfo,
+        ).to("cpu")
         pipe = Krea2Pipeline.from_pretrained(
             self.MODEL_ID, transformer=transformer, text_encoder=text_encoder,
             torch_dtype=dtype, cache_dir=_cache_dir, local_files_only=_lfo,
