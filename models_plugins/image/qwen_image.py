@@ -64,26 +64,60 @@ class QwenImagePlugin(ModelPlugin):
                 cache_dir=_cache_dir, local_files_only=_lfo,
             )
 
-        pipe.load_lora_weights(
-            "Wuli-Art/Qwen-Image-2512-Turbo-LoRA",
-            weight_name="Wuli-Qwen-Image-2512-Turbo-LoRA-4steps-V1.0-bf16.safetensors",
-        )
-        # Apply user LoRAs
+        # Lightning distillation LoRA → 4-step inference. Version-matched to
+        # Qwen-Image-2512 and stored with diffusers-native keys (transformer.
+        # prefix), so it attaches cleanly — unlike the Wuli turbo LoRA, whose
+        # ComfyUI-style keys matched zero transformer params and left output
+        # undercooked. Name it as an adapter and include it in set_adapters below
+        # so it STAYS active when the user also enables their own LoRAs (a bare
+        # load with no adapter_name gets dropped the moment set_adapters()
+        # activates only the user names). Runs CFG-free (guidance_scale=1.0).
+        _lora_names, _lora_weights = [], []
+        try:
+            pipe.load_lora_weights(
+                "lightx2v/Qwen-Image-2512-Lightning",
+                weight_name="Qwen-Image-2512-Lightning-4steps-V1.0-bf16.safetensors",
+                adapter_name="lightning",
+                cache_dir=_cache_dir,
+                local_files_only=_lfo,
+            )
+            _lora_names.append("lightning")
+            _lora_weights.append(1.0)
+        except Exception as e:
+            print(f"Qwen Image 2512: Lightning LoRA unavailable ({e}); "
+                  "raise steps for usable results.")
+
+        # Apply user LoRAs on top of Turbo
         enabled_items = kw.get("enabled_items", [])
         if enabled_items:
             from ...utils.helpers import clean_filename, bpy
             lora_folder = getattr(bpy.context.scene, "lora_folder", "")
-            names, weights = [], []
             for item in enabled_items:
                 name = clean_filename(item.name).replace(".", "")
-                names.append(name)
-                weights.append(item.weight_value)
                 pipe.load_lora_weights(
                     bpy.path.abspath(lora_folder),
                     weight_name=item.name + ".safetensors",
                     adapter_name=name,
                 )
-            pipe.set_adapters(names, adapter_weights=weights)
+                _lora_names.append(name)
+                _lora_weights.append(item.weight_value)
+
+        # Only activate adapters that actually registered. Loading a LoRA onto
+        # the bnb-4bit transformer can no-op on the PEFT adapter registry without
+        # raising (key/prefix mismatch), which would make set_adapters() fail on
+        # a name that isn't present. Intersect our intended names with what the
+        # pipe reports so this never crashes and still stacks whatever did load.
+        if _lora_names:
+            _present = set()
+            try:
+                for _v in pipe.get_list_adapters().values():
+                    _present.update(_v)
+            except Exception:
+                pass
+            _active = [(n, w) for n, w in zip(_lora_names, _lora_weights) if n in _present]
+            if _active:
+                pipe.set_adapters([n for n, _ in _active],
+                                  adapter_weights=[w for _, w in _active])
 
         if gfx_device == "mps":
             pipe.to("mps")

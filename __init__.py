@@ -31,6 +31,13 @@ os.environ.setdefault("HF_DEACTIVATE_ASYNC_LOAD", "1")
 # keeps it overridable.
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
+# NOTE: do NOT force SDNQ_USE_TORCH_COMPILE=1 here. SDNQ's torch.compile path
+# needs Triton to JIT a CUDA driver shim, which requires Python dev headers
+# (Python.h) + python313.lib that Blender's embedded Python does not ship — the
+# build fails ("'Python.h' file not found") and aborts generation. SDNQ's own
+# has_triton() self-test correctly detects this and falls back to eager dequant,
+# so leave it to auto-detect (works on machines that do have a usable Triton).
+
 from .utils.helpers import load_styles, filter_updated, input_strips_updated, get_enum_items, update_folder_callback
 # from .utils.helpers import *
 from .properties import *

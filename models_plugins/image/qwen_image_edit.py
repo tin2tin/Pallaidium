@@ -16,7 +16,7 @@ class QwenImageEditPlugin(ModelPlugin):
         UISection.PROMPT, UISection.NEG_PROMPT, UISection.MULTI_IMAGES,
         UISection.RESOLUTION, UISection.FRAMES, UISection.STEPS, UISection.SEED, UISection.LORA,
     ]
-    PARAMS       = ParamSpec(steps=50, max_multi_images=3)
+    PARAMS       = ParamSpec(steps=4, max_multi_images=3)
     REQUIRED_PACKAGES          = ["torch", "diffusers", "transformers", "sdnq"]
     supports_inpaint           = False
     supports_img2img           = True
@@ -35,7 +35,7 @@ class QwenImageEditPlugin(ModelPlugin):
         # Import sdnq before from_pretrained so it can register its quantization
         # backend with transformers — without this transformers warns and skips it.
         _apply_sdnq = None
-        _triton_ok = False
+        _triton_ok = False 
         try:
             from sdnq import SDNQConfig  # noqa: F401 — registers quantization backend
             from sdnq.common import use_torch_compile as _triton_ok
@@ -53,13 +53,24 @@ class QwenImageEditPlugin(ModelPlugin):
             cache_dir=_cache_dir,
             local_files_only=_lfo,
         )
-        transformer = QwenImageTransformer2DModel.from_pretrained(
-            self.QUANT_ID,
-            subfolder="transformer",
-            torch_dtype=dtype,
-            device_map="cpu",
-            cache_dir=_cache_dir,
-            local_files_only=_lfo,
+        # Heavy SDNQ transformer: diffusers' from_pretrained(device_map="cpu")
+        # faults with EXCEPTION_ACCESS_VIOLATION when materializing safetensors
+        # shards on the queue worker thread (torch_cpu storage.__getitem__ is not
+        # safe off the main thread in Blender's bundled build — diffusers does not
+        # honor HF_DEACTIVATE_ASYNC_LOAD, unlike transformers, which is why the
+        # text_encoder above loads fine off-thread but this did not). SDNQ's own
+        # synchronous loader avoids that path — same fix the LTX-2.3 plugins use.
+        import os as _os
+        from huggingface_hub import snapshot_download as _snap
+        from sdnq.loader import load_sdnq_model as _load_sdnq
+        _sdnq_transformer_path = _os.path.join(
+            _snap(self.QUANT_ID, cache_dir=_cache_dir, local_files_only=_lfo),
+            "transformer",
+        )
+        transformer = _load_sdnq(
+            model_path=_sdnq_transformer_path,
+            model_cls=QwenImageTransformer2DModel,
+            dtype=dtype, device="cpu",
         )
 
         pipe = QwenImageEditPlusPipeline.from_pretrained(
@@ -75,22 +86,45 @@ class QwenImageEditPlugin(ModelPlugin):
             pipe.transformer  = _apply_sdnq(pipe.transformer,  use_quantized_matmul=True)
             pipe.text_encoder = _apply_sdnq(pipe.text_encoder, use_quantized_matmul=True)
 
-        # Apply user LoRAs
+        # Lightning distillation LoRA → 4-step inference (~10x fewer steps than
+        # the stock 40-50). It is CFG-distilled, so generate() MUST run with true
+        # CFG disabled (true_cfg_scale=1.0). Kept as an adapter — never fused,
+        # since the base transformer is uint4-quantized. On download failure we
+        # fall back to full-step inference so the plugin still works offline.
+        _lora_names, _lora_weights = [], []
+        _lightning_ok = False
+        try:
+            pipe.load_lora_weights(
+                "lightx2v/Qwen-Image-Edit-2511-Lightning",
+                weight_name="Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+                adapter_name="lightning",
+                cache_dir=_cache_dir,
+                local_files_only=_lfo,
+            )
+            _lora_names.append("lightning")
+            _lora_weights.append(1.0)
+            _lightning_ok = True
+        except Exception as e:
+            print(f"Qwen Image Edit: Lightning LoRA unavailable ({e}); "
+                  "falling back to full-step inference.")
+
+        # Apply user LoRAs on top of Lightning
         enabled_items = kw.get("enabled_items", [])
         if enabled_items:
             from ...utils.helpers import clean_filename, bpy
             lora_folder = getattr(bpy.context.scene, "lora_folder", "")
-            names, weights = [], []
             for item in enabled_items:
                 name = clean_filename(item.name).replace(".", "")
-                names.append(name)
-                weights.append(item.weight_value)
                 pipe.load_lora_weights(
                     bpy.path.abspath(lora_folder),
                     weight_name=item.name + ".safetensors",
                     adapter_name=name,
                 )
-            pipe.set_adapters(names, adapter_weights=weights)
+                _lora_names.append(name)
+                _lora_weights.append(item.weight_value)
+
+        if _lora_names:
+            pipe.set_adapters(_lora_names, adapter_weights=_lora_weights)
 
         if gfx_device == "mps":
             pipe.to("mps")
@@ -99,7 +133,13 @@ class QwenImageEditPlugin(ModelPlugin):
             pipe.vae.enable_tiling()
         else:
             pipe.enable_model_cpu_offload()
-        return {"pipe": pipe, "converter": None, "refiner": None, "preprocessor": None}
+            # Enable VAE tiling on the normal path too (not just low-VRAM): the
+            # final full-size decode of a multi-image composition allocates a
+            # large activation tensor that can fault in c10 at the end of the
+            # run. Tiling caps that peak with negligible quality/speed cost.
+            pipe.vae.enable_tiling()
+        return {"pipe": pipe, "converter": None, "refiner": None,
+                "preprocessor": None, "lightning": _lightning_ok}
 
     def draw_custom_ui(self, col, context) -> bool:
         scene = context.scene
@@ -150,13 +190,16 @@ class QwenImageEditPlugin(ModelPlugin):
                 "or pick strips using the image pickers below."
             )
 
+        # Lightning LoRA is CFG-distilled → disable true CFG (this also skips the
+        # negative-prompt pass entirely, ~2x). Fall back to 4.0 if Lightning is off.
+        _true_cfg = 1.0 if pipe_obj.get("lightning") else 4.0
         self.set_phase(inputs, "Generating")
         with torch.inference_mode():
             return pipe(
                 image=qwen_images,
                 prompt=inputs.prompt,
                 generator=generator,
-                true_cfg_scale=4.0,
+                true_cfg_scale=_true_cfg,
                 negative_prompt=inputs.neg_prompt + " ",
                 num_inference_steps=inputs.steps,
                 height=inputs.height,
