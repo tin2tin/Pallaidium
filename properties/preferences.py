@@ -51,22 +51,22 @@ from ..utils.helpers import *
 
 def _video_enum_items(self, context):
     from ..models import get_enum_items
-    return get_enum_items("video")
+    return get_enum_items("video", getattr(self, "model_source", "LOCAL"))
 
 
 def _image_enum_items(self, context):
     from ..models import get_enum_items
-    return get_enum_items("image")
+    return get_enum_items("image", getattr(self, "model_source", "LOCAL"))
 
 
 def _audio_enum_items(self, context):
     from ..models import get_enum_items
-    return get_enum_items("audio")
+    return get_enum_items("audio", getattr(self, "model_source", "LOCAL"))
 
 
 def _text_enum_items(self, context):
     from ..models import get_enum_items
-    return get_enum_items("text")
+    return get_enum_items("text", getattr(self, "model_source", "LOCAL"))
 
 
 # Update wrappers: persist the selected MODEL_ID string alongside the enum
@@ -186,6 +186,33 @@ class GeneratorAddonPreferences(AddonPreferences):
         name="Google Gemini API Key",
         description="API key for Google Gemini cloud models (Nano Banana image, Veo video). "
                     "Falls back to the GEMINI_API_KEY environment variable if left empty.",
+        default="",
+        subtype="PASSWORD",
+    )
+    # ---- Remote backend (OpenAI-/v1-dialect Backend Contract) -------------
+    model_source: EnumProperty(
+        name="Model Source",
+        description="Which models appear in the dropdowns: locally-run, remote "
+                    "backend, or both. Defaults to Local — remote needs a URL "
+                    "below and a Refresh",
+        items=[
+            ("LOCAL",  "Local",          "Only models that run locally in Blender"),
+            ("REMOTE", "Remote",         "Only models served by the remote backend"),
+            ("BOTH",   "Local & Remote", "Both local and remote models"),
+        ],
+        default="LOCAL",
+    )
+    remote_backend_url: bpy.props.StringProperty(
+        name="Remote Backend URL",
+        description="Base URL of an OpenAI-/v1-dialect generation backend "
+                    "(e.g. http://localhost:8000). Falls back to the "
+                    "PALLAIDIUM_BACKEND_URL environment variable if left empty",
+        default="",
+    )
+    remote_backend_key: bpy.props.StringProperty(
+        name="Remote Backend Key",
+        description="Optional API key for the remote backend. Falls back to the "
+                    "PALLAIDIUM_BACKEND_KEY environment variable if left empty",
         default="",
         subtype="PASSWORD",
     )
@@ -319,6 +346,19 @@ class GeneratorAddonPreferences(AddonPreferences):
         row.operator(
             "wm.url_open", text="", icon="URL"
         ).url = "https://aistudio.google.com/apikey"
+
+        # ---- Remote backend ----------------------------------------------
+        rb = box.box()
+        rb.label(text="Remote Backend (OpenAI-/v1-dialect)", icon="WORLD")
+        rb.prop(self, "model_source")
+        if self.model_source in {"REMOTE", "BOTH"}:
+            rb.prop(self, "remote_backend_url")
+            rb.prop(self, "remote_backend_key")
+            rb.operator(
+                "pallaidium.refresh_remote_models",
+                text="Refresh Remote Models", icon="FILE_REFRESH",
+            )
+
         box.prop(self, "generator_ai")
         box.prop(self, "hf_cache_dir")
         row = box.row(align=True)
@@ -351,3 +391,50 @@ class GeneratorAddonPreferences(AddonPreferences):
         row_row.label(text="")
         row_row.label(text="")
         row_row.label(text="")
+
+
+class PALLAIDIUM_OT_refresh_remote_models(Operator):
+    """Query the remote backend's /v1/models and load them into the dropdowns."""
+    bl_idname = "pallaidium.refresh_remote_models"
+    bl_label = "Refresh Remote Models"
+    bl_description = ("Connect to the configured remote backend, fetch its model "
+                      "list, and make those models selectable in the dropdowns")
+
+    def execute(self, context):
+        from ..utils.remote_backend import client_from_prefs, RemoteBackendError
+        from ..models import register_remote_models
+
+        prefs = context.preferences.addons[ADDON_ID].preferences
+        try:
+            client = client_from_prefs(prefs)
+            client.check_compatible()
+            entries = client.models()
+        except RemoteBackendError as e:
+            self.report({'ERROR'}, f"Remote backend: {e}")
+            return {'CANCELLED'}
+        except Exception as e:  # noqa: BLE001 — surface any failure cleanly
+            self.report({'ERROR'}, f"Remote backend error: {e}")
+            return {'CANCELLED'}
+
+        count = register_remote_models(entries, prefs)
+        if count == 0:
+            self.report({'WARNING'}, "Backend returned no models.")
+        else:
+            # Auto-select the first available model in each dropdown so the
+            # enums are populated immediately (avoids the "matches no enum"
+            # fallback warning when the previous selection is gone).
+            from ..models import get_enum_items
+            for media_type, prop in (
+                ("video", "movie_model_card"),
+                ("image", "image_model_card"),
+                ("audio", "audio_model_card"),
+                ("text", "text_model_card"),
+            ):
+                try:
+                    items = get_enum_items(media_type, getattr(prefs, "model_source", "LOCAL"))
+                    if items:
+                        setattr(prefs, prop, items[0][0])
+                except Exception:  # noqa: BLE001 — selection is best-effort
+                    pass
+            self.report({'INFO'}, f"Loaded {count} remote model(s).")
+        return {'FINISHED'}

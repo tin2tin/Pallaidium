@@ -42,6 +42,10 @@ from .base import ModelPlugin, UISection, InputSpec, ParamSpec
 
 PLUGIN_REGISTRY: dict[str, ModelPlugin] = {}
 
+# MODEL_ID -> "local" | "remote".  Lets get_enum_items() filter the dropdowns by
+# the user's Local / Remote / Local&Remote preference.
+_PLUGIN_ORIGIN: dict[str, str] = {}
+
 _ENUM_ITEMS: dict[str, list] = {
     "video": [],
     "image": [],
@@ -189,6 +193,7 @@ def discover(plugins_dir: Path = _PLUGINS_DIR) -> None:
     Safe to call again to reload during development.
     """
     PLUGIN_REGISTRY.clear()
+    _PLUGIN_ORIGIN.clear()
     for v in _ENUM_ITEMS.values():
         v.clear()
 
@@ -217,6 +222,7 @@ def discover(plugins_dir: Path = _PLUGINS_DIR) -> None:
                 continue
 
             PLUGIN_REGISTRY[inst.MODEL_ID] = inst
+            _PLUGIN_ORIGIN[inst.MODEL_ID] = "local"
 
             media_type = inst.MODEL_TYPE
             if media_type in _ENUM_ITEMS:
@@ -237,16 +243,78 @@ def discover(plugins_dir: Path = _PLUGINS_DIR) -> None:
 # Public helpers
 # ---------------------------------------------------------------------------
 
-def get_enum_items(media_type: str) -> list:
+def get_enum_items(media_type: str, source: str = "LOCAL") -> list:
     """Return Blender EnumProperty items for a given media type.
 
-    Returns a single placeholder tuple if no plugins are registered for that
-    type (Blender disallows empty EnumProperty item lists).
+    ``source`` ∈ {"LOCAL", "REMOTE", "BOTH"} filters by plugin origin so the
+    dropdowns reflect the user's model-source preference. Defaults to "LOCAL"
+    so any caller that omits it keeps the original local-only behavior.
+
+    Returns a single placeholder tuple if nothing matches (Blender disallows
+    empty EnumProperty item lists).
     """
     items = _ENUM_ITEMS.get(media_type, [])
+    if source != "BOTH":
+        want = "remote" if source == "REMOTE" else "local"
+        items = [it for it in items if _PLUGIN_ORIGIN.get(it[0]) == want]
     if not items:
-        return [(f"__none_{media_type}__", f"No {media_type} plugins found", "")]
+        label = {
+            "REMOTE": f"No remote {media_type} models — click Refresh",
+            "BOTH":   f"No {media_type} models found",
+        }.get(source, f"No {media_type} plugins found")
+        return [(f"__none_{media_type}__", label, "")]
     return items
+
+
+def clear_remote_models() -> None:
+    """Remove all origin=='remote' plugins from the registry and enum lists."""
+    remote_ids = [mid for mid, o in _PLUGIN_ORIGIN.items() if o == "remote"]
+    for mid in remote_ids:
+        PLUGIN_REGISTRY.pop(mid, None)
+        _PLUGIN_ORIGIN.pop(mid, None)
+    for items in _ENUM_ITEMS.values():
+        items[:] = [it for it in items if it[0] not in remote_ids]
+
+
+def register_remote_models(entries: list, prefs=None) -> int:
+    """Build synthetic plugins from /v1/models entries and register them.
+
+    Clears any previously registered remote models first (so Refresh is
+    idempotent). Returns the number of remote models registered.
+    """
+    from .remote_base import make_remote_plugin
+
+    clear_remote_models()
+    count = 0
+    for entry in entries or []:
+        try:
+            inst = make_remote_plugin(entry)
+        except Exception as e:
+            print(f"[Pallaidium] Skipping remote model {entry!r}: {e}")
+            continue
+
+        if inst.MODEL_ID in PLUGIN_REGISTRY:
+            print(f"[Pallaidium] Remote model {inst.MODEL_ID!r} shadows an "
+                  f"existing id — skipping.")
+            continue
+
+        errors = _validate_plugin(inst, "<remote>")
+        if errors:
+            for err in errors:
+                print(f"[Pallaidium] remote {inst.MODEL_ID}: {err}")
+            continue
+
+        PLUGIN_REGISTRY[inst.MODEL_ID] = inst
+        _PLUGIN_ORIGIN[inst.MODEL_ID] = "remote"
+        if inst.MODEL_TYPE in _ENUM_ITEMS:
+            _ENUM_ITEMS[inst.MODEL_TYPE].append(
+                (inst.MODEL_ID, inst.DISPLAY_NAME, inst.DESCRIPTION)
+            )
+        count += 1
+        print(f"[Pallaidium] Registered remote {inst.MODEL_TYPE} model: {inst.MODEL_ID}")
+
+    print(f"[Pallaidium] Remote model refresh complete: {count} model(s).")
+    return count
 
 
 def get_plugin(model_id: str) -> "ModelPlugin | None":

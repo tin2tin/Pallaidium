@@ -134,7 +134,80 @@ The addon panel is located in the **Video Sequence Editor > Sidebar (N-Panel) > 
 
 The generated media will be saved to the directory specified in the addon preferences and automatically added to your VSE timeline on a new channel.
 
+## Remote Backends (optional)
+
+Pallaidium runs models **locally** by default. Optionally, it can also drive an
+external generation server that speaks the **OpenAI-`/v1`-dialect Backend
+Contract** — letting you offload generation to a beefier machine or a cloud
+provider while the add-on stays a thin client. This is entirely opt-in; nothing
+changes unless you enable it.
+
+### Enabling
+
+In **Preferences → Add-ons → Pallaidium**, find the **Remote Backend** box:
+
+1. **Model Source** — choose what appears in the model dropdowns:
+   - **Local** (default) — only models that run locally in Blender.
+   - **Remote** — only models served by the configured backend.
+   - **Local & Remote** — both, side by side.
+2. **Remote Backend URL** — the server's base URL, e.g. `http://localhost:8000`
+   (falls back to the `PALLAIDIUM_BACKEND_URL` environment variable).
+3. **Remote Backend Key** — optional API key (falls back to
+   `PALLAIDIUM_BACKEND_KEY`).
+4. Click **Refresh Remote Models**. Pallaidium queries the server's
+   `GET /v1/models` and adds each one to the appropriate dropdown, prefixed with
+   `[Remote]`. (Refresh is the *only* time the add-on contacts the server for the
+   model list — the dropdowns never block on the network.)
+
+Remote models then behave like any other: pick one, set your prompt / inputs /
+standard settings, and Generate. Progress and **Cancel** work through the queue
+just like local jobs.
+
+### What works remotely
+
+All four media types are supported — **Movie (video), Image, Audio, and Text
+(transcription)** — including reference inputs where the model declares them:
+
+- img2img / img2vid init image, and **multiple** reference images (e.g. Klein),
+- last-frame / anchor frames for video, motion/structure **control** video,
+- **voice cloning** (reference audio + reference transcript) for TTS,
+- IP-Adapter face/style folders.
+
+References are uploaded to the backend via `POST /v1/files`; the exact request
+fields are listed in [docs/BACKEND_CONTRACT_EXTENSIONS.md](docs/BACKEND_CONTRACT_EXTENSIONS.md).
+
+### Running a backend
+
+The contract is **provider-agnostic** — any server implementing it works, and you
+can switch by changing the URL. Common options:
+
+- **Local mock** — for testing the whole contract (incl. video jobs) on the same
+  computer.
+- **ComfyUI** — the included `comfyui_adapter.py` drives a local **ComfyUI**
+  server. You add models by dropping **API-format workflow exports** into
+  `remote_backends/comfyui_workflows/`; the adapter detects each one's media type
+  and injects your prompt / size / seed / reference image(s) by node title. Fully
+  local, covers image / video / audio. See the step-by-step in
+  [docs/BACKEND_CONTRACT_EXTENSIONS.md](docs/BACKEND_CONTRACT_EXTENSIONS.md) (§ C)
+  and `remote_backends/comfyui_workflows/README.md`.
+- **[LocalAI](https://localai.io/)** — free, self-hosted, OpenAI-compatible image
+  and audio (`/v1/images/generations`, `/v1/audio/speech`,
+  `/v1/audio/transcriptions`). No video.
+- **A provider adapter** — a small local service that implements the contract and
+  forwards to a cloud provider (e.g. fal.ai / Replicate for **Seedance** video).
+  This is where any provider-specific code and API keys live; Pallaidium itself
+  contains none.
+
+The example servers (mock, ComfyUI adapter, fal.ai adapter) ship in
+`remote_backends/` and are excluded from the built add-on.
+
 ## Change Log
+
+2026-06-24: Add: ComfyUI adapter — explicit node **bindings** for complex workflows. A `<id>.meta.json` `bindings` map names the exact `{node, input}` each request field (prompt/negative/width/height/steps/cfg/fps/num_frames/strength/seed) maps to, so parameters on non-obvious nodes (primitives, LLM prompt-enhance chains, identically-titled encoders) are reached when titling can't disambiguate. Ships a worked **LTX-Video 2.3 22B i2v** workflow (`remote_backends/comfyui_workflows/ltx-2.3-i2v.json`). Also: ComfyUI `/prompt` validation and runtime execution errors now surface their real cause, checkpoint names auto-resolve against the installed list (env override `COMFYUI_CKPT[_<ID>]`), negative seeds wrap to ComfyUI's valid range, and a per-job console log shows the incoming payload and patched node values.
+
+2026-06-24: Add: ComfyUI remote backend adapter (`remote_backends/comfyui_adapter.py`) — drives a local ComfyUI via the contract. Models are added as **API-format workflow files** in `remote_backends/comfyui_workflows/`; media type is auto-detected from the output node and prompt/size/seed/reference image(s) are injected by node title. Built-in SDXL/SD1.5 and LTX-Video templates included. Documented in [docs/BACKEND_CONTRACT_EXTENSIONS.md](docs/BACKEND_CONTRACT_EXTENSIONS.md) § C.
+
+2026-06-24: Add: Remote Backends — optional OpenAI-`/v1`-dialect backend support. New Local / Remote / Local & Remote model source in preferences, Remote Backend URL/Key, and a "Refresh Remote Models" button that discovers a server's models via `GET /v1/models` and lists them (prefixed `[Remote]`) for movie/image/audio/text. Reference inputs (img2img/i2v, multi-ref, voice clone, control) are uploaded via `POST /v1/files`. Provider-agnostic; defaults to Local so existing behavior is unchanged. See [docs/BACKEND_CONTRACT_EXTENSIONS.md](docs/BACKEND_CONTRACT_EXTENSIONS.md).
 
 2026-06-22: Add: Google cloud plugins — Nano Banana (Gemini image: text-to-image, editing, up to 3 reference-image strips) and Veo (video: text/image-to-video, first/last-frame interpolation, Veo 3.1 reference images). Set the API key in add-on preferences. Reference strips persist to metadata and restore on Redo; model-specific controls hide when not applicable.
 

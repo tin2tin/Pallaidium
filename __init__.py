@@ -175,6 +175,7 @@ bl_info = {
 classes = (
     *_queue_classes,
     GeneratorAddonPreferences,
+    PALLAIDIUM_OT_refresh_remote_models,
     SEQUENCER_OT_generate_movie,
     SEQUENCER_OT_generate_audio,
     SEQUENCER_OT_generate_image,

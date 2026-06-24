@@ -1,0 +1,7 @@
+# Needed by the cloud/ComfyUI adapters (fal_adapter.py, comfyui_adapter.py).
+# The mock backend (mock_backend.py) is stdlib-only and needs nothing here.
+fastapi>=0.110
+uvicorn>=0.29
+httpx>=0.27
+# Only the fal.ai adapter (fal_adapter.py) needs this one:
+fal-client>=0.4

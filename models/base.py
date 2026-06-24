@@ -197,6 +197,10 @@ class ModelInputs:
     # Phase reporting — set by the queue worker; None when running interactively.
     # Signature: phase_fn(label: str) → None
     phase_fn:         Optional[Any] = None
+    # Cooperative cancellation — set by the queue worker; None when running
+    # interactively. Signature: should_cancel() → bool. Long-running plugins
+    # (e.g. remote backends polling a job) may check this and abort.
+    should_cancel:    Optional[Any] = None
 
     # Result note — a short, human-readable string a plugin may set during
     # generate() (e.g. token usage / cost).  Surfaced on the completed queue job.

@@ -65,12 +65,17 @@ license = [
 
 # Optional: build settings.
 # https://docs.blender.org/manual/en/dev/advanced/extensions/command_line_arguments.html#command-line-args-extension-build
-# [build]
-# paths_exclude_pattern = [
-#   "__pycache__/",
-#   "/.git/",
-#   "/*.zip",
-# ]
+[build]
+paths_exclude_pattern = [
+  "__pycache__/",
+  "/.git/",
+  "/*.zip",
+  # Example remote-backend servers (mock + fal.ai adapter): shipped in the repo
+  # for the tutorial, but not part of the installable add-on.
+  "/remote_backends/",
+  # Dev/test artifacts.
+  "/test_remote_backend.py",
+]
 
 # Additional Information from bl_info
 location = "Video Sequence Editor > Sidebar > Generative AI"

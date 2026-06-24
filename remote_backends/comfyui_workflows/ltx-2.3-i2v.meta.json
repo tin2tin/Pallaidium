@@ -1,0 +1,14 @@
+{
+  "display_name": "LTX-Video 2.3 i2v",
+  "type": "video",
+  "modes": ["i2v"],
+  "max_ref_images": 1,
+  "description": "LTX-Video 2.3 22B image-to-video (audio + prompt-enhance chain). Source image -> LoadImage. Resolution best kept to LTX-friendly sizes (default 720x1280). Frame count comes from the graph's Duration node (default 5s) x fps.",
+  "bindings": {
+    "prompt":   {"node": "320:319", "input": "value"},
+    "negative": {"node": "320:313", "input": "text"},
+    "width":    {"node": "320:312", "input": "value"},
+    "height":   {"node": "320:299", "input": "value"},
+    "fps":      {"node": "320:300", "input": "value"}
+  }
+}
