@@ -1,7 +1,74 @@
 """Text-to-image via Krea 2 Turbo (distilled 8-step, CFG-free) with SDNQ 8-bit weights."""
 
+import os
+
 from ...models.base import ModelPlugin, InputSpec, UISection, ParamSpec, ModelInputs
 from ...utils.helpers import gfx_device, low_vram
+
+
+def _registered_adapters(pipe):
+    """Names PEFT has actually attached to the pipeline (across all components)."""
+    present = set()
+    try:
+        for v in pipe.get_list_adapters().values():
+            present.update(v)
+    except Exception:
+        pass
+    return present
+
+
+def _load_krea2_lora(pipe, file_path, adapter_name):
+    """Attach one LoRA to a Krea2Pipeline, returning True only if it registered.
+
+    diffusers' Krea2LoraLoaderMixin (added in huggingface/diffusers#14046) does
+    NO non-diffusers key conversion — it requires diffusers-native keys
+    ('transformer.<block>...lora_A/lora_B.weight'). A LoRA exported by ComfyUI
+    carries a 'diffusion_model.' prefix (or bare block keys) that matches zero
+    transformer params, so load_lora_weights no-ops with only a warning and a
+    later set_adapters() would raise. We try the native loader first (correct for
+    LoRAs from the Krea 2 DreamBooth trainer), then remap common layouts and
+    retry from an in-memory state dict.
+    """
+    # 1) Native diffusers loader — the supported path for trainer-saved LoRAs.
+    try:
+        pipe.load_lora_weights(
+            os.path.dirname(file_path),
+            weight_name=os.path.basename(file_path),
+            adapter_name=adapter_name,
+        )
+    except Exception as e:
+        print(f"Krea 2 Turbo: native LoRA load of '{adapter_name}' failed ({e}); trying key remap.")
+    if adapter_name in _registered_adapters(pipe):
+        return True
+
+    # 2) Remap non-diffusers keys to the 'transformer.' prefix and retry. kohya /
+    #    sd-scripts LoRAs (lora_down/lora_up + .alpha) need a different conversion
+    #    entirely and the mixin's is_correct_format check rejects the '.alpha'
+    #    keys, so detect and bail with a clear message instead of mangling them.
+    try:
+        from safetensors.torch import load_file
+        sd = load_file(file_path)
+    except Exception as e:
+        print(f"Krea 2 Turbo: could not read '{file_path}' for remap ({e}).")
+        return False
+
+    if any(k.endswith(".alpha") or "lora_down" in k or "lora_up" in k for k in sd):
+        print(f"Krea 2 Turbo: '{adapter_name}' is a kohya-format LoRA "
+              "(lora_down/lora_up/alpha), unsupported by the Krea2 diffusers "
+              "loader; re-export in diffusers/PEFT format.")
+        return False
+
+    if not any(k.startswith("transformer.") for k in sd):
+        if any(k.startswith("diffusion_model.") for k in sd):
+            sd = {"transformer." + k[len("diffusion_model."):]: v for k, v in sd.items()}
+        else:
+            sd = {"transformer." + k: v for k, v in sd.items()}
+        try:
+            pipe.load_lora_weights(sd, adapter_name=adapter_name)
+        except Exception as e:
+            print(f"Krea 2 Turbo: remapped LoRA load of '{adapter_name}' failed ({e}).")
+
+    return adapter_name in _registered_adapters(pipe)
 
 
 class Krea2TurboPlugin(ModelPlugin):
@@ -71,18 +138,24 @@ class Krea2TurboPlugin(ModelPlugin):
         enabled_items = kw.get("enabled_items", [])
         if enabled_items:
             from ...utils.helpers import clean_filename, bpy
-            lora_folder = getattr(bpy.context.scene, "lora_folder", "")
+            lora_folder = bpy.path.abspath(getattr(bpy.context.scene, "lora_folder", ""))
             names, weights = [], []
             for item in enabled_items:
                 name = clean_filename(item.name).replace(".", "")
-                names.append(name)
-                weights.append(item.weight_value)
-                pipe.load_lora_weights(
-                    bpy.path.abspath(lora_folder),
-                    weight_name=item.name + ".safetensors",
-                    adapter_name=name,
-                )
-            pipe.set_adapters(names, adapter_weights=weights)
+                fpath = os.path.join(lora_folder, item.name + ".safetensors")
+                if _load_krea2_lora(pipe, fpath, name):
+                    names.append(name)
+                    weights.append(item.weight_value)
+                else:
+                    print(f"Krea 2 Turbo: LoRA '{item.name}' did not attach to the "
+                          "transformer; skipping it.")
+            # Only adapters that actually registered are activated, so set_adapters
+            # never raises on a name the key/prefix mismatch left unregistered.
+            if names:
+                pipe.set_adapters(names, adapter_weights=weights)
+            else:
+                print("Krea 2 Turbo: no enabled LoRA matched the transformer; "
+                      "generating without LoRA.")
 
         # NOTE: deliberately NOT calling apply_sdnq_options_to_model(use_quantized_matmul=True).
         # The repo ships these weights with use_quantized_matmul=False; forcing the
