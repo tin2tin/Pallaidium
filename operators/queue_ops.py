@@ -1644,6 +1644,10 @@ class SEQUENCER_OT_add_to_queue(Operator):
                     random.randint(-2147483647, 2147483647)
                     if scene.movie_use_random else scene.movie_num_seed
                 )
+                # Reflect the latest random seed in the UI field so the user
+                # can see / reuse the value that was actually generated.
+                if scene.movie_use_random:
+                    scene.movie_num_seed = seed
 
                 if strip is not None:
                     # Strip mode: batch copies placed consecutively in time,

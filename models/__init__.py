@@ -20,11 +20,17 @@ import traceback
 import types
 from pathlib import Path
 
-# Blender's embedded Python lacks pyconfig.h, which causes Triton's tcc.exe to
-# fail when it tries to compile cuda_utils.c for GPU capability detection.
-# These two env vars tell SDNQ to skip both the Triton compilation test and the
-# Triton matrix-multiply backend entirely, falling back to PyTorch eager mode.
-# Must be set before any from_pretrained call can trigger SDNQ's first import.
+# Keep SDNQ's torch.compile / Triton-matmul fast paths OFF.
+#
+# `import triton` and raw Triton JIT now build on this Windows box (see
+# __init__.py::_configure_triton_build), but torch's *Inductor* codegen is NOT
+# compatible with the installed triton-windows build: SDNQ's compiled dequantizer
+# (dequantize_packed_*_compiled → torch.compile → Inductor) crashes with
+# "'KernelMetadata' object has no attribute 'cluster_dims'", taking down every
+# SDNQ plugin (ernie/ernie_turbo/krea2). Until the triton↔torch version skew is
+# resolved, force the eager dequant path. (use_quantized_matmul is gated on the
+# same flag in plugins, so this also keeps that numerically-broken int8 path off.)
+# Must be set before SDNQ's first import (i.e. before any from_pretrained).
 os.environ.setdefault("SDNQ_USE_TORCH_COMPILE", "0")
 os.environ.setdefault("SDNQ_USE_TRITON_MM", "0")
 

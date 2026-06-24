@@ -41,7 +41,7 @@ standard-aifc
 standard-sunau
 
 # --- ML Framework Dependencies & Extensions ---
-git+https://github.com/Disty0/sdnq.git
+# sdnq is pinned to ==0.2.0 in DependencyManager.get_phase_3_git_and_extensions (skip-if-present)
 optimum-quanto
 timm
 kornia

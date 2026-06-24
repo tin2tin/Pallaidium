@@ -118,12 +118,25 @@
       "Bash(/c/Users/peter/Documents/blender-5.2.0-beta/blender-5.2.0-beta+v52.2b1958ccdccb-windows.amd64-release/5.2/python/bin/python.exe -m py_compile '/c/Users/peter/AppData/Roaming/Blender Foundation/Blender/5.2/extensions/user_default/pallaidium_generative_ai/operators/system.py')",
       "Bash(/c/Users/peter/Documents/blender-5.2.0-beta/blender-5.2.0-beta+v52.2b1958ccdccb-windows.amd64-release/5.2/python/bin/python.exe -)",
       "Bash(/c/Users/peter/Documents/blender-5.2.0-beta/blender-5.2.0-beta+v52.2b1958ccdccb-windows.amd64-release/5.2/python/bin/python.exe -m py_compile '/c/Users/peter/AppData/Roaming/Blender Foundation/Blender/5.2/extensions/user_default/pallaidium_generative_ai/__init__.py')",
-      "Bash(python -m py_compile models_plugins/image/krea2_turbo.py models_plugins/image/krea2_base.py)"
+      "Bash(python -m py_compile models_plugins/image/krea2_turbo.py models_plugins/image/krea2_base.py)",
+      "Bash(python -m py_compile models_plugins/image/krea2_turbo.py)",
+      "Bash(python -m py_compile models/__init__.py models_plugins/image/krea2_turbo.py)",
+      "Bash(python -m py_compile models/__init__.py)",
+      "Bash(curl -s https://huggingface.co/OzzyGT/Krea_2_Turbo_sdnq_dynamic_8bit/raw/main/model_index.json)",
+      "Bash(curl -s https://huggingface.co/OzzyGT/Krea_2_Turbo_sdnq_dynamic_8bit/raw/main/transformer/config.json)",
+      "Bash(curl -s https://huggingface.co/OzzyGT/Krea_2_Turbo_sdnq_dynamic_8bit/raw/main/text_encoder/config.json)",
+      "Bash(python -m py_compile operators/system.py utils/helpers.py)",
+      "Bash(curl -s https://huggingface.co/OzzyGT/Krea_2_Turbo_sdnq_dynamic_4bit/raw/main/model_index.json)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/asomoza/diffusers-recipes/main/models/krea2_turbo/scripts/t2i_sdnq.py\")",
+      "Bash('/c/Program Files/Blender Foundation/Blender 5.1/5.1/python/bin/python.exe' --version)",
+      "Bash('/c/Program Files/Blender Foundation/Blender 5.1/5.1/python/bin/python.exe' -m pip --version)",
+      "Bash(SP=\"/c/Users/peter/AppData/Roaming/Blender Foundation/Blender/5.2/datafiles/Pallaidium/site-packages\"; rm -rf \"$SP/sdnq\" \"$SP\"/sdnq-*.dist-info && echo \"removed old sdnq\" && ls -d \"$SP\"/sdnq* 2>/dev/null || echo \"no sdnq remaining\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\peter\\.claude\\projects\\c--Users-peter-AppData-Roaming-Blender-Foundation-Blender-5-2-extensions-user-default-pallaidium-generative-ai\\memory",
       "\\tmp",
-      "c:\\Users\\peter\\.claude\\plans"
+      "c:\\Users\\peter\\.claude\\plans",
+      "C:\\Users\\peter\\AppData\\Roaming\\Blender Foundation\\Blender\\5.2\\datafiles\\Pallaidium\\site-packages\\sdnq"
     ]
   }
 }

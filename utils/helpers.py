@@ -1011,7 +1011,31 @@ def repair_clobbered_namespace_packages(pybin, on_line=None):
     if not repair_set:
         return None
 
-    repair_list = sorted(repair_set)
+    # Stale .dist-info from a prior version of a package can survive an
+    # ``--upgrade --force-reinstall`` (the new version's metadata lands beside
+    # the old one's). That makes repair_set hold two specs for one package, e.g.
+    # ``sdnq==0.2.0`` and ``sdnq==0.2.1`` — which pip cannot resolve together.
+    # Collapse to one spec per (normalized) name, keeping the highest version.
+    def _norm_name(spec):
+        return spec.split("==", 1)[0].lower().replace("_", "-").replace(".", "-")
+
+    def _version_key(spec):
+        ver = spec.split("==", 1)[1] if "==" in spec else ""
+        try:
+            from packaging.version import Version
+            return (1, Version(ver))
+        except Exception:
+            # Fallback: split into numeric/text runs for a best-effort ordering.
+            parts = re.findall(r"\d+|[a-zA-Z]+", ver)
+            return (0, tuple((1, int(p)) if p.isdigit() else (0, p) for p in parts))
+
+    best_by_name: dict = {}
+    for spec in repair_set:
+        name = _norm_name(spec)
+        cur = best_by_name.get(name)
+        if cur is None or _version_key(spec) > _version_key(cur):
+            best_by_name[name] = spec
+    repair_list = sorted(best_by_name.values())
     log(f"PALLAIDIUM repair: namespace dir(s) {sorted(clobbered_dirs)} clobbered; "
         f"reinstalling {len(repair_list)} package(s) together: {', '.join(repair_list)}")
 
@@ -1266,16 +1290,19 @@ class DependencyManager:
 
     # for installing branch: git+https://github.com/huggingface/diffusers.git@ltx2-i2v-lora-mixin-fix
 
-    def get_phase_diffusers_git(self):
-        """diffusers, always pulled fresh from git.
+    def get_phase_force_git(self):
+        """Git packages that must be pulled fresh from their latest commit.
 
-        Returned as its own phase so GENERATOR_OT_install can force-reinstall it on
-        every "Install Dependencies" press (bypassing the normal skip-if-present
-        logic). The newest model plugins (e.g. Krea2) need classes from diffusers
-        main, and a plain --upgrade no-ops against an already-installed .dev0 build.
-        To pin a branch: git+https://github.com/huggingface/diffusers.git@branch-name
+        Returned as their own phase so GENERATOR_OT_install can force-reinstall them
+        on every "Install Dependencies" press (bypassing the normal skip-if-present
+        logic). The newest model plugins (e.g. Krea2) need classes from these repos'
+        latest main, and a plain --upgrade no-ops against an already-installed commit
+        (git URLs without a fixed ref are otherwise treated as "already satisfied").
+        To pin a branch: git+https://github.com/<org>/<repo>.git@branch-name
         """
-        return ["git+https://github.com/huggingface/diffusers.git"]
+        return [
+            "git+https://github.com/huggingface/diffusers.git",
+        ]
 
     def get_phase_3_git_and_extensions(self):
         reqs = [
@@ -1283,6 +1310,9 @@ class DependencyManager:
             "faster-qwen3-tts",
             #"git+https://github.com/QwenLM/Qwen3-TTS.git",
             #"git+https://github.com/huggingface/parler-tts.git",
+            # Pinned: the git main of sdnq tracks diffusers main too closely and
+            # regresses; 0.2.0 is the known-good release for our quantized loads.
+            "sdnq==0.2.0",
             "stable-audio-tools",
             "torcheval",
             "torchao",

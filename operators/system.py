@@ -695,13 +695,14 @@ class GENERATOR_OT_install(Operator):
             if lines:
                 batches.append((phase_name, False, False, lines))
 
-        # diffusers: always installed with --force-reinstall on every press, so the
-        # latest diffusers main lands even when an older .dev0 build is present (a
-        # plain --upgrade no-ops against an equal version string, and the git URL
-        # would otherwise be skipped as "already installed"). Bypasses filter_existing.
-        diffusers_lines = BlenderInternalManager.filter_list(mgr.get_phase_diffusers_git())
-        if diffusers_lines:
-            batches.append(("Diffusers", False, True, diffusers_lines))
+        # diffusers: always installed with --force-reinstall on every press, so
+        # its latest git commit lands even when an older build is present (a plain
+        # --upgrade no-ops against an equal version string, and the git URL would
+        # otherwise be skipped as "already installed"). Bypasses filter_existing.
+        # (sdnq is pinned to a release in the Git phase, so it is skip-if-present.)
+        force_git_lines = BlenderInternalManager.filter_list(mgr.get_phase_force_git())
+        if force_git_lines:
+            batches.append(("LatestGit", False, True, force_git_lines))
 
         # Linux: thinc/spacy must be installed as binary wheels (Python 3.13 Cython compat)
         if _plat.system() == "Linux":
