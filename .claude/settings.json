@@ -163,7 +163,8 @@
       "Bash(ls models/loras/)",
       "Bash(ls models/audio_checkpoints/)",
       "Bash(python -m py_compile comfyui_adapter.py)",
-      "Bash(cp \"/c/Users/peter/Downloads/video_ltx2_3_i2v_psf.json\" \"/c/Users/peter/AppData/Roaming/Blender Foundation/Blender/5.2/extensions/user_default/pallaidium_generative_ai/remote_backends/comfyui_workflows/ltx-2.3-i2v.json\" && echo COPIED && ls \"/c/Users/peter/AppData/Roaming/Blender Foundation/Blender/5.2/extensions/user_default/pallaidium_generative_ai/remote_backends/comfyui_workflows/\")"
+      "Bash(cp \"/c/Users/peter/Downloads/video_ltx2_3_i2v_psf.json\" \"/c/Users/peter/AppData/Roaming/Blender Foundation/Blender/5.2/extensions/user_default/pallaidium_generative_ai/remote_backends/comfyui_workflows/ltx-2.3-i2v.json\" && echo COPIED && ls \"/c/Users/peter/AppData/Roaming/Blender Foundation/Blender/5.2/extensions/user_default/pallaidium_generative_ai/remote_backends/comfyui_workflows/\")",
+      "WebFetch(domain:fal.ai)"
     ],
     "additionalDirectories": [
       "c:\\Users\\peter\\.claude\\projects\\c--Users-peter-AppData-Roaming-Blender-Foundation-Blender-5-2-extensions-user-default-pallaidium-generative-ai\\memory",

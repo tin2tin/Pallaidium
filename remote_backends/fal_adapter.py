@@ -37,15 +37,40 @@ FAL_QUEUE = "https://queue.fal.run"
 FAL_KEY = os.environ.get("FAL_KEY", "")
 
 # Map contract model ids -> fal endpoint + media type + capability hints.
-# Endpoint ids are examples; confirm the current ones on fal.ai.
+# `fal` is the text-to-video (or text-to-image) endpoint; `fal_i2v` is used when
+# the request carries an init image. Endpoint ids verified on fal.ai — confirm
+# the current ones if fal renames them.
 MODELS = {
-    "seedance-2.0": {
+    # --- ByteDance Seedance video family ---------------------------------
+    "seedance-1-pro": {
         "type": "video",
         "modes": ["t2v", "i2v"],
         "fal": "fal-ai/bytedance/seedance/v1/pro/text-to-video",
         "fal_i2v": "fal-ai/bytedance/seedance/v1/pro/image-to-video",
+        "display_name": "Seedance 1.0 Pro (fal)",
+    },
+    "seedance-1-pro-fast": {
+        "type": "video",
+        "modes": ["t2v", "i2v"],
+        "fal": "fal-ai/bytedance/seedance/v1/pro/fast/text-to-video",
+        "fal_i2v": "fal-ai/bytedance/seedance/v1/pro/fast/image-to-video",
+        "display_name": "Seedance 1.0 Pro Fast (fal)",
+    },
+    "seedance-2": {
+        "type": "video",
+        "modes": ["t2v", "i2v"],
+        "fal": "bytedance/seedance-2.0/text-to-video",
+        "fal_i2v": "bytedance/seedance-2.0/image-to-video",
         "display_name": "Seedance 2.0 (fal)",
     },
+    "seedance-2-fast": {
+        "type": "video",
+        "modes": ["t2v", "i2v"],
+        "fal": "bytedance/seedance-2.0/fast/text-to-video",
+        "fal_i2v": "bytedance/seedance-2.0/fast/image-to-video",
+        "display_name": "Seedance 2.0 Fast (fal)",
+    },
+    # --- Image -----------------------------------------------------------
     "flux-dev": {
         "type": "image",
         "modes": ["t2i"],
@@ -171,11 +196,12 @@ def _submit(payload: dict, kind: str):
 def _to_fal_args(payload: dict, spec: dict, kind: str) -> dict:
     """Translate contract fields -> fal arguments (per-model tweaks as needed)."""
     args = {"prompt": payload.get("prompt", "")}
-    if payload.get("negative_prompt"):
-        args["negative_prompt"] = payload["negative_prompt"]
     if payload.get("seed"):
         args["seed"] = payload["seed"]
     if kind == "image":
+        # FLUX-style image args.
+        if payload.get("negative_prompt"):
+            args["negative_prompt"] = payload["negative_prompt"]
         if payload.get("num_inference_steps"):
             args["num_inference_steps"] = payload["num_inference_steps"]
         if payload.get("guidance_scale"):
@@ -183,7 +209,9 @@ def _to_fal_args(payload: dict, spec: dict, kind: str) -> dict:
         if payload.get("width") and payload.get("height"):
             args["image_size"] = {"width": payload["width"], "height": payload["height"]}
     if kind == "video":
-        # Seedance uses resolution + duration; map from contract.
+        # Seedance schema = prompt / resolution / duration / seed (+ image_url
+        # for i2v). It does NOT accept negative_prompt — fal rejects unknown
+        # fields — so map only the supported ones from the contract.
         if payload.get("num_frames") and payload.get("fps"):
             args["duration"] = max(1, round(payload["num_frames"] / payload["fps"]))
         if payload.get("height"):
