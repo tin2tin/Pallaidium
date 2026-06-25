@@ -285,10 +285,14 @@ class RemoteModelPlugin(ModelPlugin):
             return False
 
         scene = context.scene
-        try:
-            col.prop(scene, "input_strips", text="Input")
-        except Exception:  # noqa: BLE001
-            pass
+        # For image models draw_custom_ui replaces the standard "Input" dropdown,
+        # so draw it here. For video the panel already drew it before calling us,
+        # so drawing it again would duplicate the row.
+        if self.MODEL_TYPE == "image":
+            try:
+                col.prop(scene, "input_strips", text="Input")
+            except Exception:  # noqa: BLE001
+                pass
 
         if has_multi and scene.sequence_editor is not None:
             n = max(1, min(9, int(getattr(self.PARAMS, "max_multi_images", 1))))
