@@ -332,6 +332,8 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             col = layout.column(align=True)
             if _has(UISection.FRAMES):
                 col.prop(context.scene, "generate_movie_frames", text="Frames")
+            if type == "movie" and _has(UISection.AUDIO_OUTPUT):
+                col.prop(context.scene, "remote_generate_audio", text="Generate Audio")
             if _has(UISection.AUDIO_DURATION):
                 col.prop(context.scene, "audio_length_in_f", text="Frames")
             if type == "audio" and _has(UISection.SPEED):

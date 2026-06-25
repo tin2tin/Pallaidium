@@ -62,6 +62,7 @@ MODELS = {
         "fal": "bytedance/seedance-2.0/text-to-video",
         "fal_i2v": "bytedance/seedance-2.0/image-to-video",
         "display_name": "Seedance 2.0 (fal)",
+        "supports_audio_output": True,
     },
     "seedance-2-fast": {
         "type": "video",
@@ -69,6 +70,7 @@ MODELS = {
         "fal": "bytedance/seedance-2.0/fast/text-to-video",
         "fal_i2v": "bytedance/seedance-2.0/fast/image-to-video",
         "display_name": "Seedance 2.0 Fast (fal)",
+        "supports_audio_output": True,
     },
     "seedance-2-mini": {
         "type": "video",
@@ -76,13 +78,16 @@ MODELS = {
         "fal": "bytedance/seedance-2.0/mini/text-to-video",
         "fal_i2v": "bytedance/seedance-2.0/mini/image-to-video",
         "display_name": "Seedance 2.0 Mini (fal)",
+        "supports_audio_output": True,
     },
     "seedance-2-mini-ref": {
         "type": "video",
         "modes": ["i2v", "control"],   # reference image(s) + optional source video
         "fal": "bytedance/seedance-2.0/mini/reference-to-video",
         "reference": True,
-        "max_ref_images": 9,
+        "max_ref_images": 9,           # up to 9 reference images (image_urls)
+        "needs_audio_ref": True,       # optional reference audio (audio_urls)
+        "supports_audio_output": True,
         "display_name": "Seedance 2.0 Mini Reference-to-Video (fal)",
     },
     # --- Audio -----------------------------------------------------------
@@ -123,7 +128,8 @@ def route_models():
     for mid, spec in MODELS.items():
         entry = {"id": mid, "type": spec["type"], "modes": spec["modes"]}
         for k in ("display_name", "default_steps", "max_ref_images",
-                  "needs_speaker_ref", "needs_ref_text", "control_types"):
+                  "needs_speaker_ref", "needs_ref_text", "control_types",
+                  "needs_audio_ref", "supports_audio_output"):
             if k in spec:
                 entry[k] = spec[k]
         data.append(entry)
@@ -243,6 +249,8 @@ def _to_fal_args(payload: dict, spec: dict, kind: str) -> dict:
             args["duration"] = max(1, round(payload["num_frames"] / payload["fps"]))
         if payload.get("height"):
             args["resolution"] = "720p" if payload["height"] >= 720 else "480p"
+        if "generate_audio" in payload:
+            args["generate_audio"] = bool(payload["generate_audio"])
     if kind == "audio":
         # Seed Audio turns a text prompt into speech; the contract sends the
         # text in `input` (TTS) or `prompt`.
@@ -265,10 +273,15 @@ def _to_fal_ref_args(payload: dict) -> dict:
     vid = _control_video_data_url(payload)
     if vid:
         args["video_urls"] = [vid]
+    auds = _all_audio_data_urls(payload)
+    if auds:
+        args["audio_urls"] = auds
     if payload.get("height"):
         args["resolution"] = "720p" if payload["height"] >= 720 else "480p"
     if payload.get("num_frames") and payload.get("fps"):
         args["duration"] = max(1, round(payload["num_frames"] / payload["fps"]))
+    if "generate_audio" in payload:
+        args["generate_audio"] = bool(payload["generate_audio"])
     return args
 
 
@@ -294,6 +307,16 @@ def _control_video_data_url(payload: dict) -> str:
             data, ctype = _FILES[fid]
             return f"data:{ctype or 'video/mp4'};base64," + base64.b64encode(data).decode()
     return ""
+
+
+def _all_audio_data_urls(payload: dict) -> list:
+    """data: URLs for reference audio (reference_audio_ids) -> fal audio_urls."""
+    out = []
+    for fid in payload.get("reference_audio_ids") or []:
+        if fid in _FILES:
+            data, ctype = _FILES[fid]
+            out.append(f"data:{ctype or 'audio/mpeg'};base64," + base64.b64encode(data).decode())
+    return out
 
 
 def _data_url(payload: dict) -> str:

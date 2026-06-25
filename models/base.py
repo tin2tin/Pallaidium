@@ -80,6 +80,7 @@ class UISection(str, Enum):
     AUDIO_DURATION    = "audio_duration"   # duration in frames / seconds
     SPEED             = "speed"            # audio playback-speed / CPS slider
     CHAT_PARAMS       = "chat_params"      # exaggeration + pace + temperature
+    AUDIO_OUTPUT      = "audio_output"     # toggle: generate synchronized audio for a video output
 
     # --- Image-specific extras ---
     ILLUMINATION      = "illumination"     # lighting style + light direction dropdowns

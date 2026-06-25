@@ -82,7 +82,7 @@ class RemoteModelPlugin(ModelPlugin):
                 "seed": inputs.seed,
             }
         if t == "video":
-            return {
+            p = {
                 "prompt": inputs.prompt,
                 "negative_prompt": inputs.neg_prompt,
                 "width": inputs.width,
@@ -92,6 +92,9 @@ class RemoteModelPlugin(ModelPlugin):
                 "seed": inputs.seed,
                 "strength": inputs.strength,
             }
+            if getattr(self, "_supports_audio_output", False):
+                p["generate_audio"] = bool(getattr(scene, "remote_generate_audio", True))
+            return p
         if t == "audio":
             return {
                 "input": inputs.prompt,
@@ -144,11 +147,16 @@ class RemoteModelPlugin(ModelPlugin):
             if anchors:
                 payload["anchor_file_ids"] = anchors
 
-        # Speaker reference audio + reference text (voice clone).
+        # Audio reference. For audio models this is a voice-clone speaker ref;
+        # for video models (Seedance reference-to-video) it is a reference audio
+        # track that fal exposes as audio_urls.
         if (InputSpec.AUDIO_REF in flags or InputSpec.AUDIO_REF_REQ in flags):
             ref = inputs.audio_ref
             if ref and os.path.isfile(ref):
-                payload["speaker_reference_id"] = client.upload_file(ref, "speaker_reference")
+                if self.MODEL_TYPE == "video":
+                    payload["reference_audio_ids"] = [client.upload_file(ref, "reference")]
+                else:
+                    payload["speaker_reference_id"] = client.upload_file(ref, "speaker_reference")
         if (InputSpec.TEXT_REF in flags) and inputs.text_ref:
             payload["speaker_reference_text"] = inputs.text_ref
 
@@ -193,6 +201,9 @@ class RemoteModelPlugin(ModelPlugin):
         from ..utils.helpers import solve_path, clean_filename
 
         self.set_phase(inputs, "Submitting to backend")
+        # Gather multi-reference images from the flux-style strip pickers.
+        if InputSpec.MULTI_IMAGE in self.INPUTS:
+            self._collect_multi_images(inputs, scene)
         payload = self.build_payload(inputs, scene, prefs)
         payload.setdefault("model", self.remote_model_name())
         try:
@@ -257,6 +268,74 @@ class RemoteModelPlugin(ModelPlugin):
         image.save(buf, format="PNG")
         return base64.b64encode(buf.getvalue()).decode("ascii")
 
+    # ---- custom input UI (multi-image refs + video audio reference) -------
+
+    def draw_custom_ui(self, col, context) -> bool:
+        """Draw multi-reference-image pickers and/or a video audio reference.
+
+        Reuses the existing flux-style strip pickers (scene.flux_strip_N +
+        flux_visible_strips, the strip_picker / flux_add_strip / flux_hide_strip
+        operators). Returns True only when it took over the input area; otherwise
+        False so the standard single-strip selector is drawn by the panel.
+        """
+        flags = self.INPUTS
+        has_multi = InputSpec.MULTI_IMAGE in flags
+        has_audio_ref = (InputSpec.AUDIO_REF in flags) and self.MODEL_TYPE == "video"
+        if not (has_multi or has_audio_ref):
+            return False
+
+        scene = context.scene
+        try:
+            col.prop(scene, "input_strips", text="Input")
+        except Exception:  # noqa: BLE001
+            pass
+
+        if has_multi and scene.sequence_editor is not None:
+            n = max(1, min(9, int(getattr(self.PARAMS, "max_multi_images", 1))))
+            vis = max(1, min(int(getattr(scene, "flux_visible_strips", 1)), n))
+            for i in range(1, vis + 1):
+                row = col.row(align=True)
+                row.prop_search(scene, f"flux_strip_{i}", scene.sequence_editor,
+                                "strips", text="Ref.", icon="FILE_IMAGE")
+                row.operator("sequencer.strip_picker", text="",
+                             icon="EYEDROPPER").action = f"flux_select{i}"
+                if i == vis and vis < n:
+                    if vis > 1:
+                        row.operator("object.flux_hide_strip", text="",
+                                     icon="REMOVE").strip_index = i
+                    row.operator("object.flux_add_strip", text="", icon="ADD")
+
+        if has_audio_ref:
+            row = col.row(align=True)
+            row.prop(scene, "ref_audio_path", text="Audio Ref.")
+            row.operator("sequencer.open_audio_filebrowser", text="", icon="FILEBROWSER")
+
+        return True
+
+    @staticmethod
+    def _collect_multi_images(inputs: ModelInputs, scene) -> None:
+        """Populate inputs.images from the selected flux_strip_N reference strips."""
+        from ..utils.helpers import find_strip_by_name, load_strip_as_pil
+        imgs = []
+        if inputs.image is not None:
+            imgs.append(inputs.image)
+        for i in range(1, 10):
+            name = getattr(scene, f"flux_strip_{i}", "") or ""
+            if not name:
+                continue
+            strip = find_strip_by_name(scene, name)
+            if strip is None:
+                continue
+            try:
+                pil = load_strip_as_pil(strip)
+            except Exception as e:  # noqa: BLE001
+                print(f"[Remote] could not load reference strip {name!r}: {e}")
+                continue
+            if pil is not None:
+                imgs.append(pil)
+        if imgs:
+            inputs.images = imgs
+
 
 # ---------------------------------------------------------------------------
 # Factory — build a synthetic plugin from a /v1/models discovery entry
@@ -287,9 +366,18 @@ def _derive_ui(mtype: str, modes: list, entry: dict):
         if "i2v" in modes:
             inputs |= InputSpec.IMAGE
             sections.insert(2, UISection.IMAGE_STRIP)
+        if max_ref > 1:
+            # Multiple reference images (e.g. Seedance reference-to-video):
+            # drawn with the flux-style pickers in draw_custom_ui.
+            inputs |= InputSpec.MULTI_IMAGE
+            sections.insert(3, UISection.MULTI_IMAGES)
         if "control" in modes:
             inputs |= InputSpec.VIDEO
             sections.insert(3, UISection.VIDEO_STRIP)
+        if entry.get("needs_audio_ref"):
+            inputs |= InputSpec.AUDIO_REF        # reference audio (audio_urls)
+        if entry.get("supports_audio_output"):
+            sections.append(UISection.AUDIO_OUTPUT)
         return inputs, sections
 
     if mtype == "audio":
@@ -352,14 +440,19 @@ def make_remote_plugin(entry: dict) -> "RemoteModelPlugin":
     inst.UI_SECTIONS = sections
     inst.PARAMS = _derive_params(mtype, entry)
 
-    # Capability hints used by upload_inputs.
+    # Capability hints used by upload_inputs / draw_custom_ui.
     inst._max_ref_images = int(entry.get("max_ref_images", 0))
     inst._needs_speaker_ref = bool(entry.get("needs_speaker_ref", False))
     inst._needs_ref_text = bool(entry.get("needs_ref_text", False))
     inst._control_types = list(entry.get("control_types", []))
+    inst._supports_audio_output = bool(entry.get("supports_audio_output", False))
 
-    # Show the standard input-strip selector only when an image/video input is used.
-    inst.uses_standard_input_strip = bool(
+    # Models with multiple reference images, or a video-side audio reference,
+    # draw their input area in draw_custom_ui (flux-style pickers) rather than
+    # the single standard input-strip selector.
+    needs_custom = (InputSpec.MULTI_IMAGE in inputs) or (
+        (InputSpec.AUDIO_REF in inputs) and mtype == "video")
+    inst.uses_standard_input_strip = (not needs_custom) and bool(
         (InputSpec.IMAGE in inputs) or (InputSpec.VIDEO in inputs)
     )
     inst.requires_input_strip = (mtype == "text")

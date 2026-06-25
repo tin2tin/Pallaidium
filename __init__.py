@@ -581,6 +581,14 @@ def register():
     )
     bpy.types.Scene.genai_out_path = ""
 
+    # Remote video models that support generated audio (e.g. Seedance 2.0).
+    bpy.types.Scene.remote_generate_audio = bpy.props.BoolProperty(
+        name="Generate Audio",
+        description="Ask the backend to generate synchronized audio for the video "
+                    "(supported by Seedance 2.0 models)",
+        default=True,
+    )
+
     bpy.types.Scene.minimax_subject = bpy.props.StringProperty(
         name="minimax_subject", default=""
     )
@@ -1335,6 +1343,7 @@ def unregister():
     del bpy.types.Scene.movie_path
     del bpy.types.Scene.image_path
     del bpy.types.Scene.sound_path
+    del bpy.types.Scene.remote_generate_audio
     del bpy.types.Scene.ltx_middle_images_json
     del bpy.types.Scene.refine_sd
     del bpy.types.Scene.aurasr
