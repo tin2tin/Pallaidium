@@ -70,6 +70,28 @@ MODELS = {
         "fal_i2v": "bytedance/seedance-2.0/fast/image-to-video",
         "display_name": "Seedance 2.0 Fast (fal)",
     },
+    "seedance-2-mini": {
+        "type": "video",
+        "modes": ["t2v", "i2v"],
+        "fal": "bytedance/seedance-2.0/mini/text-to-video",
+        "fal_i2v": "bytedance/seedance-2.0/mini/image-to-video",
+        "display_name": "Seedance 2.0 Mini (fal)",
+    },
+    "seedance-2-mini-ref": {
+        "type": "video",
+        "modes": ["i2v", "control"],   # reference image(s) + optional source video
+        "fal": "bytedance/seedance-2.0/mini/reference-to-video",
+        "reference": True,
+        "max_ref_images": 9,
+        "display_name": "Seedance 2.0 Mini Reference-to-Video (fal)",
+    },
+    # --- Audio -----------------------------------------------------------
+    "seed-audio": {
+        "type": "audio",
+        "modes": ["tts"],
+        "fal": "bytedance/seed-audio-1.0",
+        "display_name": "Seed Audio 1.0 (fal)",
+    },
     # --- Image -----------------------------------------------------------
     "flux-dev": {
         "type": "image",
@@ -164,13 +186,18 @@ def _submit(payload: dict, kind: str):
     if not spec:
         return 400, {"error": f"unknown model {mid!r}"}
 
-    args = _to_fal_args(payload, spec, kind)
-    fal_app = spec["fal"]
-    # image-to-video uses a different fal endpoint when an init image is present.
-    if kind == "video" and (payload.get("image_file_id") or payload.get("image_b64")) \
-            and spec.get("fal_i2v"):
-        fal_app = spec["fal_i2v"]
-        args["image_url"] = _data_url(payload)
+    if spec.get("reference"):
+        # reference-to-video: prompt + lists of reference image/video URLs.
+        fal_app = spec["fal"]
+        args = _to_fal_ref_args(payload)
+    else:
+        args = _to_fal_args(payload, spec, kind)
+        fal_app = spec["fal"]
+        # image-to-video uses a different fal endpoint when an init image is present.
+        if kind == "video" and (payload.get("image_file_id") or payload.get("image_b64")) \
+                and spec.get("fal_i2v"):
+            fal_app = spec["fal_i2v"]
+            args["image_url"] = _data_url(payload)
 
     try:
         code, body = post_json(f"{FAL_QUEUE}/{fal_app}", args,
@@ -216,7 +243,57 @@ def _to_fal_args(payload: dict, spec: dict, kind: str) -> dict:
             args["duration"] = max(1, round(payload["num_frames"] / payload["fps"]))
         if payload.get("height"):
             args["resolution"] = "720p" if payload["height"] >= 720 else "480p"
+    if kind == "audio":
+        # Seed Audio turns a text prompt into speech; the contract sends the
+        # text in `input` (TTS) or `prompt`.
+        args["prompt"] = payload.get("input") or payload.get("prompt", "")
     return args
+
+
+def _to_fal_ref_args(payload: dict) -> dict:
+    """Build args for Seedance reference-to-video (prompt + reference URL lists).
+
+    fal expects ``image_urls`` / ``video_urls`` lists; we pass the uploaded
+    reference image(s) and the source/control video as data: URLs.
+    """
+    args = {"prompt": payload.get("prompt", "")}
+    if payload.get("seed"):
+        args["seed"] = payload["seed"]
+    imgs = _all_image_data_urls(payload)
+    if imgs:
+        args["image_urls"] = imgs
+    vid = _control_video_data_url(payload)
+    if vid:
+        args["video_urls"] = [vid]
+    if payload.get("height"):
+        args["resolution"] = "720p" if payload["height"] >= 720 else "480p"
+    if payload.get("num_frames") and payload.get("fps"):
+        args["duration"] = max(1, round(payload["num_frames"] / payload["fps"]))
+    return args
+
+
+def _all_image_data_urls(payload: dict) -> list:
+    """data: URLs for every reference image (multi-ref ids, else the single one)."""
+    out = []
+    for fid in payload.get("reference_file_ids") or []:
+        if fid in _FILES:
+            data, ctype = _FILES[fid]
+            out.append(f"data:{ctype};base64," + base64.b64encode(data).decode())
+    if not out:
+        single = _data_url(payload)
+        if single:
+            out.append(single)
+    return out
+
+
+def _control_video_data_url(payload: dict) -> str:
+    """data: URL for the source/control video (control_file_id / video_file_id)."""
+    for key in ("control_file_id", "video_file_id"):
+        fid = payload.get(key)
+        if fid and fid in _FILES:
+            data, ctype = _FILES[fid]
+            return f"data:{ctype or 'video/mp4'};base64," + base64.b64encode(data).decode()
+    return ""
 
 
 def _data_url(payload: dict) -> str:
@@ -274,9 +351,10 @@ class Handler(BaseAdapterHandler):
         if path == "/v1/files":
             _fields, files = self.read_multipart()
             return self.send_json(*_swap(route_upload(files)))
-        if path in ("/v1/videos", "/v1/images/generations"):
+        if path in ("/v1/videos", "/v1/images/generations", "/v1/audio/speech"):
             payload = self.read_json()
-            kind = "video" if path == "/v1/videos" else "image"
+            kind = {"/v1/videos": "video", "/v1/images/generations": "image",
+                    "/v1/audio/speech": "audio"}[path]
             return self.send_json(*_swap(_submit(payload, kind)))
         return self.send_json({"error": "not found"}, 404)
 
