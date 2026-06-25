@@ -2174,36 +2174,105 @@ def render_meta_child_to_path(context, meta_strip, child_strip, image_output=Fal
     return None
 
 
-def render_strip_to_wav(context, strip):
-    """Render any strip (SOUND or MOVIE-with-audio) to a PCM WAV via sound.mixdown.
+def _extract_strip_audio_trimmed(strip, output_path, expected_dur, offset_s):
+    """Decode a strip's source audio with PyAV and slice it to the trimmed range.
 
-    Mutes all other strips and restricts the frame range to the strip's trimmed
-    in/out points, so exactly the audible region is captured regardless of source
-    format, trimming, volume envelopes, or speed effects.
+    Primary, mixdown-free path for render_strip_to_wav(). It reads the strip's
+    own source file (SOUND → sound.filepath, MOVIE → filepath), resamples to a
+    consistent float32 stereo layout, and keeps only
+    ``source[offset_s : offset_s + expected_dur]`` — exactly the audible region a
+    single-strip mixdown would produce.
+
+    Using PyAV instead of bpy.ops.sound.mixdown avoids the asynchronous WM
+    mixdown job entirely, which matters in two ways:
+      * No job means the sequencer is never read from a background thread, so
+        the EXCEPTION_ACCESS_VIOLATION that run_sound_mixdown_sync() guards
+        against cannot happen.
+      * Several renders can run back-to-back on the main thread (e.g. the queue
+        enqueuing multiple SOUND strips at once) without colliding. A blocking
+        mixdown never lets the WM reap its finished job, so the next mixdown
+        could not start and its busy-wait spun to the 600s timeout (a hang).
+
+    Returns True on success (output_path written), False to fall back to mixdown.
+    """
+    try:
+        import av
+        import numpy as np
+        import soundfile as sf
+    except Exception as _e:
+        print(f"[render_strip_to_wav] PyAV/soundfile unavailable: {_e}")
+        return False
+
+    if strip.type == "SOUND":
+        try:
+            src = bpy.path.abspath(strip.sound.filepath)
+        except Exception:
+            src = ""
+    elif strip.type == "MOVIE":
+        try:
+            src = bpy.path.abspath(strip.filepath)
+        except Exception:
+            src = ""
+    else:
+        return False
+
+    if not src or not os.path.isfile(src):
+        print(f"[render_strip_to_wav] source file not found for direct extraction: {src!r}")
+        return False
+
+    try:
+        chunks = []
+        sr = 48000
+        with av.open(src) as container:
+            astreams = [s for s in container.streams if s.type == "audio"]
+            if not astreams:
+                print(f"[render_strip_to_wav] no audio stream in {src!r}")
+                return False
+            stream = astreams[0]
+            sr = stream.codec_context.sample_rate or 48000
+            resampler = av.AudioResampler(format="fltp", layout="stereo", rate=sr)
+            for frame in container.decode(stream):
+                for out in resampler.resample(frame):
+                    chunks.append(out.to_ndarray())       # (2, n) float32
+            for out in resampler.resample(None):          # flush
+                chunks.append(out.to_ndarray())
+
+        if not chunks:
+            return False
+
+        audio  = np.concatenate(chunks, axis=1)           # (2, total_samples)
+        start  = max(0, int(round(offset_s * sr)))
+        length = int(round(expected_dur * sr))
+        clip   = audio[:, start:start + length]
+        if clip.shape[1] == 0:
+            print(f"[render_strip_to_wav] trimmed clip is empty (offset {offset_s:.3f}s, dur {expected_dur:.3f}s)")
+            return False
+
+        sf.write(output_path, clip.T, sr, subtype="PCM_16")   # soundfile: (samples, channels)
+        return True
+    except Exception as _e:
+        print(f"[render_strip_to_wav] direct PyAV extraction failed: {_e}")
+        return False
+
+
+def render_strip_to_wav(context, strip):
+    """Render any strip (SOUND or MOVIE-with-audio) to a PCM WAV.
+
+    Primary path extracts the strip's source audio directly with PyAV, sliced to
+    the strip's trimmed in/out points (see _extract_strip_audio_trimmed). This is
+    mixdown-free, so consecutive renders never collide and the sequencer is never
+    touched from a background thread. If direct extraction is unavailable (no
+    PyAV, unreadable source, etc.) it falls back to bpy.ops.sound.mixdown, which
+    mutes all other strips and restricts the frame range to the strip's trimmed
+    in/out points so exactly the audible region is captured.
     Returns the absolute path to the generated WAV, or None on failure.
     """
     vse_scene = getattr(context, "sequencer_scene", context.scene)
     if not vse_scene or not vse_scene.sequence_editor:
         return None
 
-    seq_editor = vse_scene.sequence_editor
-    orig_prefetch    = seq_editor.use_prefetch
-    orig_cache       = seq_editor.use_cache_raw
-    orig_mute_states = {s: s.mute for s in seq_editor.strips}
-    orig_f_start     = vse_scene.frame_start
-    orig_f_end       = vse_scene.frame_end
-
-    seq_editor.use_prefetch  = False
-    seq_editor.use_cache_raw = False
-
     render_start = int(strip.frame_final_start)
     render_end   = int(strip.frame_final_start + strip.frame_final_duration - 1)
-
-    for s in seq_editor.strips:
-        s.mute = (s != strip)
-
-    vse_scene.frame_start = render_start
-    vse_scene.frame_end   = render_end
 
     addon_prefs  = bpy.context.preferences.addons[ADDON_ID].preferences
     rendered_dir = os.path.join(addon_prefs.generator_ai, str(date.today()), "Rendered_Strips")
@@ -2215,12 +2284,19 @@ def render_strip_to_wav(context, strip):
 
     _fps_stw      = vse_scene.render.fps / max(1.0, getattr(vse_scene.render, 'fps_base', 1.0))
     _expected_stw = strip.frame_final_duration / _fps_stw
-    try:
-        _src_stw   = bpy.path.abspath(strip.sound.filepath)
-        _off_stw   = strip.frame_offset_start / _fps_stw
-    except Exception:
+    _off_stw      = strip.frame_offset_start / _fps_stw
+    if strip.type == "SOUND":
+        try:
+            _src_stw = bpy.path.abspath(strip.sound.filepath)
+        except Exception:
+            _src_stw = "(unknown)"
+    elif strip.type == "MOVIE":
+        try:
+            _src_stw = bpy.path.abspath(strip.filepath)
+        except Exception:
+            _src_stw = "(unknown)"
+    else:
         _src_stw = "(unknown)"
-        _off_stw = 0.0
     print(f"[render_strip_to_wav] ── SOUND IN ──────────────────────────")
     print(f"  strip            : {strip.name!r}  type={strip.type}")
     print(f"  source file      : {_src_stw!r}")
@@ -2230,6 +2306,47 @@ def render_strip_to_wav(context, strip):
     print(f"  mixdown range    : scene.frame_start={render_start}  scene.frame_end={render_end}")
     print(f"  expected WAV dur : {_expected_stw:.3f}s")
     print(f"[render_strip_to_wav] ──────────────────────────────────────")
+
+    # Remove any stale file so the size/duration checks below are reliable.
+    try:
+        if os.path.exists(output_path):
+            os.remove(output_path)
+    except OSError:
+        pass
+
+    # ── Primary: direct PyAV extraction (no async mixdown job) ──────────────
+    if _extract_strip_audio_trimmed(strip, output_path, _expected_stw, _off_stw):
+        try:
+            import soundfile as _sf_ok
+            _info_ok = _sf_ok.info(output_path)
+            print(f"[render_strip_to_wav] ── WAV OUT (direct) ──────────────────")
+            print(f"  output file    : {output_path!r}")
+            print(f"  actual duration: {_info_ok.frames / _info_ok.samplerate:.3f}s  "
+                  f"({_info_ok.frames} samples @ {_info_ok.samplerate} Hz)")
+            print(f"  expected       : {_expected_stw:.3f}s")
+            print(f"[render_strip_to_wav] ──────────────────────────────────────")
+        except Exception:
+            pass
+        return output_path
+
+    print("[render_strip_to_wav] direct extraction unavailable — falling back to sound.mixdown")
+
+    # ── Fallback: Blender mixdown of the isolated strip ─────────────────────
+    seq_editor = vse_scene.sequence_editor
+    orig_prefetch    = seq_editor.use_prefetch
+    orig_cache       = seq_editor.use_cache_raw
+    orig_mute_states = {s: s.mute for s in seq_editor.strips}
+    orig_f_start     = vse_scene.frame_start
+    orig_f_end       = vse_scene.frame_end
+
+    seq_editor.use_prefetch  = False
+    seq_editor.use_cache_raw = False
+
+    for s in seq_editor.strips:
+        s.mute = (s != strip)
+
+    vse_scene.frame_start = render_start
+    vse_scene.frame_end   = render_end
 
     try:
         run_sound_mixdown_sync(output_path)

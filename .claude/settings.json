@@ -166,7 +166,11 @@
       "Bash(cp \"/c/Users/peter/Downloads/video_ltx2_3_i2v_psf.json\" \"/c/Users/peter/AppData/Roaming/Blender Foundation/Blender/5.2/extensions/user_default/pallaidium_generative_ai/remote_backends/comfyui_workflows/ltx-2.3-i2v.json\" && echo COPIED && ls \"/c/Users/peter/AppData/Roaming/Blender Foundation/Blender/5.2/extensions/user_default/pallaidium_generative_ai/remote_backends/comfyui_workflows/\")",
       "WebFetch(domain:fal.ai)",
       "Bash(PYTHONIOENCODING=utf-8 python -c ' *)",
-      "Bash(python -c \"import ast; ast.parse\\(open\\('fal_adapter.py',encoding='utf-8'\\).read\\(\\)\\); print\\('OK parse'\\)\")"
+      "Bash(python -c \"import ast; ast.parse\\(open\\('fal_adapter.py',encoding='utf-8'\\).read\\(\\)\\); print\\('OK parse'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('models/remote_base.py',encoding='utf-8'\\).read\\(\\)\\); print\\('OK parse'\\)\")",
+      "Bash(py -c \"import ast; ast.parse\\(open\\('models/remote_base.py'\\).read\\(\\)\\); ast.parse\\(open\\('remote_backends/fal_adapter.py'\\).read\\(\\)\\); print\\('parse OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('models/remote_base.py'\\).read\\(\\)\\); ast.parse\\(open\\('remote_backends/fal_adapter.py'\\).read\\(\\)\\); print\\('parse OK'\\)\")",
+      "Bash(python -c \"import ast,sys; ast.parse\\(open\\('utils/helpers.py',encoding='utf-8'\\).read\\(\\)\\); print\\('OK helpers.py parses'\\)\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\peter\\.claude\\projects\\c--Users-peter-AppData-Roaming-Blender-Foundation-Blender-5-2-extensions-user-default-pallaidium-generative-ai\\memory",
