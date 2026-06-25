@@ -155,9 +155,11 @@ Each model entry is `{"id", "type", "modes"}` in v0.1. Pallaidium reads these
 |---|---|---|
 | `display_name` | string | Friendlier label (else the `id` is used) |
 | `description` | string | Tooltip text |
-| `max_ref_images` | int | Enable N reference-image pickers (e.g. `9` for Klein); `1` = single img2img |
+| `max_ref_images` | int | Enable N reference-image pickers (e.g. `9` for Klein or Seedance reference-to-video); `1` = single img2img/i2v. Works for **image and video** models. |
 | `needs_speaker_ref` | bool | TTS model accepts a reference voice sample |
 | `needs_ref_text` | bool | TTS model accepts a reference transcript |
+| `needs_audio_ref` | bool | **Video** model accepts a reference audio clip (e.g. Seedance reference-to-video). Shows an Audio Ref. picker. |
+| `supports_audio_output` | bool | **Video** model can generate a soundtrack. Shows a *Generate Audio* toggle whose state is sent as `generate_audio`. |
 | `control_types` | list[str] | Allowed control maps, e.g. `["canny","depth","pose"]` |
 | `default_steps` | int | Default inference steps shown in the UI |
 | `default_guidance` | float | Default guidance scale |
@@ -173,7 +175,9 @@ Example:
   { "id": "flux-klein", "type": "image", "modes": ["t2i","i2i"],
     "max_ref_images": 9, "default_steps": 28 },
   { "id": "seedance-2.0", "type": "video", "modes": ["t2v","i2v","control"],
-    "control_types": ["canny","depth","pose"] },
+    "control_types": ["canny","depth","pose"], "supports_audio_output": true },
+  { "id": "seedance-2-mini-ref", "type": "video", "modes": ["i2v","control"],
+    "max_ref_images": 9, "needs_audio_ref": true, "supports_audio_output": true },
   { "id": "xtts", "type": "audio", "modes": ["tts"],
     "needs_speaker_ref": true, "needs_ref_text": true },
   { "id": "whisper-large", "type": "text", "modes": ["transcription"] }
@@ -189,9 +193,9 @@ and the add-on then passes the returned `file_id` in the generation body:
 
 | `purpose` | Used for |
 |---|---|
-| `reference` | init / reference / last / anchor / IP-Adapter images, source video |
+| `reference` | init / reference / last / anchor / IP-Adapter images, source video, **reference audio for reference-to-video** |
 | `control` | motion/structure control video |
-| `speaker_reference` | voice-clone reference audio |
+| `speaker_reference` | voice-clone reference audio (TTS) |
 
 Response: `{ "file_id": "<id>" }`.
 
@@ -209,6 +213,9 @@ Sent on the generation endpoints (`/v1/videos`, `/v1/images/generations`,
 | `reference_prompts` | list[str] | images | Per-reference-image prompts (e.g. OmniGen) |
 | `last_image_file_id` | string | videos | Last-frame condition (FLF) |
 | `anchor_file_ids` | list[{file_id, fraction}] | videos | Interior keyframe anchors at timeline fractions |
+| `reference_file_ids` | list[str] | videos | Multiple reference images for reference-to-video (e.g. Seedance Mini reference-to-video → fal `image_urls`) |
+| `reference_audio_ids` | list[str] | videos | Reference audio clip(s) for reference-to-video (→ fal `audio_urls`). Uploaded with `purpose: "reference"`. |
+| `generate_audio` | bool | videos | Request a generated soundtrack. Sent for models that advertise `supports_audio_output`; mirrors the *Generate Audio* toggle. |
 | `control_file_id` | string | videos | Control / source video (v0.1). Used as the source for video-edit & character-replacement workflows. |
 | `video_file_id` | string | videos | Source video alias accepted by some adapters (e.g. ComfyUI) when not used as a control map |
 | `control_type` | string | videos | One of the model's `control_types` (v0.1) |

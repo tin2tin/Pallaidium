@@ -201,7 +201,18 @@ class RemoteModelPlugin(ModelPlugin):
         from ..utils.helpers import solve_path, clean_filename
 
         self.set_phase(inputs, "Submitting to backend")
-        # Gather multi-reference images from the flux-style strip pickers.
+        # The selected input strip seeds the first reference slot by type: an
+        # image strip becomes the first reference image, a video strip becomes
+        # the reference/source video (control). For a reference-to-video model a
+        # selected video also has its first frame auto-extracted into
+        # inputs.image upstream — drop it so the video isn't duplicated as a
+        # reference image.
+        if (self.MODEL_TYPE == "video"
+                and InputSpec.MULTI_IMAGE in self.INPUTS
+                and getattr(inputs, "video_path", None)):
+            inputs.image = None
+        # Gather multi-reference images from the flux-style strip pickers
+        # (prepending the selected image strip as the first reference).
         if InputSpec.MULTI_IMAGE in self.INPUTS:
             self._collect_multi_images(inputs, scene)
         payload = self.build_payload(inputs, scene, prefs)
@@ -318,7 +329,14 @@ class RemoteModelPlugin(ModelPlugin):
 
     @staticmethod
     def _collect_multi_images(inputs: ModelInputs, scene) -> None:
-        """Populate inputs.images from the selected flux_strip_N reference strips."""
+        """Populate inputs.images from the selected flux_strip_N reference strips.
+
+        The job's selected input strip (inputs.image, when it is a genuine image
+        strip) becomes the *first* reference image, followed by the explicit
+        flux-style Ref. pickers. For a selected video strip inputs.image has
+        already been cleared by generate(), so the video is used as the source
+        video instead of leaking its first frame in here.
+        """
         from ..utils.helpers import find_strip_by_name, load_strip_as_pil
         imgs = []
         if inputs.image is not None:

@@ -173,8 +173,11 @@ one, set your prompt / inputs / standard settings, and Generate. Progress and
 All four media types are supported — **Movie (video), Image, Audio, and Text
 (transcription)** — including reference inputs where the model declares them:
 
-- img2img / img2vid init image, and **multiple** reference images (e.g. Klein),
+- img2img / img2vid init image, and **multiple** reference images (e.g. Klein, or
+  Seedance reference-to-video),
 - last-frame / anchor frames for video, motion/structure **control** video,
+- **reference audio** and a **Generate Audio** soundtrack toggle for video models
+  that declare them (e.g. Seedance 2.0),
 - **voice cloning** (reference audio + reference transcript) for TTS,
 - IP-Adapter face/style folders.
 
@@ -213,6 +216,8 @@ The example connectors (mock, ComfyUI, fal.ai) ship in `remote_backends/`, are
 excluded from the built add-on.
 
 ## Change Log
+
+2026-06-25: Add: **One-click remote backends.** An **Adapter** dropdown (Mock / ComfyUI / fal.ai / Custom URL) plus **Start/Stop Backend** buttons launch a bundled connector with Blender's own Python — no console, no `pip`. Connectors are now **stdlib-only** (`remote_backends/_adapter_http.py` shared helpers), self-describe via `<name>.manifest.json`, and discovered models are cached (`discovery.json`) so they survive a restart. New **fal.ai** connector (queue REST) ships **Seedance 1.0 Pro / Pro Fast**, **Seedance 2.0 / Fast / Mini** (text-, image- and **reference-to-video** with up to 9 reference images), **seed-audio-1.0** TTS, and FLUX dev. Video models can declare `needs_audio_ref` (reference-audio picker) and `supports_audio_output` (**Generate Audio** soundtrack toggle → `generate_audio`). **Import Workflow** / **Open Folder** add ComfyUI workflows from inside Blender. Docs: `remote_backends/README.md`, [docs/BACKEND_CONTRACT_EXTENSIONS.md](docs/BACKEND_CONTRACT_EXTENSIONS.md).
 
 2026-06-24: Add: ComfyUI adapter — explicit node **bindings** for complex workflows. A `<id>.meta.json` `bindings` map names the exact `{node, input}` each request field (prompt/negative/width/height/steps/cfg/fps/num_frames/strength/seed) maps to, so parameters on non-obvious nodes (primitives, LLM prompt-enhance chains, identically-titled encoders) are reached when titling can't disambiguate. Ships a worked **LTX-Video 2.3 22B i2v** workflow (`remote_backends/comfyui_workflows/ltx-2.3-i2v.json`). Also: ComfyUI `/prompt` validation and runtime execution errors now surface their real cause, checkpoint names auto-resolve against the installed list (env override `COMFYUI_CKPT[_<ID>]`), negative seeds wrap to ComfyUI's valid range, and a per-job console log shows the incoming payload and patched node values.
 
