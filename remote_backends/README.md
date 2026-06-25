@@ -1,117 +1,94 @@
-# Pallaidium Remote Backends (test/reference servers)
+# Pallaidium Remote Backends (one-click connectors)
 
-Standalone servers that implement Pallaidium's **Backend Contract v0.1**. They
-are **separate from the add-on** — Pallaidium contains no provider code and only
-talks to whatever URL you configure, so these are swappable and optional.
+Pallaidium can generate through an **external backend** that speaks a small
+OpenAI-style `/v1` contract ("Backend Contract v0.1"). The add-on stays
+provider-agnostic — it only ever talks HTTP to a URL — so backends are swappable.
 
-Contract version targeted: **v0.1** (+ the additive reference fields in the
-add-on's `docs/BACKEND_CONTRACT_EXTENSIONS.md`).
+The connectors here are **stdlib-only**: the add-on launches one for you with
+Blender's own Python. **No `pip install`, no console.**
 
-## 1. `mock_backend.py` — local mock (free, no deps)
+## One-click flow (in Blender)
 
-Exercises the *entire* contract on your own machine: discovery, async
-image/video/audio jobs, `/v1/files` upload, progress, cancellation, and
-transcription. Returns small canned media (real PNG/WAV; real MP4 if `ffmpeg` is
-installed, otherwise a placeholder).
+1. **Edit → Preferences → Add-ons → Pallaidium → Remote Backend.**
+2. Set **Model Source** to *Remote* (or *Local & Remote*).
+3. Pick an **Adapter** from the dropdown:
+   - **Mock** — tiny canned media; verifies the wiring with zero setup.
+   - **ComfyUI** — forwards to a running ComfyUI (set the ComfyUI URL field; start ComfyUI first).
+   - **fal.ai** — cloud models; paste your key in **Remote Backend Key**.
+   - **Custom URL** — connect to a backend you started yourself (type its URL).
+4. Click **Start Backend**. The add-on launches the adapter on a free port, fills
+   in the URL, and loads the models. Generate as usual; click **Stop Backend** when done.
 
-```bash
-python mock_backend.py --port 8000
-```
+The adapter's log is written to `<Blender DATAFILES>/Pallaidium/adapter_<id>.log`.
 
-In Pallaidium → Preferences → Remote Backend:
-- **Remote Backend URL** = `http://localhost:8000`
-- **Model Source** = Remote (or Local & Remote)
-- click **Refresh Remote Models** → `mock-image / mock-video / mock-tts / mock-asr`
+## Adding ComfyUI workflows (no console)
 
-Use this for development and CI. For genuine video, install `ffmpeg` or use a
-real backend below.
+Every ComfyUI "model" is a **workflow graph**. With the ComfyUI adapter selected:
 
-## 2. `fal_adapter.py` — reference cloud adapter (fal.ai)
+- **Import Workflow** — pick a workflow exported from ComfyUI with
+  *Settings → enable Dev mode → Save (API Format)*. It's copied into
+  `comfyui_workflows/` and becomes a `[Remote] <filename>` model (the backend
+  auto-reloads if it's running).
+- **Open Folder** — opens `comfyui_workflows/` to manage files directly.
 
-Forwards the contract to **fal.ai** so you can generate with real models such as
-ByteDance **Seedance** video and FLUX image. This is a reference — adjust the
-`MODELS` table and per-model argument mapping to the fal endpoints you use.
+Prompt / negative / size / steps / cfg / seed / reference image(s) are injected
+into the graph **by node title**; complex graphs use a `<id>.meta.json` sidecar
+with explicit `bindings`. Full convention: [`comfyui_workflows/README.md`](comfyui_workflows/README.md).
 
-```bash
-pip install -r requirements.txt
-export FAL_KEY=...                 # PowerShell: $env:FAL_KEY="..."  |  cmd: set FAL_KEY=...
-uvicorn fal_adapter:app --port 8000
-```
+## The three bundled connectors
 
-Then point the add-on at `http://localhost:8000` and Refresh as above.
+| File | What it does | Config |
+|---|---|---|
+| `mock_backend.py` | Canned PNG/WAV/MP4 for every contract path | none |
+| `comfyui_adapter.py` | Maps each model to a ComfyUI workflow graph | ComfyUI URL |
+| `fal_adapter.py` | Forwards to fal.ai's queue REST API | `FAL_KEY` |
 
-## 3. `comfyui_adapter.py` — local ComfyUI adapter
-
-Forwards the contract to a running **ComfyUI** server, mapping each model to a
-workflow graph. Built-in templates: SDXL / SD 1.5 txt2img + img2img, and
-**LTX-Video** txt2video + image-to-video. Pallaidium's prompt / size / steps /
-guidance / seed / init image are injected into the graph; ComfyUI runs locally so
-there is no per-image cloud cost.
-
-`COMFYUI_URL` defaults to `http://127.0.0.1:8188`, so if ComfyUI is on the
-default port you can **skip setting it** entirely:
+Each ships a `<name>.manifest.json` that the add-on reads to build the Adapter
+dropdown and its config fields. You can still run any of them by hand:
 
 ```bash
-pip install -r requirements.txt
-uvicorn comfyui_adapter:app --port 8000
+python comfyui_adapter.py --port 8000 --comfyui-url http://127.0.0.1:8188
+python fal_adapter.py     --port 8000 --fal-key YOUR_KEY
+python mock_backend.py    --port 8000
 ```
 
-To point at a non-default ComfyUI address, set `COMFYUI_URL` first — the syntax
-depends on your shell:
+…then choose **Custom URL** and point the add-on at `http://localhost:8000`.
 
-```bash
-# Linux / macOS (bash)
-export COMFYUI_URL=http://127.0.0.1:8188
-```
-```powershell
-# Windows PowerShell
-$env:COMFYUI_URL="http://127.0.0.1:8188"
-```
-```bat
-:: Windows Command Prompt (cmd.exe) — no spaces around =, no quotes
-set COMFYUI_URL=http://127.0.0.1:8188
-```
+## Write your own connector
 
-Then run `uvicorn comfyui_adapter:app --port 8000`, point the add-on at
-`http://localhost:8000`, and Refresh as above. (On startup the adapter prints
-whether it could reach ComfyUI.)
+1. Create `myservice_adapter.py` next to these. Implement the contract endpoints
+   you need (`GET /v1/health`, `GET /v1/models`, `POST /v1/images/generations`
+   and/or `/v1/videos` / `/v1/audio/speech`, `GET /v1/jobs/{id}`, `POST /v1/files`,
+   `GET /v1/files/{id}`). The shared helpers in [`_adapter_http.py`](_adapter_http.py)
+   give you a stdlib `BaseAdapterHandler`, multipart parsing, and `urllib` JSON/
+   bytes/multipart calls — copy the structure of `comfyui_adapter.py`.
+2. Add a `myservice_adapter.manifest.json`:
+   ```json
+   {
+     "id": "myservice",
+     "label": "My Service",
+     "entry": "myservice_adapter.py",
+     "order": 3,
+     "description": "What it does.",
+     "default_port": 8000,
+     "config_fields": [
+       {"key": "MYSERVICE_KEY", "arg": "--key", "pref": "remote_backend_key",
+        "label": "API Key", "type": "secret", "default": ""}
+     ],
+     "supports_workflow_import": false
+   }
+   ```
+   `config_fields[].pref` names the Blender preference the value comes from
+   (`remote_backend_key` for a secret, or `comfyui_url`); each becomes both an
+   env var (`key`) and, if `arg` is set, a CLI flag.
+3. Restart Blender — your connector appears in the Adapter dropdown. **No add-on
+   code changes needed.** Keep it stdlib-only so the add-on can launch it.
 
-### Adding your own models = dropping in workflow files (recommended)
-
-Every ComfyUI "model" is a **workflow graph**, so the adapter loads them from
-files. Export a workflow from ComfyUI in **API format** (Settings → enable Dev
-mode → *Save (API Format)*) into **`comfyui_workflows/`** next to the adapter.
-Each `<id>.json` becomes a `[Remote] <id>` model; its media type is auto-detected
-from the output node and your prompt / negative / seed / size / reference
-image(s) are injected **by node title**. Optional `<id>.meta.json` sets a pretty
-display name and overrides. Full convention: see
-[`comfyui_workflows/README.md`](comfyui_workflows/README.md). This is how to wire
-custom models such as character-replacement, video-edit, image-edit, or audio
-graphs — no adapter code changes needed.
-
-### Built-in example templates
-
-The adapter also ships hardcoded reference graphs: `[Remote] SDXL Base`,
-`[Remote] SD 1.5` (txt2img + img2img), and `[Remote] LTX-Video 2B` (txt2video +
-i2v). For these you need the named checkpoints in `models/checkpoints/`.
-
-In ComfyUI you must have the models each workflow/template uses, plus — for any
-mp4 video output — the
-[VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite)
-custom node (`VHS_VideoCombine`).
-
-### Swapping providers
-
-The contract is provider-agnostic. To target Replicate, Atlas Cloud, a
-self-hosted server, etc., write another adapter that exposes the same `/v1/*`
-endpoints — **no changes to Pallaidium are needed**. You can even run several
-adapters and switch by changing the Remote Backend URL.
-
-## Endpoints implemented
+## Contract endpoints
 
 `GET /v1/health`, `GET /v1/models`, `POST /v1/videos`,
 `POST /v1/images/generations`, `POST /v1/audio/speech`,
 `POST /v1/audio/transcriptions`, `POST /v1/files`, `GET /v1/files/{id}`,
-`GET /v1/jobs/{id}`.
-
-A backend only needs the endpoints for the capabilities it offers.
+`GET /v1/jobs/{id}`. A backend only needs the endpoints for the capabilities it
+offers. See [`../docs/BACKEND_CONTRACT_EXTENSIONS.md`](../docs/BACKEND_CONTRACT_EXTENSIONS.md)
+for discovery hints (`display_name`, `max_ref_images`, `default_steps`, …).

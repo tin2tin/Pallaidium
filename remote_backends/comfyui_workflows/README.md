@@ -2,7 +2,12 @@
 
 Drop ComfyUI **API-format** workflow exports here. `comfyui_adapter.py` registers
 each `*.json` as a remote model, so it shows up in Pallaidium as
-`[Remote] <name>` after you click *Refresh Remote Models*.
+`[Remote] <name>`.
+
+> **Easiest way:** in Pallaidium's **Remote Backend** preferences, with the
+> **ComfyUI** adapter selected, click **Import Workflow** to copy a `.json` in
+> here (the running backend reloads automatically), or **Open Folder** to manage
+> these files. You only need the manual steps below when crafting the export.
 
 ## 1. Export a workflow from ComfyUI
 

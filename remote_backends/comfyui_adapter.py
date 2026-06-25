@@ -4,6 +4,9 @@ A small local service that implements the contract and forwards generation to a
 running **ComfyUI** server. Pallaidium stays provider-agnostic; all ComfyUI
 specifics (the workflow graphs, node ids, checkpoint names) live here.
 
+**Stdlib only** — no fastapi / uvicorn / httpx. The Pallaidium add-on can launch
+this with Blender's own Python (no ``pip install``); you can also run it by hand.
+
 Unlike fal/Replicate, ComfyUI has no per-task REST endpoints. It runs *workflow
 graphs*: you POST a graph (API-format JSON) to `/prompt`, poll `/history/{id}`
 for the result, and fetch bytes from `/view`. So this adapter maps each contract
@@ -33,13 +36,12 @@ Two ways to add models:
 Requirements in ComfyUI: the models each workflow/template uses, plus the
 **VideoHelperSuite** custom node (`VHS_VideoCombine`) for mp4 video output.
 
-Run:
-    pip install -r requirements.txt
-    set COMFYUI_URL=http://127.0.0.1:8188   # default; PowerShell: $env:COMFYUI_URL=...
-    uvicorn comfyui_adapter:app --port 8000
+Run (or let Pallaidium's "Start Backend" button do it):
+    python comfyui_adapter.py --port 8000 --comfyui-url http://127.0.0.1:8188
 
-Then in Pallaidium preferences set Remote Backend URL = http://localhost:8000,
-switch Model Source to Remote, and click "Refresh Remote Models".
+Then in Pallaidium preferences the backend URL is filled in automatically; if you
+run it by hand, set Remote Backend URL = http://localhost:8000, switch Model
+Source to Remote, and click "Refresh Remote Models".
 """
 
 import os
@@ -47,13 +49,13 @@ import json
 import copy
 import uuid
 import base64
+import argparse
 from pathlib import Path
 
-import httpx
-from fastapi import FastAPI, UploadFile, Form, Response
-from fastapi.responses import JSONResponse
-
-app = FastAPI(title="Pallaidium <-> ComfyUI adapter")
+from _adapter_http import (
+    BaseAdapterHandler, serve,
+    get_json, get_bytes, post_json, post_multipart,
+)
 
 CONTRACT_VERSIONS = ["v0.1"]
 COMFYUI_URL = os.environ.get("COMFYUI_URL", "http://127.0.0.1:8188").rstrip("/")
@@ -205,15 +207,13 @@ def _detect_modes(mtype: str, n_images: int, n_videos: int = 0) -> list:
 
 
 # --------------------------------------------------------------------------
-# Contract endpoints
+# Contract route handlers — each returns (status_code, json_obj)
 # --------------------------------------------------------------------------
-@app.get("/v1/health")
-def health():
-    return {"status": "ok", "contract_versions": CONTRACT_VERSIONS}
+def route_health():
+    return 200, {"status": "ok", "contract_versions": CONTRACT_VERSIONS}
 
 
-@app.get("/v1/models")
-def models():
+def route_models():
     data = []
     for mid, spec in MODELS.items():
         entry = {"id": mid, "type": spec["type"], "modes": spec["modes"]}
@@ -223,89 +223,65 @@ def models():
             if k in spec:
                 entry[k] = spec[k]
         data.append(entry)
-    return {"data": data}
+    return 200, {"data": data}
 
 
-@app.post("/v1/files")
-async def upload(file: UploadFile, purpose: str = Form("reference")):
-    data = await file.read()
+def route_upload(files: dict, fields: dict):
+    """POST /v1/files — store one uploaded part for later use as a reference."""
+    if not files:
+        return 400, {"error": "no file part in multipart body"}
+    # The add-on posts a single 'file' part; take whichever part is present.
+    _name, ctype, data = next(iter(files.values()))
     fid = "file-" + uuid.uuid4().hex
-    _FILES[fid] = (data, file.content_type or "application/octet-stream")
-    return {"file_id": fid}
+    _FILES[fid] = (data, ctype or "application/octet-stream")
+    return 200, {"file_id": fid}
 
 
-@app.get("/v1/files/{file_id}")
-def get_file(file_id: str):
-    item = _FILES.get(file_id)
-    if not item:
-        return JSONResponse({"error": "no such file"}, status_code=404)
-    data, ctype = item
-    return Response(content=data, media_type=ctype)
-
-
-@app.post("/v1/images/generations")
-async def images(payload: dict):
-    return _submit(payload, kind="image")
-
-
-@app.post("/v1/videos")
-async def videos(payload: dict):
-    return _submit(payload, kind="video")
-
-
-@app.post("/v1/audio/speech")
-async def audio(payload: dict):
-    return _submit(payload, kind="audio")
-
-
-@app.get("/v1/jobs/{job_id}")
-def job_status(job_id: str):
+def route_job_status(job_id: str):
     job = _JOBS.get(job_id)
     if not job:
-        return JSONResponse({"error": "no such job"}, status_code=404)
+        return 404, {"error": "no such job"}
 
     pid = job["prompt_id"]
     try:
-        with httpx.Client(timeout=30) as c:
-            hist = c.get(f"{COMFYUI_URL}/history/{pid}").json()
+        hist = get_json(f"{COMFYUI_URL}/history/{pid}", timeout=30)
     except Exception as e:  # noqa: BLE001
-        return {"id": job_id, "status": "failed", "error": f"comfyui unreachable: {e}"}
+        return 200, {"id": job_id, "status": "failed",
+                     "error": f"comfyui unreachable: {e}"}
 
     entry = hist.get(pid)
     # A failed run may have no outputs at all, so check the error state first.
     if entry:
         status = entry.get("status", {})
         if status.get("status_str") == "error":
-            return {"id": job_id, "status": "failed", "phase": "error",
-                    "progress": 0.0, "file_id": None,
-                    "error": _history_error(status)}
+            return 200, {"id": job_id, "status": "failed", "phase": "error",
+                         "progress": 0.0, "file_id": None,
+                         "error": _history_error(status)}
     if entry and entry.get("outputs"):
         view = _first_media_ref(entry["outputs"])
         if not view:
-            return {"id": job_id, "status": "failed", "error": "no media in outputs"}
+            return 200, {"id": job_id, "status": "failed",
+                         "error": "no media in outputs"}
         try:
-            with httpx.Client(timeout=300) as c:
-                r = c.get(f"{COMFYUI_URL}/view", params=view)
-                r.raise_for_status()
-                fid = "out-" + job_id
-                _FILES[fid] = (r.content, r.headers.get("content-type", "image/png"))
+            data, ctype = get_bytes(f"{COMFYUI_URL}/view", params=view, timeout=300)
+            fid = "out-" + job_id
+            _FILES[fid] = (data, ctype or "image/png")
         except Exception as e:  # noqa: BLE001
-            return {"id": job_id, "status": "failed", "error": f"fetch failed: {e}"}
-        return {"id": job_id, "status": "succeeded", "phase": "done",
-                "progress": 1.0, "file_id": fid, "error": None}
+            return 200, {"id": job_id, "status": "failed", "error": f"fetch failed: {e}"}
+        return 200, {"id": job_id, "status": "succeeded", "phase": "done",
+                     "progress": 1.0, "file_id": fid, "error": None}
 
     # Not finished yet: distinguish running vs queued via /queue.
     phase, progress, running = "queued", 0.0, False
     try:
-        with httpx.Client(timeout=10) as c:
-            q = c.get(f"{COMFYUI_URL}/queue").json()
+        q = get_json(f"{COMFYUI_URL}/queue", timeout=10)
         running = any(_pid_in(item, pid) for item in q.get("queue_running", []))
     except Exception:  # noqa: BLE001
         pass
     if running:
         phase, progress = "generating", 0.5
-    return {"id": job_id, "status": "running" if running else "queued",
-            "phase": phase, "progress": progress, "file_id": None, "error": None}
+    return 200, {"id": job_id, "status": "running" if running else "queued",
+                 "phase": phase, "progress": progress, "file_id": None, "error": None}
 
 
 # --------------------------------------------------------------------------
@@ -315,39 +291,36 @@ def _submit(payload: dict, kind: str):
     mid = payload.get("model")
     spec = MODELS.get(mid)
     if not spec:
-        return JSONResponse({"error": f"unknown model {mid!r}"}, status_code=400)
+        return 400, {"error": f"unknown model {mid!r}"}
 
     try:
         graph = _build_graph(payload, spec)
     except Exception as e:  # noqa: BLE001
-        return JSONResponse({"error": f"workflow build failed: {e}"}, status_code=400)
+        return 400, {"error": f"workflow build failed: {e}"}
 
     _log_patch(mid, spec, payload, graph)
 
     try:
-        with httpx.Client(timeout=60) as c:
-            r = c.post(f"{COMFYUI_URL}/prompt",
-                       json={"prompt": graph, "client_id": CLIENT_ID})
-            if r.status_code >= 400:
-                # ComfyUI validates the graph and returns a JSON body describing
-                # exactly what's wrong (missing node type, bad input, absent
-                # checkpoint, ...). Surface that instead of the bare status line.
-                detail = _comfy_error_detail(r)
-                return JSONResponse(
-                    {"error": f"comfyui /prompt rejected the graph "
-                              f"(HTTP {r.status_code}): {detail}"},
-                    status_code=502,
-                )
-            pid = r.json()["prompt_id"]
+        code, body = post_json(f"{COMFYUI_URL}/prompt",
+                               {"prompt": graph, "client_id": CLIENT_ID},
+                               timeout=60)
+        if code >= 400:
+            # ComfyUI validates the graph and returns a JSON body describing
+            # exactly what's wrong (missing node type, bad input, absent
+            # checkpoint, ...). Surface that instead of the bare status line.
+            detail = _comfy_error_detail(body)
+            return 502, {"error": f"comfyui /prompt rejected the graph "
+                                  f"(HTTP {code}): {detail}"}
+        pid = body["prompt_id"]
     except Exception as e:  # noqa: BLE001
-        return JSONResponse({"error": f"comfyui /prompt failed: {e}"}, status_code=502)
+        return 502, {"error": f"comfyui /prompt failed: {e}"}
 
     job_id = f"{kind}-{uuid.uuid4().hex}"
     _JOBS[job_id] = {"prompt_id": pid, "kind": kind, "model_id": mid}
-    return {"id": job_id, "status": "queued"}
+    return 200, {"id": job_id, "status": "queued"}
 
 
-def _comfy_error_detail(resp) -> str:
+def _comfy_error_detail(body) -> str:
     """Turn ComfyUI's /prompt error response into a compact, readable string.
 
     ComfyUI returns JSON like::
@@ -359,10 +332,8 @@ def _comfy_error_detail(resp) -> str:
     We flatten the top-level message plus every node error (node id + class +
     each message/details) so the cause is visible in Blender's queue error.
     """
-    try:
-        body = resp.json()
-    except Exception:  # noqa: BLE001 — not JSON; fall back to raw text
-        text = (resp.text or "").strip()
+    if not isinstance(body, dict):
+        text = (str(body) or "").strip()
         return text[:500] or "(empty response body)"
 
     parts: list = []
@@ -403,8 +374,7 @@ def _norm_seed(seed) -> int:
 def _available_checkpoints() -> list:
     """List checkpoint filenames ComfyUI currently offers (empty if unreachable)."""
     try:
-        with httpx.Client(timeout=10) as c:
-            info = c.get(f"{COMFYUI_URL}/object_info/CheckpointLoaderSimple").json()
+        info = get_json(f"{COMFYUI_URL}/object_info/CheckpointLoaderSimple", timeout=10)
         return list(info["CheckpointLoaderSimple"]["input"]["required"]["ckpt_name"][0])
     except Exception:  # noqa: BLE001 — fall back to the configured name
         return []
@@ -800,18 +770,17 @@ def _upload_source_video(payload: dict) -> str:
 def _upload_to_comfy(data: bytes, fname: str, content_type: str) -> str:
     """POST bytes to ComfyUI /upload/image (used for images and videos);
     return the stored name (with subfolder)."""
-    with httpx.Client(timeout=120) as c:
-        r = c.post(f"{COMFYUI_URL}/upload/image",
-                   files={"image": (fname, data, content_type)},
-                   data={"overwrite": "true"})
-        r.raise_for_status()
-        info = r.json()
+    info = post_multipart(f"{COMFYUI_URL}/upload/image",
+                          files={"image": (fname, data, content_type)},
+                          data={"overwrite": "true"}, timeout=120)
+    if not isinstance(info, dict):
+        raise RuntimeError(f"comfyui /upload/image returned: {str(info)[:200]}")
     name = info.get("name", fname)
     sub = info.get("subfolder")
     return f"{sub}/{name}" if sub else name
 
 
-def _first_media_ref(outputs: dict) -> dict | None:
+def _first_media_ref(outputs: dict):
     """Find the first media output and return /view query params for it.
 
     Checks known keys first — SaveImage (`images`), VideoHelperSuite/animated
@@ -877,21 +846,76 @@ def _pid_in(queue_item, pid: str) -> bool:
 def _check_comfyui() -> None:
     """Ping COMFYUI_URL once at startup and print a clear status line."""
     try:
-        with httpx.Client(timeout=5) as c:
-            r = c.get(f"{COMFYUI_URL}/system_stats")
-            r.raise_for_status()
+        get_json(f"{COMFYUI_URL}/system_stats", timeout=5)
         print(f"[comfyui] connected to ComfyUI at {COMFYUI_URL}")
     except Exception as e:  # noqa: BLE001
         print("=" * 70)
         print(f"[comfyui] WARNING: could not reach ComfyUI at {COMFYUI_URL}")
         print(f"          ({type(e).__name__}: {e})")
         print("          Start ComfyUI first (its console prints the address,")
-        print("          e.g. http://127.0.0.1:8188), then set COMFYUI_URL to it:")
-        print('            PowerShell:  $env:COMFYUI_URL="http://127.0.0.1:8188"')
-        print("          The adapter will keep running and retry on each request.")
+        print("          e.g. http://127.0.0.1:8188). The adapter keeps running")
+        print("          and retries on each request.")
         print("=" * 70)
 
 
-# Discover workflow-file models at import time so /v1/models lists them.
-_discover_workflows()
-_check_comfyui()
+# --------------------------------------------------------------------------
+# HTTP handler — routes the contract endpoints to the functions above
+# --------------------------------------------------------------------------
+class Handler(BaseAdapterHandler):
+    log_tag = "comfyui"
+
+    def do_GET(self):
+        path = self.path.split("?")[0]
+        if path == "/v1/health":
+            return self.send_json(*_swap(route_health()))
+        if path == "/v1/models":
+            return self.send_json(*_swap(route_models()))
+        if path.startswith("/v1/jobs/"):
+            return self.send_json(*_swap(route_job_status(path.rsplit("/", 1)[1])))
+        if path.startswith("/v1/files/"):
+            fid = path.rsplit("/", 1)[1]
+            item = _FILES.get(fid)
+            if not item:
+                return self.send_json({"error": "no such file"}, 404)
+            data, ctype = item
+            return self.send_bytes(data, ctype)
+        return self.send_json({"error": "not found"}, 404)
+
+    def do_POST(self):
+        path = self.path.split("?")[0]
+        if path == "/v1/files":
+            fields, files = self.read_multipart()
+            return self.send_json(*_swap(route_upload(files, fields)))
+        if path in ("/v1/videos", "/v1/images/generations", "/v1/audio/speech"):
+            payload = self.read_json()
+            kind = {"/v1/videos": "video", "/v1/images/generations": "image",
+                    "/v1/audio/speech": "audio"}[path]
+            return self.send_json(*_swap(_submit(payload, kind)))
+        return self.send_json({"error": "not found"}, 404)
+
+
+def _swap(result):
+    """Route fns return (code, obj); send_json takes (obj, code)."""
+    code, obj = result
+    return obj, code
+
+
+def main():
+    global COMFYUI_URL
+    ap = argparse.ArgumentParser(description="Pallaidium <-> ComfyUI adapter")
+    ap.add_argument("--port", type=int, default=8000)
+    ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("--comfyui-url", default=COMFYUI_URL,
+                    help="Base URL of the running ComfyUI server")
+    args = ap.parse_args()
+    COMFYUI_URL = args.comfyui_url.rstrip("/")
+
+    # Discover workflow-file models so /v1/models lists them, then ping ComfyUI.
+    _discover_workflows()
+    _check_comfyui()
+    serve(Handler, host=args.host, port=args.port,
+          banner=f"[comfyui] forwarding to ComfyUI at {COMFYUI_URL}")
+
+
+if __name__ == "__main__":
+    main()

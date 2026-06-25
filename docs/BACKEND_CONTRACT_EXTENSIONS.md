@@ -20,108 +20,69 @@ expose that input. None of this breaks a v0.1-only backend.
 
 This walks you from nothing to generating with a remote model. It uses the
 included **local mock** first (zero cost, no account), then shows the **cloud
-adapter** for real models. Everything runs on your own computer.
+adapter** and **ComfyUI**. Everything runs on your own computer, and Pallaidium
+launches the connectors for you — **no console, no `pip install`**.
 
-> The example servers ship in the project's **`remote_backends/`** folder (mock +
-> fal.ai adapter + their README). They are **not** part of the installable add-on
-> (excluded from the built extension and never imported by Blender) — Pallaidium
-> only talks to a URL. Run the commands below *from that folder*. It sits next to
-> this `docs/` folder inside the Pallaidium source, e.g.:
->
-> - find your Pallaidium install path (shown in Blender → Preferences → Add-ons →
->   Pallaidium → the file path under the add-on name), then `cd` into its
->   `remote_backends` subfolder, **or**
-> - copy the `remote_backends/` folder anywhere with Python installed and run it
->   there. It only needs Python 3 (the mock has no dependencies).
+> The example connectors ship in the project's **`remote_backends/`** folder
+> (mock + ComfyUI + fal.ai + their README). They are **stdlib-only** and **not**
+> part of the installable add-on (excluded from the built extension) — Pallaidium
+> only ever talks to a URL. Pallaidium starts the one you pick using Blender's own
+> Python; you can still run them by hand (see § B/C) and choose **Custom URL**.
 
 ### A. Try it with the local mock (recommended first)
 
-1. **Start the mock server** (stdlib only, no install needed) — from the
-   `remote_backends` folder:
-   ```bash
-   cd <pallaidium>/remote_backends      # the folder beside docs/
-   python mock_backend.py --port 8000
-   ```
-   On Windows the path looks like
-   `…\extensions\user_default\pallaidium_generative_ai\remote_backends`.
-   It prints `Mock backend on http://127.0.0.1:8000`. (Install `ffmpeg` if you
-   want it to return a real playable video; otherwise video is a placeholder.)
-
-2. **Point Pallaidium at it.** In Blender: **Edit → Preferences → Add-ons →
-   Pallaidium**, open the **Remote Backend** box and set:
+1. In Blender: **Edit → Preferences → Add-ons → Pallaidium**, open the **Remote
+   Backend** box and set:
    - **Model Source** → `Remote` (or `Local & Remote` to keep local models too)
-   - **Remote Backend URL** → `http://localhost:8000`
-   - **Remote Backend Key** → leave empty (the mock needs none)
+   - **Adapter** → `Mock (local test, no deps)`
 
-3. **Load the models.** Click **Refresh Remote Models**. You should see a report
-   like “Loaded 4 remote model(s)”. They appear in the dropdowns prefixed
-   `[Remote]` (`mock-image`, `mock-video`, `mock-tts`, `mock-asr`).
+2. Click **Start Backend**. Pallaidium launches the mock on a free port, fills in
+   the URL, and reports e.g. “Mock started — 4 model(s) loaded”. The models appear
+   in the dropdowns prefixed `[Remote]` (`mock-image`, `mock-video`, `mock-tts`,
+   `mock-asr`). (Install `ffmpeg` if you want real playable video from the mock.)
 
-4. **Generate.** In the VSE sidebar (**N-panel → Generative AI**): pick an Output
+3. **Generate.** In the VSE sidebar (**N-panel → Generative AI**): pick an Output
    type, choose a `[Remote]` model, type a prompt, and click **Generate**. Watch
    the queue panel show *generating* / progress; the result is downloaded and
-   added to the timeline. **Cancel** mid-job ends it as *Cancelled*.
+   added to the timeline. **Cancel** mid-job ends it as *Cancelled*. Click **Stop
+   Backend** when finished.
 
-If Refresh reports an error, the message tells you what failed (bad URL,
-unreachable server, or an unsupported contract version).
+If Start reports an error, the message (and the log at
+`<Blender DATAFILES>/Pallaidium/adapter_mock.log`) tells you what failed.
 
 ### B. Switch to a real cloud backend (e.g. Seedance video via fal.ai)
 
-The contract is provider-agnostic; a small **adapter** translates it to a
-provider. The included reference adapter targets **fal.ai**:
+The included **fal.ai** connector forwards the contract to fal's cloud:
 
-1. **Install and run the adapter** (from the `remote_backends` folder):
-   ```bash
-   cd <pallaidium>/remote_backends
-   pip install -r requirements.txt
-   export FAL_KEY=...        # PowerShell: $env:FAL_KEY="..."  |  cmd: set FAL_KEY=...
-   uvicorn fal_adapter:app --port 8000
-   ```
-   The API key stays here, in the adapter — never in Blender.
+1. **Model Source** → `Remote`, **Adapter** → `fal.ai (cloud)`.
+2. Paste your fal key into **Remote Backend Key** (it is passed to the connector
+   as `FAL_KEY`; it is never sent to Blender's own servers).
+3. Click **Start Backend**, then generate as in § A.3 — `[Remote] FLUX`,
+   `[Remote] Seedance`, etc. now produce real cloud results.
 
-2. In Pallaidium, keep **Remote Backend URL** = `http://localhost:8000`, click
-   **Refresh Remote Models**, and generate as in step A.4. Now `[Remote] Seedance`
-   etc. produce real cloud results.
-
-To use a different provider (Replicate, Atlas Cloud, a self-hosted server, …),
-run an adapter exposing the same `/v1/*` endpoints and change only the URL —
-**no add-on changes needed**.
+Prefer to run it yourself? `python fal_adapter.py --port 8000 --fal-key YOUR_KEY`,
+then choose **Custom URL** = `http://localhost:8000`. To target a different
+provider, drop a stdlib `<name>_adapter.py` + `<name>.manifest.json` into
+`remote_backends/` and it appears in the Adapter dropdown — **no add-on changes**.
 
 ### C. Run models locally with ComfyUI
 
-If you already use **ComfyUI**, the included `comfyui_adapter.py` drives it
-through the contract — fully local, no cloud cost. In ComfyUI every "model" is a
-*workflow graph*, so you add models by dropping **workflow files** into a folder;
-the adapter exposes each one and injects Pallaidium's prompt / size / seed /
-reference image(s) into it.
+If you already use **ComfyUI**, the included connector drives it through the
+contract — fully local, no cloud cost. In ComfyUI every "model" is a *workflow
+graph*, so you add models by importing **workflow files**.
 
 1. **Start ComfyUI** (default `http://127.0.0.1:8188`).
 
-2. **Run the adapter** (from the `remote_backends` folder). `COMFYUI_URL`
-   defaults to `http://127.0.0.1:8188`, so on the default port you can skip
-   setting it:
-   ```bash
-   cd <pallaidium>/remote_backends
-   pip install -r requirements.txt
-   uvicorn comfyui_adapter:app --port 8000
-   ```
-   For a non-default ComfyUI address, set `COMFYUI_URL` first — the syntax
-   depends on your shell:
-   ```bash
-   export COMFYUI_URL=http://127.0.0.1:8188          # Linux / macOS (bash)
-   ```
-   ```powershell
-   $env:COMFYUI_URL="http://127.0.0.1:8188"          # Windows PowerShell
-   ```
-   ```bat
-   set COMFYUI_URL=http://127.0.0.1:8188             :: Windows cmd.exe (no spaces/quotes)
-   ```
-   The adapter prints on startup whether it could reach ComfyUI.
+2. In Pallaidium: **Model Source** → `Remote`, **Adapter** → `ComfyUI (local)`.
+   Set **ComfyUI URL** if yours isn't on the default address, then click **Start
+   Backend**. The connector's log notes whether it reached ComfyUI.
 
 3. **Add your models as workflow files.** In ComfyUI: **Settings → enable
-   "Dev mode"**, build/open a workflow, then **Save (API Format)** into
-   `remote_backends/comfyui_workflows/`. Each `<id>.json` becomes a
-   `[Remote] <id>` model. The adapter:
+   "Dev mode"**, build/open a workflow, then **Save (API Format)**. Back in
+   Pallaidium click **Import Workflow** and pick that `.json` (or **Open Folder**
+   and drop files into `remote_backends/comfyui_workflows/` yourself). Each
+   `<id>.json` becomes a `[Remote] <id>` model and the running backend reloads
+   automatically. The adapter:
    - detects the **media type** from the output node (`SaveImage` → image,
      `VHS_VideoCombine`/`SaveVideo`/`SaveAnimatedWEBP`/`SaveWEBM` → video,
      `SaveAudio*` → audio);
@@ -143,12 +104,13 @@ reference image(s) into it.
    output needs the **VideoHelperSuite** custom node (`VHS_VideoCombine`).
    Full convention: `remote_backends/comfyui_workflows/README.md`.
 
-4. In Pallaidium, keep **Remote Backend URL** = `http://localhost:8000`, click
-   **Refresh Remote Models**, and generate as in step A.4 — your ComfyUI
-   workflows now run from the VSE.
+   The imported model appears right away (the running backend reloads); otherwise
+   click **Refresh Models**. Generate as in § A.3 — your ComfyUI workflows now run
+   from the VSE.
 
 ### D. Configure without the UI (optional)
 
+This applies to the **Custom URL** adapter (when you start a connector yourself).
 Instead of the preference fields you can set environment variables before
 launching Blender; the URL/key fields fall back to them when left empty:
 
@@ -172,12 +134,13 @@ set PALLAIDIUM_BACKEND_KEY=             :: optional
 
 | Symptom | Likely cause / fix |
 |---|---|
-| Refresh: “connection failed” | Server not running, or wrong port/URL |
+| Start Backend fails immediately | See the connector log at `<Blender DATAFILES>/Pallaidium/adapter_<id>.log` |
+| “Could not locate Blender's Python …” | Rare; use **Custom URL** and start a connector by hand instead |
 | Refresh: “Backend speaks […], add-on needs 'v0.1'” | Backend advertises a different `contract_versions` |
-| Dropdown shows “No remote … — click Refresh” | You switched to Remote but haven’t refreshed yet |
-| Remote models gone after restarting Blender | Expected — click **Refresh Remote Models** again |
+| Dropdown shows “No remote … — click Refresh” | You switched to Remote but haven’t started/refreshed yet |
+| fal.ai: “FAL_KEY is not set” | Paste your key into **Remote Backend Key**, then **Start Backend** |
 | Video strip won’t play (mock) | Mock placeholder; install `ffmpeg` or use a real backend |
-| ComfyUI: workflow not listed | Must be **API-format** export, in `comfyui_workflows/`; restart the adapter (it scans at startup) |
+| ComfyUI: workflow not listed | Must be **API-format** export; use **Import Workflow** (it reloads the backend) |
 | ComfyUI: prompt/seed ignored | Title the nodes (`prompt`, `negative`, …); seed needs a `seed`/`noise_seed` input present |
 | ComfyUI: "no media in outputs" | Workflow has no recognised save node, or a node/model is missing in ComfyUI |
 

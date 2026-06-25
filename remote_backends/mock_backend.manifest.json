@@ -1,0 +1,10 @@
+{
+  "id": "mock",
+  "label": "Mock (local test, no deps)",
+  "entry": "mock_backend.py",
+  "order": 0,
+  "description": "Local mock backend. Exercises the whole contract with tiny canned media (PNG/WAV/MP4). No GPU, no account, no install — use it to verify the wiring.",
+  "default_port": 8000,
+  "config_fields": [],
+  "supports_workflow_import": false
+}

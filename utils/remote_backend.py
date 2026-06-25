@@ -311,6 +311,51 @@ def client_from_prefs(prefs, timeout: float = 60.0) -> RemoteBackendClient:
     return RemoteBackendClient(url, key, timeout=timeout)
 
 
+# ---------------------------------------------------------------------------
+# Discovery cache — persist the last /v1/models list so remote models survive a
+# Blender restart without re-querying the backend (cineloom-style).
+# ---------------------------------------------------------------------------
+
+def _datafiles_dir() -> str:
+    try:
+        import bpy
+        d = os.path.join(bpy.utils.user_resource("DATAFILES", create=True), "Pallaidium")
+    except Exception:  # noqa: BLE001 — outside Blender (tests)
+        d = os.path.join(os.path.expanduser("~"), ".pallaidium")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _discovery_cache_path() -> str:
+    return os.path.join(_datafiles_dir(), "discovery.json")
+
+
+def save_discovery_cache(url: str, entries: list) -> None:
+    """Persist the discovered model list for ``url`` to discovery.json."""
+    try:
+        with open(_discovery_cache_path(), "w", encoding="utf-8") as f:
+            json.dump({"url": url, "at": time.time(), "entries": entries}, f)
+    except Exception as e:  # noqa: BLE001 — cache is best-effort
+        print(f"[pallaidium] could not write discovery cache: {e}")
+
+
+def load_discovery_cache(url: str = "") -> list:
+    """Return cached model entries, or [] if absent.
+
+    If ``url`` is given, only return the cache when it matches the cached URL
+    (so stale models from a different backend aren't shown).
+    """
+    try:
+        with open(_discovery_cache_path(), encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:  # noqa: BLE001 — no/with bad cache -> nothing to load
+        return []
+    if url and data.get("url") and data["url"].rstrip("/") != url.rstrip("/"):
+        return []
+    entries = data.get("entries")
+    return entries if isinstance(entries, list) else []
+
+
 def _download_absolute(url: str, timeout: float):
     """GET an absolute URL that is not under our base_url (e.g. a CDN link)."""
     req = urllib.request.Request(url, method="GET")

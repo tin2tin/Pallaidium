@@ -69,6 +69,72 @@ def _text_enum_items(self, context):
     return get_enum_items("text", getattr(self, "model_source", "LOCAL"))
 
 
+# ---------------------------------------------------------------------------
+# Remote-backend adapter enum + shared discovery helpers
+# ---------------------------------------------------------------------------
+
+# Cached so the dynamic-enum strings aren't garbage-collected (Blender quirk).
+_adapter_enum_cache = [("CUSTOM", "Custom URL", "", 0)]
+
+
+def _remote_adapter_items(self, context):
+    """Enum of the bundled adapters in remote_backends/ + a Custom URL entry."""
+    global _adapter_enum_cache
+    items = []
+    try:
+        from ..utils.adapter_launcher import discover_adapters
+        for i, m in enumerate(discover_adapters()):
+            items.append((m["id"], m.get("label", m["id"]),
+                          m.get("description", ""), i))
+    except Exception as e:  # noqa: BLE001 — never let the UI enum raise
+        print("[pallaidium] adapter discovery failed:", e)
+    items.append(("CUSTOM", "Custom URL",
+                  "Connect to a backend you start yourself", len(items)))
+    _adapter_enum_cache = items
+    return _adapter_enum_cache
+
+
+def _wrap_text(s, width=64):
+    import textwrap
+    return textwrap.wrap(s, width) or [s]
+
+
+def _autoselect_remote_models(prefs):
+    """Point each media dropdown at the first available model after a refresh."""
+    from ..models import get_enum_items
+    for media_type, prop in (
+        ("video", "movie_model_card"), ("image", "image_model_card"),
+        ("audio", "audio_model_card"), ("text", "text_model_card"),
+    ):
+        try:
+            items = get_enum_items(media_type, getattr(prefs, "model_source", "LOCAL"))
+            if items:
+                setattr(prefs, prop, items[0][0])
+        except Exception:  # noqa: BLE001 — selection is best-effort
+            pass
+
+
+def _discover_and_register(prefs) -> int:
+    """Query the backend's /v1/models, register them, cache them, auto-select.
+
+    Shared by the Start, Refresh and Import operators. Raises on any backend /
+    transport / contract failure so the caller can report it.
+    """
+    from ..utils.remote_backend import client_from_prefs, save_discovery_cache
+    from ..models import register_remote_models
+    client = client_from_prefs(prefs)
+    client.check_compatible()
+    entries = client.models()
+    count = register_remote_models(entries, prefs)
+    try:
+        save_discovery_cache(getattr(prefs, "remote_backend_url", ""), entries)
+    except Exception:  # noqa: BLE001 — cache is best-effort
+        pass
+    if count:
+        _autoselect_remote_models(prefs)
+    return count
+
+
 # Update wrappers: persist the selected MODEL_ID string alongside the enum
 # so we can restore the correct selection across Blender restarts without
 # relying on the enum's internal integer (which changes as plugins are added).
@@ -211,11 +277,26 @@ class GeneratorAddonPreferences(AddonPreferences):
     )
     remote_backend_key: bpy.props.StringProperty(
         name="Remote Backend Key",
-        description="Optional API key for the remote backend. Falls back to the "
+        description="API key for the remote backend / fal.ai. Falls back to the "
                     "PALLAIDIUM_BACKEND_KEY environment variable if left empty",
         default="",
         subtype="PASSWORD",
     )
+    remote_adapter: EnumProperty(
+        name="Adapter",
+        description="Which bundled connector to launch, or Custom URL to connect "
+                    "to a backend you start yourself",
+        items=_remote_adapter_items,
+    )
+    comfyui_url: StringProperty(
+        name="ComfyUI URL",
+        description="Address of your running ComfyUI server (start ComfyUI first)",
+        default="http://127.0.0.1:8188",
+    )
+    # Remote-backend runtime state (SKIP_SAVE — reset each session)
+    adapter_running:     BoolProperty(default=False, options={'SKIP_SAVE'})
+    adapter_port:        IntProperty(default=0,       options={'SKIP_SAVE'})
+    adapter_status_line: StringProperty(default="",   options={'SKIP_SAVE'})
     text_model_card: EnumProperty(
         name="Text Model",
         items=_text_enum_items,
@@ -352,12 +433,47 @@ class GeneratorAddonPreferences(AddonPreferences):
         rb.label(text="Remote Backend (OpenAI-/v1-dialect)", icon="WORLD")
         rb.prop(self, "model_source")
         if self.model_source in {"REMOTE", "BOTH"}:
-            rb.prop(self, "remote_backend_url")
-            rb.prop(self, "remote_backend_key")
-            rb.operator(
-                "pallaidium.refresh_remote_models",
-                text="Refresh Remote Models", icon="FILE_REFRESH",
-            )
+            from ..utils.adapter_launcher import get_manifest
+            rb.prop(self, "remote_adapter")
+            adapter_id = self.remote_adapter
+            man = None if adapter_id == "CUSTOM" else get_manifest(adapter_id)
+
+            # Per-adapter configuration.
+            if adapter_id == "CUSTOM":
+                rb.prop(self, "remote_backend_url")
+                rb.prop(self, "remote_backend_key")
+            else:
+                if man and man.get("description"):
+                    col = rb.column(align=True)
+                    col.scale_y = 0.7
+                    for line in _wrap_text(man["description"], 64):
+                        col.label(text=line)
+                for f in (man.get("config_fields") if man else None) or []:
+                    pref = f.get("pref")
+                    if pref and hasattr(self, pref):
+                        rb.prop(self, pref)
+
+            # Start / Stop + Refresh.
+            row = rb.row(align=True)
+            if self.adapter_running and adapter_id != "CUSTOM":
+                row.operator("pallaidium.stop_backend",
+                             text="Stop Backend", icon="CANCEL")
+                row.operator("pallaidium.refresh_remote_models",
+                             text="Refresh Models", icon="FILE_REFRESH")
+            else:
+                txt = "Connect & Load Models" if adapter_id == "CUSTOM" else "Start Backend"
+                row.operator("pallaidium.start_backend", text=txt, icon="PLAY")
+
+            if self.adapter_status_line:
+                rb.label(text=self.adapter_status_line, icon="INFO")
+
+            # ComfyUI: add / browse workflow files without leaving Blender.
+            if man and man.get("supports_workflow_import"):
+                wf = rb.row(align=True)
+                wf.operator("pallaidium.import_comfy_workflow",
+                            text="Import Workflow", icon="IMPORT")
+                wf.operator("pallaidium.open_workflows_folder",
+                            text="Open Folder", icon="FILE_FOLDER")
 
         box.prop(self, "generator_ai")
         box.prop(self, "hf_cache_dir")
@@ -401,40 +517,139 @@ class PALLAIDIUM_OT_refresh_remote_models(Operator):
                       "list, and make those models selectable in the dropdowns")
 
     def execute(self, context):
-        from ..utils.remote_backend import client_from_prefs, RemoteBackendError
-        from ..models import register_remote_models
-
         prefs = context.preferences.addons[ADDON_ID].preferences
         try:
-            client = client_from_prefs(prefs)
-            client.check_compatible()
-            entries = client.models()
-        except RemoteBackendError as e:
+            count = _discover_and_register(prefs)
+        except Exception as e:  # noqa: BLE001 — surface any failure cleanly
             self.report({'ERROR'}, f"Remote backend: {e}")
             return {'CANCELLED'}
-        except Exception as e:  # noqa: BLE001 — surface any failure cleanly
-            self.report({'ERROR'}, f"Remote backend error: {e}")
-            return {'CANCELLED'}
 
-        count = register_remote_models(entries, prefs)
         if count == 0:
             self.report({'WARNING'}, "Backend returned no models.")
         else:
-            # Auto-select the first available model in each dropdown so the
-            # enums are populated immediately (avoids the "matches no enum"
-            # fallback warning when the previous selection is gone).
-            from ..models import get_enum_items
-            for media_type, prop in (
-                ("video", "movie_model_card"),
-                ("image", "image_model_card"),
-                ("audio", "audio_model_card"),
-                ("text", "text_model_card"),
-            ):
-                try:
-                    items = get_enum_items(media_type, getattr(prefs, "model_source", "LOCAL"))
-                    if items:
-                        setattr(prefs, prop, items[0][0])
-                except Exception:  # noqa: BLE001 — selection is best-effort
-                    pass
             self.report({'INFO'}, f"Loaded {count} remote model(s).")
+        return {'FINISHED'}
+
+
+class PALLAIDIUM_OT_start_backend(Operator):
+    """Launch the selected adapter, fill in its URL, and load its models."""
+    bl_idname = "pallaidium.start_backend"
+    bl_label = "Start Backend"
+    bl_description = ("Launch the selected adapter (or connect to the Custom URL) "
+                      "and load its models into the dropdowns")
+
+    def execute(self, context):
+        prefs = context.preferences.addons[ADDON_ID].preferences
+        adapter_id = getattr(prefs, "remote_adapter", "CUSTOM")
+
+        # Custom URL: nothing to launch — just discover against the typed URL.
+        if adapter_id == "CUSTOM":
+            try:
+                count = _discover_and_register(prefs)
+            except Exception as e:  # noqa: BLE001
+                prefs.adapter_status_line = "Connection failed (see info bar)"
+                self.report({'ERROR'}, f"Remote backend: {e}")
+                return {'CANCELLED'}
+            prefs.adapter_running = False
+            prefs.adapter_status_line = f"Custom URL — {count} model(s) loaded"
+            self.report({'INFO'}, f"Loaded {count} remote model(s).")
+            return {'FINISHED'}
+
+        from ..utils import adapter_launcher as AL
+        manifest = AL.get_manifest(adapter_id)
+        if not manifest:
+            self.report({'ERROR'}, f"Unknown adapter {adapter_id!r}")
+            return {'CANCELLED'}
+
+        config = AL.build_config_from_prefs(manifest, prefs)
+        try:
+            base_url = AL.start_adapter(manifest, config)
+        except Exception as e:  # noqa: BLE001
+            prefs.adapter_running = False
+            prefs.adapter_status_line = "Failed to start (see console / log)"
+            self.report({'ERROR'}, f"Could not start backend: {e}")
+            return {'CANCELLED'}
+
+        prefs.remote_backend_url = base_url
+        prefs.adapter_running = True
+        prefs.adapter_port = AL.adapter_status().get("port") or 0
+
+        try:
+            count = _discover_and_register(prefs)
+        except Exception as e:  # noqa: BLE001
+            prefs.adapter_status_line = (
+                f"Running at {base_url}, but model discovery failed")
+            self.report({'WARNING'}, f"Backend started but discovery failed: {e}")
+            return {'FINISHED'}
+
+        label = manifest.get("label", adapter_id)
+        prefs.adapter_status_line = f"Running: {label}  •  {base_url}  •  {count} model(s)"
+        self.report({'INFO'}, f"{label} started — {count} model(s) loaded.")
+        return {'FINISHED'}
+
+
+class PALLAIDIUM_OT_stop_backend(Operator):
+    """Stop the adapter Pallaidium launched."""
+    bl_idname = "pallaidium.stop_backend"
+    bl_label = "Stop Backend"
+    bl_description = "Stop the adapter subprocess Pallaidium started"
+
+    def execute(self, context):
+        prefs = context.preferences.addons[ADDON_ID].preferences
+        from ..utils import adapter_launcher as AL
+        AL.stop_adapter()
+        prefs.adapter_running = False
+        prefs.adapter_status_line = "Stopped"
+        self.report({'INFO'}, "Backend stopped.")
+        return {'FINISHED'}
+
+
+class PALLAIDIUM_OT_open_workflows_folder(Operator):
+    """Open the comfyui_workflows folder in the system file browser."""
+    bl_idname = "pallaidium.open_workflows_folder"
+    bl_label = "Open Workflows Folder"
+    bl_description = ("Open the comfyui_workflows folder where ComfyUI API-format "
+                      "workflow files live")
+
+    def execute(self, context):
+        from ..utils import adapter_launcher as AL
+        bpy.ops.wm.path_open(filepath=AL.workflows_dir())
+        return {'FINISHED'}
+
+
+class PALLAIDIUM_OT_import_comfy_workflow(Operator, ImportHelper):
+    """Copy a ComfyUI API-format workflow JSON into comfyui_workflows/."""
+    bl_idname = "pallaidium.import_comfy_workflow"
+    bl_label = "Import ComfyUI Workflow (API JSON)"
+    bl_description = ("Copy a ComfyUI workflow exported with 'Save (API Format)' "
+                      "into comfyui_workflows/; it becomes a [Remote] model")
+
+    filename_ext = ".json"
+    filter_glob: StringProperty(default="*.json", options={'HIDDEN'})
+
+    def execute(self, context):
+        prefs = context.preferences.addons[ADDON_ID].preferences
+        from ..utils import adapter_launcher as AL
+        try:
+            dest = AL.import_workflow(self.filepath)
+        except Exception as e:  # noqa: BLE001
+            self.report({'ERROR'}, f"Import failed: {e}")
+            return {'CANCELLED'}
+
+        name = os.path.splitext(os.path.basename(dest))[0]
+        msg = f"Imported workflow '{name}'."
+        status = AL.adapter_status()
+        # If the ComfyUI adapter is already running, restart it so it re-scans
+        # the folder, then re-discover so the new model shows up immediately.
+        if status.get("running") and status.get("adapter_id") == "comfyui":
+            try:
+                base_url = AL.restart_adapter()
+                prefs.remote_backend_url = base_url
+                count = _discover_and_register(prefs)
+                msg += f" Reloaded backend — {count} model(s)."
+            except Exception as e:  # noqa: BLE001
+                msg += f" (could not auto-reload: {e})"
+        else:
+            msg += " Start the ComfyUI backend to use it."
+        self.report({'INFO'}, msg)
         return {'FINISHED'}

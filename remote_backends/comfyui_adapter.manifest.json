@@ -1,0 +1,19 @@
+{
+  "id": "comfyui",
+  "label": "ComfyUI (local)",
+  "entry": "comfyui_adapter.py",
+  "order": 1,
+  "description": "Forwards generation to a running ComfyUI server. Built-in SDXL / SD1.5 / LTX-Video templates, plus any API-format workflow you drop in comfyui_workflows/. Start ComfyUI first.",
+  "default_port": 8000,
+  "config_fields": [
+    {
+      "key": "COMFYUI_URL",
+      "arg": "--comfyui-url",
+      "pref": "comfyui_url",
+      "label": "ComfyUI URL",
+      "type": "string",
+      "default": "http://127.0.0.1:8188"
+    }
+  ],
+  "supports_workflow_import": true
+}

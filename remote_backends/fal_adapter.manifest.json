@@ -1,0 +1,19 @@
+{
+  "id": "fal",
+  "label": "fal.ai (cloud)",
+  "entry": "fal_adapter.py",
+  "order": 2,
+  "description": "Forwards generation to fal.ai cloud models (FLUX image, Seedance video, ...). Requires a fal.ai API key in the Remote Backend Key field below.",
+  "default_port": 8000,
+  "config_fields": [
+    {
+      "key": "FAL_KEY",
+      "arg": "--fal-key",
+      "pref": "remote_backend_key",
+      "label": "fal.ai API Key",
+      "type": "secret",
+      "default": ""
+    }
+  ],
+  "supports_workflow_import": false
+}

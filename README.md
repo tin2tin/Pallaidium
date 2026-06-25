@@ -142,7 +142,7 @@ Contract** — letting you offload generation to a beefier machine or a cloud
 provider while the add-on stays a thin client. This is entirely opt-in; nothing
 changes unless you enable it.
 
-### Enabling
+### Enabling (one-click)
 
 In **Preferences → Add-ons → Pallaidium**, find the **Remote Backend** box:
 
@@ -150,18 +150,23 @@ In **Preferences → Add-ons → Pallaidium**, find the **Remote Backend** box:
    - **Local** (default) — only models that run locally in Blender.
    - **Remote** — only models served by the configured backend.
    - **Local & Remote** — both, side by side.
-2. **Remote Backend URL** — the server's base URL, e.g. `http://localhost:8000`
-   (falls back to the `PALLAIDIUM_BACKEND_URL` environment variable).
-3. **Remote Backend Key** — optional API key (falls back to
-   `PALLAIDIUM_BACKEND_KEY`).
-4. Click **Refresh Remote Models**. Pallaidium queries the server's
-   `GET /v1/models` and adds each one to the appropriate dropdown, prefixed with
-   `[Remote]`. (Refresh is the *only* time the add-on contacts the server for the
-   model list — the dropdowns never block on the network.)
+2. **Adapter** — pick a bundled connector:
+   - **Mock** — tiny canned media; verifies the wiring with zero setup.
+   - **ComfyUI** — forwards to a running ComfyUI (set the **ComfyUI URL** field;
+     start ComfyUI first).
+   - **fal.ai** — cloud models; paste your key in **Remote Backend Key**.
+   - **Custom URL** — connect to a backend you started yourself (type its URL +
+     optional key; falls back to `PALLAIDIUM_BACKEND_URL` / `PALLAIDIUM_BACKEND_KEY`).
+3. Click **Start Backend**. Pallaidium launches the connector with Blender's own
+   Python (no console, no `pip`), fills in the URL, queries `GET /v1/models`, and
+   adds each model to the dropdowns prefixed `[Remote]`. Click **Stop Backend**
+   when done. (For **Custom URL** the button is **Connect & Load Models** — there
+   is nothing to launch.) **Refresh Models** re-queries the list at any time.
 
-Remote models then behave like any other: pick one, set your prompt / inputs /
-standard settings, and Generate. Progress and **Cancel** work through the queue
-just like local jobs.
+The connector runs only while started; discovered models are cached so they
+reappear after a Blender restart. Remote models then behave like any other: pick
+one, set your prompt / inputs / standard settings, and Generate. Progress and
+**Cancel** work through the queue just like local jobs.
 
 ### What works remotely
 
@@ -176,30 +181,36 @@ All four media types are supported — **Movie (video), Image, Audio, and Text
 References are uploaded to the backend via `POST /v1/files`; the exact request
 fields are listed in [docs/BACKEND_CONTRACT_EXTENSIONS.md](docs/BACKEND_CONTRACT_EXTENSIONS.md).
 
-### Running a backend
+### Adding ComfyUI workflows (no console)
+
+With the **ComfyUI** adapter selected, two buttons appear:
+
+- **Import Workflow** — pick a workflow exported from ComfyUI with
+  *Settings → enable Dev mode → Save (API Format)*. It's copied into
+  `remote_backends/comfyui_workflows/` and becomes a `[Remote] <filename>` model;
+  if the backend is running it auto-reloads so the model shows up immediately.
+- **Open Folder** — opens that folder to manage workflow files directly.
+
+The adapter detects each workflow's media type and injects your prompt / size /
+seed / reference image(s) **by node title** (or via a `<id>.meta.json` sidecar
+for complex graphs). Full convention:
+`remote_backends/comfyui_workflows/README.md`.
+
+### Other backends
 
 The contract is **provider-agnostic** — any server implementing it works, and you
-can switch by changing the URL. Common options:
+can switch with the Adapter dropdown. Beyond the three bundled connectors:
 
-- **Local mock** — for testing the whole contract (incl. video jobs) on the same
-  computer.
-- **ComfyUI** — the included `comfyui_adapter.py` drives a local **ComfyUI**
-  server. You add models by dropping **API-format workflow exports** into
-  `remote_backends/comfyui_workflows/`; the adapter detects each one's media type
-  and injects your prompt / size / seed / reference image(s) by node title. Fully
-  local, covers image / video / audio. See the step-by-step in
-  [docs/BACKEND_CONTRACT_EXTENSIONS.md](docs/BACKEND_CONTRACT_EXTENSIONS.md) (§ C)
-  and `remote_backends/comfyui_workflows/README.md`.
-- **[LocalAI](https://localai.io/)** — free, self-hosted, OpenAI-compatible image
-  and audio (`/v1/images/generations`, `/v1/audio/speech`,
-  `/v1/audio/transcriptions`). No video.
-- **A provider adapter** — a small local service that implements the contract and
-  forwards to a cloud provider (e.g. fal.ai / Replicate for **Seedance** video).
-  This is where any provider-specific code and API keys live; Pallaidium itself
-  contains none.
+- **[LocalAI](https://localai.io/)** and other OpenAI-compatible servers — point
+  **Custom URL** at them (image/audio via `/v1/images/generations`,
+  `/v1/audio/speech`, `/v1/audio/transcriptions`).
+- **Your own connector** — drop a stdlib `<name>_adapter.py` + `<name>.manifest.json`
+  into `remote_backends/` and it appears in the Adapter dropdown, no add-on
+  changes needed. See `remote_backends/README.md` § *Write your own connector*.
 
-The example servers (mock, ComfyUI adapter, fal.ai adapter) ship in
-`remote_backends/` and are excluded from the built add-on.
+The example connectors (mock, ComfyUI, fal.ai) ship in `remote_backends/`, are
+**stdlib-only** (so Pallaidium can launch them with Blender's Python), and are
+excluded from the built add-on.
 
 ## Change Log
 
