@@ -23,6 +23,7 @@ Remote, and click "Refresh Remote Models".
 """
 
 import os
+import re
 import uuid
 import base64
 import argparse
@@ -258,22 +259,55 @@ def _to_fal_args(payload: dict, spec: dict, kind: str) -> dict:
     return args
 
 
+_REF_TOKEN_RE = re.compile(r"@(?:image|video|audio)\s*\d+", re.IGNORECASE)
+
+
+def _ensure_ref_tokens(prompt: str, n_img: int, n_vid: int, n_aud: int) -> str:
+    """Anchor every supplied reference asset in the prompt.
+
+    Seedance reference-to-video only *uses* a reference asset if the prompt
+    names it with an ``@Image1`` / ``@Video1`` / ``@Audio1`` token (fal's docs:
+    "reference assets as @Image1, @Video1, @Audio1"). The VSE pickers upload the
+    assets, but the user's prompt rarely spells the tokens out, so the model
+    silently ignores the picked image. Any supplied asset whose token is missing
+    is prepended (in order) — so the picked strip leads as ``@Image1`` and acts
+    as the opening/anchor reference instead of being dropped.
+    """
+    prompt = prompt or ""
+    existing = {m.group(0).lower().replace(" ", "")
+                for m in _REF_TOKEN_RE.finditer(prompt)}
+    missing = []
+    for kind, n in (("Image", n_img), ("Video", n_vid), ("Audio", n_aud)):
+        for i in range(1, n + 1):
+            tok = f"@{kind}{i}"
+            if tok.lower() not in existing:
+                missing.append(tok)
+    if not missing:
+        return prompt
+    prefix = " ".join(missing)
+    return f"{prefix} {prompt}".strip() if prompt else prefix
+
+
 def _to_fal_ref_args(payload: dict) -> dict:
     """Build args for Seedance reference-to-video (prompt + reference URL lists).
 
-    fal expects ``image_urls`` / ``video_urls`` lists; we pass the uploaded
-    reference image(s) and the source/control video as data: URLs.
+    fal expects ``image_urls`` / ``video_urls`` / ``audio_urls`` lists; we pass
+    the uploaded reference image(s), the source/control video, and reference
+    audio as data: URLs, and we anchor each one in the prompt with its
+    ``@Image1`` / ``@Video1`` / ``@Audio1`` token (see ``_ensure_ref_tokens``).
     """
-    args = {"prompt": payload.get("prompt", "")}
+    imgs = _all_image_data_urls(payload)
+    vid = _control_video_data_url(payload)
+    vids = [vid] if vid else []
+    auds = _all_audio_data_urls(payload)
+    args = {"prompt": _ensure_ref_tokens(
+        payload.get("prompt", ""), len(imgs), len(vids), len(auds))}
     if payload.get("seed"):
         args["seed"] = payload["seed"]
-    imgs = _all_image_data_urls(payload)
     if imgs:
         args["image_urls"] = imgs
-    vid = _control_video_data_url(payload)
-    if vid:
-        args["video_urls"] = [vid]
-    auds = _all_audio_data_urls(payload)
+    if vids:
+        args["video_urls"] = vids
     if auds:
         args["audio_urls"] = auds
     if payload.get("height"):

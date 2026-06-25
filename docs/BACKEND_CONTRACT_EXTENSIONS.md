@@ -213,7 +213,7 @@ Sent on the generation endpoints (`/v1/videos`, `/v1/images/generations`,
 | `reference_prompts` | list[str] | images | Per-reference-image prompts (e.g. OmniGen) |
 | `last_image_file_id` | string | videos | Last-frame condition (FLF) |
 | `anchor_file_ids` | list[{file_id, fraction}] | videos | Interior keyframe anchors at timeline fractions |
-| `reference_file_ids` | list[str] | videos | Multiple reference images for reference-to-video (e.g. Seedance Mini reference-to-video → fal `image_urls`) |
+| `reference_file_ids` | list[str] | videos | Multiple reference images for reference-to-video (e.g. Seedance Mini reference-to-video → fal `image_urls`). The fal adapter auto-anchors each one in the prompt with its `@Image1`/`@Image2`… token (Seedance only *uses* an asset the prompt names), so the first picked image leads as `@Image1`. |
 | `reference_audio_ids` | list[str] | videos | Reference audio clip(s) for reference-to-video (→ fal `audio_urls`). Uploaded with `purpose: "reference"`. |
 | `generate_audio` | bool | videos | Request a generated soundtrack. Sent for models that advertise `supports_audio_output`; mirrors the *Generate Audio* toggle. |
 | `control_file_id` | string | videos | Control / source video (v0.1). Used as the source for video-edit & character-replacement workflows. |
