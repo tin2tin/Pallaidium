@@ -740,6 +740,52 @@ def clear_cuda_cache():
 
 from contextlib import contextmanager
 
+# ---------------------------------------------------------------------------
+# Sequencer lock — held while a main-thread render / sound.mixdown / .blend
+# save is reading or rebuilding the sequence editor. The render-queue timer
+# (operators/queue_ops.py:_queue_tick) and the worker's main-thread load/
+# generate timers check sequencer_busy() and idle while it is set, so they
+# never insert a strip or start a job underneath an in-flight async WM job or
+# while Blender is serialising the file. This is the same crash class
+# documented on run_sound_mixdown_sync(): an interleaving sequencer mutation
+# faults the async job with EXCEPTION_ACCESS_VIOLATION.
+# Depth-counted so nested guards (e.g. a save firing around an already-guarded
+# render) only release the lock once the outermost guard exits.
+# ---------------------------------------------------------------------------
+import threading as _seqlock_threading
+_sequencer_busy_event = _seqlock_threading.Event()
+_sequencer_busy_depth = 0
+
+
+def sequencer_busy() -> bool:
+    """True while a render / mixdown / save is touching the sequencer."""
+    return _sequencer_busy_event.is_set()
+
+
+def sequencer_lock_acquire() -> None:
+    global _sequencer_busy_depth
+    _sequencer_busy_depth += 1
+    _sequencer_busy_event.set()
+
+
+def sequencer_lock_release() -> None:
+    global _sequencer_busy_depth
+    _sequencer_busy_depth = max(0, _sequencer_busy_depth - 1)
+    if _sequencer_busy_depth == 0:
+        _sequencer_busy_event.clear()
+
+
+@contextmanager
+def sequencer_busy_guard():
+    """Hold for the duration of a main-thread render / mixdown / save so the
+    render-queue timer cannot mutate the sequencer underneath it."""
+    sequencer_lock_acquire()
+    try:
+        yield
+    finally:
+        sequencer_lock_release()
+
+
 @contextmanager
 def suppress_text_encoder_warnings():
     """Silence the two benign warnings emitted while loading/running the LTX-2
@@ -1729,29 +1775,36 @@ def run_sound_mixdown_sync(output_path, timeout=600.0):
     except OSError:
         pass
 
-    bpy.ops.sound.mixdown(filepath=output_path, container="WAV", codec="PCM")
+    # Hold the sequencer lock for the whole mixdown + wait so any render-queue
+    # strip insert is deferred until the async job has finished writing, even if
+    # a future change lets this wait pump the event loop.
+    sequencer_lock_acquire()
+    try:
+        bpy.ops.sound.mixdown(filepath=output_path, container="WAV", codec="PCM")
 
-    # Poll until the file exists and its size has been stable across several
-    # consecutive checks (the WAV header is 44 bytes; require more than that).
-    start        = time.time()
-    last_size    = -1
-    stable_since = None
-    STABLE_FOR   = 0.4   # seconds the size must stay unchanged to be "done"
-    POLL         = 0.1
-    while time.time() - start < timeout:
-        size = os.path.getsize(output_path) if os.path.exists(output_path) else -1
-        if size > 44 and size == last_size:
-            if stable_since is None:
-                stable_since = time.time()
-            elif time.time() - stable_since >= STABLE_FOR:
-                return True
-        else:
-            stable_since = None
-            last_size = size
-        time.sleep(POLL)
+        # Poll until the file exists and its size has been stable across several
+        # consecutive checks (the WAV header is 44 bytes; require more than that).
+        start        = time.time()
+        last_size    = -1
+        stable_since = None
+        STABLE_FOR   = 0.4   # seconds the size must stay unchanged to be "done"
+        POLL         = 0.1
+        while time.time() - start < timeout:
+            size = os.path.getsize(output_path) if os.path.exists(output_path) else -1
+            if size > 44 and size == last_size:
+                if stable_since is None:
+                    stable_since = time.time()
+                elif time.time() - stable_since >= STABLE_FOR:
+                    return True
+            else:
+                stable_since = None
+                last_size = size
+            time.sleep(POLL)
 
-    print(f"[run_sound_mixdown_sync] timed out waiting for {output_path!r}")
-    return os.path.exists(output_path)
+        print(f"[run_sound_mixdown_sync] timed out waiting for {output_path!r}")
+        return os.path.exists(output_path)
+    finally:
+        sequencer_lock_release()
 
 
 def get_render_strip(self, context, strip, meta_strip=None):
@@ -1977,6 +2030,10 @@ def render_strip_to_path(context, strip, image_output=False):
     print(f"[render_strip_to_path] rendering '{strip.name}' "
           f"({_total_frames} frame(s))…")
 
+    # Hold the sequencer lock across the blocking render: bpy.ops.render.render()
+    # pumps the event loop, so without this the render-queue timer could fire and
+    # insert/start a job underneath the in-progress render → access violation.
+    sequencer_lock_acquire()
     try:
         if strip.type == "SOUND":
             output_path = os.path.abspath(
@@ -2044,6 +2101,7 @@ def render_strip_to_path(context, strip, image_output=False):
                     output_path = files[-1]
 
     finally:
+        sequencer_lock_release()
         try:
             if _render_progress_handler in bpy.app.handlers.render_post:
                 bpy.app.handlers.render_post.remove(_render_progress_handler)
@@ -2141,6 +2199,9 @@ def render_meta_child_to_path(context, meta_strip, child_strip, image_output=Fal
     safe_name   = re.sub(r'[^\w]', '', child_strip.name) or "strip"
     output_path = None
 
+    # bpy.ops.render.render() below pumps the event loop; hold the sequencer lock
+    # so the render-queue timer can't insert a strip underneath the render.
+    sequencer_lock_acquire()
     try:
         if child_strip.type == "SOUND":
             output_path = os.path.abspath(
@@ -2245,6 +2306,7 @@ def render_meta_child_to_path(context, meta_strip, child_strip, image_output=Fal
                     output_path = files[-1]
 
     finally:
+        sequencer_lock_release()
         for s, state in orig_mute_states.items():
             if s:
                 s.mute = state

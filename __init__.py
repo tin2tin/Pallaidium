@@ -1175,6 +1175,13 @@ def register():
     if _reset_queue_state not in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.append(_reset_queue_state)
 
+    # Pause the render-queue timer across .blend saves so a strip insert can't
+    # land mid-serialisation (EXCEPTION_ACCESS_VIOLATION). Paired pre/post.
+    if _queue_lock_on_save_pre not in bpy.app.handlers.save_pre:
+        bpy.app.handlers.save_pre.append(_queue_lock_on_save_pre)
+    if _queue_lock_on_save_post not in bpy.app.handlers.save_post:
+        bpy.app.handlers.save_post.append(_queue_lock_on_save_post)
+
     _reset_dep_state()
     if _reset_dep_state not in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.append(_reset_dep_state)
@@ -1292,6 +1299,14 @@ def _reset_queue_state(_=None):
     re-submitted; queue_is_running is forced False because no background thread
     exists after restart.
     """
+    # Clear any sequencer lock orphaned by a save whose save_post never fired,
+    # so the queue timer isn't frozen after the next file load.
+    try:
+        from .utils.helpers import _sequencer_busy_event, sequencer_lock_release
+        while _sequencer_busy_event.is_set():
+            sequencer_lock_release()
+    except Exception:
+        pass
     try:
         scenes = bpy.data.scenes
     except AttributeError:
@@ -1304,6 +1319,38 @@ def _reset_queue_state(_=None):
                     job.progress = 0.0
         except Exception:
             pass
+
+
+def _queue_lock_on_save_pre(_=None):
+    """Hold the sequencer lock for the duration of a .blend save.
+
+    Saving serialises the whole scene; if the render-queue timer fires during
+    the save and inserts a result strip (or starts a job that mutates the
+    sequencer), the half-written data faults Blender. The lock makes _queue_tick
+    idle until save_post clears it.
+    """
+    try:
+        from .utils.helpers import sequencer_lock_acquire
+        sequencer_lock_acquire()
+    except Exception:
+        pass
+
+
+def _queue_lock_on_save_post(_=None):
+    """Release the sequencer lock taken in _queue_lock_on_save_pre."""
+    try:
+        from .utils.helpers import sequencer_lock_release
+        sequencer_lock_release()
+    except Exception:
+        pass
+
+
+try:
+    from bpy.app.handlers import persistent as _persistent
+    _queue_lock_on_save_pre = _persistent(_queue_lock_on_save_pre)
+    _queue_lock_on_save_post = _persistent(_queue_lock_on_save_post)
+except Exception:
+    pass
 
 
 def unregister():
@@ -1327,6 +1374,17 @@ def unregister():
         bpy.app.handlers.load_post.remove(_reset_dep_state)
     if _apply_hf_env_from_prefs in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.remove(_apply_hf_env_from_prefs)
+    if _queue_lock_on_save_pre in bpy.app.handlers.save_pre:
+        bpy.app.handlers.save_pre.remove(_queue_lock_on_save_pre)
+    if _queue_lock_on_save_post in bpy.app.handlers.save_post:
+        bpy.app.handlers.save_post.remove(_queue_lock_on_save_post)
+    # Drop any lock left set by an interrupted save so a reload starts clean.
+    try:
+        from .utils.helpers import _sequencer_busy_event, sequencer_lock_release
+        while _sequencer_busy_event.is_set():
+            sequencer_lock_release()
+    except Exception:
+        pass
     from .operators.queue_ops import _queue_tick, _queue_stop
     try:
         if bpy.app.timers.is_registered(_queue_tick):

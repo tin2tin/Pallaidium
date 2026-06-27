@@ -45,6 +45,7 @@ from ..utils.helpers import (
     find_first_empty_channel,
     load_first_frame,
     release_model_cache,
+    sequencer_busy,
     set_ai_metadata_from_dict,
     set_system_console_topmost,
     show_system_console,
@@ -714,6 +715,11 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
                 _load_result = {}
 
                 def _main_thread_load():
+                    # If a render/mixdown/save is pumping the event loop, this
+                    # timer may fire reentrantly mid-render. Defer until the
+                    # sequencer lock clears so torch never loads inside a render.
+                    if sequencer_busy():
+                        return 0.05  # retry shortly
                     try:
                         _load_result["loaded"] = plugin.load(
                             prefs_proxy, scene_proxy,
@@ -911,6 +917,10 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             _gen_result = {}
 
             def _main_thread_generate():
+                # Defer if a render/mixdown/save owns the sequencer — running
+                # generate() reentrantly inside a pumped render loop faults torch.
+                if sequencer_busy():
+                    return 0.05  # retry shortly
                 try:
                     _gen_result["value"] = plugin.generate(
                         pipe_obj, inputs, scene_proxy, prefs_proxy
@@ -2661,6 +2671,15 @@ def _queue_tick() -> float | None:
         if scene is None:
             _queue_stop()
             return None
+
+        # ---- Defer while a render / mixdown / save owns the sequencer ----
+        # render_strip_to_path(), run_sound_mixdown_sync() and the file-save
+        # handlers hold the sequencer lock. Inserting a result strip or starting
+        # a job underneath an in-flight async WM job (or mid-save) reads/mutates
+        # the sequence editor from two places at once → EXCEPTION_ACCESS_VIOLATION.
+        # Skip this tick entirely; results stay queued and drain next tick.
+        if sequencer_busy():
+            return _TIMER_INTERVAL
 
         # ---- Drain one result from the worker ---------------------------
         try:
