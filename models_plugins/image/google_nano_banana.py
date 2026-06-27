@@ -14,7 +14,11 @@ import os
 from ...models.base import ModelPlugin, InputSpec, UISection, ParamSpec, ModelInputs
 from ...utils.helpers import find_strip_by_name, load_strip_as_pil
 
-_REF_ATTRS = ["nano_banana_ref_strip_1", "nano_banana_ref_strip_2", "nano_banana_ref_strip_3"]
+# Nano Banana accepts up to 9 reference images; how many picker rows are shown
+# is driven by scene.nano_banana_ref_count.  _REF_ATTRS lists every possible slot
+# so the queue/metadata plumbing can enumerate them uniformly.
+NANO_BANANA_MAX_REFS = 9
+_REF_ATTRS = [f"nano_banana_ref_strip_{i}" for i in range(1, NANO_BANANA_MAX_REFS + 1)]
 
 
 class GoogleNanoBananaPlugin(ModelPlugin):
@@ -41,6 +45,9 @@ class GoogleNanoBananaPlugin(ModelPlugin):
         # Klein-style reference-image pickers (composition / editing).  Imagen is
         # text-to-image only, so image inputs are hidden when it is selected.
         scene = context.scene
+        # Strip refs live in the scene shown in the VSE (context.sequencer_scene
+        # in Blender 5.x), which can differ from the active scene.
+        vse_scene = getattr(context, "sequencer_scene", None) or context.scene
         model = getattr(scene, "nano_banana_model", "gemini-2.5-flash-image")
         if model.startswith("imagen"):
             return True
@@ -48,11 +55,13 @@ class GoogleNanoBananaPlugin(ModelPlugin):
             col.prop(scene, "input_strips", text="Input")
         except Exception:
             pass
-        if scene.sequence_editor is None:
+        if vse_scene.sequence_editor is None:
             return True
-        for i, attr in enumerate(_REF_ATTRS, 1):
+        col.prop(scene, "nano_banana_ref_count")
+        ref_count = max(1, min(getattr(scene, "nano_banana_ref_count", 3), len(_REF_ATTRS)))
+        for i, attr in enumerate(_REF_ATTRS[:ref_count], 1):
             row = col.row(align=True)
-            row.prop_search(scene, attr, scene.sequence_editor, "strips",
+            row.prop_search(vse_scene, attr, vse_scene.sequence_editor, "strips",
                             text="Ref.", icon="FILE_IMAGE")
             row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = f"nano_banana_select{i}"
         return True
@@ -174,7 +183,10 @@ class GoogleNanoBananaPlugin(ModelPlugin):
         refs = []
         if inputs.image is not None:
             refs.append(inputs.image)
-        for attr in _REF_ATTRS:
+        # Honour the active reference count so stale names in hidden slots
+        # (the UI only shows the first nano_banana_ref_count rows) don't leak in.
+        ref_count = max(1, min(getattr(scene, "nano_banana_ref_count", 3), len(_REF_ATTRS)))
+        for attr in _REF_ATTRS[:ref_count]:
             img = None
             path = getattr(scene, attr + "_path", "") or ""
             if path and os.path.isfile(path):

@@ -38,6 +38,24 @@ import importlib.metadata
 import warnings
 import logging
 import bpy
+
+# ── Reload diagnostic ─────────────────────────────────────────────────────────
+# Writes a line to a file every time THIS module is imported by Blender, and a
+# helper generate_image() uses to log the img2img decision.  Because Blender
+# caches imported modules, editing this file has NO effect until the addon is
+# reloaded (full restart, or disable→enable the extension).  If the timestamp in
+# this file does not update after a restart, the edit is not being loaded.
+_PALLAIDIUM_DIAG_LOG = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                                    "_diag_scene_input.log")
+
+def _diag(msg):
+    try:
+        with open(_PALLAIDIUM_DIAG_LOG, "a", encoding="utf-8") as _fh:
+            _fh.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')}  {msg}\n")
+    except Exception:
+        pass
+
+_diag("=== main_ops.py IMPORTED (build: scene-strip-v3) ===")
 import os
 import re
 from datetime import date
@@ -617,6 +635,10 @@ class SEQUENCER_OT_generate_audio(Operator):
 class SEQUENCER_OT_generate_image(Operator):
     """Generate Image"""
 
+    # NOTE: Legacy immediate "Generate" path. Normal inference is now ALWAYS routed
+    # through the render queue (operators/queue_ops.py), which runs plugins on a
+    # background worker and never calls this operator. Input handling for queued jobs
+    # lives in queue_ops.py — edit there, not here.
     bl_idname = "sequencer.generate_image"
     bl_label = "Prompt"
     bl_description = "Convert text to image"
@@ -710,9 +732,23 @@ class SEQUENCER_OT_generate_image(Operator):
         do_refine = getattr(scene, "refine_sd", False) and not do_convert
         mode = "inpaint" if do_inpaint else ("img2img" if do_convert else "txt2img")
 
+        _sel_dbg = [(s.name, s.type) for s in (strips or [])]
+        print("[generate_image][dbg] ===== SCENE-INPUT DIAG (build: scene-strip-v3) =====")
+        print(f"[generate_image][dbg] input_mode={input_mode!r} type_select={type_select!r} "
+              f"selected_strips={_sel_dbg}")
+        print(f"[generate_image][dbg] scene.image_path={getattr(scene, 'image_path', '')!r}")
+        print(f"[generate_image][dbg] scene.movie_path={getattr(scene, 'movie_path', '')!r}")
+        print(f"[generate_image][dbg] supports_img2img={plugin.supports_img2img} "
+              f"requires_input_strip={getattr(plugin, 'requires_input_strip', False)}")
         print("do_inpaint: " + str(do_inpaint))
         print("do_convert: " + str(do_convert))
         print("do_refine:  " + str(do_refine))
+        print(f"[generate_image][dbg] → mode={mode}")
+        _diag(f"generate_image: model={image_model_card} input_mode={input_mode} "
+              f"type_select={type_select} selected={_sel_dbg} "
+              f"image_path={getattr(scene, 'image_path', '')!r} "
+              f"movie_path={getattr(scene, 'movie_path', '')!r} "
+              f"supports_img2img={plugin.supports_img2img} → mode={mode}")
 
         # Validate strip selection when input strip is required
         if do_inpaint or do_convert or plugin.requires_input_strip:
@@ -1195,6 +1231,13 @@ class SEQUENCER_OT_generate_text(Operator):
 class SEQUENCER_OT_strip_to_generatorAI(Operator):
     """Convert selected text strips to Generative AI with Smart Memory Management"""
 
+    # NOTE: The immediate "Generate" path (this dispatcher + sequencer.generate_image/
+    # movie/audio/text) is NO LONGER the entry point for normal use. All inference is
+    # now initiated through the render QUEUE (OBJECT_OT_QueueAddOperator in
+    # operators/queue_ops.py), which builds its own job snapshot and runs the plugin on
+    # a background worker WITHOUT calling these operators. When changing input handling
+    # (scene-strip rendering, img2img mode detection, reference images, …) edit the
+    # queue path; changes here will not affect queued generations.
     bl_idname = "sequencer.text_to_generator"
     bl_label = "Pallaidium"
     bl_options = {"INTERNAL"}
@@ -1565,8 +1608,12 @@ class SEQUENCER_OT_strip_to_generatorAI(Operator):
 
                     else:
                         # Standard render pipeline for image generation or non-meta strips
+                        print(f"[dispatcher][dbg] standard-render branch: child='{child_strip.name}' "
+                              f"type={child_strip.type} target_type={target_type}")
                         current_temp_strip = get_render_strip(self, context, child_strip, meta_strip=meta_strip)
                         print("Adding: " + str(current_temp_strip))
+                        print(f"[dispatcher][dbg] get_render_strip → "
+                              f"{(current_temp_strip.name, current_temp_strip.type) if current_temp_strip else None}")
                         if current_temp_strip:
                             temp_strips.append(current_temp_strip)
 

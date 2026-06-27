@@ -3,7 +3,7 @@
 import os
 from ...models.base import ModelPlugin, InputSpec, UISection, ParamSpec, ModelInputs
 from ...utils.helpers import (
-    solve_path, clean_filename, find_strip_by_name,
+    solve_path, clean_filename,
     invoke_video_generation, query_video_generation, fetch_video_result, minimax_validate_image,
 )
 
@@ -93,35 +93,30 @@ class MiniMaxSubject2VidPlugin(_MiniMaxBase):
     INPUTS       = InputSpec.PROMPT | InputSpec.IMAGE | InputSpec.API_KEY
 
     def draw_custom_ui(self, col, context) -> bool:
-        scene = context.scene
-        if scene.sequence_editor is None:
+        # Strip refs live in the scene shown in the VSE (context.sequencer_scene
+        # in Blender 5.x), which can differ from the active scene.
+        vse_scene = getattr(context, "sequencer_scene", None) or context.scene
+        if vse_scene.sequence_editor is None:
             return False
         row = col.row(align=True)
         row.prop_search(
-            scene, "minimax_subject", scene.sequence_editor, "strips",
+            vse_scene, "minimax_subject", vse_scene.sequence_editor, "strips",
             text="Subject", icon="USER",
         )
         row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = "minimax_select"
         return False
 
     def generate(self, pipe_obj, inputs: ModelInputs, scene, prefs):
-        import bpy, os
-
         api_key = self._get_api_key(prefs)
         if not api_key:
             raise RuntimeError("MiniMax API key is missing.")
 
-        minimax_subject = getattr(scene, "minimax_subject", "")
-        if not minimax_subject:
-            raise RuntimeError("MiniMax subject2vid requires a subject strip to be selected.")
+        # The subject strip is resolved to an image path at queue-add time (from
+        # the sequencer scene) and delivered via minimax_subject_path on the proxy.
+        image_path = getattr(scene, "minimax_subject_path", "")
+        if not image_path or not os.path.isfile(image_path):
+            raise RuntimeError("MiniMax subject2vid requires a subject image strip to be selected.")
 
-        strip = find_strip_by_name(scene, minimax_subject)
-        if not strip or strip.type != "IMAGE":
-            raise RuntimeError("MiniMax subject2vid: selected subject is not an IMAGE strip.")
-
-        image_path = bpy.path.abspath(
-            os.path.join(strip.directory, strip.elements[0].filename)
-        )
         if not minimax_validate_image(image_path):
             raise RuntimeError(f"MiniMax subject2vid: image validation failed for {image_path!r}.")
 

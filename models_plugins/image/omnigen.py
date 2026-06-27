@@ -39,13 +39,16 @@ class OmniGenPlugin(ModelPlugin):
 
     def draw_custom_ui(self, col, context) -> bool:
         scene = context.scene
-        if scene.sequence_editor is None:
+        # Strip refs live in the scene shown in the VSE (context.sequencer_scene
+        # in Blender 5.x), which can differ from the active scene.
+        vse_scene = getattr(context, "sequencer_scene", None) or context.scene
+        if vse_scene.sequence_editor is None:
             return True
         for idx in range(1, 4):
             col.prop(scene, f"omnigen_prompt_{idx}", text="", icon="ADD")
             row = col.row(align=True)
             row.prop_search(
-                scene, f"omnigen_strip_{idx}", scene.sequence_editor, "strips",
+                vse_scene, f"omnigen_strip_{idx}", vse_scene.sequence_editor, "strips",
                 text="", icon="FILE_IMAGE",
             )
             row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = f"omni_select{idx}"

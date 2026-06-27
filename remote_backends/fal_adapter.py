@@ -91,6 +91,16 @@ MODELS = {
         "supports_audio_output": True,
         "display_name": "Seedance 2.0 Mini Reference-to-Video (fal)",
     },
+    # --- LTX video-to-video ----------------------------------------------
+    "ltx-2.3-render-to-real": {
+        "type": "video",
+        "modes": ["control", "i2v"],   # source render video + optional first frame
+        "fal": "fal-ai/ltx-2.3-quality/render-to-real",
+        "video_to_video": True,
+        "supports_audio_output": True,
+        "display_name": "LTX 2.3 Render-to-Real (fal)",
+        "description": "Turn a 3D / CG / game render into photorealistic video.",
+    },
     # --- Audio -----------------------------------------------------------
     "seed-audio": {
         "type": "audio",
@@ -128,7 +138,7 @@ def route_models():
     data = []
     for mid, spec in MODELS.items():
         entry = {"id": mid, "type": spec["type"], "modes": spec["modes"]}
-        for k in ("display_name", "default_steps", "max_ref_images",
+        for k in ("display_name", "description", "default_steps", "max_ref_images",
                   "needs_speaker_ref", "needs_ref_text", "control_types",
                   "needs_audio_ref", "supports_audio_output"):
             if k in spec:
@@ -197,6 +207,10 @@ def _submit(payload: dict, kind: str):
         # reference-to-video: prompt + lists of reference image/video URLs.
         fal_app = spec["fal"]
         args = _to_fal_ref_args(payload)
+    elif spec.get("video_to_video"):
+        # video-to-video (e.g. LTX render-to-real): source video + first frame.
+        fal_app = spec["fal"]
+        args = _to_fal_v2v_args(payload)
     else:
         args = _to_fal_args(payload, spec, kind)
         fal_app = spec["fal"]
@@ -314,6 +328,51 @@ def _to_fal_ref_args(payload: dict) -> dict:
         args["resolution"] = "720p" if payload["height"] >= 720 else "480p"
     if payload.get("num_frames") and payload.get("fps"):
         args["duration"] = max(1, round(payload["num_frames"] / payload["fps"]))
+    if "generate_audio" in payload:
+        args["generate_audio"] = bool(payload["generate_audio"])
+    return args
+
+
+def _ensure_render_trigger(prompt: str) -> str:
+    """LTX render-to-real keys off a ``3DREAL`` trigger token (its default
+    prompt is ``"3DREAL. "``). Prepend it when the user's prompt omits it so the
+    photoreal conversion still fires."""
+    prompt = (prompt or "").strip()
+    if "3dreal" in prompt.lower():
+        return prompt
+    return f"3DREAL. {prompt}".strip()
+
+
+def _to_fal_v2v_args(payload: dict) -> dict:
+    """Build args for a video-to-video model (LTX 2.3 render-to-real).
+
+    The source 3D/CG render is the required ``video_url`` (uploaded via the
+    contract's control/source-video picker); an optional first-frame
+    ``image_url`` anchors the look. Maps the contract's prompt / resolution /
+    frame count / fps / seed and the Generate Audio toggle. Note fal uses
+    ``frames_per_second`` (not ``fps``) and a raw ``num_frames`` count.
+    """
+    args = {"prompt": _ensure_render_trigger(payload.get("prompt", ""))}
+    video = _control_video_data_url(payload)
+    if video:
+        args["video_url"] = video
+    img = _data_url(payload)
+    if img:
+        args["image_url"] = img
+    if payload.get("negative_prompt"):
+        args["negative_prompt"] = payload["negative_prompt"]
+    if payload.get("seed"):
+        args["seed"] = payload["seed"]
+    if payload.get("height"):
+        args["resolution"] = "720p" if payload["height"] >= 720 else "480p"
+    if payload.get("num_frames"):
+        args["num_frames"] = int(payload["num_frames"])
+    if payload.get("fps"):
+        args["frames_per_second"] = payload["fps"]
+    if payload.get("num_inference_steps"):
+        args["num_inference_steps"] = payload["num_inference_steps"]
+    if payload.get("guidance_scale"):
+        args["guidance_scale"] = payload["guidance_scale"]
     if "generate_audio" in payload:
         args["generate_audio"] = bool(payload["generate_audio"])
     return args

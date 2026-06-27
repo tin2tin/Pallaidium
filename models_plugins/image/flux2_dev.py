@@ -1,5 +1,7 @@
 """Text-to-image with multi-image support via FLUX.2-dev (4-bit quantized, HF token required)."""
 
+import os
+
 from ...models.base import ModelPlugin, InputSpec, UISection, ParamSpec, ModelInputs
 from ...utils.helpers import gfx_device, low_vram, find_strip_by_name, get_strip_path, load_first_frame, load_strip_as_pil
 
@@ -59,16 +61,19 @@ class Flux2DevPlugin(ModelPlugin):
 
     def draw_custom_ui(self, col, context) -> bool:
         scene = context.scene
+        # Strip refs live in the scene shown in the VSE (context.sequencer_scene
+        # in Blender 5.x), which can differ from the active scene.
+        vse_scene = getattr(context, "sequencer_scene", None) or context.scene
         try:
             col.prop(scene, "input_strips", text="Input")
         except Exception:
             pass
-        if scene.sequence_editor is None:
+        if vse_scene.sequence_editor is None:
             return True
         for i in range(1, scene.flux_visible_strips + 1):
             row = col.row(align=True)
             row.prop_search(
-                scene, f"flux_strip_{i}", scene.sequence_editor, "strips",
+                vse_scene, f"flux_strip_{i}", vse_scene.sequence_editor, "strips",
                 text="Ref.", icon="FILE_IMAGE",
             )
             op = row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER")
@@ -92,12 +97,14 @@ class Flux2DevPlugin(ModelPlugin):
         flux_images = []
         if inputs.image is not None:
             flux_images.append(inputs.image)
+        # Reference strips are resolved to image paths at queue-add time (from the
+        # sequencer scene) and delivered via flux_strip_N_path on the proxy.
         for i in range(1, 10):
-            strip_name = getattr(scene, f"flux_strip_{i}", None)
-            if strip_name:
-                strip = find_strip_by_name(scene, strip_name)
-                if strip:
-                    flux_images.append(load_strip_as_pil(strip))
+            path = getattr(scene, f"flux_strip_{i}_path", "")
+            if path and os.path.isfile(path):
+                img = load_first_frame(path)
+                if img is not None:
+                    flux_images.append(img)
 
         self.set_phase(inputs, "Generating")
         return pipe(

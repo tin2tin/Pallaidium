@@ -52,6 +52,23 @@ from ..utils.helpers import (
 )
 
 # ---------------------------------------------------------------------------
+# Reload / scene-input diagnostic — shared log file with main_ops.py so a single
+# file shows what BOTH the immediate path and the queue path decided.
+# ---------------------------------------------------------------------------
+import time as _time
+_PALLAIDIUM_DIAG_LOG = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                                    "_diag_scene_input.log")
+
+def _diag(msg):
+    try:
+        with open(_PALLAIDIUM_DIAG_LOG, "a", encoding="utf-8") as _fh:
+            _fh.write(f"{_time.strftime('%Y-%m-%d %H:%M:%S')}  {msg}\n")
+    except Exception:
+        pass
+
+_diag("=== queue_ops.py IMPORTED (build: scene-strip-v3) ===")
+
+# ---------------------------------------------------------------------------
 # Module-level thread state  (main thread writes, worker reads via closure)
 # ---------------------------------------------------------------------------
 
@@ -171,9 +188,28 @@ class RenderQueueJob(PropertyGroup):
     klein_strip_1_path:   StringProperty()   # Klein reference image 1
     klein_strip_2_path:   StringProperty()   # Klein reference image 2
     klein_strip_3_path:   StringProperty()   # Klein reference image 3
-    nano_banana_ref_strip_1_path: StringProperty()  # Nano Banana reference image 1
-    nano_banana_ref_strip_2_path: StringProperty()  # Nano Banana reference image 2
-    nano_banana_ref_strip_3_path: StringProperty()  # Nano Banana reference image 3
+    # FLUX.2 / remote multi-image reference strips (flux_strip_N pickers, up to 9)
+    flux_strip_1_path:    StringProperty()
+    flux_strip_2_path:    StringProperty()
+    flux_strip_3_path:    StringProperty()
+    flux_strip_4_path:    StringProperty()
+    flux_strip_5_path:    StringProperty()
+    flux_strip_6_path:    StringProperty()
+    flux_strip_7_path:    StringProperty()
+    flux_strip_8_path:    StringProperty()
+    flux_strip_9_path:    StringProperty()
+    minimax_subject_path: StringProperty()   # MiniMax subject2vid reference image
+    # Nano Banana reference images (up to 9; nano_banana_ref_count = how many are active)
+    nano_banana_ref_count: IntProperty(default=3)
+    nano_banana_ref_strip_1_path: StringProperty()
+    nano_banana_ref_strip_2_path: StringProperty()
+    nano_banana_ref_strip_3_path: StringProperty()
+    nano_banana_ref_strip_4_path: StringProperty()
+    nano_banana_ref_strip_5_path: StringProperty()
+    nano_banana_ref_strip_6_path: StringProperty()
+    nano_banana_ref_strip_7_path: StringProperty()
+    nano_banana_ref_strip_8_path: StringProperty()
+    nano_banana_ref_strip_9_path: StringProperty()
     veo_ref_strip_1_path: StringProperty()   # Veo 3.1 reference image 1
     veo_ref_strip_2_path: StringProperty()   # Veo 3.1 reference image 2
     veo_ref_strip_3_path: StringProperty()   # Veo 3.1 reference image 3
@@ -181,6 +217,12 @@ class RenderQueueJob(PropertyGroup):
     nano_banana_ref_strip_1: StringProperty()
     nano_banana_ref_strip_2: StringProperty()
     nano_banana_ref_strip_3: StringProperty()
+    nano_banana_ref_strip_4: StringProperty()
+    nano_banana_ref_strip_5: StringProperty()
+    nano_banana_ref_strip_6: StringProperty()
+    nano_banana_ref_strip_7: StringProperty()
+    nano_banana_ref_strip_8: StringProperty()
+    nano_banana_ref_strip_9: StringProperty()
     veo_ref_strip_1: StringProperty()
     veo_ref_strip_2: StringProperty()
     veo_ref_strip_3: StringProperty()
@@ -251,6 +293,9 @@ class RenderQueueJob(PropertyGroup):
     ltx23ic_control_downscale:   IntProperty(default=1)
     ltx23ic_control_audio_str:   FloatProperty(default=1.0)
     ltx23ic_identity_guidance:   FloatProperty(default=0.0)
+    # 3DREAL mode: dropdown holds an IMAGE → frame-0 appearance reference,
+    # while the MAIN input video drives control_video.
+    ltx23ic_ref_image_path:      StringProperty(default="")
 
     # ltx23_extend — clip extension params + resolved audio-strip path
     ltx23ext_extend_frames:      IntProperty(default=96)
@@ -478,6 +523,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             ltx23ic_control_downscale      = snapshot.get("ltx23ic_control_downscale",   1),
             ltx23ic_control_audio_str      = snapshot.get("ltx23ic_control_audio_str",   1.0),
             ltx23ic_identity_guidance      = snapshot.get("ltx23ic_identity_guidance",   0.0),
+            ltx23ic_ref_image_path         = snapshot.get("ltx23ic_ref_image_path",      ""),
             # ltx23_extend params
             ltx23ext_extend_frames         = snapshot.get("ltx23ext_extend_frames",      96),
             ltx23ext_video_strength        = snapshot.get("ltx23ext_video_strength",     1.0),
@@ -533,9 +579,19 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             klein_strip_1_path     = snapshot.get("klein_strip_1_path",     ""),
             klein_strip_2_path     = snapshot.get("klein_strip_2_path",     ""),
             klein_strip_3_path     = snapshot.get("klein_strip_3_path",     ""),
+            minimax_subject_path   = snapshot.get("minimax_subject_path",   ""),
+            **{f"flux_strip_{_n}_path": snapshot.get(f"flux_strip_{_n}_path", "")
+               for _n in range(1, 10)},
+            nano_banana_ref_count  = snapshot.get("nano_banana_ref_count", 3),
             nano_banana_ref_strip_1_path = snapshot.get("nano_banana_ref_strip_1_path", ""),
             nano_banana_ref_strip_2_path = snapshot.get("nano_banana_ref_strip_2_path", ""),
             nano_banana_ref_strip_3_path = snapshot.get("nano_banana_ref_strip_3_path", ""),
+            nano_banana_ref_strip_4_path = snapshot.get("nano_banana_ref_strip_4_path", ""),
+            nano_banana_ref_strip_5_path = snapshot.get("nano_banana_ref_strip_5_path", ""),
+            nano_banana_ref_strip_6_path = snapshot.get("nano_banana_ref_strip_6_path", ""),
+            nano_banana_ref_strip_7_path = snapshot.get("nano_banana_ref_strip_7_path", ""),
+            nano_banana_ref_strip_8_path = snapshot.get("nano_banana_ref_strip_8_path", ""),
+            nano_banana_ref_strip_9_path = snapshot.get("nano_banana_ref_strip_9_path", ""),
             veo_ref_strip_1_path   = snapshot.get("veo_ref_strip_1_path",   ""),
             veo_ref_strip_2_path   = snapshot.get("veo_ref_strip_2_path",   ""),
             veo_ref_strip_3_path   = snapshot.get("veo_ref_strip_3_path",   ""),
@@ -972,6 +1028,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             "ltx23ic_control_downscale":   snapshot.get("ltx23ic_control_downscale",   1),
             "ltx23ic_control_audio_str":   snapshot.get("ltx23ic_control_audio_str",   1.0),
             "ltx23ic_identity_guidance":   snapshot.get("ltx23ic_identity_guidance",   0.0),
+            "ltx23ic_ref_image_path":      snapshot.get("ltx23ic_ref_image_path",      ""),
             # ltx23_extend
             "ltx23ext_extend_frames":      snapshot.get("ltx23ext_extend_frames",      96),
             "ltx23ext_video_strength":     snapshot.get("ltx23ext_video_strength",     1.0),
@@ -989,15 +1046,14 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             "veo_person_generation":       snapshot.get("veo_person_generation",  "allow_adult"),
             "veo_image_mode":              snapshot.get("veo_image_mode",         "AUTO"),
             # Reference strips — names (drive Redo) + resolved paths (record)
-            "nano_banana_ref_strip_1":      snapshot.get("nano_banana_ref_strip_1",      ""),
-            "nano_banana_ref_strip_2":      snapshot.get("nano_banana_ref_strip_2",      ""),
-            "nano_banana_ref_strip_3":      snapshot.get("nano_banana_ref_strip_3",      ""),
+            "nano_banana_ref_count":        snapshot.get("nano_banana_ref_count", 3),
+            **{f"nano_banana_ref_strip_{_n}":
+                   snapshot.get(f"nano_banana_ref_strip_{_n}", "") for _n in range(1, 10)},
             "veo_ref_strip_1":              snapshot.get("veo_ref_strip_1",              ""),
             "veo_ref_strip_2":              snapshot.get("veo_ref_strip_2",              ""),
             "veo_ref_strip_3":              snapshot.get("veo_ref_strip_3",              ""),
-            "nano_banana_ref_strip_1_path": snapshot.get("nano_banana_ref_strip_1_path", ""),
-            "nano_banana_ref_strip_2_path": snapshot.get("nano_banana_ref_strip_2_path", ""),
-            "nano_banana_ref_strip_3_path": snapshot.get("nano_banana_ref_strip_3_path", ""),
+            **{f"nano_banana_ref_strip_{_n}_path":
+                   snapshot.get(f"nano_banana_ref_strip_{_n}_path", "") for _n in range(1, 10)},
             "veo_ref_strip_1_path":         snapshot.get("veo_ref_strip_1_path",         ""),
             "veo_ref_strip_2_path":         snapshot.get("veo_ref_strip_2_path",         ""),
             "veo_ref_strip_3_path":         snapshot.get("veo_ref_strip_3_path",         ""),
@@ -1094,6 +1150,15 @@ class SEQUENCER_OT_add_to_queue(Operator):
         from ..utils.helpers import find_strip_by_name, get_strip_path, render_strip_to_path
         strip = find_strip_by_name(scene, strip_name)
         if strip is None:
+            # Fallback: the slot may hold a direct file path (e.g. a Screenwriter
+            # script-to-screen reference) rather than a timeline strip name. This
+            # makes reference delivery scene-independent — no source strip needs to
+            # exist in the enqueue scene.
+            try:
+                if strip_name and os.path.isfile(bpy.path.abspath(strip_name)):
+                    return bpy.path.abspath(strip_name)
+            except Exception:
+                pass
             return ""
 
         if strip.type == "IMAGE":
@@ -1267,10 +1332,15 @@ class SEQUENCER_OT_add_to_queue(Operator):
         prefs = context.preferences.addons[ADDON_ID].preferences
         otype = scene.generatorai_typeselect
 
-        # In Blender 5.x the workspace.sequencer_scene can differ from the
-        # active scene.  Record it now so the strip lands in the right place.
-        _ws_seq_scene = getattr(context.workspace, "sequencer_scene", None)
-        sequencer_scene_name = (_ws_seq_scene or scene).name
+        # In Blender 5.x the VSE edits context.sequencer_scene (a workspace
+        # property) which can differ from the active scene.  All picked-strip
+        # references (input strips and the per-plugin ref pickers) live in that
+        # scene, so resolve them from it rather than context.scene.  Record its
+        # name too so generated strips land back in the right place.
+        seq_scene = (getattr(context, "sequencer_scene", None)
+                     or getattr(context.workspace, "sequencer_scene", None)
+                     or scene)
+        sequencer_scene_name = seq_scene.name
 
         if not scene.sequence_editor:
             scene.sequence_editor_create()
@@ -1358,27 +1428,44 @@ class SEQUENCER_OT_add_to_queue(Operator):
             joyimage_yaw          = getattr(scene, "joyimage_yaw", 0.0),
             joyimage_pitch        = getattr(scene, "joyimage_pitch", 0.0),
             joyimage_zoom         = getattr(scene, "joyimage_zoom", "unchanged"),
-            kontext_strip_1_path  = self._resolve_named_strip_path(scene, getattr(scene, "kontext_strip_1", "")),
-            inpaint_mask_path     = self._resolve_named_strip_path(scene, getattr(scene, "inpaint_selected_strip", "")),
-            qwen_strip_1_path     = self._render_named_strip_image(context, scene, getattr(scene, "qwen_strip_1", "")),
-            qwen_strip_2_path     = self._render_named_strip_image(context, scene, getattr(scene, "qwen_strip_2", "")),
-            qwen_strip_3_path     = self._render_named_strip_image(context, scene, getattr(scene, "qwen_strip_3", "")),
-            klein_strip_1_path    = self._render_named_strip_image(context, scene, getattr(scene, "klein_strip_1", "")),
-            klein_strip_2_path    = self._render_named_strip_image(context, scene, getattr(scene, "klein_strip_2", "")),
-            klein_strip_3_path    = self._render_named_strip_image(context, scene, getattr(scene, "klein_strip_3", "")),
-            nano_banana_ref_strip_1_path = self._render_named_strip_image(context, scene, getattr(scene, "nano_banana_ref_strip_1", "")),
-            nano_banana_ref_strip_2_path = self._render_named_strip_image(context, scene, getattr(scene, "nano_banana_ref_strip_2", "")),
-            nano_banana_ref_strip_3_path = self._render_named_strip_image(context, scene, getattr(scene, "nano_banana_ref_strip_3", "")),
-            veo_ref_strip_1_path  = self._render_named_strip_image(context, scene, getattr(scene, "veo_ref_strip_1", "")),
-            veo_ref_strip_2_path  = self._render_named_strip_image(context, scene, getattr(scene, "veo_ref_strip_2", "")),
-            veo_ref_strip_3_path  = self._render_named_strip_image(context, scene, getattr(scene, "veo_ref_strip_3", "")),
+            kontext_strip_1_path  = self._resolve_named_strip_path(seq_scene, getattr(seq_scene, "kontext_strip_1", "")),
+            inpaint_mask_path     = self._resolve_named_strip_path(seq_scene, getattr(seq_scene, "inpaint_selected_strip", "")),
+            qwen_strip_1_path     = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "qwen_strip_1", "")),
+            qwen_strip_2_path     = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "qwen_strip_2", "")),
+            qwen_strip_3_path     = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "qwen_strip_3", "")),
+            klein_strip_1_path    = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "klein_strip_1", "")),
+            klein_strip_2_path    = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "klein_strip_2", "")),
+            klein_strip_3_path    = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "klein_strip_3", "")),
+            minimax_subject_path  = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "minimax_subject", "")),
+            **{f"flux_strip_{_n}_path":
+                   self._render_named_strip_image(context, seq_scene, getattr(seq_scene, f"flux_strip_{_n}", ""))
+               for _n in range(1, 10)},
+            nano_banana_ref_count = getattr(scene, "nano_banana_ref_count", 3),
+            nano_banana_ref_strip_1_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_1", "")),
+            nano_banana_ref_strip_2_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_2", "")),
+            nano_banana_ref_strip_3_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_3", "")),
+            nano_banana_ref_strip_4_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_4", "")),
+            nano_banana_ref_strip_5_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_5", "")),
+            nano_banana_ref_strip_6_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_6", "")),
+            nano_banana_ref_strip_7_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_7", "")),
+            nano_banana_ref_strip_8_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_8", "")),
+            nano_banana_ref_strip_9_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_9", "")),
+            veo_ref_strip_1_path  = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "veo_ref_strip_1", "")),
+            veo_ref_strip_2_path  = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "veo_ref_strip_2", "")),
+            veo_ref_strip_3_path  = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "veo_ref_strip_3", "")),
             # Source strip names (carried through to metadata for Redo)
-            nano_banana_ref_strip_1 = getattr(scene, "nano_banana_ref_strip_1", ""),
-            nano_banana_ref_strip_2 = getattr(scene, "nano_banana_ref_strip_2", ""),
-            nano_banana_ref_strip_3 = getattr(scene, "nano_banana_ref_strip_3", ""),
-            veo_ref_strip_1       = getattr(scene, "veo_ref_strip_1", ""),
-            veo_ref_strip_2       = getattr(scene, "veo_ref_strip_2", ""),
-            veo_ref_strip_3       = getattr(scene, "veo_ref_strip_3", ""),
+            nano_banana_ref_strip_1 = getattr(seq_scene, "nano_banana_ref_strip_1", ""),
+            nano_banana_ref_strip_2 = getattr(seq_scene, "nano_banana_ref_strip_2", ""),
+            nano_banana_ref_strip_3 = getattr(seq_scene, "nano_banana_ref_strip_3", ""),
+            nano_banana_ref_strip_4 = getattr(seq_scene, "nano_banana_ref_strip_4", ""),
+            nano_banana_ref_strip_5 = getattr(seq_scene, "nano_banana_ref_strip_5", ""),
+            nano_banana_ref_strip_6 = getattr(seq_scene, "nano_banana_ref_strip_6", ""),
+            nano_banana_ref_strip_7 = getattr(seq_scene, "nano_banana_ref_strip_7", ""),
+            nano_banana_ref_strip_8 = getattr(seq_scene, "nano_banana_ref_strip_8", ""),
+            nano_banana_ref_strip_9 = getattr(seq_scene, "nano_banana_ref_strip_9", ""),
+            veo_ref_strip_1       = getattr(seq_scene, "veo_ref_strip_1", ""),
+            veo_ref_strip_2       = getattr(seq_scene, "veo_ref_strip_2", ""),
+            veo_ref_strip_3       = getattr(seq_scene, "veo_ref_strip_3", ""),
             whisper_model_size = getattr(scene, "whisper_model_size", "large-v3-turbo"),
             whisper_language   = getattr(scene, "whisper_language",   ""),
             stem_split_model  = getattr(scene, "stem_split_model",  "htdemucs_ft"),
@@ -1458,7 +1545,10 @@ class SEQUENCER_OT_add_to_queue(Operator):
         # it works correctly from the N-panel (same as strip_to_generatorAI).
         # Fall back to se.strips + s.select for non-VSE invocations (keybinds,
         # Python calls) where context may not carry the sequence editor state.
-        se = scene.sequence_editor
+        # Resolve input/reference strips from the sequencer scene (see top of
+        # execute) so picked refs and the select fallback see the strips
+        # actually shown in the editor.
+        se = seq_scene.sequence_editor
         _ctx_sel = list(context.selected_strips) if context.selected_strips else []
         if _ctx_sel:
             selected = sorted(
@@ -1477,7 +1567,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
             return {"CANCELLED"}
         strip_list = selected if (input_mode == "input_strips" and selected) else [None]
 
-        inpaint_strip = getattr(scene, "inpaint_selected_strip", "")
+        inpaint_strip = getattr(seq_scene, "inpaint_selected_strip", "")
         # Deterministic single-output plugins (supports_batch=False) gain nothing
         # from batching — the UI hides Batch Count for them, so clamp to 1 here
         # to avoid enqueuing identical duplicate jobs from a stale movie_num_batch.
@@ -1490,6 +1580,8 @@ class SEQUENCER_OT_add_to_queue(Operator):
         for strip in strip_list:
             if strip is not None:
                 image_path, movie_path, sound_path, last_image_path, middle_images_json, control_video_path, control_audio_path = self._paths_from_strip(strip)
+                print(f"[Queue][dbg] loop strip='{strip.name}' type={strip.type} otype={otype} "
+                      f"input_mode={input_mode} → image_path={image_path!r} movie_path={movie_path!r}")
 
                 # Render audio to a trimmed WAV so the job never holds a pointer to
                 # the full source file (avoids CUDA OOM when frame count is derived
@@ -1529,6 +1621,64 @@ class SEQUENCER_OT_add_to_queue(Operator):
                     else:
                         print(f"[Queue] Florence2 input render failed, keeping raw")
 
+                # SCENE strips carry no source file, so _paths_from_strip returns
+                # empty paths and the job would silently fall through to a txt2*
+                # mode that ignores the strip. Render the scene through the VSE and
+                # use the rendered file as the model input — a single-frame PNG for
+                # image/text plugins, an animation MP4 for video plugins. Mirrors
+                # load_strip_as_pil()/_render_named_strip_image()'s decision tree.
+                # A failed render is surfaced to the UI so the job never silently
+                # degrades to txt2* (which is what "input is a scene strip but mode
+                # came out txt2img" looks like to the user).
+                if strip.type == "SCENE" and not (image_path or movie_path):
+                    from ..utils.helpers import render_strip_to_path
+                    print(f"[Queue][dbg] SCENE block ENTERED for '{strip.name}', "
+                          f"rendering (otype={otype})…")
+                    _diag(f"SCENE block ENTERED for '{strip.name}' otype={otype}")
+                    _want_video = (otype == "movie")
+                    _scene_rendered = None
+                    try:
+                        _scene_rendered = render_strip_to_path(
+                            context, strip, image_output=not _want_video
+                        )
+                    except Exception as _scene_err:
+                        print(f"[Queue] SCENE render raised: {_scene_err!r}")
+                        _diag(f"SCENE render RAISED: {_scene_err!r}")
+                    _diag(f"SCENE render returned: {_scene_rendered!r}")
+                    if _scene_rendered:
+                        if _want_video:
+                            movie_path = _scene_rendered
+                        else:
+                            image_path = _scene_rendered
+                        print(f"[Queue] SCENE input rendered ({'video' if _want_video else 'image'}) → {_scene_rendered!r}")
+                    elif otype in ("image", "movie", "text"):
+                        # Empty path → _detect_mode would pick txt2*, dropping the
+                        # scene the user explicitly selected. Make that loud.
+                        self.report(
+                            {"WARNING"},
+                            f"Could not render scene strip '{strip.name}' to an input "
+                            f"image — job will run without it. Check the scene has a camera/output.",
+                        )
+                        print(f"[Queue] SCENE render returned no file for '{strip.name}'")
+
+                # MOVIE main inputs (Output: Video): re-render through the VSE so the
+                # model receives only the strip's visible (trimmed) duration — and any
+                # speed/transform baked in — instead of the full untrimmed source file.
+                # Mirrors the SCENE branch; a failed render keeps the raw path so the
+                # job still runs.
+                if strip.type == "MOVIE" and otype == "movie" and movie_path:
+                    from ..utils.helpers import render_strip_to_path
+                    _trim_mov = None
+                    try:
+                        _trim_mov = render_strip_to_path(context, strip, image_output=False)
+                    except Exception as _mov_err:
+                        print(f"[Queue] MOVIE trim render raised: {_mov_err!r}")
+                    if _trim_mov:
+                        movie_path = _trim_mov
+                        print(f"[Queue] MOVIE input rendered (trimmed) → {_trim_mov!r}")
+                    else:
+                        print(f"[Queue] MOVIE trim render failed, keeping raw: {movie_path!r}")
+
                 # Compute audio start offset (seconds) from SOUND strip position in META
                 _audio_start_time = 0.0
                 if strip.type == "META" and sound_path:
@@ -1558,8 +1708,8 @@ class SEQUENCER_OT_add_to_queue(Operator):
                             break
                 elif strip.type == "MOVIE" and control_video_path:
                     # Single MOVIE control strip: render trimmed version
-                    _ctrl_strip_name = getattr(scene, "ltx23ic_control_strip", "")
-                    _ctrl_strip_obj  = scene.sequence_editor.strips.get(_ctrl_strip_name) if _ctrl_strip_name and scene.sequence_editor else None
+                    _ctrl_strip_name = getattr(seq_scene, "ltx23ic_control_strip", "")
+                    _ctrl_strip_obj  = se.strips.get(_ctrl_strip_name) if _ctrl_strip_name and se else None
                     if _ctrl_strip_obj and _ctrl_strip_obj.type == "MOVIE":
                         from ..utils.helpers import render_strip_to_path
                         _trimmed_cv = render_strip_to_path(context, _ctrl_strip_obj, image_output=False)
@@ -1634,6 +1784,11 @@ class SEQUENCER_OT_add_to_queue(Operator):
 
             mode = self._detect_mode(otype, image_path, movie_path,
                                      inpaint_strip if strip is None else "")
+            print(f"[Queue][dbg] mode-detect otype={otype} image_path={image_path!r} "
+                  f"movie_path={movie_path!r} inpaint={inpaint_strip!r} → mode={mode}")
+            _diag(f"queue enqueue: strip={(strip.name, strip.type) if strip is not None else None} "
+                  f"otype={otype} input_mode={input_mode} image_path={image_path!r} "
+                  f"movie_path={movie_path!r} → mode={mode}")
 
             # For strip mode: find the output channel once, then advance the
             # frame cursor after each batch copy so they form a sequence.
@@ -1692,11 +1847,26 @@ class SEQUENCER_OT_add_to_queue(Operator):
                 # IC-LoRA / V2 — resolved at queue time so the worker is self-contained
                 job.ltx23ic_control_video_path = control_video_path
                 job.ltx23ic_control_audio_path = control_audio_path
+                job.ltx23ic_ref_image_path     = ""
                 job.ltx23m_audio_start_time    = _audio_start_time
 
-                # Single-file control strip: resolve ltx23ic_control_strip scene prop
+                def _image_strip_path(_s):
+                    """Absolute path to an IMAGE strip's first element, or ''."""
+                    try:
+                        _dir = os.path.dirname(bpy.path.abspath(_s.directory))
+                        _fn  = _s.elements[0].filename
+                        _p   = os.path.join(_dir, _fn) if _fn else ""
+                        return _p if _p and os.path.isfile(_p) else ""
+                    except Exception:
+                        return ""
+
+                # Single-file control strip: resolve ltx23ic_control_strip prop
+                # from the sequencer scene. Supports a MOVIE strip (control video),
+                # an IMAGE strip (3DREAL frame-0 appearance reference → the MAIN
+                # input video drives control_video), or a META whose first
+                # MOVIE/SOUND/IMAGE children supply the control references.
                 if not control_video_path:
-                    _ctrl_name = getattr(scene, "ltx23ic_control_strip", "")
+                    _ctrl_name = getattr(seq_scene, "ltx23ic_control_strip", "")
                     if _ctrl_name and se:
                         _ctrl_s = se.strips.get(_ctrl_name)
                         if _ctrl_s and _ctrl_s.type == "MOVIE":
@@ -1706,10 +1876,29 @@ class SEQUENCER_OT_add_to_queue(Operator):
                                     job.ltx23ic_control_video_path = _cp
                             except Exception:
                                 pass
+                        elif _ctrl_s and _ctrl_s.type == "IMAGE":
+                            job.ltx23ic_ref_image_path = _image_strip_path(_ctrl_s)
+                        elif _ctrl_s and _ctrl_s.type == "META":
+                            for _c in _ctrl_s.strips:
+                                try:
+                                    if _c.type == "MOVIE" and not job.ltx23ic_control_video_path:
+                                        _cp = bpy.path.abspath(_c.filepath)
+                                        if os.path.isfile(_cp):
+                                            job.ltx23ic_control_video_path = _cp
+                                    elif _c.type == "IMAGE" and not job.ltx23ic_ref_image_path:
+                                        job.ltx23ic_ref_image_path = _image_strip_path(_c)
+                                    elif (_c.type == "SOUND"
+                                          and not job.ltx23ic_control_audio_path
+                                          and getattr(_c, "sound", None)):
+                                        _ap = bpy.path.abspath(_c.sound.filepath)
+                                        if os.path.isfile(_ap):
+                                            job.ltx23ic_control_audio_path = _ap
+                                except Exception:
+                                    pass
 
                 # ltx23_extend: resolve the picked SOUND strip → file path for the worker.
                 job.ltx23ext_audio_path = ""
-                _ext_name = getattr(scene, "ltx23ext_audio_strip", "")
+                _ext_name = getattr(seq_scene, "ltx23ext_audio_strip", "")
                 if _ext_name and se:
                     _ext_s = se.strips.get(_ext_name)
                     if _ext_s and _ext_s.type == "SOUND" and getattr(_ext_s, "sound", None):
@@ -1726,7 +1915,13 @@ class SEQUENCER_OT_add_to_queue(Operator):
                 # For TEXT strips: prepend the strip's text to the prompt,
                 # matching the non-queue behaviour: strip.text + ", " + base_prompt
                 # Strip // comment lines (Florence-2 metadata) before using as prompt.
-                if strip is not None and strip.type == "TEXT":
+                # Skip when the strip carries its own ai_meta_prompt (a metadata
+                # carrier, e.g. a Screenwriter script-to-screen TEXT strip): Redo
+                # already loaded that authoritative prompt into job.prompt, so
+                # prepending the visible text would duplicate it (dialogue spoken
+                # twice / shot annotation repeated).
+                if (strip is not None and strip.type == "TEXT"
+                        and not strip.get("ai_meta_prompt")):
                     strip_text = getattr(strip, "text", "").strip()
                     strip_text = "\n".join(
                         ln for ln in strip_text.splitlines()
@@ -1823,9 +2018,12 @@ def _queue_start_job(scene, job) -> None:
         "stem_split_bass", "stem_split_other", "stem_split_guitar", "stem_split_piano",
         "qwen_strip_1_path", "qwen_strip_2_path", "qwen_strip_3_path",
         "klein_strip_1_path", "klein_strip_2_path", "klein_strip_3_path",
-        "nano_banana_ref_strip_1_path", "nano_banana_ref_strip_2_path", "nano_banana_ref_strip_3_path",
+        *(f"flux_strip_{_n}_path" for _n in range(1, 10)),
+        "minimax_subject_path",
+        "nano_banana_ref_count",
+        *(f"nano_banana_ref_strip_{_n}_path" for _n in range(1, 10)),
         "veo_ref_strip_1_path", "veo_ref_strip_2_path", "veo_ref_strip_3_path",
-        "nano_banana_ref_strip_1", "nano_banana_ref_strip_2", "nano_banana_ref_strip_3",
+        *(f"nano_banana_ref_strip_{_n}" for _n in range(1, 10)),
         "veo_ref_strip_1", "veo_ref_strip_2", "veo_ref_strip_3",
         "florence2_mode", "florence2_send_to_mask",
         "klein_schematic_mode", "klein_schematic_target",
@@ -1840,6 +2038,7 @@ def _queue_start_job(scene, job) -> None:
         "ltx23ic_control_video_path", "ltx23ic_control_audio_path",
         "ltx23ic_control_strength", "ltx23ic_control_downscale",
         "ltx23ic_control_audio_str", "ltx23ic_identity_guidance",
+        "ltx23ic_ref_image_path",
         # ltx23_extend params + resolved audio-strip path
         "ltx23ext_extend_frames", "ltx23ext_video_strength", "ltx23ext_audio_path",
         "ltx23_stage_mode",
@@ -2359,10 +2558,15 @@ def _queue_insert_strip(scene, result: dict) -> None:
                     extra_meta[_k] = _v
             # Google Nano Banana / Veo reference strips — write names (for Redo)
             # and resolved paths (record) only when a slot was actually used.
+            # Only the first nano_banana_ref_count slots are active (the rest are
+            # hidden in the UI), so ignore stale names/paths beyond that count.
+            _nb_count = max(1, min(int(result.get("nano_banana_ref_count", 3) or 3), 9))
+            if any(result.get(f"nano_banana_ref_strip_{_n}") for _n in range(1, _nb_count + 1)):
+                extra_meta["nano_banana_ref_count"] = _nb_count
             for _k in (
-                "nano_banana_ref_strip_1", "nano_banana_ref_strip_2", "nano_banana_ref_strip_3",
+                *(f"nano_banana_ref_strip_{_n}" for _n in range(1, _nb_count + 1)),
                 "veo_ref_strip_1", "veo_ref_strip_2", "veo_ref_strip_3",
-                "nano_banana_ref_strip_1_path", "nano_banana_ref_strip_2_path", "nano_banana_ref_strip_3_path",
+                *(f"nano_banana_ref_strip_{_n}_path" for _n in range(1, _nb_count + 1)),
                 "veo_ref_strip_1_path", "veo_ref_strip_2_path", "veo_ref_strip_3_path",
             ):
                 if result.get(_k):
@@ -2375,6 +2579,7 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 "ltx23ic_control_video_path", "ltx23ic_control_audio_path",
                 "ltx23ic_control_strength", "ltx23ic_control_downscale",
                 "ltx23ic_control_audio_str", "ltx23ic_identity_guidance",
+                "ltx23ic_ref_image_path",
             ):
                 _v = result.get(_k)
                 if _v is not None:
@@ -2401,7 +2606,23 @@ def _queue_insert_strip(scene, result: dict) -> None:
                     if _k == "moss_model_variant" or _v != _def:
                         extra_meta[_k] = _v
 
+            # Generic input paths — write so redo-from-metadata can reconstruct the
+            # inputs even when the metadata carrier is a TEXT strip (Screenwriter
+            # script-to-screen jobs) rather than the rendered media itself. Only
+            # non-empty values are written to keep metadata compact.
+            for _k in (
+                "image_path", "last_image_path", "middle_images_json",
+                "movie_path", "sound_path", "ref_audio_path", "ref_text",
+                "kontext_strip_1_path",
+                "qwen_strip_1_path", "qwen_strip_2_path", "qwen_strip_3_path",
+                "klein_strip_1_path", "klein_strip_2_path", "klein_strip_3_path",
+            ):
+                _v = result.get(_k)
+                if _v:
+                    extra_meta[_k] = _v
+
             set_ai_metadata_from_dict(new_strip, {
+                "output_type":     result.get("output_type", ""),
                 "model":           result.get("model_card", ""),
                 "mode":            result.get("mode", ""),
                 "prompt":          result.get("prompt", ""),
@@ -2689,8 +2910,10 @@ class SEQUENCER_OT_redo_from_job(Operator):
             scene.veo_person_generation      = job.veo_person_generation
             scene.veo_image_mode             = job.veo_image_mode
         # Reference strips (re-rendered from the restored names at queue time)
+        if hasattr(scene, "nano_banana_ref_count"):
+            scene.nano_banana_ref_count = getattr(job, "nano_banana_ref_count", 3) or 3
         for _attr in (
-            "nano_banana_ref_strip_1", "nano_banana_ref_strip_2", "nano_banana_ref_strip_3",
+            *(f"nano_banana_ref_strip_{_n}" for _n in range(1, 10)),
             "veo_ref_strip_1", "veo_ref_strip_2", "veo_ref_strip_3",
         ):
             if hasattr(scene, _attr):

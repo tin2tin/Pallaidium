@@ -164,6 +164,10 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         image_model_card = addon_prefs.image_model_card
         text_model_card = addon_prefs.text_model_card
         scene = context.scene
+        # Strip refs (inpaint mask, Kontext ref) live in the scene shown in the
+        # VSE (context.sequencer_scene in Blender 5.x), which can differ from the
+        # active scene.
+        vse_scene = getattr(context, "sequencer_scene", None) or context.scene
         type = scene.generatorai_typeselect
         input = scene.input_strips
         layout = self.layout
@@ -250,15 +254,15 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         col.prop(context.scene, "image_power", text="Strip Power")
 
                     if (
-                        bpy.context.scene.sequence_editor is not None
+                        vse_scene.sequence_editor is not None
                         and (plugin is None or plugin.supports_inpaint)
                     ):
                         if type == "image":
                             row = col.row(align=True)
                             row.prop_search(
-                                scene,
+                                vse_scene,
                                 "inpaint_selected_strip",
-                                scene.sequence_editor,
+                                vse_scene.sequence_editor,
                                 "strips",
                                 text="Inpaint Mask",
                                 icon="SEQ_STRIP_DUPLICATE",
@@ -268,9 +272,9 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             if image_model_card == "yuvraj108c/FLUX.1-Kontext-dev" and type == "image":
                 row = col.row(align=True)
                 row.prop_search(
-                    scene,
+                    vse_scene,
                     "kontext_strip_1",
-                    scene.sequence_editor,
+                    vse_scene.sequence_editor,
                     "strips",
                     text="Ref.",
                     icon="FILE_IMAGE",

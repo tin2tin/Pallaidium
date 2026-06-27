@@ -63,11 +63,15 @@ class LTX2_3ExtendStagedPlugin(ModelPlugin):
 
     def draw_custom_ui(self, col, context) -> bool:
         scene = context.scene
-        if scene.sequence_editor is not None:
+        # The audio strip lives in the scene shown in the VSE
+        # (context.sequencer_scene in Blender 5.x), which can differ from the
+        # active scene. List + store it there so the picker and queue agree.
+        vse_scene = getattr(context, "sequencer_scene", None) or context.scene
+        if vse_scene.sequence_editor is not None:
             row = col.row(align=True)
             row.prop_search(
-                scene, "ltx23ext_audio_strip",
-                scene.sequence_editor, "strips",
+                vse_scene, "ltx23ext_audio_strip",
+                vse_scene.sequence_editor, "strips",
                 text="Audio Strip", icon="SEQ_STRIP_DUPLICATE",
             )
             row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = "ltx23ext_audio_select"

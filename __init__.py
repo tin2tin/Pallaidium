@@ -752,7 +752,7 @@ def register():
     # ltx23_multi_ic_lora — IC-LoRA control params
     bpy.types.Scene.ltx23ic_control_strip       = bpy.props.StringProperty(name="IC-LoRA Ref Strip",    default="",  description="Name of the IC-LoRA reference strip (META or MOVIE)")
     bpy.types.Scene.ltx23ic_control_strength    = bpy.props.FloatProperty( name="Control Strength",     default=1.0, min=0.0, max=1.0,  description="Strength of IC-LoRA reference token conditioning")
-    bpy.types.Scene.ltx23ic_control_downscale   = bpy.props.IntProperty(   name="Control Downscale",    default=1,   min=1,   max=4,    description="Spatial downscale factor for IC-LoRA reference encoding")
+    bpy.types.Scene.ltx23ic_control_downscale   = bpy.props.IntProperty(   name="Control Downscale",    default=2,   min=1,   max=4,    description="Spatial downscale factor for IC-LoRA reference encoding (2 = quarter the control tokens, much lower Stage-1 VRAM)")
     bpy.types.Scene.ltx23ic_control_audio_str   = bpy.props.FloatProperty( name="Audio Ref Strength",   default=1.0, min=0.0, max=1.0,  description="Strength of IC-LoRA audio reference conditioning")
     bpy.types.Scene.ltx23ic_identity_guidance   = bpy.props.FloatProperty( name="Identity Guidance",    default=0.0, min=0.0, max=5.0,  description="Extra forward pass amplification for audio identity transfer")
 
@@ -891,15 +891,20 @@ def register():
     )
 
     # Reference-image strip pickers (Nano Banana composition / Veo 3.1 ingredients)
-    bpy.types.Scene.nano_banana_ref_strip_1 = bpy.props.StringProperty(
-        name="nano_banana_ref_strip_1", options={"TEXTEDIT_UPDATE"}, default=""
+    # Nano Banana supports up to 9 reference images; how many picker rows are
+    # shown is driven by nano_banana_ref_count (Nano Banana Pro handles the most).
+    bpy.types.Scene.nano_banana_ref_count = bpy.props.IntProperty(
+        name="References", default=3, min=1, max=9,
+        description="Number of reference-image slots to use for Nano Banana",
     )
-    bpy.types.Scene.nano_banana_ref_strip_2 = bpy.props.StringProperty(
-        name="nano_banana_ref_strip_2", options={"TEXTEDIT_UPDATE"}, default=""
-    )
-    bpy.types.Scene.nano_banana_ref_strip_3 = bpy.props.StringProperty(
-        name="nano_banana_ref_strip_3", options={"TEXTEDIT_UPDATE"}, default=""
-    )
+    for _i in range(1, 10):
+        setattr(
+            bpy.types.Scene, f"nano_banana_ref_strip_{_i}",
+            bpy.props.StringProperty(
+                name=f"nano_banana_ref_strip_{_i}",
+                options={"TEXTEDIT_UPDATE"}, default="",
+            ),
+        )
     bpy.types.Scene.veo_ref_strip_1 = bpy.props.StringProperty(
         name="veo_ref_strip_1", options={"TEXTEDIT_UPDATE"}, default=""
     )
@@ -1412,7 +1417,8 @@ def unregister():
         "veo_model", "veo_aspect", "veo_resolution", "veo_duration",
         "veo_person_generation",
         "veo_image_mode",
-        "nano_banana_ref_strip_1", "nano_banana_ref_strip_2", "nano_banana_ref_strip_3",
+        "nano_banana_ref_count",
+        *(f"nano_banana_ref_strip_{_n}" for _n in range(1, 10)),
         "veo_ref_strip_1", "veo_ref_strip_2", "veo_ref_strip_3",
     ):
         if hasattr(bpy.types.Scene, _prop):

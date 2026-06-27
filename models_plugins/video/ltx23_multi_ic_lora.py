@@ -53,8 +53,9 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
     MODEL_TYPE   = "video"
     DESCRIPTION  = (
         "IC-LoRA video/audio style transfer with selectable stage mode (Step 1 / Step 2 / Full). "
-        "Use a META strip whose 1st MOVIE child is the image-condition source and 2nd MOVIE child "
-        "is the IC-LoRA control reference."
+        "Select a MOVIE/SCENE strip as the main input and pick a Ref Strip: a MOVIE → IC-LoRA "
+        "control video; an IMAGE → 3DREAL appearance reference (frame 0), with the main input "
+        "video driving control_video (matches fal/LTX-2.3-3DREAL: video_url + image_url)."
     )
 
     INPUTS       = InputSpec.PROMPT | InputSpec.NEG_PROMPT | InputSpec.IMAGE | InputSpec.LORA | InputSpec.AUDIO_REF
@@ -80,20 +81,24 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
 
     def draw_custom_ui(self, col, context) -> bool:
         scene = context.scene
+        # The IC-LoRA ref strip lives in the scene shown in the VSE, which in
+        # Blender 5.x can differ from the active scene. List + store it there so
+        # the dropdown shows the strips you actually see and the picker agrees.
+        vse_scene = getattr(context, "sequencer_scene", None) or context.scene
         row = col.row(align=True)
         row.prop(scene, "ref_audio_path", text="Audio Ref.")
         row.operator("sequencer.open_audio_filebrowser", text="", icon="FILEBROWSER")
-        if scene.sequence_editor:
+        if vse_scene.sequence_editor:
             row = col.row(align=True)
             row.prop_search(
-                scene, "ltx23ic_control_strip",
-                scene.sequence_editor, "strips",
-                text="IC-LoRA Ref Strip",
+                vse_scene, "ltx23ic_control_strip",
+                vse_scene.sequence_editor, "strips",
+                text="Ref Strip (vid/img)",
                 icon="SEQ_STRIP_META",
             )
             row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = "ltx23ic_control_select"
         else:
-            col.prop(scene, "ltx23ic_control_strip", text="IC-LoRA Ref Strip")
+            col.prop(vse_scene, "ltx23ic_control_strip", text="IC-LoRA Ref Strip")
         col.prop(scene, "ltx23ic_control_strength")
         col.prop(scene, "ltx23ic_control_downscale")
         col.prop(scene, "ltx23ic_control_audio_str")
@@ -205,6 +210,7 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
         # ── IC-LoRA control params from scene_proxy ─────────────────────────
         _ctrl_video_path  = getattr(scene, "ltx23ic_control_video_path", "")
         _ctrl_audio_path  = getattr(scene, "ltx23ic_control_audio_path", "")
+        _ref_image_path   = getattr(scene, "ltx23ic_ref_image_path",     "")
         _ctrl_strength    = float(getattr(scene, "ltx23ic_control_strength",  1.0))
         _ctrl_downscale   = int(getattr(scene,   "ltx23ic_control_downscale", 1))
         _ctrl_audio_str   = float(getattr(scene, "ltx23ic_control_audio_str", 1.0))
@@ -230,12 +236,26 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
         # ── Resolve Image & Audio Inputs ────────────────────────────────────
         image_input = inputs.image
 
+        # 3DREAL mode: the IC-LoRA "ref strip" dropdown holds a still image. Use
+        # it as the frame-0 appearance reference and let the MAIN input video
+        # drive control_video (matches fal/LTX-2.3-3DREAL: video_url + image_url).
+        if _ref_image_path and os.path.isfile(_ref_image_path):
+            try:
+                image_input = load_first_frame(_ref_image_path)
+                print(f"[LTX23ICLoRAStaged] Ref image loaded: {_ref_image_path!r}")
+            except Exception as _e:
+                print(f"[LTX23ICLoRAStaged] WARNING: failed to load ref image ({_e})")
+
         vid_path = None
         for attr in ["video_path", "video", "video_ref"]:
             val = getattr(inputs, attr, None)
             if val and isinstance(val, str) and os.path.exists(val):
                 vid_path = val
                 break
+
+        # When a ref still is supplied AND a main input video exists, the video is
+        # the control source — not a first-frame image condition.
+        _video_is_control = bool(_ref_image_path) and bool(vid_path)
 
         explicit_audio = None
         for attr in ["audio_path", "audio", "audio_ref", "sound", "sound_path"]:
@@ -252,12 +272,12 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
                 with av.open(vid_path) as container:
                     has_video = any(s.type == 'video' for s in container.streams)
                     has_audio = any(s.type == 'audio' for s in container.streams)
-                    if has_video and image_input is None:
+                    if has_video and image_input is None and not _video_is_control:
                         image_input = load_first_frame(vid_path)
                     if has_audio and not explicit_audio:
                         sound_path = vid_path
             except Exception:
-                if image_input is None:
+                if image_input is None and not _video_is_control:
                     try:
                         image_input = load_first_frame(vid_path)
                     except Exception:
@@ -362,11 +382,17 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
             image_conditions = [LTX2ImageCondition(image=image_input, frame=0, strength=1.0)]
 
         # ── Load control reference material ────────────────────────────────
+        # Control source priority:
+        #   1. explicit IC-LoRA control MOVIE (dropdown holds a video)
+        #   2. 3DREAL mode: the MAIN input video (dropdown held the ref image)
         control_video_frames = None
-        if _ctrl_video_path and os.path.isfile(_ctrl_video_path):
+        _control_src = _ctrl_video_path if (_ctrl_video_path and os.path.isfile(_ctrl_video_path)) else None
+        if _control_src is None and _video_is_control and os.path.isfile(vid_path):
+            _control_src = vid_path
+        if _control_src:
             try:
-                control_video_frames = load_video(_ctrl_video_path)
-                print(f"[LTX23ICLoRAStaged] Control video loaded: {len(control_video_frames)} frames from {_ctrl_video_path!r}")
+                control_video_frames = load_video(_control_src)
+                print(f"[LTX23ICLoRAStaged] Control video loaded: {len(control_video_frames)} frames from {_control_src!r}")
             except Exception as _e:
                 print(f"[LTX23ICLoRAStaged] WARNING: failed to load control video ({_e})")
 

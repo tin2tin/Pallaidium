@@ -59,7 +59,10 @@ class GoogleVeoPlugin(ModelPlugin):
         # (first/last frame via timeline selection) still renders.  Hidden for
         # Veo 3.0, which does not support reference images.
         scene = context.scene
-        if scene.sequence_editor is None:
+        # Strip refs live in the scene shown in the VSE (context.sequencer_scene
+        # in Blender 5.x), which can differ from the active scene.
+        vse_scene = getattr(context, "sequencer_scene", None) or context.scene
+        if vse_scene.sequence_editor is None:
             return False
         if not self._supports_reference_images(
             getattr(scene, "veo_model", "veo-3.1-fast-generate-preview")
@@ -67,7 +70,7 @@ class GoogleVeoPlugin(ModelPlugin):
             return False
         for i, attr in enumerate(_REF_ATTRS, 1):
             row = col.row(align=True)
-            row.prop_search(scene, attr, scene.sequence_editor, "strips",
+            row.prop_search(vse_scene, attr, vse_scene.sequence_editor, "strips",
                             text="Ref.", icon="FILE_IMAGE")
             row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = f"veo_select{i}"
         return False

@@ -74,7 +74,15 @@ class SEQUENCER_OT_ai_strip_picker(Operator):
             v2d = region.view2d
             mouse_x_view, mouse_y_view = v2d.region_to_view(*mouse_region_coord)
 
-            for strip in context.scene.sequence_editor.strips_all:
+            # In Blender 5.x the VSE edits context.sequencer_scene, which can
+            # differ from the active context.scene (e.g. one window per scene).
+            # Hit-test against the scene actually shown in this editor.
+            vse_scene = getattr(context, "sequencer_scene", None) or context.scene
+            se = getattr(vse_scene, "sequence_editor", None)
+            if se is None:
+                context.window.cursor_modal_restore()
+                return {"CANCELLED"}
+            for strip in se.strips_all:
                 if hasattr(strip, 'transform'):
                     scale_y = strip.transform.scale_y
                 else:
@@ -100,7 +108,11 @@ class SEQUENCER_OT_ai_strip_picker(Operator):
         return {"RUNNING_MODAL"}
 
     def perform_action(self, context, strip):
-        scene = context.scene
+        # Resolve and store strip references on the sequencer scene actually
+        # shown in the VSE (context.sequencer_scene in Blender 5.x), which can
+        # differ from the active context.scene. find_strip_by_name and the
+        # plugin dropdowns/queue resolution all key off this same scene.
+        scene = getattr(context, "sequencer_scene", None) or context.scene
 
         if self.action == "omni_select1":
             self.report({"INFO"}, f"Picked: {strip.name}")
@@ -109,11 +121,11 @@ class SEQUENCER_OT_ai_strip_picker(Operator):
         elif self.action == "omni_select2":
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):
-                context.scene.omnigen_strip_2 = strip.name
+                scene.omnigen_strip_2 = strip.name
         elif self.action == "omni_select3":
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):
-                context.scene.omnigen_strip_3 = strip.name
+                scene.omnigen_strip_3 = strip.name
 
         if self.action == "qwen_select1":
             self.report({"INFO"}, f"Picked: {strip.name}")
@@ -122,61 +134,61 @@ class SEQUENCER_OT_ai_strip_picker(Operator):
         elif self.action == "qwen_select2":
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):
-                context.scene.qwen_strip_2 = strip.name
+                scene.qwen_strip_2 = strip.name
         elif self.action == "qwen_select3":
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):
-                context.scene.qwen_strip_3 = strip.name
+                scene.qwen_strip_3 = strip.name
 
         if self.action == "klein_select1":
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):
-                context.scene.klein_strip_1 = strip.name
+                scene.klein_strip_1 = strip.name
         elif self.action == "klein_select2":
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):
-                context.scene.klein_strip_2 = strip.name
+                scene.klein_strip_2 = strip.name
         elif self.action == "klein_select3":
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):
-                context.scene.klein_strip_3 = strip.name
+                scene.klein_strip_3 = strip.name
 
-        for _i in range(1, 4):
+        for _i in range(1, 10):
             if self.action == f"nano_banana_select{_i}":
                 self.report({"INFO"}, f"Picked '{strip.name}'")
                 if find_strip_by_name(scene, strip.name):
-                    setattr(context.scene, f"nano_banana_ref_strip_{_i}", strip.name)
+                    setattr(scene, f"nano_banana_ref_strip_{_i}", strip.name)
                 break
-            if self.action == f"veo_select{_i}":
+            if _i <= 3 and self.action == f"veo_select{_i}":
                 self.report({"INFO"}, f"Picked '{strip.name}'")
                 if find_strip_by_name(scene, strip.name):
-                    setattr(context.scene, f"veo_ref_strip_{_i}", strip.name)
+                    setattr(scene, f"veo_ref_strip_{_i}", strip.name)
                 break
 
         if self.action == "ltx23ic_control_select":
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):
-                context.scene.ltx23ic_control_strip = strip.name
+                scene.ltx23ic_control_strip = strip.name
 
         elif self.action == "ltx23ext_audio_select":
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):
-                context.scene.ltx23ext_audio_strip = strip.name
+                scene.ltx23ext_audio_strip = strip.name
 
         elif self.action == "minimax_select":
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):
-                context.scene.minimax_subject = strip.name
+                scene.minimax_subject = strip.name
 
         elif self.action == "inpaint_select":
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):
-                context.scene.inpaint_selected_strip = strip.name
+                scene.inpaint_selected_strip = strip.name
 
         elif self.action == "out_frame_select":
             self.report({"INFO"}, f"Picked '{strip.name}'")
             if find_strip_by_name(scene, strip.name):
-                context.scene.out_frame = strip.name
+                scene.out_frame = strip.name
 
         for i in range(1, 10):
             if self.action == f"flux_select{i}":

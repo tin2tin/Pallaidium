@@ -211,6 +211,22 @@ class RemoteModelPlugin(ModelPlugin):
                 and InputSpec.MULTI_IMAGE in self.INPUTS
                 and getattr(inputs, "video_path", None)):
             inputs.image = None
+        # Render-to-real (source video + single photoreal reference image): the
+        # active strip is the source VIDEO (→ control_file_id/video_url); the
+        # image input comes from the dedicated "Ref. Image" picker (flux_strip_1),
+        # never the source video's leaked first frame.
+        if getattr(self, "_ref_image_for_v2v", False):
+            _ref_path = getattr(scene, "flux_strip_1_path", "") or ""
+            if _ref_path and os.path.isfile(_ref_path):
+                try:
+                    from ..utils.helpers import load_first_frame
+                    inputs.image = load_first_frame(_ref_path)
+                    print(f"[Remote] render-to-real ref image: {_ref_path!r}")
+                except Exception as _e:  # noqa: BLE001
+                    print(f"[Remote] could not load ref image {_ref_path!r}: {_e}")
+                    inputs.image = None
+            elif getattr(inputs, "video_path", None):
+                inputs.image = None
         # Gather multi-reference images from the flux-style strip pickers
         # (prepending the selected image strip as the first reference).
         if InputSpec.MULTI_IMAGE in self.INPUTS:
@@ -292,10 +308,15 @@ class RemoteModelPlugin(ModelPlugin):
         flags = self.INPUTS
         has_multi = InputSpec.MULTI_IMAGE in flags
         has_audio_ref = (InputSpec.AUDIO_REF in flags) and self.MODEL_TYPE == "video"
-        if not (has_multi or has_audio_ref):
+        has_ref_image = getattr(self, "_ref_image_for_v2v", False)
+        if not (has_multi or has_audio_ref or has_ref_image):
             return False
 
         scene = context.scene
+        # Reference strips live in the scene shown in the VSE
+        # (context.sequencer_scene in Blender 5.x), which can differ from the
+        # active scene.
+        vse_scene = getattr(context, "sequencer_scene", None) or context.scene
         # For image models draw_custom_ui replaces the standard "Input" dropdown,
         # so draw it here. For video the panel already drew it before calling us,
         # so drawing it again would duplicate the row.
@@ -305,12 +326,12 @@ class RemoteModelPlugin(ModelPlugin):
             except Exception:  # noqa: BLE001
                 pass
 
-        if has_multi and scene.sequence_editor is not None:
+        if has_multi and vse_scene.sequence_editor is not None:
             n = max(1, min(9, int(getattr(self.PARAMS, "max_multi_images", 1))))
             vis = max(1, min(int(getattr(scene, "flux_visible_strips", 1)), n))
             for i in range(1, vis + 1):
                 row = col.row(align=True)
-                row.prop_search(scene, f"flux_strip_{i}", scene.sequence_editor,
+                row.prop_search(vse_scene, f"flux_strip_{i}", vse_scene.sequence_editor,
                                 "strips", text="Ref.", icon="FILE_IMAGE")
                 row.operator("sequencer.strip_picker", text="",
                              icon="EYEDROPPER").action = f"flux_select{i}"
@@ -319,6 +340,16 @@ class RemoteModelPlugin(ModelPlugin):
                         row.operator("object.flux_hide_strip", text="",
                                      icon="REMOVE").strip_index = i
                     row.operator("object.flux_add_strip", text="", icon="ADD")
+
+        # Render-to-real: a single photoreal reference image (the active strip is
+        # the source/control video). Reuses the flux_strip_1 picker, which the
+        # queue resolves to flux_strip_1_path at add-time.
+        if has_ref_image and vse_scene.sequence_editor is not None:
+            row = col.row(align=True)
+            row.prop_search(vse_scene, "flux_strip_1", vse_scene.sequence_editor,
+                            "strips", text="Ref. Image", icon="FILE_IMAGE")
+            row.operator("sequencer.strip_picker", text="",
+                         icon="EYEDROPPER").action = "flux_select1"
 
         if has_audio_ref:
             row = col.row(align=True)
@@ -336,22 +367,23 @@ class RemoteModelPlugin(ModelPlugin):
         flux-style Ref. pickers. For a selected video strip inputs.image has
         already been cleared by generate(), so the video is used as the source
         video instead of leaking its first frame in here.
+
+        The Ref. strips are resolved to image paths at queue-add time (from the
+        sequencer scene) and delivered via flux_strip_N_path on the proxy.
         """
-        from ..utils.helpers import find_strip_by_name, load_strip_as_pil
+        import os
+        from ..utils.helpers import load_first_frame
         imgs = []
         if inputs.image is not None:
             imgs.append(inputs.image)
         for i in range(1, 10):
-            name = getattr(scene, f"flux_strip_{i}", "") or ""
-            if not name:
-                continue
-            strip = find_strip_by_name(scene, name)
-            if strip is None:
+            path = getattr(scene, f"flux_strip_{i}_path", "") or ""
+            if not path or not os.path.isfile(path):
                 continue
             try:
-                pil = load_strip_as_pil(strip)
+                pil = load_first_frame(path)
             except Exception as e:  # noqa: BLE001
-                print(f"[Remote] could not load reference strip {name!r}: {e}")
+                print(f"[Remote] could not load reference image {path!r}: {e}")
                 continue
             if pil is not None:
                 imgs.append(pil)
@@ -476,6 +508,15 @@ def make_remote_plugin(entry: dict) -> "RemoteModelPlugin":
         (InputSpec.AUDIO_REF in inputs) and mtype == "video")
     inst.uses_standard_input_strip = (not needs_custom) and bool(
         (InputSpec.IMAGE in inputs) or (InputSpec.VIDEO in inputs)
+    )
+    # Render-to-real-style v2v: a source VIDEO (active strip → control) plus a
+    # single photoreal reference IMAGE. Draw a dedicated "Ref. Image" picker so
+    # the image input is a separate still, not the source video's first frame.
+    inst._ref_image_for_v2v = (
+        mtype == "video"
+        and InputSpec.VIDEO in inputs
+        and InputSpec.IMAGE in inputs
+        and InputSpec.MULTI_IMAGE not in inputs
     )
     inst.requires_input_strip = (mtype == "text")
     return inst

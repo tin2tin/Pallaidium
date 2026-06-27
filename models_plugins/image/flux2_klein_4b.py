@@ -76,11 +76,14 @@ class Flux2Klein4BPlugin(ModelPlugin):
 
     def draw_custom_ui(self, col, context) -> bool:
         scene = context.scene
+        # Strip refs live in the scene shown in the VSE (context.sequencer_scene
+        # in Blender 5.x), which can differ from the active scene.
+        vse_scene = getattr(context, "sequencer_scene", None) or context.scene
         try:
             col.prop(scene, "input_strips", text="Input")
         except Exception:
             pass
-        if scene.sequence_editor is None:
+        if vse_scene.sequence_editor is None:
             return True
         #col.label(text="Reference Images:")
         for attr, action in [
@@ -90,7 +93,7 @@ class Flux2Klein4BPlugin(ModelPlugin):
         ]:
             row = col.row(align=True)
             row.prop_search(
-                scene, attr, scene.sequence_editor, "strips",
+                vse_scene, attr, vse_scene.sequence_editor, "strips",
                 text="Ref.", icon="FILE_IMAGE",
             )
             row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = action

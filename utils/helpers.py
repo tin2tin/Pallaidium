@@ -1855,6 +1855,16 @@ def get_render_strip(self, context, strip, meta_strip=None):
 _rendered_temp_paths: set = set()
 
 
+def _rsp_diag(msg):
+    try:
+        _p = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                          "_diag_scene_input.log")
+        with open(_p, "a", encoding="utf-8") as _fh:
+            _fh.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')}  [render_strip_to_path] {msg}\n")
+    except Exception:
+        pass
+
+
 def render_strip_to_path(context, strip, image_output=False):
     """Render a VSE strip through the pipeline and return the output file path.
 
@@ -1866,8 +1876,19 @@ def render_strip_to_path(context, strip, image_output=False):
     image_output=False → animation MP4  (for video plugins)
     Returns None on failure.
     """
+    print(f"[render_strip_to_path] strip='{getattr(strip, 'name', '?')}' "
+          f"type={getattr(strip, 'type', '?')} image_output={image_output}")
+    _rsp_diag(f"ENTER strip='{getattr(strip, 'name', '?')}' "
+              f"type={getattr(strip, 'type', '?')} image_output={image_output}")
+    _ctx_scene = getattr(context, 'scene', None)
+    _seq_scene = getattr(context, 'sequencer_scene', None)
+    _rsp_diag(f"scene identity: context.scene={getattr(_ctx_scene,'name',None)!r} "
+              f"context.sequencer_scene={getattr(_seq_scene,'name',None)!r}")
     vse_scene = getattr(context, 'sequencer_scene', context.scene)
     if not vse_scene or not vse_scene.sequence_editor:
+        print("[render_strip_to_path] no vse_scene/sequence_editor → None")
+        _rsp_diag(f"ABORT no vse_scene/sequence_editor "
+                  f"(vse_scene={vse_scene!r}) → None")
         return None
 
     seq_editor = vse_scene.sequence_editor
@@ -1921,6 +1942,41 @@ def render_strip_to_path(context, strip, image_output=False):
     safe_name   = re.sub(r'[^\w]', '', strip.name)
     output_path = None
 
+    # ── Lightweight render progress ─────────────────────────────────────
+    # The render below is a blocking, main-thread bpy.ops.render call. Drive
+    # Blender's window-manager progress bar from a render_post handler so the
+    # user sees per-frame advancement (cursor + header progress) while the input
+    # strip is trimmed/rendered, instead of an opaque UI freeze.
+    _wm           = getattr(bpy.context, "window_manager", None)
+    _total_frames = max(1, int(strip.frame_final_duration))
+    _prog_state   = {"done": 0}
+
+    def _render_progress_handler(*_args):
+        _prog_state["done"] += 1
+        if _wm is not None:
+            try:
+                _wm.progress_update(min(_total_frames, _prog_state["done"]))
+            except Exception:
+                pass
+        try:
+            for _win in bpy.context.window_manager.windows:
+                for _area in _win.screen.areas:
+                    if _area.type in {"SEQUENCE_EDITOR", "VIEW_3D", "PROPERTIES"}:
+                        _area.tag_redraw()
+        except Exception:
+            pass
+
+    _progress_active = False
+    if _wm is not None:
+        try:
+            _wm.progress_begin(0, _total_frames)
+            _progress_active = True
+        except Exception:
+            _progress_active = False
+    bpy.app.handlers.render_post.append(_render_progress_handler)
+    print(f"[render_strip_to_path] rendering '{strip.name}' "
+          f"({_total_frames} frame(s))…")
+
     try:
         if strip.type == "SOUND":
             output_path = os.path.abspath(
@@ -1935,8 +1991,26 @@ def render_strip_to_path(context, strip, image_output=False):
                 vse_scene.render.image_settings.media_type = 'IMAGE'
             vse_scene.render.image_settings.file_format = 'PNG'
             vse_scene.render.use_sequencer = True
+            # Render exactly ONE frame via the animation path rather than
+            # write_still. bpy.ops.render.render(write_still=True) silently writes
+            # no file when compositing the sequencer (notably for SCENE strips):
+            # it returns {'FINISHED'} but the output never lands on disk. The
+            # animation path is what get_render_strip() uses successfully — it
+            # writes "{filepath}{frame:04d}.png" reliably. Collapse the frame range
+            # to a single frame so only one PNG is produced.
+            vse_scene.frame_start   = render_start
+            vse_scene.frame_end     = render_start
             vse_scene.frame_current = render_start
-            bpy.ops.render.render(animation=False, write_still=True)
+            _rsp_diag(f"image render: frame={render_start} "
+                      f"base={base!r} res={vse_scene.render.resolution_x}x"
+                      f"{vse_scene.render.resolution_y}@{vse_scene.render.resolution_percentage}")
+            # render.render() renders the CONTEXT scene, which in the queue-enqueue
+            # context is the active project scene (full range, video output) — NOT
+            # the vse_scene we configured. Override so it renders the scene whose
+            # render settings we just set.
+            with bpy.context.temp_override(scene=vse_scene):
+                _rr = bpy.ops.render.render(animation=True, write_still=False)
+            _rsp_diag(f"image render op result={_rr!r}")
             # Blender appends frame digits; find the actual file
             for pad in (4, 5, 6):
                 candidate = f"{base}{render_start:0{pad}d}.png"
@@ -1944,9 +2018,10 @@ def render_strip_to_path(context, strip, image_output=False):
                     output_path = candidate
                     break
             if not output_path:
-                files = sorted(glob.glob(f"{base}*.png"), key=os.path.getmtime)
-                if files:
-                    output_path = files[-1]
+                _glob = sorted(glob.glob(f"{base}*.png"), key=os.path.getmtime)
+                _rsp_diag(f"image glob {base}*.png → {_glob!r}")
+                if _glob:
+                    output_path = _glob[-1]
 
         else:
             output_path = os.path.abspath(
@@ -1958,7 +2033,8 @@ def render_strip_to_path(context, strip, image_output=False):
             vse_scene.render.ffmpeg.codec       = 'H264'
             vse_scene.render.ffmpeg.audio_codec = 'AAC'
             vse_scene.render.use_sequencer = True
-            bpy.ops.render.render(animation=True, write_still=False)
+            with bpy.context.temp_override(scene=vse_scene):
+                bpy.ops.render.render(animation=True, write_still=False)
             if not os.path.exists(output_path):
                 files = sorted(
                     glob.glob(os.path.join(rendered_dir,
@@ -1968,6 +2044,16 @@ def render_strip_to_path(context, strip, image_output=False):
                     output_path = files[-1]
 
     finally:
+        try:
+            if _render_progress_handler in bpy.app.handlers.render_post:
+                bpy.app.handlers.render_post.remove(_render_progress_handler)
+        except Exception:
+            pass
+        if _progress_active and _wm is not None:
+            try:
+                _wm.progress_end()
+            except Exception:
+                pass
         for s, state in orig_mute_states.items():
             if s:
                 s.mute = state
@@ -1987,7 +2073,12 @@ def render_strip_to_path(context, strip, image_output=False):
 
     if output_path and os.path.exists(output_path):
         _rendered_temp_paths.add(output_path)
+        print(f"[render_strip_to_path] OK → {output_path}")
+        _rsp_diag(f"OK → {output_path}")
         return output_path
+    print(f"[render_strip_to_path] FAILED (output_path={output_path!r} exists="
+          f"{output_path and os.path.exists(output_path)}) → None")
+    _rsp_diag(f"FAILED output_path={output_path!r} → None")
     return None
 
 
@@ -2691,18 +2782,17 @@ class OBJECT_OT_FluxHideStrip(bpy.types.Operator):
 
     def execute(self, context):
         scene = context.scene
+        # flux_strip_N values live in the sequencer scene (the one shown in the
+        # VSE), which can differ from the active scene in Blender 5.x.
+        vse_scene = getattr(context, "sequencer_scene", None) or context.scene
 
+        strip_to_clear_name = f"flux_strip_{self.strip_index}"
+        if hasattr(vse_scene, strip_to_clear_name):
+            setattr(vse_scene, strip_to_clear_name, "")  # Clear its string property
         if scene.flux_visible_strips > 1:
-            # Clear the value of the strip corresponding to this button
-            strip_to_clear_name = f"flux_strip_{self.strip_index}"
-            if hasattr(scene, strip_to_clear_name):
-                setattr(scene, strip_to_clear_name, "") # Clear its string property
             scene.flux_visible_strips -= 1
         else:
             # If only one is left, don't hide it, just clear its value
-            strip_to_clear_name = f"flux_strip_{self.strip_index}"
-            if hasattr(scene, strip_to_clear_name):
-                setattr(scene, strip_to_clear_name, "") # Clear its string property
             self.report({'INFO'}, "Minimum one Flux image input must be visible. Value cleared.")
         return {'FINISHED'}
 
@@ -3437,7 +3527,13 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
         # Set typeselect + model first — input_strips_updated fires here and
         # overwrites x/y/frames with model defaults.  All explicit values
         # are written afterwards so they win over those defaults.
-        if strip.type == 'MOVIE':
+        # Prefer an explicit output_type from metadata (a TEXT carrier strip can
+        # describe an image OR an audio job — Screenwriter script-to-screen);
+        # fall back to inferring from the strip type for normal media strips.
+        meta_output_type = _get("output_type")
+        if meta_output_type in ("image", "movie", "audio", "text"):
+            output_type = str(meta_output_type)
+        elif strip.type == 'MOVIE':
             output_type = "movie"
         elif strip.type == 'SOUND':
             output_type = "audio"
@@ -3566,7 +3662,7 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
             "nano_banana_model", "nano_banana_aspect", "nano_banana_resolution",
             "veo_model", "veo_aspect", "veo_resolution", "veo_duration",
             "veo_person_generation", "veo_image_mode",
-            "nano_banana_ref_strip_1", "nano_banana_ref_strip_2", "nano_banana_ref_strip_3",
+            *(f"nano_banana_ref_strip_{_n}" for _n in range(1, 10)),
             "veo_ref_strip_1", "veo_ref_strip_2", "veo_ref_strip_3",
         ]:
             _v = _get(_attr)
@@ -3575,6 +3671,14 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
                     setattr(scene, _attr, str(_v))
                 except Exception:
                     pass
+
+        # Nano Banana reference count — restore how many picker rows are shown.
+        _v = _get("nano_banana_ref_count")
+        if _v is not None and hasattr(scene, "nano_banana_ref_count"):
+            try:
+                scene.nano_banana_ref_count = int(_v)
+            except (TypeError, ValueError):
+                pass
 
         # MOSS-TTS params (audio strips)
         for _attr, _cast in [
@@ -3593,6 +3697,29 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
                     setattr(scene, _attr, _cast(_v))
                 except Exception:
                     pass
+
+        # Generic input paths — restore into the scene props the queue builder reads,
+        # so a metadata-only carrier (e.g. a Screenwriter script-to-screen TEXT strip)
+        # reproduces its inputs on Redo + Add-to-Queue.
+        for _attr in (
+            "image_path", "movie_path", "sound_path", "ref_audio_path", "ref_text",
+        ):
+            _v = _get(_attr)
+            if _v is not None and hasattr(scene, _attr):
+                try:
+                    setattr(scene, _attr, str(_v))
+                except Exception:
+                    pass
+
+        # LTX Multi N-anchor middle images — metadata key differs from the
+        # scene prop name (middle_images_json -> ltx_middle_images_json), so it
+        # needs an explicit restore alongside the generic input paths above.
+        _v = _get("middle_images_json")
+        if _v is not None and hasattr(scene, "ltx_middle_images_json"):
+            try:
+                scene.ltx_middle_images_json = str(_v)
+            except Exception:
+                pass
 
         # Restore LoRA: scan full folder so all files appear in the UIList,
         # then mark the saved (enabled) ones and restore their weights.
@@ -3646,8 +3773,18 @@ class AI_Metadata_PT_Panel(bpy.types.Panel):
             seq_scene = getattr(context, 'sequencer_scene', None) or context.scene
             if seq_scene and seq_scene.sequence_editor:
                 active_strip = seq_scene.sequence_editor.active_strip
-                if active_strip and active_strip.type in {'IMAGE', 'MOVIE', 'SOUND'}:
-                    return True
+                if active_strip:
+                    if active_strip.type in {'IMAGE', 'MOVIE', 'SOUND'}:
+                        return True
+                    # TEXT strips can be AI metadata carriers (Screenwriter
+                    # script-to-screen jobs describing image/audio/text/video
+                    # output). Show the panel — and its Redo button — only when
+                    # the strip actually carries ai_meta_* props, so ordinary
+                    # text strips stay uncluttered.
+                    if active_strip.type == 'TEXT' and any(
+                        k.startswith(AI_METADATA_PREFIX) for k in active_strip.keys()
+                    ):
+                        return True
         return False
 
     def draw(self, context):
