@@ -6,7 +6,7 @@ from ...utils.helpers import gfx_device, low_vram
 
 class FluxDepthPlugin(ModelPlugin):
     MODEL_ID     = "romanfratric234/FLUX.1-Depth-dev-lora"
-    DISPLAY_NAME = "Image: FLUX Depth ControlNet"
+    DISPLAY_NAME = "FLUX Depth ControlNet"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "Depth-guided generation via FLUX.1 Depth ControlNet"
 

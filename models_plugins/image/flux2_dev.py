@@ -8,7 +8,7 @@ from ...utils.helpers import gfx_device, low_vram, find_strip_by_name, get_strip
 
 class Flux2DevPlugin(ModelPlugin):
     MODEL_ID     = "diffusers/FLUX.2-dev-bnb-4bit"
-    DISPLAY_NAME = "Image: FLUX.2 Dev (4-bit, multi-image)"
+    DISPLAY_NAME = "FLUX.2 Dev (4-bit, multi-image)"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "Text-to-image with multi-image support via FLUX.2-dev (HF token required)"
 

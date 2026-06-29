@@ -16,7 +16,7 @@ def _resize_for_wan(image, max_dim: int = 832):
 
 class WanI2VPlugin(ModelPlugin):
     MODEL_ID     = "Wan-AI/Wan2.2-I2V-A14B-Diffusers"
-    DISPLAY_NAME = "Video: Wan2.2 I2V"
+    DISPLAY_NAME = "Wan2.2 I2V"
     MODEL_TYPE   = "video"
     DESCRIPTION  = "Image-to-video via Wan2.2-I2V-A14B (dual 4-bit transformers, Lightx2v LoRA)"
 

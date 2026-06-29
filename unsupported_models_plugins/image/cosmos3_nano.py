@@ -5,7 +5,7 @@ from ...models.base import ModelPlugin, InputSpec, UISection, ParamSpec, ModelIn
 
 class Cosmos3NanoImagePlugin(ModelPlugin):
     MODEL_ID     = "nvidia/Cosmos3-Nano"
-    DISPLAY_NAME = "Image: Cosmos3-Nano"
+    DISPLAY_NAME = "Cosmos3-Nano"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "NVIDIA Cosmos3-Nano single-frame generation (txt2img / img2img), runs under 24 GB VRAM"
 

@@ -6,7 +6,7 @@ from ...utils.helpers import gfx_device, low_vram, find_strip_by_name, load_stri
 
 class Flux2Klein9BKVPlugin(ModelPlugin):
     MODEL_ID     = "dx8152/Flux2-Klein-9B-Consistency"
-    DISPLAY_NAME = "Image: FLUX.2 Klein 9B KV (Consistency)"
+    DISPLAY_NAME = "FLUX.2 Klein 9B KV (Consistency)"
     DESCRIPTION  = "Multi-reference image generation via FLUX.2 Klein 9B KV-cache with consistency LoRA"
     MODEL_TYPE   = "image"
     INPUTS       = InputSpec.PROMPT | InputSpec.IMAGE | InputSpec.LORA

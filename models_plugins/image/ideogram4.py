@@ -22,7 +22,7 @@ class Ideogram4Plugin(ModelPlugin):
     # MODEL_ID     = "Disty0/Ideogram-4-SDNQ-FP8"
     # MODEL_ID     = "Disty0/Ideogram-4-SDNQ-4bit-dynamic-hadamard"
 
-    DISPLAY_NAME = "Image: Ideogram 4"
+    DISPLAY_NAME = "Ideogram 4"
     DESCRIPTION  = (
         "Text-to-image via Ideogram 4 (~10.5 GB NF4 / ~17.9 GB FP8). "
         "Optional local prompt upsampling needs: pip install outlines."

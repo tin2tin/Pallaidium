@@ -9,7 +9,7 @@ from ...utils.helpers import gfx_device, low_vram
 
 class SDXLCannyPlugin(ModelPlugin):
     MODEL_ID     = "diffusers/controlnet-canny-sdxl-1.0-small"
-    DISPLAY_NAME = "Image: SDXL Canny ControlNet"
+    DISPLAY_NAME = "SDXL Canny ControlNet"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "Edge-guided image generation via SDXL Canny ControlNet"
 

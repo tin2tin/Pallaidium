@@ -124,7 +124,7 @@ class _Flux2KleinBase(ModelPlugin):
 
 class Flux2Klein9BKVPlugin(_Flux2KleinBase):
     MODEL_ID     = "dx8152/Flux2-Klein-9B-Consistency"
-    DISPLAY_NAME = "Image: FLUX.2 Klein 9B KV (Consistency)"
+    DISPLAY_NAME = "FLUX.2 Klein 9B KV (Consistency)"
     DESCRIPTION  = "Multi-reference image generation via FLUX.2 Klein 9B KV-cache with consistency LoRA"
 
     _CONSISTENCY_LORA    = "dx8152/Flux2-Klein-9B-Consistency"
@@ -266,13 +266,13 @@ class Flux2Klein9BKVPlugin(_Flux2KleinBase):
 
 class Flux2KleinBasePlugin(_Flux2KleinBase):
     MODEL_ID     = "Runware/BFL-FLUX.2-klein-base-4B"
-    DISPLAY_NAME = "Image: FLUX.2 Klein 4B"
+    DISPLAY_NAME = "FLUX.2 Klein 4B"
     DESCRIPTION  = "Fast text-to-image via FLUX.2 Klein 4B (quantized)"
 
 
 class Flux2Klein9BPlugin(_Flux2KleinBase):
     MODEL_ID     = "black-forest-labs/FLUX.2-klein-9b-kv"
-    DISPLAY_NAME = "Image: FLUX.2 Klein 9B"
+    DISPLAY_NAME = "FLUX.2 Klein 9B"
     DESCRIPTION  = "Fast text-to-image via FLUX.2 Klein 9B (quantized)"
 
     def draw_custom_ui(self, col, context) -> bool:

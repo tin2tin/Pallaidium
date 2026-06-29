@@ -44,7 +44,7 @@ class _MiniMaxBase(ModelPlugin):
 
 class MiniMaxTxt2VidPlugin(_MiniMaxBase):
     MODEL_ID     = "Hailuo/MiniMax/txt2vid"
-    DISPLAY_NAME = "Video: MiniMax txt2vid (cloud)"
+    DISPLAY_NAME = "MiniMax txt2vid (cloud)"
     DESCRIPTION  = "Cloud text-to-video via MiniMax Hailuo API"
 
     def generate(self, pipe_obj, inputs: ModelInputs, scene, prefs):
@@ -61,7 +61,7 @@ class MiniMaxTxt2VidPlugin(_MiniMaxBase):
 
 class MiniMaxImg2VidPlugin(_MiniMaxBase):
     MODEL_ID     = "Hailuo/MiniMax/img2vid"
-    DISPLAY_NAME = "Video: MiniMax img2vid (cloud)"
+    DISPLAY_NAME = "MiniMax img2vid (cloud)"
     DESCRIPTION  = "Cloud image-to-video via MiniMax Hailuo API"
     INPUTS       = InputSpec.PROMPT | InputSpec.IMAGE | InputSpec.API_KEY
 
@@ -88,7 +88,7 @@ class MiniMaxImg2VidPlugin(_MiniMaxBase):
 
 class MiniMaxSubject2VidPlugin(_MiniMaxBase):
     MODEL_ID     = "Hailuo/MiniMax/subject2vid"
-    DISPLAY_NAME = "Video: MiniMax subject2vid (cloud)"
+    DISPLAY_NAME = "MiniMax subject2vid (cloud)"
     DESCRIPTION  = "Cloud subject-to-video via MiniMax Hailuo API"
     INPUTS       = InputSpec.PROMPT | InputSpec.IMAGE | InputSpec.API_KEY
 

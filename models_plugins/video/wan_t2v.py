@@ -8,7 +8,7 @@ from ...utils.helpers import gfx_device, low_vram, solve_path, clean_filename
 
 class WanT2VPlugin(ModelPlugin):
     MODEL_ID     = "Wan-AI/Wan2.2-T2V-A14B-Diffusers"
-    DISPLAY_NAME = "Video: Wan2.2 T2V"
+    DISPLAY_NAME = "Wan2.2 T2V"
     MODEL_TYPE   = "video"
     DESCRIPTION  = "Fast text-to-video via Wan2.2-T2V-A14B (dual 4-bit transformers, Lightx2v LoRA)"
 

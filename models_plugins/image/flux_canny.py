@@ -6,7 +6,7 @@ from ...utils.helpers import gfx_device, low_vram
 
 class FluxCannyPlugin(ModelPlugin):
     MODEL_ID     = "fuliucansheng/FLUX.1-Canny-dev-diffusers-lora"
-    DISPLAY_NAME = "Image: FLUX Canny ControlNet"
+    DISPLAY_NAME = "FLUX Canny ControlNet"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "Edge-guided generation via FLUX.1 Canny ControlNet"
 

@@ -6,7 +6,7 @@ from ...utils.helpers import gfx_device, low_vram
 
 class ChromaPlugin(ModelPlugin):
     MODEL_ID     = "lodestones/Chroma"
-    DISPLAY_NAME = "Image: Chroma"
+    DISPLAY_NAME = "Chroma"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "Text-to-image via Chroma (text-only, no img2img/inpaint)"
 

@@ -7,7 +7,7 @@ from ...utils.helpers import gfx_device, solve_path, clean_filename, load_first_
 
 class LTX2MultiPlugin(ModelPlugin):
     MODEL_ID     = "LTX-2 Multi-Input File"
-    DISPLAY_NAME = "Video: LTX-2 (Multimodal)"
+    DISPLAY_NAME = "LTX-2 (Multimodal)"
     MODEL_TYPE   = "video"
     DESCRIPTION  = "LTX-2 audio-to-video pipeline supporting image + audio inputs"
 

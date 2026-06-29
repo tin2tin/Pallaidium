@@ -6,7 +6,7 @@ from ...utils.helpers import gfx_device, low_vram
 
 class Flux2Klein9BPlugin(ModelPlugin):
     MODEL_ID     = "ModelsLab/FLUX.2-klein-9B"
-    DISPLAY_NAME = "Image: FLUX.2 Klein 9B"
+    DISPLAY_NAME = "FLUX.2 Klein 9B"
     DESCRIPTION  = "Text-to-image via FLUX.2 Klein 9B (quantized) with up to 3 reference images"
     MODEL_TYPE   = "image"
     INPUTS       = InputSpec.PROMPT | InputSpec.IMAGE | InputSpec.LORA

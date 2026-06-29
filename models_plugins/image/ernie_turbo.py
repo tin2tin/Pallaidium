@@ -8,7 +8,7 @@ class ErnieTurboPlugin(ModelPlugin):
     MODEL_ID     = "baidu/ERNIE-Image-Turbo"
     SDNQ_4BIT_ID = "OzzyGT/ERNIE_Image_Turbo_sdnq_dynamic_int4"
     SDNQ_8BIT_ID = "OzzyGT/ERNIE_Image_Turbo_sdnq_dynamic_int8"
-    DISPLAY_NAME = "Image: ERNIE-Image Turbo"
+    DISPLAY_NAME = "ERNIE-Image Turbo"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "Fast text-to-image via ERNIE-Image-Turbo (SDNQ quantized)"
 

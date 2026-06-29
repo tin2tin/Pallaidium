@@ -6,7 +6,7 @@ from ...utils.helpers import gfx_device, low_vram
 
 class Flux2Klein4BPlugin(ModelPlugin):
     MODEL_ID     = "black-forest-labs/FLUX.2-klein-4B"
-    DISPLAY_NAME = "Image: FLUX.2 Klein 4B"
+    DISPLAY_NAME = "FLUX.2 Klein 4B"
     DESCRIPTION  = "Text-to-image via FLUX.2 Klein 4B with up to 3 reference images"
     MODEL_TYPE   = "image"
     INPUTS       = InputSpec.PROMPT | InputSpec.IMAGE | InputSpec.LORA

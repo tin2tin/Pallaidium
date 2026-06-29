@@ -16,7 +16,7 @@ def _closest_div8(n: int) -> int:
 
 class SDXLVideoPlugin(ModelPlugin):
     MODEL_ID     = "stable-diffusion-xl/frame2frame"
-    DISPLAY_NAME = "Video: SDXL Frame-by-Frame"
+    DISPLAY_NAME = "SDXL Frame-by-Frame"
     MODEL_TYPE   = "video"
     DESCRIPTION  = "Apply SDXL img2img to every frame of an input video or image strip"
 

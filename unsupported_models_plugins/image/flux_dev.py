@@ -8,7 +8,7 @@ from ...utils.helpers import gfx_device, low_vram
 
 class FluxDevPlugin(ModelPlugin):
     MODEL_ID     = "ChuckMcSneed/FLUX.1-dev"
-    DISPLAY_NAME = "Image: FLUX.1 Dev"
+    DISPLAY_NAME = "FLUX.1 Dev"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "High-quality text-to-image, img2img, and inpaint via FLUX.1-dev (NF4 quantized)"
 

@@ -53,7 +53,7 @@ def _mux_audio(video_path, audio_source, output_path):
 
 class MaxineVSRVideoPlugin(ModelPlugin):
     MODEL_ID     = "nvidia/maxine-vsr-video"
-    DISPLAY_NAME = "Video: Maxine Super Resolution"
+    DISPLAY_NAME = "Maxine Super Resolution"
     MODEL_TYPE   = "video"
     DESCRIPTION  = "AI video super-resolution + denoise + deblur via NVIDIA Maxine"
 

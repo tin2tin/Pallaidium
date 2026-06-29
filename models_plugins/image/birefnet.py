@@ -6,7 +6,7 @@ from ...utils.helpers import gfx_device, low_vram
 
 class BiRefNetPlugin(ModelPlugin):
     MODEL_ID     = "ZhengPeng7/BiRefNet_HR"
-    DISPLAY_NAME = "Image: Remove Background (BiRefNet)"
+    DISPLAY_NAME = "Remove Background (BiRefNet)"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "AI background removal via BiRefNet-HR"
 

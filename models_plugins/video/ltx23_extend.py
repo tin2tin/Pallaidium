@@ -47,7 +47,7 @@ def vae_temporal_decode_streaming(vae, latents_cpu, *, decode_device, temb=None)
 
 class LTX2_3ExtendStagedPlugin(ModelPlugin):
     MODEL_ID     = "LTX-2.3 Extend Staged"
-    DISPLAY_NAME = "Video: LTX-2.3 Extend (Staged)"
+    DISPLAY_NAME = "LTX-2.3 Extend (Staged)"
     MODEL_TYPE   = "video"
     DESCRIPTION  = "Extend a video clip with LTX-2.3 — with selectable stage mode (Step 1 / Step 2 / Full)"
 

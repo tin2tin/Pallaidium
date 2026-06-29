@@ -8,7 +8,7 @@ from ...utils.helpers import (
 
 class SDXLPlugin(ModelPlugin):
     MODEL_ID     = "stabilityai/stable-diffusion-xl-base-1.0"
-    DISPLAY_NAME = "Image: Stable Diffusion XL"
+    DISPLAY_NAME = "Stable Diffusion XL"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "SDXL with IP Adapter, LCM, LoRA, img2img, inpaint, and refiner"
 

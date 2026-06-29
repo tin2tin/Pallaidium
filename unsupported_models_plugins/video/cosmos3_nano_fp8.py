@@ -12,7 +12,7 @@ from ...utils.helpers import solve_path, clean_filename
 
 class Cosmos3NanoFP8VideoPlugin(ModelPlugin):
     MODEL_ID     = "benjiaiplayground/Cosmos3-Nano_fp8-video"   # unique registry key
-    DISPLAY_NAME = "Video: Cosmos3-Nano Low VRAM"
+    DISPLAY_NAME = "Cosmos3-Nano Low VRAM"
     MODEL_TYPE   = "video"
     DESCRIPTION  = "NVIDIA Cosmos3-Nano multi-frame video generation with sequential CPU offload (~8–16 GB VRAM, slower)"
 

@@ -37,7 +37,7 @@ def _get_quality_level(scene):
 
 class MaxineVSRPlugin(ModelPlugin):
     MODEL_ID     = "nvidia/maxine-vsr"
-    DISPLAY_NAME = "Image: Maxine Super Resolution"
+    DISPLAY_NAME = "Maxine Super Resolution"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "AI super-resolution + denoise + deblur via NVIDIA Maxine"
 

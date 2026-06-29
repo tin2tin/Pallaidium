@@ -6,7 +6,7 @@ from ...utils.helpers import gfx_device, low_vram, ILLUMINATION_OPTIONS
 
 class KontextRelightPlugin(ModelPlugin):
     MODEL_ID     = "kontext-community/relighting-kontext-dev-lora-v3"
-    DISPLAY_NAME = "Image: Kontext Relight"
+    DISPLAY_NAME = "Kontext Relight"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "AI image relighting via FLUX Kontext + relight LoRA"
 

@@ -8,7 +8,7 @@ from ...utils.helpers import gfx_device, low_vram, solve_path, clean_filename, l
 
 class WanVACEPlugin(ModelPlugin):
     MODEL_ID     = "Wan-AI/Wan2.1-VACE-1.3B-diffusers"
-    DISPLAY_NAME = "Video: Wan2.1 VACE 1.3B"
+    DISPLAY_NAME = "Wan2.1 VACE 1.3B"
     MODEL_TYPE   = "video"
     DESCRIPTION  = "Text-to-video and img2vid via Wan2.1-VACE-1.3B (4-bit NF4 quantized)"
 

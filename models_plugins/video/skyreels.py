@@ -13,7 +13,7 @@ def _ensure_skyreel(prompt: str) -> str:
 
 class SkyReelsPlugin(ModelPlugin):
     MODEL_ID     = "Skywork/SkyReels-V1-Hunyuan-T2V"
-    DISPLAY_NAME = "Video: SkyReels V1"
+    DISPLAY_NAME = "SkyReels V1"
     MODEL_TYPE   = "video"
     DESCRIPTION  = "Text-to-video and img2vid via SkyReels V1 (HunyuanVideo int4)"
 

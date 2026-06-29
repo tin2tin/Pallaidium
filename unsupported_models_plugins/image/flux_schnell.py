@@ -8,7 +8,7 @@ from ...utils.helpers import gfx_device, low_vram
 
 class FluxSchnellPlugin(ModelPlugin):
     MODEL_ID     = "lzyvegetable/FLUX.1-schnell"
-    DISPLAY_NAME = "Image: FLUX.1 Schnell (fast)"
+    DISPLAY_NAME = "FLUX.1 Schnell (fast)"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "Fast text-to-image, img2img, and inpaint via FLUX.1-schnell (NF4 quantized)"
 

@@ -7,7 +7,7 @@ from ...utils.helpers import gfx_device, low_vram
 class NucleusMoEPlugin(ModelPlugin):
     MODEL_ID     = "NucleusAI/Nucleus-Image"
     FP8_REPO     = "D-Squarius-Green-Jr/Nucleus-Image-FP8"
-    DISPLAY_NAME = "Image: NucleusMoE"
+    DISPLAY_NAME = "NucleusMoE"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "High-quality text-to-image via Nucleus-Image with FP8 weights (24 GB VRAM friendly)"
 

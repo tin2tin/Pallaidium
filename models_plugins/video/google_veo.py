@@ -23,7 +23,7 @@ _REF_ATTRS = ["veo_ref_strip_1", "veo_ref_strip_2", "veo_ref_strip_3"]
 
 class GoogleVeoPlugin(ModelPlugin):
     MODEL_ID     = "google/veo"
-    DISPLAY_NAME = "Video: Google Veo (cloud)"
+    DISPLAY_NAME = "Google Veo (cloud)"
     MODEL_TYPE   = "video"
     DESCRIPTION  = "Cloud text/image-to-video via the Google Veo API"
 

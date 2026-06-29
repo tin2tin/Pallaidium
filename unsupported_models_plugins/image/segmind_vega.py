@@ -6,7 +6,7 @@ from ...utils.helpers import gfx_device, low_vram
 
 class SegmindVegaPlugin(ModelPlugin):
     MODEL_ID     = "segmind/Segmind-Vega"
-    DISPLAY_NAME = "Image: Segmind Vega (fast)"
+    DISPLAY_NAME = "Segmind Vega (fast)"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "Fast text-to-image via Segmind Vega + VegaRT LCM"
 

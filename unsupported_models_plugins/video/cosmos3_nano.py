@@ -10,7 +10,7 @@ _HF_REPO = "nvidia/Cosmos3-Nano"
 
 class Cosmos3NanoVideoPlugin(ModelPlugin):
     MODEL_ID     = "nvidia/Cosmos3-Nano-video"   # unique registry key; HF repo is _HF_REPO
-    DISPLAY_NAME = "Video: Cosmos3-Nano"
+    DISPLAY_NAME = "Cosmos3-Nano"
     MODEL_TYPE   = "video"
     DESCRIPTION  = "NVIDIA Cosmos3-Nano multi-frame video generation (txt2video / img2video), runs under 24 GB VRAM"
 

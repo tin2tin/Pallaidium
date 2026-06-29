@@ -126,6 +126,6 @@ class _CogVideoXBase(ModelPlugin):
 
 class CogVideoX5bPlugin(_CogVideoXBase):
     MODEL_ID     = "THUDM/CogVideoX-5b"
-    DISPLAY_NAME = "Video: CogVideoX-5b"
+    DISPLAY_NAME = "CogVideoX-5b"
 
 

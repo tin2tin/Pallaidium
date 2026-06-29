@@ -146,7 +146,7 @@ class _ZImageBase(ModelPlugin):
 
 class ZImagePlugin(_ZImageBase):
     MODEL_ID     = "Tongyi-MAI/Z-Image"
-    DISPLAY_NAME = "Image: Z-Image"
+    DISPLAY_NAME = "Z-Image"
     DESCRIPTION  = "Text-to-image and img2img via Z-Image"
     PARAMS       = ParamSpec(steps=30, guidance=7.0)
 
@@ -161,7 +161,7 @@ class ZImagePlugin(_ZImageBase):
 
 class ZImageTurboPlugin(_ZImageBase):
     MODEL_ID     = "Tongyi-MAI/Z-Image-Turbo"
-    DISPLAY_NAME = "Image: Z-Image Turbo (fast)"
+    DISPLAY_NAME = "Z-Image Turbo (fast)"
     DESCRIPTION  = "Fast text-to-image and img2img via Z-Image Turbo"
     PARAMS       = ParamSpec(steps=8, guidance=0.0)
 

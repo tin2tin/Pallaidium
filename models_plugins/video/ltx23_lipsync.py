@@ -41,7 +41,7 @@ def vae_temporal_decode_streaming(vae, latents_cpu, *, decode_device, temb=None)
 
 class LTX2_3LipSyncPlugin(ModelPlugin):
     MODEL_ID     = "LTX-2.3 Lip Sync"
-    DISPLAY_NAME = "Video: LTX-2.3 (Lip Sync)"
+    DISPLAY_NAME = "LTX-2.3 (Lip Sync)"
     MODEL_TYPE   = "video"
     DESCRIPTION  = "Single-stage LTX-2.3 (SDNQ 4-bit) — image+audio-to-video lip sync with audio output"
 

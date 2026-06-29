@@ -6,7 +6,7 @@ from ...utils.helpers import gfx_device, low_vram
 
 class Krea2BasePlugin(ModelPlugin):
     MODEL_ID     = "ethanfel/Krea-2-Base-Diffusers"
-    DISPLAY_NAME = "Image: Krea 2"
+    DISPLAY_NAME = "Krea 2"
     DESCRIPTION  = "High-quality text-to-image via Krea 2 (12.9B MMDiT, CFG-guided)"
     MODEL_TYPE   = "image"
     INPUTS       = InputSpec.PROMPT | InputSpec.NEG_PROMPT | InputSpec.LORA

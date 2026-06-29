@@ -49,7 +49,7 @@ _IC_LORA_FALLBACK = "Lightricks/LTX-2.3-22b-IC-LoRA-Union-Control"
 
 class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
     MODEL_ID     = "LTX-2.3 IC-LoRA Staged"
-    DISPLAY_NAME = "Video: LTX-2.3 IC-LoRA (Staged)"
+    DISPLAY_NAME = "LTX-2.3 IC-LoRA (Staged)"
     MODEL_TYPE   = "video"
     DESCRIPTION  = (
         "IC-LoRA video/audio style transfer with selectable stage mode (Step 1 / Step 2 / Full). "

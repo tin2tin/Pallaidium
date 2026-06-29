@@ -73,7 +73,7 @@ def _load_krea2_lora(pipe, file_path, adapter_name):
 
 class Krea2TurboPlugin(ModelPlugin):
     MODEL_ID     = "OzzyGT/Krea_2_Turbo_sdnq_dynamic_8bit"
-    DISPLAY_NAME = "Image: Krea 2 Turbo"
+    DISPLAY_NAME = "Krea 2 Turbo"
     DESCRIPTION  = "Fast text-to-image via Krea 2 Turbo (12.9B MMDiT, distilled to 8 steps, CFG-free, SDNQ 8-bit)"
     MODEL_TYPE   = "image"
     INPUTS       = InputSpec.PROMPT | InputSpec.NEG_PROMPT | InputSpec.LORA

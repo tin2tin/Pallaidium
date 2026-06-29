@@ -6,7 +6,7 @@ from ...utils.helpers import gfx_device, low_vram
 
 class FluxReduxPlugin(ModelPlugin):
     MODEL_ID     = "Runware/FLUX.1-Redux-dev"
-    DISPLAY_NAME = "Image: FLUX Redux (image restyle)"
+    DISPLAY_NAME = "FLUX Redux (image restyle)"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "Image restyling via FLUX Redux — no text prompt needed"
 

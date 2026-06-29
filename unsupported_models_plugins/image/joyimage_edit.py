@@ -80,7 +80,7 @@ def _flush(cuda: bool = True) -> None:
 
 class JoyImageEditPlugin(ModelPlugin):
     MODEL_ID     = "jdopensource/JoyAI-Image-Edit-Diffusers"
-    DISPLAY_NAME = "Image: JoyAI Image Edit (spatial)"
+    DISPLAY_NAME = "JoyAI Image Edit (spatial)"
     MODEL_TYPE   = "image"
     DESCRIPTION  = (
         "Instruction-guided image editing with object move, object rotation, "

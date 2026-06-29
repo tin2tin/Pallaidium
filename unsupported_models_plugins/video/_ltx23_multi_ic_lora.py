@@ -59,7 +59,7 @@ _IC_LORA_FALLBACK = "Lightricks/LTX-2.3-22b-IC-LoRA-Union-Control"
 
 class LTX2_3MultiICLoRAPlugin(ModelPlugin):
     MODEL_ID     = "LTX-2.3 IC-LoRA"
-    DISPLAY_NAME = "Video: LTX-2.3 (IC-LoRA)"
+    DISPLAY_NAME = "LTX-2.3 (IC-LoRA)"
     MODEL_TYPE   = "video"
     DESCRIPTION  = (
         "IC-LoRA video/audio style transfer. Use a META strip whose 1st MOVIE child is the "

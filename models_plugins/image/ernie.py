@@ -8,7 +8,7 @@ class ErniePlugin(ModelPlugin):
     MODEL_ID     = "baidu/ERNIE-Image"
     SDNQ_4BIT_ID = "OzzyGT/ERNIE_Image_sdnq_dynamic_int4"
     SDNQ_8BIT_ID = "OzzyGT/ERNIE_Image_sdnq_dynamic_int8"
-    DISPLAY_NAME = "Image: ERNIE-Image"
+    DISPLAY_NAME = "ERNIE-Image"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "High-quality text-to-image via ERNIE-Image (SDNQ quantized)"
 

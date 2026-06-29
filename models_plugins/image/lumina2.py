@@ -6,7 +6,7 @@ from ...utils.helpers import gfx_device, low_vram
 
 class Lumina2Plugin(ModelPlugin):
     MODEL_ID     = "Alpha-VLLM/Lumina-Image-2.0"
-    DISPLAY_NAME = "Image: Lumina-Image 2.0"
+    DISPLAY_NAME = "Lumina-Image 2.0"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "High-quality text-to-image via Lumina-Image 2.0"
 

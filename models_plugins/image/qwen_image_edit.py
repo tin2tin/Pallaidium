@@ -7,7 +7,7 @@ from ...utils.helpers import gfx_device, low_vram, load_first_frame
 class QwenImageEditPlugin(ModelPlugin):
     MODEL_ID     = "Qwen/Qwen-Image-Edit-2511"
     QUANT_ID     = "Disty0/Qwen-Image-Edit-2511-SDNQ-uint4-svd-r32"
-    DISPLAY_NAME = "Image: Qwen Image Edit (multi-image)"
+    DISPLAY_NAME = "Qwen Image Edit (multi-image)"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "Multi-image instruction editing via Qwen-Image-Edit-2511 SDNQ uint4"
 

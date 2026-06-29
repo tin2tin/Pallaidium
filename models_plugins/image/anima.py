@@ -6,7 +6,7 @@ from ...utils.helpers import gfx_device, low_vram, clean_filename
 
 class AnimaPlugin(ModelPlugin):
     MODEL_ID     = "mrfatso/anima-preview3-diffusers"
-    DISPLAY_NAME = "Image: Anima"
+    DISPLAY_NAME = "Anima"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "Anime-style generation via Anima with txt2img, img2img, and LoRA support"
 

@@ -41,7 +41,7 @@ def vae_temporal_decode_streaming(vae, latents_cpu, *, decode_device, temb=None)
 
 class LTX2_3MultiPlugin(ModelPlugin):
     MODEL_ID     = "LTX-2.3 Multi-Input File"
-    DISPLAY_NAME = "Video: LTX-2.3 (Multimodal)"
+    DISPLAY_NAME = "LTX-2.3 (Multimodal)"
     MODEL_TYPE   = "video"
     DESCRIPTION  = "Two-stage distilled LTX-2.3 (SDNQ 4-bit) — text/image/audio-to-video with audio output"
 

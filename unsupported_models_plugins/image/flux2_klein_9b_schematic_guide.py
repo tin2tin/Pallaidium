@@ -6,7 +6,7 @@ from ...utils.helpers import gfx_device, low_vram, find_strip_by_name, load_stri
 
 class Flux2Klein9BSchematicGuidePlugin(ModelPlugin):
     MODEL_ID     = "black-forest-labs/FLUX.2-klein-base-9B#guide"
-    DISPLAY_NAME = "Image: FLUX.2 Klein 9B Schematic → Image"
+    DISPLAY_NAME = "FLUX.2 Klein 9B Schematic → Image"
     DESCRIPTION  = "Generate images guided by schematic maps (depth/pose/normal/seg) via Klein 9B"
     MODEL_TYPE   = "image"
     INPUTS       = InputSpec.PROMPT | InputSpec.IMAGE | InputSpec.LORA

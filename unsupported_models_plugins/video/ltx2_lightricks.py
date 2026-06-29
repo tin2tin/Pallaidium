@@ -8,7 +8,7 @@ from ...utils.helpers import gfx_device, solve_path, clean_filename, load_first_
 
 class LTX2LightricksPlugin(ModelPlugin):
     MODEL_ID     = "Lightricks/LTX-2"
-    DISPLAY_NAME = "Video: LTX-2 Lightricks"
+    DISPLAY_NAME = "LTX-2 Lightricks"
     MODEL_TYPE   = "video"
     DESCRIPTION  = "High-quality txt2vid and img2vid via Lightricks/LTX-2 (4-bit quantized)"
 

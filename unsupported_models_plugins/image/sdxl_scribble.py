@@ -11,7 +11,7 @@ from ...utils.helpers import gfx_device, low_vram
 
 class SDXLScribblePlugin(ModelPlugin):
     MODEL_ID     = "xinsir/controlnet-scribble-sdxl-1.0"
-    DISPLAY_NAME = "Image: SDXL Scribble ControlNet"
+    DISPLAY_NAME = "SDXL Scribble ControlNet"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "Sketch-guided generation via SDXL Scribble ControlNet"
 

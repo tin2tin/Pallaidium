@@ -10,7 +10,7 @@ from ...models.base import ModelPlugin, InputSpec, UISection, ParamSpec, ModelIn
 
 class Cosmos3NanoFP8ImagePlugin(ModelPlugin):
     MODEL_ID     = "benjiaiplayground/Cosmos3-Nano_fp8-image"   # unique registry key
-    DISPLAY_NAME = "Image: Cosmos3-Nano Low VRAM"
+    DISPLAY_NAME = "Cosmos3-Nano Low VRAM"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "NVIDIA Cosmos3-Nano single-frame generation with sequential CPU offload (~8–16 GB VRAM, slower)"
 

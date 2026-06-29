@@ -6,7 +6,7 @@ from ...utils.helpers import gfx_device, low_vram, solve_path, clean_filename, l
 
 class LTX2Plugin(ModelPlugin):
     MODEL_ID     = "rootonchair/LTX-2-19b-distilled"
-    DISPLAY_NAME = "Video: LTX-2 19b (distilled)"
+    DISPLAY_NAME = "LTX-2 19b (distilled)"
     MODEL_TYPE   = "video"
     DESCRIPTION  = "High-quality img2vid via LTX-2 19b distilled with latent upsampling"
 

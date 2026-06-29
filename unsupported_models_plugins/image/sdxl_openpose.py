@@ -6,7 +6,7 @@ from ...utils.helpers import gfx_device, low_vram
 
 class SDXLOpenPosePlugin(ModelPlugin):
     MODEL_ID     = "xinsir/controlnet-openpose-sdxl-1.0"
-    DISPLAY_NAME = "Image: SDXL OpenPose ControlNet"
+    DISPLAY_NAME = "SDXL OpenPose ControlNet"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "Pose-guided generation via SDXL OpenPose ControlNet"
 

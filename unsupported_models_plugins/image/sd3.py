@@ -37,7 +37,7 @@ class _SD3Base(ModelPlugin):
 
 class SD3MediumPlugin(_SD3Base):
     MODEL_ID     = "adamo1139/stable-diffusion-3.5-medium-ungated"
-    DISPLAY_NAME = "Image: Stable Diffusion 3.5 Medium"
+    DISPLAY_NAME = "Stable Diffusion 3.5 Medium"
     DESCRIPTION  = "SD 3.5 Medium (4-bit quantized)"
     PARAMS       = ParamSpec(steps=28, guidance=4.5)
 
@@ -61,7 +61,7 @@ class SD3MediumPlugin(_SD3Base):
 
 class SD3LargePlugin(_SD3Base):
     MODEL_ID     = "adamo1139/stable-diffusion-3.5-large-ungated"
-    DISPLAY_NAME = "Image: Stable Diffusion 3.5 Large"
+    DISPLAY_NAME = "Stable Diffusion 3.5 Large"
     DESCRIPTION  = "SD 3.5 Large (4-bit quantized, HF token required)"
     PARAMS       = ParamSpec(steps=28, guidance=4.5)
     INPUTS       = InputSpec.PROMPT | InputSpec.NEG_PROMPT | InputSpec.HF_TOKEN

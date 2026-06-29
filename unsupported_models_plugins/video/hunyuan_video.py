@@ -7,7 +7,7 @@ from ...utils.helpers import gfx_device, low_vram, solve_path, clean_filename, l
 
 class HunyuanVideoPlugin(ModelPlugin):
     MODEL_ID     = "hunyuanvideo-community/HunyuanVideo"
-    DISPLAY_NAME = "Video: HunyuanVideo"
+    DISPLAY_NAME = "HunyuanVideo"
     MODEL_TYPE   = "video"
     DESCRIPTION  = "High-quality text-to-video and img2vid via HunyuanVideo (GGUF quantized)"
 

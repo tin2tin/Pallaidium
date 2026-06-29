@@ -7,7 +7,7 @@ from ...utils.helpers import gfx_device, low_vram, solve_path, clean_filename
 
 class LTXVideoPlugin(ModelPlugin):
     MODEL_ID     = "Lightricks/LTX-Video"
-    DISPLAY_NAME = "Video: LTX-Video"
+    DISPLAY_NAME = "LTX-Video"
     MODEL_TYPE   = "video"
     DESCRIPTION  = "Text-to-video and img2vid via LTX-Video (NF4 quantized)"
 

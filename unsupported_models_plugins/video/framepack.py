@@ -7,7 +7,7 @@ from ...utils.helpers import gfx_device, low_vram, solve_path, clean_filename, l
 
 class FramePackPlugin(ModelPlugin):
     MODEL_ID     = "lllyasviel/FramePackI2V_HY"
-    DISPLAY_NAME = "Video: FramePack I2V"
+    DISPLAY_NAME = "FramePack I2V"
     MODEL_TYPE   = "video"
     DESCRIPTION  = "Image-to-video via FramePack (HunyuanVideo backbone, Siglip encoder)"
 

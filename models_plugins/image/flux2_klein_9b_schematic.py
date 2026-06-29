@@ -24,7 +24,7 @@ _TRIGGER_PROMPTS = {
 
 class Flux2Klein9BSchematicPlugin(ModelPlugin):
     MODEL_ID     = "nomadoor/flux-2-klein-9B-schematic-lora"
-    DISPLAY_NAME = "Image: FLUX.2 Klein 9B Schematic"
+    DISPLAY_NAME = "FLUX.2 Klein 9B Schematic"
     DESCRIPTION  = "Transform images into schematic maps via Klein 9B (depth, normal, pose, segmentation)"
     MODEL_TYPE   = "image"
     INPUTS       = InputSpec.PROMPT | InputSpec.IMAGE

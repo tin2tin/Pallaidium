@@ -6,7 +6,7 @@ from ...utils.helpers import gfx_device, low_vram, find_strip_by_name, get_strip
 
 class OmniGenPlugin(ModelPlugin):
     MODEL_ID     = "Shitao/OmniGen-v1-diffusers"
-    DISPLAY_NAME = "Image: OmniGen (multi-image)"
+    DISPLAY_NAME = "OmniGen (multi-image)"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "Multi-image / instruction-based generation via OmniGen"
 

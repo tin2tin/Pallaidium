@@ -6,7 +6,7 @@ from ...utils.helpers import gfx_device, low_vram
 
 class QwenImagePlugin(ModelPlugin):
     MODEL_ID     = "Qwen/Qwen-Image-2512"
-    DISPLAY_NAME = "Image: Qwen Image 2512"
+    DISPLAY_NAME = "Qwen Image 2512"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "High-quality text-to-image and img2img via Qwen-Image-2512"
 

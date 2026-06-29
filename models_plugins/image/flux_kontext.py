@@ -6,7 +6,7 @@ from ...utils.helpers import gfx_device, low_vram, find_strip_by_name, get_strip
 
 class FluxKontextPlugin(ModelPlugin):
     MODEL_ID     = "yuvraj108c/FLUX.1-Kontext-dev"
-    DISPLAY_NAME = "Image: FLUX Kontext (image editing)"
+    DISPLAY_NAME = "FLUX Kontext (image editing)"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "Instruction-based image editing via FLUX.1-Kontext-dev"
 

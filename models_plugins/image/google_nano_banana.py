@@ -23,7 +23,7 @@ _REF_ATTRS = [f"nano_banana_ref_strip_{i}" for i in range(1, NANO_BANANA_MAX_REF
 
 class GoogleNanoBananaPlugin(ModelPlugin):
     MODEL_ID     = "google/nano-banana"
-    DISPLAY_NAME = "Image: Google Nano Banana (cloud)"
+    DISPLAY_NAME = "Google Nano Banana (cloud)"
     MODEL_TYPE   = "image"
     DESCRIPTION  = "Cloud text-to-image / image editing via the Google Gemini API"
 
