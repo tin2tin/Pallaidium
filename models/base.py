@@ -253,6 +253,8 @@ class ModelPlugin:
     requires_main_thread:      bool = False  # True  → run generate() on main thread (bpy access needed)
     supports_batch:            bool = True   # False → hide "Batch Count" (deterministic single-output
                                              #         models: captioning, transcription, stem split, …)
+    supports_input_downscale:  bool = False  # True  → queue honours ltx23ic_input_downscale_pct when
+                                             #         pre-rendering a MOVIE/SCENE main-input strip
 
     # -----------------------------------------------------------------------
 

@@ -13,6 +13,11 @@ import ctypes
 from ...models.base import ModelPlugin, InputSpec, UISection, ParamSpec, ModelInputs
 from ...utils.helpers import gfx_device, solve_path, clean_filename, load_first_frame
 
+try:
+    from ._ltx23_control_shared import ensure_ic_lora, resolve_control_inputs, print_input_summary
+except ImportError:
+    from _ltx23_control_shared import ensure_ic_lora, resolve_control_inputs, print_input_summary
+
 
 def vae_temporal_decode_streaming(vae, latents_cpu, *, decode_device, temb=None):
     import torch
@@ -44,9 +49,6 @@ def vae_temporal_decode_streaming(vae, latents_cpu, *, decode_device, temb=None)
     return torch.cat(result_tiles, dim=2)[:, :, :n_sample_frames]
 
 
-_IC_LORA_FALLBACK = "Lightricks/LTX-2.3-22b-IC-LoRA-Union-Control"
-
-
 class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
     MODEL_ID     = "LTX-2.3 IC-LoRA Staged"
     DISPLAY_NAME = "LTX-2.3 IC-LoRA (Staged)"
@@ -66,6 +68,7 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
     PARAMS            = ParamSpec(steps=8, guidance=1.0)
     REQUIRED_PACKAGES = ["torch", "torchaudio", "soundfile", "av", "diffusers", "transformers", "sdnq"]
     supports_inpaint  = False
+    supports_input_downscale = True
 
     # Async (worker-thread) generation re-enabled: the two real render-queue
     # crashes are fixed elsewhere — the audio-mixdown race
@@ -88,6 +91,7 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
         row = col.row(align=True)
         row.prop(scene, "ref_audio_path", text="Audio Ref.")
         row.operator("sequencer.open_audio_filebrowser", text="", icon="FILEBROWSER")
+        col.prop(scene, "ltx23ic_input_downscale_pct")
         if vse_scene.sequence_editor:
             row = col.row(align=True)
             row.prop_search(
@@ -107,65 +111,6 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
 
     def draw_post_seed_ui(self, col, context):
         col.prop(context.scene, "ltx23_stage_mode")
-
-    @staticmethod
-    def _apply_loras(pipe, lora_folder, enabled_loras):
-        import warnings as _warnings
-        names, weights = [], []
-        for item in enabled_loras:
-            name = clean_filename(item.name).replace(".", "")
-            try:
-                with _warnings.catch_warnings():
-                    _warnings.filterwarnings(
-                        "ignore",
-                        message="Already found a `peft_config` attribute",
-                    )
-                    pipe.load_lora_weights(
-                        lora_folder,
-                        weight_name=item.name + ".safetensors",
-                        adapter_name=name,
-                    )
-            except Exception as e:
-                print(f"  LoRA '{item.name}': load error — {e}")
-                continue
-            loaded = {a for v in pipe.get_list_adapters().values() for a in v}
-            if name in loaded:
-                names.append(name)
-                weights.append(getattr(item, "weight_value", 1.0))
-                print(f"  LoRA '{item.name}': loaded (weight={weights[-1]})")
-            else:
-                print(f"  LoRA '{item.name}': no matching keys for LTX-2.3, skipped.")
-        if names:
-            pipe.set_adapters(names, adapter_weights=weights)
-            print(f"  Active LoRAs: {names}")
-        else:
-            print("  No compatible LoRAs applied.")
-        return names
-
-    @staticmethod
-    def _ensure_ic_lora(pipe, lora_folder, enabled_loras, cache_dir, lfo):
-        names = []
-        if enabled_loras and lora_folder:
-            names = LTX2_3MultiICLoRAStagedPlugin._apply_loras(pipe, lora_folder, enabled_loras)
-
-        if not names:
-            loaded = {a for v in pipe.get_list_adapters().values() for a in v}
-            if not loaded:
-                print(f"[LTX23ICLoRAStaged] No LoRA loaded — auto-loading fallback: {_IC_LORA_FALLBACK}")
-                try:
-                    pipe.load_lora_weights(
-                        _IC_LORA_FALLBACK,
-                        weight_name="ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
-                        adapter_name="ic_lora_fallback",
-                        cache_dir=cache_dir,
-                        local_files_only=lfo,
-                    )
-                    pipe.set_adapters(["ic_lora_fallback"], adapter_weights=[1.0])
-                    print("[LTX23ICLoRAStaged] Fallback IC-LoRA loaded.")
-                    names = ["ic_lora_fallback"]
-                except Exception as _e:
-                    print(f"[LTX23ICLoRAStaged] WARNING: Fallback IC-LoRA load failed ({_e}). Proceeding without IC-LoRA.")
-        return names
 
     def generate(self, pipe_obj, inputs: ModelInputs, scene, prefs) -> str:
         import torch
@@ -236,16 +181,6 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
         # ── Resolve Image & Audio Inputs ────────────────────────────────────
         image_input = inputs.image
 
-        # 3DREAL mode: the IC-LoRA "ref strip" dropdown holds a still image. Use
-        # it as the frame-0 appearance reference and let the MAIN input video
-        # drive control_video (matches fal/LTX-2.3-3DREAL: video_url + image_url).
-        if _ref_image_path and os.path.isfile(_ref_image_path):
-            try:
-                image_input = load_first_frame(_ref_image_path)
-                print(f"[LTX23ICLoRAStaged] Ref image loaded: {_ref_image_path!r}")
-            except Exception as _e:
-                print(f"[LTX23ICLoRAStaged] WARNING: failed to load ref image ({_e})")
-
         vid_path = None
         for attr in ["video_path", "video", "video_ref"]:
             val = getattr(inputs, attr, None)
@@ -253,9 +188,12 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
                 vid_path = val
                 break
 
-        # When a ref still is supplied AND a main input video exists, the video is
-        # the control source — not a first-frame image condition.
-        _video_is_control = bool(_ref_image_path) and bool(vid_path)
+        # 3DREAL mode: the "ref strip" dropdown holds a still image. Use it as
+        # the frame-0 appearance reference and let the MAIN input video drive
+        # control_video (matches fal/LTX-2.3-3DREAL: video_url + image_url).
+        image_input, _video_is_control, control_video_frames = resolve_control_inputs(
+            image_input, vid_path, _ref_image_path, _ctrl_video_path, load_first_frame, load_video,
+        )
 
         explicit_audio = None
         for attr in ["audio_path", "audio", "audio_ref", "sound", "sound_path"]:
@@ -381,21 +319,6 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
         elif image_input is not None:
             image_conditions = [LTX2ImageCondition(image=image_input, frame=0, strength=1.0)]
 
-        # ── Load control reference material ────────────────────────────────
-        # Control source priority:
-        #   1. explicit IC-LoRA control MOVIE (dropdown holds a video)
-        #   2. 3DREAL mode: the MAIN input video (dropdown held the ref image)
-        control_video_frames = None
-        _control_src = _ctrl_video_path if (_ctrl_video_path and os.path.isfile(_ctrl_video_path)) else None
-        if _control_src is None and _video_is_control and os.path.isfile(vid_path):
-            _control_src = vid_path
-        if _control_src:
-            try:
-                control_video_frames = load_video(_control_src)
-                print(f"[LTX23ICLoRAStaged] Control video loaded: {len(control_video_frames)} frames from {_control_src!r}")
-            except Exception as _e:
-                print(f"[LTX23ICLoRAStaged] WARNING: failed to load control video ({_e})")
-
         _ctrl_audio_wave = None
 
         # ── Step 0: Text encoding ───────────────────────────────────────────
@@ -443,6 +366,18 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
         from ...utils.helpers import bpy as _bpy
         _lora_folder   = _bpy.path.abspath(getattr(scene, "lora_folder", ""))
         _enabled_loras = [item for item in getattr(scene, "lora_files", []) if item.enabled]
+
+        print_input_summary(
+            "LTX23ICLoRAStaged",
+            image_input=image_input, vid_path=vid_path, sound_path=sound_path,
+            ref_image_path=_ref_image_path, ctrl_video_path=_ctrl_video_path,
+            ctrl_audio_path=_ctrl_audio_path, video_is_control=_video_is_control,
+            control_video_frames=control_video_frames,
+            control_active=bool(control_video_frames is not None or _ctrl_audio_path or _ref_image_path),
+            ctrl_strength=_ctrl_strength, ctrl_downscale=_ctrl_downscale,
+            ctrl_audio_str=_ctrl_audio_str, identity_guid=_identity_guid,
+            stage_mode=_stage_mode, lora_folder=_lora_folder, enabled_loras=_enabled_loras,
+        )
 
         audio_latent = None
         audio_conditions = None
@@ -514,7 +449,7 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
 
             if _enabled_loras and _lora_folder:
                 print(f"LTX-2.3 IC-LoRA Stage 1: loading {len(_enabled_loras)} LoRA(s)")
-            self._ensure_ic_lora(pipe, _lora_folder, _enabled_loras, _cache_dir, _lfo)
+            ensure_ic_lora(pipe, _lora_folder, _enabled_loras, _cache_dir, _lfo)
 
             if _ctrl_audio_path and os.path.isfile(_ctrl_audio_path):
                 if hasattr(pipe, "audio_vae") and pipe.audio_vae:
@@ -624,7 +559,7 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
 
             if _enabled_loras and _lora_folder:
                 print(f"LTX-2.3 IC-LoRA Stage 2: loading {len(_enabled_loras)} LoRA(s)")
-            self._ensure_ic_lora(refine_pipe, _lora_folder, _enabled_loras, _cache_dir, _lfo)
+            ensure_ic_lora(refine_pipe, _lora_folder, _enabled_loras, _cache_dir, _lfo)
 
             # STEP2: load audio from input video since Stage 1 was skipped
             if _stage_mode == "STEP2":

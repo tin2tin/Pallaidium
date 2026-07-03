@@ -378,6 +378,18 @@ def closest_divisible_128(num):
     else:
         return max(num + (64 - remainder), 256)
 
+def closest_divisible_64(num):
+    # Round to the nearest multiple of 64 (min 64) — the resolution alignment
+    # required by models like LTX-2.3, whose two-stage pipeline halves/doubles
+    # dimensions internally.
+    num = round(num)
+    remainder = num % 64
+    if remainder <= 32:
+        result = num - remainder
+        return max(result, 64)
+    else:
+        return max(num + (64 - remainder), 64)
+
 def find_first_empty_channel(start_frame, end_frame):
     for ch in range(1, len(bpy.context.scene.sequence_editor.strips_all) + 1):
         for seq in bpy.context.scene.sequence_editor.strips_all:
@@ -1918,7 +1930,150 @@ def _rsp_diag(msg):
         pass
 
 
-def render_strip_to_path(context, strip, image_output=False):
+def _resolve_fallback_camera(vse_scene, strip):
+    """Find a camera to satisfy bpy.ops.render.render()'s "no camera" check.
+
+    Blender's render operator requires scene.camera even for a pure VSE/
+    sequencer composite that never looks through a 3D viewport. When the
+    target strip is a SCENE strip, mirror the Strip Properties panel's own
+    resolution order (Scene → Scene Input → Scene Camera) so the borrowed
+    camera matches what the strip would actually composite:
+      scene_input == 'CAMERA' → strip.scene_camera, else strip.scene.camera
+      scene_input == 'SEQUENCER' (or unset) → strip.scene.camera
+    Falls back to any SCENE strip in the same sequence editor, then to any
+    camera object in the file. Returns None if nothing is found.
+    """
+    def _camera_for_scene_strip(s):
+        sub_scene = getattr(s, "scene", None)
+        if not sub_scene:
+            return None
+        if getattr(s, "scene_input", "SEQUENCER") == "CAMERA":
+            return getattr(s, "scene_camera", None) or sub_scene.camera
+        return sub_scene.camera
+
+    if getattr(strip, "type", None) == "SCENE":
+        cam = _camera_for_scene_strip(strip)
+        if cam:
+            return cam
+
+    seq_editor = getattr(vse_scene, "sequence_editor", None)
+    if seq_editor:
+        for s in seq_editor.strips:
+            if getattr(s, "type", None) == "SCENE":
+                cam = _camera_for_scene_strip(s)
+                if cam:
+                    return cam
+
+    for obj in bpy.data.objects:
+        if obj.type == "CAMERA":
+            return obj
+    return None
+
+
+def _set_render_resolution_for_strip(vse_scene, strip, downscale_pct=100.0):
+    """Set vse_scene.render.resolution_x/y/percentage for rendering `strip`.
+
+    Shared by render_strip_to_path() and render_meta_child_to_path() so both
+    single-strip and META-child-strip renders honour the same native-size /
+    downscale_pct / even-dimension rules identically.
+
+    - IMAGE/MOVIE strips render at their native (elements[0].orig_*) size so
+      the output fills the frame with no letterbox padding.
+    - downscale_pct < 100 shrinks the render via resolution_percentage
+      (resolution_x/y are kept at native size — see comment below).
+    - Whatever the above produces, the FINAL rendered pixel dimensions are
+      then forced even (H.264 requires it), regardless of the path taken.
+    """
+    # Render IMAGE/MOVIE strips at their native resolution so the output fills
+    # the frame with no transparent margins. Otherwise a strip smaller than the
+    # scene render size composites centered with letterbox padding, which makes
+    # downstream consumers (Florence-2 Box Editor background, img2img/init
+    # frames) misalign with content that was analyzed/resized to fill.
+    target_res = None
+    if strip.type in ("IMAGE", "MOVIE"):
+        try:
+            elem = strip.elements[0]
+            if elem.orig_width and elem.orig_height:
+                target_res = (elem.orig_width, elem.orig_height)
+        except Exception:
+            target_res = None
+    if target_res:
+        vse_scene.render.resolution_x          = target_res[0]
+        vse_scene.render.resolution_y          = target_res[1]
+        vse_scene.render.resolution_percentage = 100
+
+    if downscale_pct and downscale_pct < 100:
+        # VSE strip transforms are computed against the base resolution_x/y —
+        # shrinking resolution_x/y directly after the fact leaves the strip's
+        # content sized for the old (larger) canvas, so the render comes out
+        # cropped/zoomed instead of downscaled. resolution_percentage is the
+        # mechanism that scales the whole composited frame proportionally, so
+        # keep resolution_x/y at their native size and drive the shrink through
+        # the percentage instead.
+        base_w = target_res[0] if target_res else vse_scene.render.resolution_x
+        base_h = target_res[1] if target_res else vse_scene.render.resolution_y
+        target_w = closest_divisible_64(base_w * downscale_pct / 100.0)
+        vse_scene.render.resolution_x          = base_w
+        vse_scene.render.resolution_y          = base_h
+        vse_scene.render.resolution_percentage = max(1, round(target_w / base_w * 100.0))
+
+    # ── Guarantee even output dimensions ────────────────────────────────
+    # Whatever path set resolution_x/y/percentage above (native scene
+    # resolution left untouched, IMAGE/MOVIE native size, or the downscale
+    # branch), Blender computes the actual rendered pixel size via integer
+    # TRUNCATION — int(resolution_x * resolution_percentage / 100), a
+    # C-style cast, NOT Python round() (e.g. 1920 * 23% = 441.6 renders as
+    # 441, not 442 — confirmed via _diag_scene_input.log after round()-based
+    # predictions passed the even-check here but Blender still rejected the
+    # actual 441-wide render). Must replicate that exact truncation or this
+    # guard silently approves a percentage that still renders odd. Video
+    # codecs (H.264) require both dimensions to be even, and none of the
+    # paths above guarantee that (e.g. a scene's own native resolution can
+    # simply be odd, or percentage truncation can land on an odd value even
+    # when the pre-percentage target was a clean multiple of 64). Fix it up
+    # here, once, regardless of which path was taken.
+    def _final_dims():
+        return (
+            int(vse_scene.render.resolution_x * vse_scene.render.resolution_percentage / 100.0),
+            int(vse_scene.render.resolution_y * vse_scene.render.resolution_percentage / 100.0),
+        )
+
+    fw, fh = _final_dims()
+    if fw % 2 or fh % 2:
+        base_w = vse_scene.render.resolution_x
+        base_h = vse_scene.render.resolution_y
+        pct0   = vse_scene.render.resolution_percentage
+
+        def _dims(pct):
+            return (int(base_w * pct / 100.0), int(base_h * pct / 100.0))
+
+        fixed = False
+        for delta in range(0, 51):
+            for pct in ({pct0 - delta, pct0 + delta} if delta else {pct0}):
+                if pct < 1 or pct > 100:
+                    continue
+                aw, ah = _dims(pct)
+                if aw % 2 == 0 and ah % 2 == 0:
+                    vse_scene.render.resolution_percentage = pct
+                    fixed = True
+                    break
+            if fixed:
+                break
+        if not fixed:
+            # No percentage in range gives even dimensions on both axes —
+            # last resort: nudge the base resolution itself by 1px.
+            fw, fh = _final_dims()
+            if fw % 2:
+                vse_scene.render.resolution_x = max(2, vse_scene.render.resolution_x - 1)
+            if fh % 2:
+                vse_scene.render.resolution_y = max(2, vse_scene.render.resolution_y - 1)
+        _rsp_diag(f"[{strip.name}] even-dimension guard: resolution_x={vse_scene.render.resolution_x} "
+                  f"resolution_y={vse_scene.render.resolution_y} "
+                  f"resolution_percentage={vse_scene.render.resolution_percentage} "
+                  f"→ actual {_final_dims()}")
+
+
+def render_strip_to_path(context, strip, image_output=False, downscale_pct=100.0):
     """Render a VSE strip through the pipeline and return the output file path.
 
     Unlike get_render_strip() this does NOT add a new strip to the VSE — it
@@ -1927,6 +2082,11 @@ def render_strip_to_path(context, strip, image_output=False):
 
     image_output=True  → single-frame PNG (for image plugins)
     image_output=False → animation MP4  (for video plugins)
+    downscale_pct       → shrink the render resolution to this percentage of
+                           its native/current size (< 100 shrinks; values
+                           >= 100 are a no-op). The result is rounded to the
+                           nearest multiple of 64 (min 64) so it stays aligned
+                           with models that require 64-divisible dimensions.
     Returns None on failure.
     """
     print(f"[render_strip_to_path] strip='{getattr(strip, 'name', '?')}' "
@@ -1958,6 +2118,20 @@ def render_strip_to_path(context, strip, image_output=False):
     orig_res_x      = vse_scene.render.resolution_x
     orig_res_y      = vse_scene.render.resolution_y
     orig_res_pct    = vse_scene.render.resolution_percentage
+    orig_camera     = vse_scene.camera
+
+    # bpy.ops.render.render() refuses to run at all ("Cannot render, no
+    # camera") if scene.camera is None — even when the output is a pure
+    # sequencer composite that never uses a 3D view. Borrow one for the
+    # duration of this render so VSE-only scenes (and SCENE strips whose
+    # sub-scene has no camera of its own) still render.
+    if vse_scene.camera is None:
+        _fallback_cam = _resolve_fallback_camera(vse_scene, strip)
+        if _fallback_cam is not None:
+            vse_scene.camera = _fallback_cam
+            _rsp_diag(f"borrowed camera {_fallback_cam.name!r} for scene {vse_scene.name!r}")
+        else:
+            _rsp_diag(f"no camera available anywhere for scene {vse_scene.name!r}")
 
     seq_editor.use_prefetch = False
     seq_editor.use_cache_raw = False
@@ -1971,23 +2145,7 @@ def render_strip_to_path(context, strip, image_output=False):
     vse_scene.frame_start = render_start
     vse_scene.frame_end   = render_end
 
-    # Render IMAGE/MOVIE strips at their native resolution so the output fills
-    # the frame with no transparent margins. Otherwise a strip smaller than the
-    # scene render size composites centered with letterbox padding, which makes
-    # downstream consumers (Florence-2 Box Editor background, img2img/init
-    # frames) misalign with content that was analyzed/resized to fill.
-    target_res = None
-    if strip.type in ("IMAGE", "MOVIE"):
-        try:
-            elem = strip.elements[0]
-            if elem.orig_width and elem.orig_height:
-                target_res = (elem.orig_width, elem.orig_height)
-        except Exception:
-            target_res = None
-    if target_res:
-        vse_scene.render.resolution_x          = target_res[0]
-        vse_scene.render.resolution_y          = target_res[1]
-        vse_scene.render.resolution_percentage = 100
+    _set_render_resolution_for_strip(vse_scene, strip, downscale_pct=downscale_pct)
 
     addon_prefs  = bpy.context.preferences.addons[ADDON_ID].preferences
     rendered_dir = os.path.join(addon_prefs.generator_ai, str(date.today()), "Rendered_Strips")
@@ -2128,6 +2286,7 @@ def render_strip_to_path(context, strip, image_output=False):
         vse_scene.render.resolution_x          = orig_res_x
         vse_scene.render.resolution_y          = orig_res_y
         vse_scene.render.resolution_percentage = orig_res_pct
+        vse_scene.camera = orig_camera
 
     if output_path and os.path.exists(output_path):
         _rendered_temp_paths.add(output_path)
@@ -2140,7 +2299,7 @@ def render_strip_to_path(context, strip, image_output=False):
     return None
 
 
-def render_meta_child_to_path(context, meta_strip, child_strip, image_output=False):
+def render_meta_child_to_path(context, meta_strip, child_strip, image_output=False, downscale_pct=100.0):
     """Render one child strip inside a META through the VSE compositor.
 
     Unlike render_strip_to_path(), this keeps the META unmuted (so the child's
@@ -2155,6 +2314,11 @@ def render_meta_child_to_path(context, meta_strip, child_strip, image_output=Fal
     image_output=True              → single-frame PNG at child.frame_final_start
     child.type == 'SOUND'          → PCM WAV covering the META's full duration
     otherwise                      → MP4 for the child's trimmed duration
+    downscale_pct                  → shrink the (non-SOUND) render to this
+                                      percentage of native size, same rules as
+                                      render_strip_to_path() (< 100 shrinks,
+                                      final dimensions forced even). No effect
+                                      on SOUND children.
     Returns the absolute output path, or None on failure.
     """
     vse_scene = getattr(context, 'sequencer_scene', context.scene)
@@ -2172,9 +2336,21 @@ def render_meta_child_to_path(context, meta_strip, child_strip, image_output=Fal
     orig_format      = vse_scene.render.image_settings.file_format
     orig_media       = getattr(vse_scene.render.image_settings, 'media_type', None)
     orig_use_seq     = vse_scene.render.use_sequencer
+    orig_camera      = vse_scene.camera
+    orig_res_x       = vse_scene.render.resolution_x
+    orig_res_y       = vse_scene.render.resolution_y
+    orig_res_pct     = vse_scene.render.resolution_percentage
+
+    if vse_scene.camera is None and child_strip.type != "SOUND":
+        _fallback_cam = _resolve_fallback_camera(vse_scene, meta_strip)
+        if _fallback_cam is not None:
+            vse_scene.camera = _fallback_cam
 
     seq_editor.use_prefetch  = False
     seq_editor.use_cache_raw = False
+
+    if child_strip.type != "SOUND":
+        _set_render_resolution_for_strip(vse_scene, child_strip, downscale_pct=downscale_pct)
 
     # For SOUND: render the full META range so the exported audio duration equals
     # the META duration and the child's audio lands at its correct relative offset.
@@ -2320,6 +2496,10 @@ def render_meta_child_to_path(context, meta_strip, child_strip, image_output=Fal
             vse_scene.render.image_settings.media_type = orig_media
         vse_scene.render.image_settings.file_format = orig_format
         vse_scene.render.use_sequencer = orig_use_seq
+        vse_scene.camera = orig_camera
+        vse_scene.render.resolution_x          = orig_res_x
+        vse_scene.render.resolution_y          = orig_res_y
+        vse_scene.render.resolution_percentage = orig_res_pct
 
     if output_path and os.path.exists(output_path):
         _rendered_temp_paths.add(output_path)
@@ -3689,6 +3869,7 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
             ("ltx23ic_control_downscale", int),
             ("ltx23ic_control_audio_str", float),
             ("ltx23ic_identity_guidance", float),
+            ("ltx23ic_input_downscale_pct", float),
         ]:
             _v = _get(_attr)
             if _v is not None and hasattr(scene, _attr):

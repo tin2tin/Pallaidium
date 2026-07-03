@@ -297,6 +297,7 @@ class RenderQueueJob(PropertyGroup):
     # 3DREAL mode: dropdown holds an IMAGE → frame-0 appearance reference,
     # while the MAIN input video drives control_video.
     ltx23ic_ref_image_path:      StringProperty(default="")
+    ltx23ic_input_downscale_pct: FloatProperty(default=100.0)
 
     # ltx23_extend — clip extension params + resolved audio-strip path
     ltx23ext_extend_frames:      IntProperty(default=96)
@@ -1039,6 +1040,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             "ltx23ic_control_audio_str":   snapshot.get("ltx23ic_control_audio_str",   1.0),
             "ltx23ic_identity_guidance":   snapshot.get("ltx23ic_identity_guidance",   0.0),
             "ltx23ic_ref_image_path":      snapshot.get("ltx23ic_ref_image_path",      ""),
+            "ltx23ic_input_downscale_pct": snapshot.get("ltx23ic_input_downscale_pct", 100.0),
             # ltx23_extend
             "ltx23ext_extend_frames":      snapshot.get("ltx23ext_extend_frames",      96),
             "ltx23ext_video_strength":     snapshot.get("ltx23ext_video_strength",     1.0),
@@ -1108,6 +1110,17 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
     finally:
         pipe_obj = None
         gc.collect()
+        # Drain any GPU work still in flight before freeing memory below —
+        # without this, empty_cache() can unmap a block a lagging async
+        # kernel (e.g. flash-attn/SDNQ matmul on a non-default stream) is
+        # still writing to, faulting as an EXCEPTION_ACCESS_VIOLATION in
+        # c10.dll with no Python frame on the crashing thread.
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+        except (ImportError, AttributeError, RuntimeError):
+            pass
         if snapshot.get("should_unload", True) and model_cache is not None:
             release_model_cache(model_cache)
         # Always trim the CUDA cache between jobs, even when the model is kept
@@ -1383,6 +1396,14 @@ class SEQUENCER_OT_add_to_queue(Operator):
         if _pi is not None and hasattr(_pi, "_build_prompt"):
             prompt = _pi._build_prompt(scene, prompt)
 
+        # Main-input render downscale (LTX-2.3 IC-LoRA only): shrink the
+        # SCENE/MOVIE strip render before it becomes the model's input video.
+        _input_downscale_pct = (
+            getattr(scene, "ltx23ic_input_downscale_pct", 100.0)
+            if (_pi is not None and getattr(_pi, "supports_input_downscale", False))
+            else 100.0
+        )
+
         neg_prompt = (
             scene.generate_movie_negative_prompt
             + ", " + styled[1]
@@ -1522,6 +1543,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
             ltx23ic_control_downscale   = getattr(scene, "ltx23ic_control_downscale",   1),
             ltx23ic_control_audio_str   = getattr(scene, "ltx23ic_control_audio_str",   1.0),
             ltx23ic_identity_guidance   = getattr(scene, "ltx23ic_identity_guidance",   0.0),
+            ltx23ic_input_downscale_pct = getattr(scene, "ltx23ic_input_downscale_pct", 100.0),
             # ltx23_extend params (ltx23ext_audio_path is resolved per-job below)
             ltx23ext_extend_frames      = getattr(scene, "ltx23ext_extend_frames",      96),
             ltx23ext_video_strength     = getattr(scene, "ltx23ext_video_strength",     1.0),
@@ -1591,7 +1613,13 @@ class SEQUENCER_OT_add_to_queue(Operator):
             if strip is not None:
                 image_path, movie_path, sound_path, last_image_path, middle_images_json, control_video_path, control_audio_path = self._paths_from_strip(strip)
                 print(f"[Queue][dbg] loop strip='{strip.name}' type={strip.type} otype={otype} "
-                      f"input_mode={input_mode} → image_path={image_path!r} movie_path={movie_path!r}")
+                      f"input_mode={input_mode} → image_path={image_path!r} movie_path={movie_path!r} "
+                      f"sound_path={sound_path!r} last_image_path={last_image_path!r} "
+                      f"middle_images_json={middle_images_json!r} "
+                      f"control_video_path={control_video_path!r} control_audio_path={control_audio_path!r}")
+                if strip.type == "META":
+                    _child_summary = [(c.name, c.type) for c in strip.strips]
+                    print(f"[Queue][dbg] main strip '{strip.name}' is META, children: {_child_summary}")
 
                 # Render audio to a trimmed WAV so the job never holds a pointer to
                 # the full source file (avoids CUDA OOM when frame count is derived
@@ -1649,7 +1677,8 @@ class SEQUENCER_OT_add_to_queue(Operator):
                     _scene_rendered = None
                     try:
                         _scene_rendered = render_strip_to_path(
-                            context, strip, image_output=not _want_video
+                            context, strip, image_output=not _want_video,
+                            downscale_pct=_input_downscale_pct,
                         )
                     except Exception as _scene_err:
                         print(f"[Queue] SCENE render raised: {_scene_err!r}")
@@ -1680,7 +1709,10 @@ class SEQUENCER_OT_add_to_queue(Operator):
                     from ..utils.helpers import render_strip_to_path
                     _trim_mov = None
                     try:
-                        _trim_mov = render_strip_to_path(context, strip, image_output=False)
+                        _trim_mov = render_strip_to_path(
+                            context, strip, image_output=False,
+                            downscale_pct=_input_downscale_pct,
+                        )
                     except Exception as _mov_err:
                         print(f"[Queue] MOVIE trim render raised: {_mov_err!r}")
                     if _trim_mov:
@@ -1722,7 +1754,10 @@ class SEQUENCER_OT_add_to_queue(Operator):
                     _ctrl_strip_obj  = se.strips.get(_ctrl_strip_name) if _ctrl_strip_name and se else None
                     if _ctrl_strip_obj and _ctrl_strip_obj.type == "MOVIE":
                         from ..utils.helpers import render_strip_to_path
-                        _trimmed_cv = render_strip_to_path(context, _ctrl_strip_obj, image_output=False)
+                        _trimmed_cv = render_strip_to_path(
+                            context, _ctrl_strip_obj, image_output=False,
+                            downscale_pct=_input_downscale_pct,
+                        )
                         if _trimmed_cv:
                             control_video_path = _trimmed_cv
                             print(f"[Queue] IC-LoRA single-MOVIE trimmed → {_trimmed_cv!r}")
@@ -1872,39 +1907,84 @@ class SEQUENCER_OT_add_to_queue(Operator):
 
                 # Single-file control strip: resolve ltx23ic_control_strip prop
                 # from the sequencer scene. Supports a MOVIE strip (control video),
-                # an IMAGE strip (3DREAL frame-0 appearance reference → the MAIN
-                # input video drives control_video), or a META whose first
-                # MOVIE/SOUND/IMAGE children supply the control references.
+                # a SCENE strip (rendered to a temp video, same treatment as the
+                # main-input SCENE path above — SCENE strips carry no source file
+                # so they must be rendered through the VSE first), an IMAGE strip
+                # (3DREAL frame-0 appearance reference → the MAIN input video
+                # drives control_video), or a META whose first MOVIE/SCENE/SOUND/
+                # IMAGE children supply the control references.
                 if not control_video_path:
                     _ctrl_name = getattr(seq_scene, "ltx23ic_control_strip", "")
-                    if _ctrl_name and se:
-                        _ctrl_s = se.strips.get(_ctrl_name)
-                        if _ctrl_s and _ctrl_s.type == "MOVIE":
+                    _ctrl_s = se.strips.get(_ctrl_name) if (_ctrl_name and se) else None
+                    print(f"[Queue][dbg] Ref Strip: name={_ctrl_name!r} "
+                          f"resolved_type={getattr(_ctrl_s, 'type', None)!r}")
+                    if _ctrl_s and _ctrl_s.type == "MOVIE":
+                        try:
+                            _cp = bpy.path.abspath(_ctrl_s.filepath)
+                            if os.path.isfile(_cp):
+                                job.ltx23ic_control_video_path = _cp
+                                print(f"[Queue][dbg] Ref Strip (MOVIE) → control_video_path={_cp!r}")
+                        except Exception:
+                            pass
+                    elif _ctrl_s and _ctrl_s.type == "SCENE":
+                        from ..utils.helpers import render_strip_to_path
+                        _cp = None
+                        try:
+                            _cp = render_strip_to_path(
+                                context, _ctrl_s, image_output=False,
+                                downscale_pct=_input_downscale_pct,
+                            )
+                        except Exception as _ctrl_scene_err:
+                            print(f"[Queue] Ref Strip SCENE render raised: {_ctrl_scene_err!r}")
+                        if _cp:
+                            job.ltx23ic_control_video_path = _cp
+                            print(f"[Queue][dbg] Ref Strip (SCENE, rendered) → control_video_path={_cp!r}")
+                        else:
+                            self.report(
+                                {"WARNING"},
+                                f"Could not render Ref Strip '{_ctrl_s.name}' (SCENE) — "
+                                f"control conditioning will be skipped for this job.",
+                            )
+                            print(f"[Queue] Ref Strip SCENE render returned no file for '{_ctrl_s.name}'")
+                    elif _ctrl_s and _ctrl_s.type == "IMAGE":
+                        job.ltx23ic_ref_image_path = _image_strip_path(_ctrl_s)
+                        print(f"[Queue][dbg] Ref Strip (IMAGE) → ref_image_path={job.ltx23ic_ref_image_path!r}")
+                    elif _ctrl_s and _ctrl_s.type == "META":
+                        _child_summary = [(c.name, c.type) for c in _ctrl_s.strips]
+                        print(f"[Queue][dbg] Ref Strip META '{_ctrl_s.name}' children: {_child_summary}")
+                        for _c in _ctrl_s.strips:
                             try:
-                                _cp = bpy.path.abspath(_ctrl_s.filepath)
-                                if os.path.isfile(_cp):
-                                    job.ltx23ic_control_video_path = _cp
-                            except Exception:
-                                pass
-                        elif _ctrl_s and _ctrl_s.type == "IMAGE":
-                            job.ltx23ic_ref_image_path = _image_strip_path(_ctrl_s)
-                        elif _ctrl_s and _ctrl_s.type == "META":
-                            for _c in _ctrl_s.strips:
-                                try:
-                                    if _c.type == "MOVIE" and not job.ltx23ic_control_video_path:
-                                        _cp = bpy.path.abspath(_c.filepath)
-                                        if os.path.isfile(_cp):
-                                            job.ltx23ic_control_video_path = _cp
-                                    elif _c.type == "IMAGE" and not job.ltx23ic_ref_image_path:
-                                        job.ltx23ic_ref_image_path = _image_strip_path(_c)
-                                    elif (_c.type == "SOUND"
-                                          and not job.ltx23ic_control_audio_path
-                                          and getattr(_c, "sound", None)):
-                                        _ap = bpy.path.abspath(_c.sound.filepath)
-                                        if os.path.isfile(_ap):
-                                            job.ltx23ic_control_audio_path = _ap
-                                except Exception:
-                                    pass
+                                if _c.type == "MOVIE" and not job.ltx23ic_control_video_path:
+                                    _cp = bpy.path.abspath(_c.filepath)
+                                    if os.path.isfile(_cp):
+                                        job.ltx23ic_control_video_path = _cp
+                                        print(f"[Queue][dbg] Ref Strip META child '{_c.name}' (MOVIE) → control_video_path={_cp!r}")
+                                elif _c.type == "SCENE" and not job.ltx23ic_control_video_path:
+                                    from ..utils.helpers import render_meta_child_to_path
+                                    _cp = render_meta_child_to_path(
+                                        context, _ctrl_s, _c, image_output=False,
+                                        downscale_pct=_input_downscale_pct,
+                                    )
+                                    if _cp:
+                                        job.ltx23ic_control_video_path = _cp
+                                        print(f"[Queue][dbg] Ref Strip META child '{_c.name}' (SCENE, rendered) → control_video_path={_cp!r}")
+                                    else:
+                                        print(f"[Queue] Ref Strip META child SCENE '{_c.name}' render returned no file")
+                                elif _c.type == "IMAGE" and not job.ltx23ic_ref_image_path:
+                                    job.ltx23ic_ref_image_path = _image_strip_path(_c)
+                                    print(f"[Queue][dbg] Ref Strip META child '{_c.name}' (IMAGE) → ref_image_path={job.ltx23ic_ref_image_path!r}")
+                                elif (_c.type == "SOUND"
+                                      and not job.ltx23ic_control_audio_path
+                                      and getattr(_c, "sound", None)):
+                                    _ap = bpy.path.abspath(_c.sound.filepath)
+                                    if os.path.isfile(_ap):
+                                        job.ltx23ic_control_audio_path = _ap
+                                        print(f"[Queue][dbg] Ref Strip META child '{_c.name}' (SOUND) → control_audio_path={_ap!r}")
+                            except Exception as _child_err:
+                                print(f"[Queue] Ref Strip META child '{_c.name}' resolution error: {_child_err!r}")
+                    elif _ctrl_s is not None:
+                        print(f"[Queue] Ref Strip '{_ctrl_name}' has unsupported type "
+                              f"{_ctrl_s.type!r} for IC-LoRA control — no effect")
 
                 # ltx23_extend: resolve the picked SOUND strip → file path for the worker.
                 job.ltx23ext_audio_path = ""
@@ -2048,7 +2128,7 @@ def _queue_start_job(scene, job) -> None:
         "ltx23ic_control_video_path", "ltx23ic_control_audio_path",
         "ltx23ic_control_strength", "ltx23ic_control_downscale",
         "ltx23ic_control_audio_str", "ltx23ic_identity_guidance",
-        "ltx23ic_ref_image_path",
+        "ltx23ic_ref_image_path", "ltx23ic_input_downscale_pct",
         # ltx23_extend params + resolved audio-strip path
         "ltx23ext_extend_frames", "ltx23ext_video_strength", "ltx23ext_audio_path",
         "ltx23_stage_mode",
@@ -2447,23 +2527,47 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 )
                 new_strip.text = text_body
 
+    # Silence prefetch/cache before mutating the strip list: strips.remove()
+    # has a documented Blender-core race with the prefetch thread reading
+    # freed strip memory (see delete_strip() in utils/helpers.py), and
+    # strips.new_image()/new_movie() mutate the same underlying strip list —
+    # do the same "silence around the mutation, restore after" as every
+    # other place in this codebase that touches seq_editor.strips.
+    orig_prefetch    = getattr(ed, "use_prefetch", False)
+    orig_cache_raw   = getattr(ed, "use_cache_raw", False)
+    orig_cache_final = getattr(ed, "use_cache_final", False)
+    try:
+        ed.use_prefetch    = False
+        ed.use_cache_raw   = False
+        ed.use_cache_final = False
+    except Exception:
+        pass
+
     new_strip = None
     try:
-        _do_insert()
-    except Exception as exc1:
-        # Direct call failed (common from timer callbacks) — retry with override.
-        new_strip = None
-        window, area, region = _find_vse_override()
-        if window is None:
-            print(f"[Queue] No SEQUENCE_EDITOR area found ({exc1}) — cannot insert strip.")
-            return
         try:
-            with bpy.context.temp_override(window=window, area=area, region=region):
-                _do_insert()
-        except Exception as exc2:
-            print(f"[Queue] Strip insertion failed: {exc2}")
-            traceback.print_exc()
-            return
+            _do_insert()
+        except Exception as exc1:
+            # Direct call failed (common from timer callbacks) — retry with override.
+            new_strip = None
+            window, area, region = _find_vse_override()
+            if window is None:
+                print(f"[Queue] No SEQUENCE_EDITOR area found ({exc1}) — cannot insert strip.")
+                return
+            try:
+                with bpy.context.temp_override(window=window, area=area, region=region):
+                    _do_insert()
+            except Exception as exc2:
+                print(f"[Queue] Strip insertion failed: {exc2}")
+                traceback.print_exc()
+                return
+    finally:
+        try:
+            ed.use_prefetch    = orig_prefetch
+            ed.use_cache_raw   = orig_cache_raw
+            ed.use_cache_final = orig_cache_final
+        except Exception:
+            pass
 
     # --- Florence-2 → Mask Editor (text/Ideogram4 with send_to_mask enabled) ---
     if (
@@ -2589,7 +2693,7 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 "ltx23ic_control_video_path", "ltx23ic_control_audio_path",
                 "ltx23ic_control_strength", "ltx23ic_control_downscale",
                 "ltx23ic_control_audio_str", "ltx23ic_identity_guidance",
-                "ltx23ic_ref_image_path",
+                "ltx23ic_ref_image_path", "ltx23ic_input_downscale_pct",
             ):
                 _v = result.get(_k)
                 if _v is not None:

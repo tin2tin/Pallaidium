@@ -755,6 +755,12 @@ def register():
     bpy.types.Scene.ltx23ic_control_downscale   = bpy.props.IntProperty(   name="Control Downscale",    default=2,   min=1,   max=4,    description="Spatial downscale factor for IC-LoRA reference encoding (2 = quarter the control tokens, much lower Stage-1 VRAM)")
     bpy.types.Scene.ltx23ic_control_audio_str   = bpy.props.FloatProperty( name="Audio Ref Strength",   default=1.0, min=0.0, max=1.0,  description="Strength of IC-LoRA audio reference conditioning")
     bpy.types.Scene.ltx23ic_identity_guidance   = bpy.props.FloatProperty( name="Identity Guidance",    default=0.0, min=0.0, max=5.0,  description="Extra forward pass amplification for audio identity transfer")
+    bpy.types.Scene.ltx23ic_input_downscale_pct = bpy.props.FloatProperty(
+        name="Input Downscale %", default=100.0, min=25.0, max=100.0, subtype='PERCENTAGE',
+        description="Downscale the rendered main input video/scene strip to this percentage of "
+                    "its native resolution before it is fed to the model (rounded to the nearest "
+                    "multiple of 64). Lower values render the intermediate clip faster and use "
+                    "less VRAM at the cost of input detail")
 
     # ltx23_extend — clip extension params
     bpy.types.Scene.ltx23ext_extend_frames = bpy.props.IntProperty(
@@ -1469,6 +1475,7 @@ def unregister():
         "ltx23m_audio_modality_scale", "ltx23m_audio_noise_scale", "ltx23m_audio_start_time",
         "ltx23ic_control_strip", "ltx23ic_control_strength", "ltx23ic_control_downscale",
         "ltx23ic_control_audio_str", "ltx23ic_identity_guidance",
+        "ltx23ic_input_downscale_pct",
         "ltx23_stage_mode",
         "maxine_quality",
         "nano_banana_model", "nano_banana_aspect", "nano_banana_resolution",
