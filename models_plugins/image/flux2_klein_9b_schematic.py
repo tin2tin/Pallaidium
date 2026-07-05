@@ -104,6 +104,9 @@ class Flux2Klein9BSchematicPlugin(ModelPlugin):
 
     def draw_custom_ui(self, col, context) -> bool:
         scene = context.scene
+        # Reference strips live in the scene shown in the VSE (context.sequencer_scene
+        # in Blender 5.x), which can differ from the active scene.
+        vse_scene = getattr(context, "sequencer_scene", None) or context.scene
         row = col.row()
         row.enabled = False
         try:
@@ -113,6 +116,23 @@ class Flux2Klein9BSchematicPlugin(ModelPlugin):
         col.prop(scene, "klein_schematic_mode", text="Mode")
         if getattr(scene, "klein_schematic_mode", "DEPTH") in ("BINARY_SEG", "AMODAL_SEG"):
             col.prop(scene, "klein_schematic_target", text="Target")
+        # Optional reference strips (same slots/plumbing as FLUX.2 Klein 9B multi):
+        # any content strip — IMAGE, MOVIE, META, SCENE, … — is resolved to a PNG by
+        # the queue (_render_named_strip_image) and passed alongside the input as a
+        # separate reference.
+        if vse_scene.sequence_editor is None:
+            return True
+        for i in range(1, scene.klein_visible_strips + 1):
+            row = col.row(align=True)
+            row.prop_search(
+                vse_scene, f"klein_strip_{i}", vse_scene.sequence_editor, "strips",
+                text="Ref.", icon="FILE_IMAGE",
+            )
+            row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = f"klein_select{i}"
+            if i == scene.klein_visible_strips and scene.klein_visible_strips < 9:
+                if scene.klein_visible_strips > 3:
+                    row.operator("object.klein_hide_strip", text="", icon="REMOVE").strip_index = i
+                row.operator("object.klein_add_strip", text="", icon="ADD")
         return True
 
     def generate(self, pipe_obj, inputs: ModelInputs, scene, prefs):
@@ -132,7 +152,28 @@ class Flux2Klein9BSchematicPlugin(ModelPlugin):
 
         img = inputs.image.convert("RGB")
         w, h = img.size
-        src = img
+
+        # Optional reference strips (klein_strip_1..9), resolved to PNGs by the queue
+        # — including SCENE/META strips via _render_named_strip_image. Pass them as a
+        # LIST of separate images: Flux2KleinPipeline VAE-encodes each on its own and
+        # assigns it a distinct T-coordinate reference slot, so each named ref actually
+        # conditions generation (concatenating them into one wide image loses that).
+        # The active input strip stays the first reference; the output is still
+        # generated at the input's own w×h (schematic maps preserve size).
+        ref_images = []
+        for attr in (f"klein_strip_{i}_path" for i in range(1, 10)):
+            path = getattr(scene, attr, None)
+            if path:
+                try:
+                    r = _PIL.open(path).convert("RGB")
+                    ref_images.append(r)
+                    print(f"Klein schematic ref loaded: {attr} = '{path}' {r.size}")
+                except Exception as e:
+                    print(f"Klein schematic ref failed to open '{path}': {e}")
+            else:
+                print(f"Klein schematic ref empty: {attr}")
+        images = [img] + ref_images
+        print(f"Klein schematic → pipe images={len(images)} (input + {len(ref_images)} ref(s))")
 
         seed = inputs.seed
         generator = (
@@ -143,7 +184,7 @@ class Flux2Klein9BSchematicPlugin(ModelPlugin):
         self.set_phase(inputs, "Generating")
         result = pipe_obj["pipe"](
             prompt=inputs.prompt,
-            image=src,
+            image=images,
             num_inference_steps=inputs.steps,
             guidance_scale=inputs.guidance,
             height=h,

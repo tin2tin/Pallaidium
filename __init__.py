@@ -206,6 +206,8 @@ classes = (
     AI_Metadata_PT_Panel,
     OBJECT_OT_FluxAddStrip,
     OBJECT_OT_FluxHideStrip,
+    OBJECT_OT_KleinAddStrip,
+    OBJECT_OT_KleinHideStrip,
     SEQUENCER_OT_stem_split,
 )
 
@@ -649,6 +651,23 @@ def register():
     bpy.types.Scene.klein_strip_3 = bpy.props.StringProperty(
         name="klein_strip_3", options={"TEXTEDIT_UPDATE"}, default=""
     )
+    # Klein optional overflow refs (4..9) — 1-3 are always shown, 4-9 are
+    # revealed via the add/remove UI mirroring flux_visible_strips.
+    for _i in range(4, 10):
+        setattr(
+            bpy.types.Scene,
+            f"klein_strip_{_i}",
+            bpy.props.StringProperty(
+                name=f"klein_strip_{_i}", options={"TEXTEDIT_UPDATE"}, default=""
+            )
+        )
+    bpy.types.Scene.klein_visible_strips = bpy.props.IntProperty(
+        name="Visible Klein Strips",
+        description="Number of Klein reference image strips visible in the UI",
+        default=3,
+        min=3,
+        max=9,
+    )
 
     # Klein Schematic LoRA plugin
     bpy.types.Scene.klein_schematic_mode = bpy.props.EnumProperty(
@@ -805,6 +824,8 @@ def register():
         name="Variant",
         items=[
             ("gemini-2.5-flash-image",     "Nano Banana (Flash)",  "Gemini 2.5 Flash Image — fast, low cost"),
+            ("gemini-3.1-flash-lite-image","Nano Banana Lite",     "Gemini 3.1 Flash-Lite Image — ultra-low latency, cheapest"),
+            ("gemini-3.1-flash-image",     "Nano Banana 2",        "Gemini 3.1 Flash Image — high-efficiency, optimized for speed"),
             ("gemini-3-pro-image-preview", "Nano Banana Pro",      "Gemini 3 Pro Image — highest quality, up to 4K"),
             ("imagen-4.0-generate-001",    "Imagen 4",             "Imagen 4 text-to-image"),
         ],

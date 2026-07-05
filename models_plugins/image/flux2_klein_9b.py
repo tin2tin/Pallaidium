@@ -117,17 +117,17 @@ class Flux2Klein9BPlugin(ModelPlugin):
             pass
         if vse_scene.sequence_editor is None:
             return True
-        for attr, action in [
-            ("klein_strip_1", "klein_select1"),
-            ("klein_strip_2", "klein_select2"),
-            ("klein_strip_3", "klein_select3"),
-        ]:
+        for i in range(1, scene.klein_visible_strips + 1):
             row = col.row(align=True)
             row.prop_search(
-                vse_scene, attr, vse_scene.sequence_editor, "strips",
+                vse_scene, f"klein_strip_{i}", vse_scene.sequence_editor, "strips",
                 text="Ref.", icon="FILE_IMAGE",
             )
-            row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = action
+            row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = f"klein_select{i}"
+            if i == scene.klein_visible_strips and scene.klein_visible_strips < 9:
+                if scene.klein_visible_strips > 3:
+                    row.operator("object.klein_hide_strip", text="", icon="REMOVE").strip_index = i
+                row.operator("object.klein_add_strip", text="", icon="ADD")
         return True
 
     def generate(self, pipe_obj, inputs: ModelInputs, scene, prefs):
@@ -150,7 +150,7 @@ class Flux2Klein9BPlugin(ModelPlugin):
 
         from PIL import Image as _PILImage
         ref_images = []
-        for attr in ["klein_strip_1_path", "klein_strip_2_path", "klein_strip_3_path"]:
+        for attr in (f"klein_strip_{i}_path" for i in range(1, 10)):
             path = getattr(scene, attr, None)
             if path:
                 try:
@@ -187,26 +187,18 @@ class Flux2Klein9BPlugin(ModelPlugin):
             if result.size != (inputs.width, inputs.height):
                 result = result.resize((inputs.width, inputs.height), _PILImage.LANCZOS)
             return result
-        # Klein was trained with a single horizontally-concatenated reference image per the
-        # official BFL sampling code — separate T-coordinate slots (T=20, T=30…) have zero
-        # effect. Always concatenate before passing.
-        cat = pipe_obj["pipe"].image_processor.concatenate_images
-        if inputs.mode == "img2img" and inputs.image is not None:
-            src_rgb = inputs.image.convert("RGB")
-            if ref_images:
-                # Resize input to match the first ref so concatenate_images
-                # doesn't introduce white-padding between tiles.
-                src_rgb = src_rgb.resize(ref_images[0].size, _PILImage.LANCZOS)
-                ref_list = [src_rgb] + ref_images
-            else:
-                ref_list = [src_rgb]
-            ref_input = cat(ref_list)
-            print(f"Klein img2img → pipe image={ref_input.size}, refs={len(ref_images)} (+input)")
-            return pipe_obj["converter"](**common, image=ref_input,
-                                         callback_on_step_end=self.step_callback(inputs)).images[0]
-        if ref_images:
-            ref_input = cat(ref_images)
-            print(f"Klein txt2img → pipe image={ref_input.size}, refs={len(ref_images)}")
-            return pipe_obj["pipe"](**common, image=ref_input,
-                                    callback_on_step_end=self.step_callback(inputs)).images[0]
+        # Pass references as a LIST of separate images: Flux2KleinPipeline VAE-encodes
+        # each element on its own and assigns it a distinct T-coordinate reference slot,
+        # so the model treats each as a real reference (matching the working FLUX.2 Dev
+        # plugin). Concatenating them into one wide image loses that per-reference
+        # conditioning. A visual strip on the active input (image/video/scene frame)
+        # always becomes the first reference, ahead of the named ref slots, regardless
+        # of txt2img/img2img mode.
+        images = ([inputs.image.convert("RGB")] if inputs.image is not None else []) + ref_images
+
+        pipe_key = "converter" if (inputs.mode == "img2img" and inputs.image is not None) else "pipe"
+        if images:
+            print(f"Klein {inputs.mode} → pipe images={len(images)} (list of separate refs)")
+            return pipe_obj[pipe_key](**common, image=images,
+                                      callback_on_step_end=self.step_callback(inputs)).images[0]
         return pipe_obj["pipe"](**common, callback_on_step_end=self.step_callback(inputs)).images[0]

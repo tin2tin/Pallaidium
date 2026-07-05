@@ -1,9 +1,11 @@
 """Cloud text-to-image / image-editing via Google Gemini ("Nano Banana").
 
-Three selectable variants (scene.nano_banana_model):
-  - gemini-2.5-flash-image      (Nano Banana, fast)
-  - gemini-3-pro-image-preview  (Nano Banana Pro, up to 4K)
-  - imagen-4.0-generate-001     (Imagen 4)
+Five selectable variants (scene.nano_banana_model):
+  - gemini-2.5-flash-image        (Nano Banana, fast)
+  - gemini-3.1-flash-lite-image   (Nano Banana Lite, ultra-low latency / cheapest)
+  - gemini-3.1-flash-image        (Nano Banana 2, high-efficiency)
+  - gemini-3-pro-image-preview    (Nano Banana Pro, up to 4K)
+  - imagen-4.0-generate-001       (Imagen 4)
 
 The API key comes from the addon preference ``gemini_api_key`` (falls back to the
 GEMINI_API_KEY environment variable).  Image strips (including META strips bundling

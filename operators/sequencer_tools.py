@@ -140,18 +140,12 @@ class SEQUENCER_OT_ai_strip_picker(Operator):
             if find_strip_by_name(scene, strip.name):
                 scene.qwen_strip_3 = strip.name
 
-        if self.action == "klein_select1":
-            self.report({"INFO"}, f"Picked '{strip.name}'")
-            if find_strip_by_name(scene, strip.name):
-                scene.klein_strip_1 = strip.name
-        elif self.action == "klein_select2":
-            self.report({"INFO"}, f"Picked '{strip.name}'")
-            if find_strip_by_name(scene, strip.name):
-                scene.klein_strip_2 = strip.name
-        elif self.action == "klein_select3":
-            self.report({"INFO"}, f"Picked '{strip.name}'")
-            if find_strip_by_name(scene, strip.name):
-                scene.klein_strip_3 = strip.name
+        for _i in range(1, 10):
+            if self.action == f"klein_select{_i}":
+                self.report({"INFO"}, f"Picked '{strip.name}'")
+                if find_strip_by_name(scene, strip.name):
+                    setattr(scene, f"klein_strip_{_i}", strip.name)
+                break
 
         for _i in range(1, 10):
             if self.action == f"nano_banana_select{_i}":

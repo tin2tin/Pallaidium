@@ -3038,6 +3038,41 @@ class OBJECT_OT_FluxHideStrip(bpy.types.Operator):
             self.report({'INFO'}, "Minimum one Flux image input must be visible. Value cleared.")
         return {'FINISHED'}
 
+class OBJECT_OT_KleinAddStrip(bpy.types.Operator):
+    bl_idname = "object.klein_add_strip"
+    bl_label = "Add Klein Image Input"
+    bl_description = "Adds another optional reference image input slot for Klein"
+
+    def execute(self, context):
+        scene = context.scene
+        if scene.klein_visible_strips < 9:
+            scene.klein_visible_strips += 1
+        else:
+            self.report({'INFO'}, "Maximum 9 Klein image inputs already displayed.")
+        return {'FINISHED'}
+
+class OBJECT_OT_KleinHideStrip(bpy.types.Operator):
+    bl_idname = "object.klein_hide_strip"
+    bl_label = "Hide Klein Image Input"
+    bl_description = "Hides the last optional Klein image input and clears its value"
+
+    strip_index: bpy.props.IntProperty(default=0)  # Which strip's value to clear
+
+    def execute(self, context):
+        scene = context.scene
+        # klein_strip_N values live in the sequencer scene (the one shown in the
+        # VSE), which can differ from the active scene in Blender 5.x.
+        vse_scene = getattr(context, "sequencer_scene", None) or context.scene
+
+        strip_to_clear_name = f"klein_strip_{self.strip_index}"
+        if hasattr(vse_scene, strip_to_clear_name):
+            setattr(vse_scene, strip_to_clear_name, "")
+        if scene.klein_visible_strips > 3:
+            scene.klein_visible_strips -= 1
+        else:
+            self.report({'INFO'}, "Minimum three Klein image inputs must be visible. Value cleared.")
+        return {'FINISHED'}
+
 class NoWatermark:
     def apply_watermark(self, img):
         return img
@@ -3920,6 +3955,22 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
         if _v is not None and hasattr(scene, "nano_banana_ref_count"):
             try:
                 scene.nano_banana_ref_count = int(_v)
+            except (TypeError, ValueError):
+                pass
+
+        # Klein reference strips — restoring the names lets the queue re-render
+        # the reference images from the source strips on Redo.
+        for _attr in (f"klein_strip_{_n}" for _n in range(1, 10)):
+            _v = _get(_attr)
+            if _v is not None and hasattr(scene, _attr):
+                try:
+                    setattr(scene, _attr, str(_v))
+                except Exception:
+                    pass
+        _v = _get("klein_visible_strips")
+        if _v is not None and hasattr(scene, "klein_visible_strips"):
+            try:
+                scene.klein_visible_strips = int(_v)
             except (TypeError, ValueError):
                 pass
 

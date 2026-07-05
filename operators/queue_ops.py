@@ -42,7 +42,6 @@ from ..utils.helpers import (
     clean_filename,
     clear_cuda_cache,
     closest_divisible_32,
-    find_first_empty_channel,
     load_first_frame,
     release_model_cache,
     sequencer_busy,
@@ -189,6 +188,24 @@ class RenderQueueJob(PropertyGroup):
     klein_strip_1_path:   StringProperty()   # Klein reference image 1
     klein_strip_2_path:   StringProperty()   # Klein reference image 2
     klein_strip_3_path:   StringProperty()   # Klein reference image 3
+    # Klein optional overflow refs (up to 9; klein_visible_strips = how many are shown)
+    klein_strip_4_path:   StringProperty()
+    klein_strip_5_path:   StringProperty()
+    klein_strip_6_path:   StringProperty()
+    klein_strip_7_path:   StringProperty()
+    klein_strip_8_path:   StringProperty()
+    klein_strip_9_path:   StringProperty()
+    klein_visible_strips: IntProperty(default=3)
+    # Source strip names (persisted to metadata so Redo can restore picker state)
+    klein_strip_1: StringProperty()
+    klein_strip_2: StringProperty()
+    klein_strip_3: StringProperty()
+    klein_strip_4: StringProperty()
+    klein_strip_5: StringProperty()
+    klein_strip_6: StringProperty()
+    klein_strip_7: StringProperty()
+    klein_strip_8: StringProperty()
+    klein_strip_9: StringProperty()
     # FLUX.2 / remote multi-image reference strips (flux_strip_N pickers, up to 9)
     flux_strip_1_path:    StringProperty()
     flux_strip_2_path:    StringProperty()
@@ -578,9 +595,8 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             florence2_send_to_mask = snapshot.get("florence2_send_to_mask", False),
             klein_schematic_mode   = snapshot.get("klein_schematic_mode",   "DEPTH"),
             klein_schematic_target = snapshot.get("klein_schematic_target", "person"),
-            klein_strip_1_path     = snapshot.get("klein_strip_1_path",     ""),
-            klein_strip_2_path     = snapshot.get("klein_strip_2_path",     ""),
-            klein_strip_3_path     = snapshot.get("klein_strip_3_path",     ""),
+            **{f"klein_strip_{_n}_path": snapshot.get(f"klein_strip_{_n}_path", "")
+               for _n in range(1, 10)},
             minimax_subject_path   = snapshot.get("minimax_subject_path",   ""),
             **{f"flux_strip_{_n}_path": snapshot.get(f"flux_strip_{_n}_path", "")
                for _n in range(1, 10)},
@@ -992,6 +1008,18 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             out_path = _queue_solve_path(fname + ".png", generator_ai)
             result.save(out_path)
 
+        # A file-based job MUST have produced a real, non-empty file on disk. A
+        # cloud plugin that returned nothing (e.g. the Gemini/Nano Banana API
+        # replied with no image) would otherwise be reported COMPLETED with an
+        # empty path and silently skip strip insertion — surface it as a failure
+        # so the download problem is visible instead of "Done but no strip".
+        if otype in ("image", "movie", "audio"):
+            if not out_path or not os.path.isfile(out_path) or os.path.getsize(out_path) == 0:
+                raise RuntimeError(
+                    f"{otype.capitalize()} generation produced no output file — the "
+                    "model returned no data, so nothing was saved or inserted."
+                )
+
         progress_store[job_id] = {"progress": 1.0, "phase": "Done", "step": 0, "total": 0}
         result_queue.put({
             "job_id":               job_id,
@@ -1069,6 +1097,10 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             "veo_ref_strip_1_path":         snapshot.get("veo_ref_strip_1_path",         ""),
             "veo_ref_strip_2_path":         snapshot.get("veo_ref_strip_2_path",         ""),
             "veo_ref_strip_3_path":         snapshot.get("veo_ref_strip_3_path",         ""),
+            # Klein reference strips — names (drive Redo) + resolved paths (record)
+            "klein_visible_strips":        snapshot.get("klein_visible_strips", 3),
+            **{f"klein_strip_{_n}":      snapshot.get(f"klein_strip_{_n}", "")      for _n in range(1, 10)},
+            **{f"klein_strip_{_n}_path": snapshot.get(f"klein_strip_{_n}_path", "") for _n in range(1, 10)},
             "florence2_send_to_mask":      snapshot.get("florence2_send_to_mask",      False),
             "florence2_source_image_path": snapshot.get("image_path") or snapshot.get("movie_path") or "",
             # Chatterbox Multilingual
@@ -1464,9 +1496,12 @@ class SEQUENCER_OT_add_to_queue(Operator):
             qwen_strip_1_path     = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "qwen_strip_1", "")),
             qwen_strip_2_path     = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "qwen_strip_2", "")),
             qwen_strip_3_path     = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "qwen_strip_3", "")),
-            klein_strip_1_path    = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "klein_strip_1", "")),
-            klein_strip_2_path    = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "klein_strip_2", "")),
-            klein_strip_3_path    = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "klein_strip_3", "")),
+            **{f"klein_strip_{_n}_path":
+                   self._render_named_strip_image(context, seq_scene, getattr(seq_scene, f"klein_strip_{_n}", ""))
+               for _n in range(1, 10)},
+            klein_visible_strips  = getattr(scene, "klein_visible_strips", 3),
+            # Source strip names (carried through to metadata for Redo)
+            **{f"klein_strip_{_n}": getattr(seq_scene, f"klein_strip_{_n}", "") for _n in range(1, 10)},
             minimax_subject_path  = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "minimax_subject", "")),
             **{f"flux_strip_{_n}_path":
                    self._render_named_strip_image(context, seq_scene, getattr(seq_scene, f"flux_strip_{_n}", ""))
@@ -1835,16 +1870,22 @@ class SEQUENCER_OT_add_to_queue(Operator):
                   f"otype={otype} input_mode={input_mode} image_path={image_path!r} "
                   f"movie_path={movie_path!r} → mode={mode}")
 
-            # For strip mode: find the output channel once, then advance the
-            # frame cursor after each batch copy so they form a sequence.
+            # Frame cursor for consecutive batch copies. Strip mode: align to the
+            # input strip's in-point on the channel just above it. Prompt mode: no
+            # input strip, so anchor to the playhead of the scene the strips are
+            # inserted into (seq_scene) — captured now, at add-time. Using
+            # seq_scene rather than the active scene keeps the strip on the
+            # playhead the user actually sees when the VSE shows a different scene.
             if strip is not None:
                 _batch_frame = strip_frame_start
                 _batch_ch    = _find_free_channel(
-                    scene,
+                    seq_scene,
                     strip_frame_start,
                     strip_frame_start + max(1, insert_dur),
                     strip.channel + 1,
                 )
+            else:
+                _batch_frame = seq_scene.frame_current
 
             for _batch_i in range(batch_count):
                 seed = (
@@ -1864,10 +1905,12 @@ class SEQUENCER_OT_add_to_queue(Operator):
                     channel     = _batch_ch
                     _batch_frame = frame_end  # advance cursor for next copy
                 else:
-                    # Prompt mode: each batch copy is placed consecutively in time.
-                    frame_start = scene.frame_current
+                    # Prompt mode: place at the playhead (captured above), then
+                    # advance the cursor so batch copies sit consecutively in time.
+                    frame_start = _batch_frame
                     frame_end   = frame_start + max(1, insert_dur)
-                    channel     = find_first_empty_channel(frame_start, frame_end)
+                    channel     = _find_free_channel(seq_scene, frame_start, frame_end, 1)
+                    _batch_frame = frame_end  # advance cursor for next copy
 
                 job = scene.render_queue.add()
                 job.job_id   = f"{id(job)}_{random.randint(0, 999999)}"
@@ -2107,7 +2150,9 @@ def _queue_start_job(scene, job) -> None:
         "stem_split_model", "stem_split_vocals", "stem_split_drums",
         "stem_split_bass", "stem_split_other", "stem_split_guitar", "stem_split_piano",
         "qwen_strip_1_path", "qwen_strip_2_path", "qwen_strip_3_path",
-        "klein_strip_1_path", "klein_strip_2_path", "klein_strip_3_path",
+        *(f"klein_strip_{_n}_path" for _n in range(1, 10)),
+        *(f"klein_strip_{_n}" for _n in range(1, 10)),
+        "klein_visible_strips",
         *(f"flux_strip_{_n}_path" for _n in range(1, 10)),
         "minimax_subject_path",
         "nano_banana_ref_count",
@@ -2403,6 +2448,20 @@ def _queue_insert_strip(scene, result: dict) -> None:
     otype        = result.get("output_type", "")
     text_content = result.get("text_content", "")
 
+    def _fail_job(msg: str) -> None:
+        """Flag the job FAILED so a silent no-insert surfaces in the UI/panel.
+
+        The caller marks the job COMPLETED before invoking us; downgrade it here
+        when the generated media never actually made it into the sequencer so the
+        user sees why nothing appeared instead of a green "Done" with no strip.
+        """
+        print(f"[Queue] {msg}")
+        job = _find_job(scene, result.get("job_id", ""))
+        if job is not None:
+            job.status        = "FAILED"
+            job.progress      = 0.0
+            job.error_message = msg[:200]
+
     # Multi-stem output from StemSplitterPlugin: insert one SOUND strip per stem.
     _MULTI_PREFIX = "MULTI_STEM:"
     if out_path.startswith(_MULTI_PREFIX):
@@ -2445,7 +2504,7 @@ def _queue_insert_strip(scene, result: dict) -> None:
         print("[Queue] Text model produced no output — skipping strip insertion.")
         return
     elif not out_path or not os.path.isfile(out_path):
-        print(f"[Queue] Output file not found: {out_path!r}")
+        _fail_job(f"Output file not found — nothing was inserted: {out_path!r}")
         return
 
     # Resolve the target scene — use the sequencer_scene recorded at add-time.
@@ -2552,13 +2611,13 @@ def _queue_insert_strip(scene, result: dict) -> None:
             new_strip = None
             window, area, region = _find_vse_override()
             if window is None:
-                print(f"[Queue] No SEQUENCE_EDITOR area found ({exc1}) — cannot insert strip.")
+                _fail_job(f"No Sequencer area found ({exc1}) — cannot insert the generated strip.")
                 return
             try:
                 with bpy.context.temp_override(window=window, area=area, region=region):
                     _do_insert()
             except Exception as exc2:
-                print(f"[Queue] Strip insertion failed: {exc2}")
+                _fail_job(f"Strip insertion failed: {exc2}")
                 traceback.print_exc()
                 return
     finally:
@@ -2568,6 +2627,12 @@ def _queue_insert_strip(scene, result: dict) -> None:
             ed.use_cache_final = orig_cache_final
         except Exception:
             pass
+
+    # The file was downloaded/saved (verified above), so if no strip object came
+    # back the insertion silently failed — flag it rather than report success.
+    if new_strip is None and otype in ("image", "movie", "audio"):
+        _fail_job("Generated file was saved but no strip was added to the sequencer.")
+        return
 
     # --- Florence-2 → Mask Editor (text/Ideogram4 with send_to_mask enabled) ---
     if (
@@ -2685,6 +2750,15 @@ def _queue_insert_strip(scene, result: dict) -> None:
             ):
                 if result.get(_k):
                     extra_meta[_k] = result.get(_k)
+            # Klein reference strips — write names (for Redo) only when a slot was
+            # actually used. Resolved paths are written unconditionally below via
+            # the generic input-paths block.
+            _klein_count = max(3, min(int(result.get("klein_visible_strips", 3) or 3), 9))
+            if any(result.get(f"klein_strip_{_n}") for _n in range(1, _klein_count + 1)):
+                extra_meta["klein_visible_strips"] = _klein_count
+            for _k in (f"klein_strip_{_n}" for _n in range(1, _klein_count + 1)):
+                if result.get(_k):
+                    extra_meta[_k] = result.get(_k)
             # ltx23_extend — write the resolved audio-strip path when present
             if result.get("ltx23ext_audio_path"):
                 extra_meta["ltx23ext_audio_path"] = result.get("ltx23ext_audio_path", "")
@@ -2729,7 +2803,7 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 "movie_path", "sound_path", "ref_audio_path", "ref_text",
                 "kontext_strip_1_path",
                 "qwen_strip_1_path", "qwen_strip_2_path", "qwen_strip_3_path",
-                "klein_strip_1_path", "klein_strip_2_path", "klein_strip_3_path",
+                *(f"klein_strip_{_n}_path" for _n in range(1, 10)),
             ):
                 _v = result.get(_k)
                 if _v:
@@ -3039,6 +3113,11 @@ class SEQUENCER_OT_redo_from_job(Operator):
             *(f"nano_banana_ref_strip_{_n}" for _n in range(1, 10)),
             "veo_ref_strip_1", "veo_ref_strip_2", "veo_ref_strip_3",
         ):
+            if hasattr(scene, _attr):
+                setattr(scene, _attr, getattr(job, _attr, ""))
+        if hasattr(scene, "klein_visible_strips"):
+            scene.klein_visible_strips = getattr(job, "klein_visible_strips", 3) or 3
+        for _attr in (f"klein_strip_{_n}" for _n in range(1, 10)):
             if hasattr(scene, _attr):
                 setattr(scene, _attr, getattr(job, _attr, ""))
         # Chatterbox Multilingual
