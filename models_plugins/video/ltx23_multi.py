@@ -140,7 +140,13 @@ class LTX2_3MultiStagedPlugin(ModelPlugin):
         torch_dtype    = torch.bfloat16
         onload_device  = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         offload_device = torch.device("cpu")
-        fps            = 24.0
+        # Honor the project/strip frame rate so the generated clip plays at the
+        # timeline's speed and the muxed source audio stays in sync (a fixed
+        # 24 fps would be retimed on a non-24 timeline, drifting the audio).
+        # Fall back to 24 fps when the queue supplies no valid rate.
+        fps            = float(getattr(inputs, "fps", 24.0) or 24.0)
+        if fps <= 0:
+            fps = 24.0
 
         seed = inputs.seed or torch.randint(0, 2**32, (1,)).item()
         generator = torch.Generator(device="cpu").manual_seed(seed)
@@ -574,28 +580,33 @@ class LTX2_3MultiStagedPlugin(ModelPlugin):
             ensure_ic_lora(refine_pipe, _lora_folder, _enabled_loras, _cache_dir, _lfo,
                            enable_fallback=_control_active)
 
-            # STEP2: load control/input audio here since Stage 1 was skipped
-            # (so _ctrl_audio_wave was never populated above).
-            if _stage_mode == "STEP2":
-                if _ctrl_audio_path and os.path.isfile(_ctrl_audio_path):
-                    if hasattr(refine_pipe, "audio_vae") and refine_pipe.audio_vae:
-                        target_sr = refine_pipe.audio_vae.config.sample_rate
-                        try:
-                            _ctrl_audio_wave = load_audio(_ctrl_audio_path, target_sample_rate=target_sr, seconds=dur_s)
-                            print(f"[LTX23MultiStaged] STEP2: Control audio loaded from {_ctrl_audio_path!r}")
-                        except Exception as _e:
-                            print(f"[LTX23MultiStaged] STEP2: WARNING: failed to load control audio ({_e})")
-
-                if sound_path and hasattr(refine_pipe, "audio_vae") and refine_pipe.audio_vae:
+            # Re-load the SOURCE input audio here so Stage 2 conditions on a
+            # FRESH condition object rather than reusing the Stage-1 one (which
+            # was built before `del pipe` / `_flush()` and may reference an
+            # offloaded/freed device). This guarantees the source audio drives
+            # BOTH stages — the requirement is that when there is source input
+            # audio it is used in every step, never the model's own generated
+            # audio. In STEP2 mode Stage 1 was skipped entirely, so the control
+            # audio (never populated above) is also loaded here.
+            if _ctrl_audio_wave is None and _ctrl_audio_path and os.path.isfile(_ctrl_audio_path):
+                if hasattr(refine_pipe, "audio_vae") and refine_pipe.audio_vae:
                     target_sr = refine_pipe.audio_vae.config.sample_rate
                     try:
-                        waveform = load_audio(sound_path, target_sample_rate=target_sr, seconds=dur_s)
-                        audio_conditions = [LTX2AudioCondition(
-                            audio=waveform, strength=1.0, start_time=_audio_start_time,
-                        )]
-                        print(f"[LTX23MultiStaged] STEP2: Audio conditions loaded from input video")
-                    except Exception:
-                        import traceback; traceback.print_exc()
+                        _ctrl_audio_wave = load_audio(_ctrl_audio_path, target_sample_rate=target_sr, seconds=dur_s)
+                        print(f"[LTX23MultiStaged] Stage 2: control audio loaded from {_ctrl_audio_path!r}")
+                    except Exception as _e:
+                        print(f"[LTX23MultiStaged] Stage 2: WARNING: failed to load control audio ({_e})")
+
+            if sound_path and hasattr(refine_pipe, "audio_vae") and refine_pipe.audio_vae:
+                target_sr = refine_pipe.audio_vae.config.sample_rate
+                try:
+                    waveform = load_audio(sound_path, target_sample_rate=target_sr, seconds=dur_s)
+                    audio_conditions = [LTX2AudioCondition(
+                        audio=waveform, strength=1.0, start_time=_audio_start_time,
+                    )]
+                    print(f"[LTX23MultiStaged] Stage 2: source audio conditions (re)loaded from {os.path.basename(sound_path)}")
+                except Exception:
+                    import traceback; traceback.print_exc()
 
             refine_pipe.enable_group_offload(
                 onload_device=onload_device,
@@ -691,6 +702,18 @@ class LTX2_3MultiStagedPlugin(ModelPlugin):
         _use_audio    = None
         _use_audio_sr = 24000
 
+        def _to_stereo(_w):
+            # encode_video()/_write_audio() require a 2-channel waveform; a 1-D
+            # or [1, T] (mono vocoder) tensor raises ValueError. Collapse any
+            # channel layout to mono, then duplicate to interleaved stereo
+            # [T, 2] — the layout _write_audio accepts as-is.
+            _w = _w.float().cpu().squeeze()
+            if _w.ndim == 2:            # [C, T] → mono
+                _w = _w.mean(0)
+            return _w.unsqueeze(-1).expand(-1, 2).contiguous()   # [T, 2]
+
+        # Source input audio ALWAYS wins over the model's generated audio: when
+        # a driving sound is present it is what should be heard, in every step.
         if sound_path:
             try:
                 import torchaudio
@@ -700,8 +723,7 @@ class LTX2_3MultiStagedPlugin(ModelPlugin):
                     _wav = _wav[..., :_target_n]
                 elif _wav.shape[-1] < _target_n:
                     _wav = torch.nn.functional.pad(_wav, (0, _target_n - _wav.shape[-1]))
-                _mono = _wav.mean(0).float()               # [T]
-                _use_audio    = _mono.unsqueeze(-1).expand(-1, 2).contiguous()  # [T, 2]
+                _use_audio    = _to_stereo(_wav)               # [T, 2]
                 _use_audio_sr = int(_sr)
                 print(f"[LTX23MultiStaged] Muxing input audio: {_sr} Hz, "
                       f"{_wav.shape[-1]} samples → {dur_s:.2f}s")
@@ -709,10 +731,10 @@ class LTX2_3MultiStagedPlugin(ModelPlugin):
                 print(f"[LTX23MultiStaged] Input audio mux failed ({_ae}), "
                       f"falling back to model audio.")
                 if audio_out is not None:
-                    _use_audio    = audio_out[0].float().cpu()
+                    _use_audio    = _to_stereo(audio_out[0])
                     _use_audio_sr = audio_sr
         elif audio_out is not None:
-            _use_audio    = audio_out[0].float().cpu()
+            _use_audio    = _to_stereo(audio_out[0])
             _use_audio_sr = audio_sr
 
         if _use_audio is not None:

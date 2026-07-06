@@ -411,6 +411,77 @@ def _queue_solve_path(filename: str, generator_ai_dir: str) -> str:
 # Background worker — no bpy access allowed
 # ---------------------------------------------------------------------------
 
+def _install_download_phase_patch(progress_store, job_id, cancel_check=None, job=None):
+    """Patch tqdm so Hugging Face weight downloads report a "Downloading model"
+    phase, for the duration this patch is installed — around EVERY plugin
+    entry point that may call from_pretrained/hf_hub_download/snapshot_download
+    (load(), and generate() for plugins that load weights lazily there, e.g.
+    the LTX-2.3 lipsync/multi models). Without this, a first-run download
+    inside generate() shows whatever phase the plugin last set (e.g.
+    "Text encoding") instead of "Downloading".
+
+    Only byte-download bars (tqdm unit == 'B') are acted on; inference/step
+    bars (unit == 'it') are left completely untouched so the plugin's own
+    denoising progress via progress_fn is never clobbered.
+
+    `job` is optional and, when given, also updates job.progress/job.phase
+    directly — only safe to pass from the main thread (a bpy PropertyGroup
+    must never be touched from the background worker thread).
+
+    Returns a restore() callable that undoes the patch and must always be
+    called (wrap the protected call in try/finally).
+    """
+    try:
+        import tqdm.std as _tqdm_std
+    except Exception:
+        return lambda: None
+
+    _active: dict = {}   # id(bar) → [bytes_done, bytes_total]
+    _dl: set = set()     # ids of byte-download bars
+    _orig_init   = _tqdm_std.tqdm.__init__
+    _orig_update = _tqdm_std.tqdm.update
+
+    def _init(tqdm_self, *a, **kw):
+        _orig_init(tqdm_self, *a, **kw)
+        if not getattr(tqdm_self, "disable", False) and getattr(tqdm_self, "unit", "it") == "B":
+            _active[id(tqdm_self)] = [tqdm_self.n or 0, tqdm_self.total or 0]
+            _dl.add(id(tqdm_self))
+
+    def _update(tqdm_self, n=1):
+        if cancel_check is not None and cancel_check():
+            raise KeyboardInterrupt("Queue job cancelled during download")
+        result = _orig_update(tqdm_self, n)
+        if id(tqdm_self) in _dl:
+            entry = _active.get(id(tqdm_self))
+            if entry is not None:
+                entry[0] = tqdm_self.n or 0
+                entry[1] = tqdm_self.total or 0
+            total_b = sum(v[1] for v in _active.values() if v[1] > 0)
+            done_b  = sum(v[0] for v in _active.values())
+            dl_frac = (done_b / total_b) if total_b > 0 else 0.0
+            progress_store[job_id] = {
+                "progress": dl_frac,
+                "phase":    "Downloading model",
+                "step":     max(0, int(done_b  / 1_048_576)),
+                "total":    max(1, int(total_b / 1_048_576)),
+            }
+            if job is not None:
+                job.progress = dl_frac
+                job.phase    = "Downloading model"
+        return result
+
+    _tqdm_std.tqdm.__init__ = _init
+    _tqdm_std.tqdm.update   = _update
+
+    def _restore():
+        _tqdm_std.tqdm.__init__ = _orig_init
+        _tqdm_std.tqdm.update   = _orig_update
+        _active.clear()
+        _dl.clear()
+
+    return _restore
+
+
 def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None:
     """Runs in a background thread.
 
@@ -675,53 +746,14 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
                 "total":    0,
             }
 
-            # Patch tqdm.std.tqdm.__init__ and .update directly on the base class.
-            # This works regardless of when huggingface_hub imported tqdm, because
-            # huggingface_hub.utils.tqdm.tqdm inherits from tqdm.std.tqdm and does
-            # not override update() — so our patch is inherited by every instance.
-            # Running in the download thread means KeyboardInterrupt here genuinely
-            # aborts the HTTP transfer.
-            try:
-                import tqdm.std as _tqdm_std
-            except Exception:
-                _tqdm_std = None
-
-            _active_bars: dict = {}   # id(bar) → [bytes_done, bytes_total]
-            _dl_bars: set = set()     # ids of bars that are actual network downloads (unit='B')
-
-            if _tqdm_std is not None:
-                _orig_tqdm_init   = _tqdm_std.tqdm.__init__
-                _orig_tqdm_update = _tqdm_std.tqdm.update
-
-                def _patched_tqdm_init(tqdm_self, *a, **kw):
-                    _orig_tqdm_init(tqdm_self, *a, **kw)
-                    if not getattr(tqdm_self, "disable", False):
-                        _active_bars[id(tqdm_self)] = [tqdm_self.n or 0, tqdm_self.total or 0]
-                        if getattr(tqdm_self, "unit", "it") == "B":
-                            _dl_bars.add(id(tqdm_self))
-
-                def _patched_tqdm_update(tqdm_self, n=1):
-                    if cancel_event.is_set():
-                        raise KeyboardInterrupt("Queue job cancelled during download")
-                    result = _orig_tqdm_update(tqdm_self, n)
-                    entry = _active_bars.get(id(tqdm_self))
-                    if entry is not None:
-                        entry[0] = tqdm_self.n or 0
-                        entry[1] = tqdm_self.total or 0
-                    total_b = sum(v[1] for v in _active_bars.values() if v[1] > 0)
-                    done_b  = sum(v[0] for v in _active_bars.values())
-                    dl_frac = (done_b / total_b) if total_b > 0 else 0.0
-                    phase = "Downloading model" if id(tqdm_self) in _dl_bars else "Loading model"
-                    progress_store[job_id] = {
-                        "progress": dl_frac,
-                        "phase":    phase,
-                        "step":     max(0, int(done_b  / 1_048_576)),
-                        "total":    max(1, int(total_b / 1_048_576)),
-                    }
-                    return result
-
-                _tqdm_std.tqdm.__init__ = _patched_tqdm_init
-                _tqdm_std.tqdm.update   = _patched_tqdm_update
+            # Patches tqdm.std.tqdm.__init__/.update directly on the base class so
+            # any download (load() here, or a plugin's lazy from_pretrained inside
+            # generate() — patched separately around that call) reports a
+            # "Downloading model" phase. Works regardless of when huggingface_hub
+            # imported tqdm, because huggingface_hub.utils.tqdm.tqdm inherits from
+            # tqdm.std.tqdm and does not override update(). Running in the download
+            # thread means KeyboardInterrupt here genuinely aborts the HTTP transfer.
+            _dl_restore = _install_download_phase_patch(progress_store, job_id, cancel_event.is_set)
 
             if getattr(plugin, "requires_main_thread_for_load", False):
                 # Plugin's load() crashes in worker threads on Windows
@@ -750,11 +782,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
                     except Exception as _exc:
                         _load_result["error"] = _exc
                     finally:
-                        if _tqdm_std is not None:
-                            _tqdm_std.tqdm.__init__ = _orig_tqdm_init
-                            _tqdm_std.tqdm.update   = _orig_tqdm_update
-                        _active_bars.clear()
-                        _dl_bars.clear()
+                        _dl_restore()
                         _load_done.set()
                     return None  # don't re-register the timer
 
@@ -778,11 +806,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
                         local_files_only=snapshot["local_files_only"],
                     )
                 finally:
-                    if _tqdm_std is not None:
-                        _tqdm_std.tqdm.__init__ = _orig_tqdm_init
-                        _tqdm_std.tqdm.update   = _orig_tqdm_update
-                    _active_bars.clear()
-                    _dl_bars.clear()
+                    _dl_restore()
 
             # If cancelled during load, stop here
             if cancel_event.is_set():
@@ -881,6 +905,20 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
         if _preserve_dims and init_image is not None:
             _infer_w, _infer_h = init_image.size
 
+        # Audio reference resolution. A per-strip input (e.g. a META strip's
+        # SOUND child, carried in sound_path) drives THIS job specifically, so
+        # it must win over the scene-level "Audio Ref." (ref_audio_path), which
+        # is the same shared value on every queued job. Without this, several
+        # LTX-multi META jobs would all reuse the single scene ref (or the same
+        # first strip) instead of each META's own speech. Fall back to the
+        # scene ref only when the strip supplies no valid audio file.
+        _snap_snd = snapshot.get("sound_path") or ""
+        _snap_ref = snapshot.get("ref_audio_path") or ""
+        if _snap_snd and os.path.isfile(_snap_snd):
+            _audio_ref = _snap_snd
+        else:
+            _audio_ref = _snap_ref or _snap_snd or None
+
         inputs = ModelInputs(
             prompt               = snapshot["prompt"],
             neg_prompt           = snapshot["neg_prompt"],
@@ -897,7 +935,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             guidance       = snapshot["guidance"],
             strength       = snapshot["image_power"],
             seed           = snapshot["seed"],
-            audio_ref      = snapshot.get("ref_audio_path") or snapshot.get("sound_path") or None,
+            audio_ref      = _audio_ref,
             text_ref       = snapshot.get("ref_text", ""),
             video_path     = vid_path or None,
             audio_length   = _audio_length_in_s,
@@ -929,32 +967,41 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
         # to non-queue generation, which never crashes — while the worker blocks
         # here until it finishes. The UI is frozen for the duration, exactly as
         # it is during a direct (non-queue) generation of the same model.
-        if getattr(plugin, "requires_main_thread_for_generate", False):
-            _gen_done   = threading.Event()
-            _gen_result = {}
+        #
+        # Plugins that download weights inside generate() (lipsync/multi call
+        # from_pretrained lazily) need the download-phase detection re-installed
+        # here — the load()-time patch was already restored, so a first-run
+        # download would otherwise show the plugin's last phase ("Text encoding").
+        _dl_restore = _install_download_phase_patch(progress_store, job_id, cancel_event.is_set)
+        try:
+            if getattr(plugin, "requires_main_thread_for_generate", False):
+                _gen_done   = threading.Event()
+                _gen_result = {}
 
-            def _main_thread_generate():
-                # Defer if a render/mixdown/save owns the sequencer — running
-                # generate() reentrantly inside a pumped render loop faults torch.
-                if sequencer_busy():
-                    return 0.05  # retry shortly
-                try:
-                    _gen_result["value"] = plugin.generate(
-                        pipe_obj, inputs, scene_proxy, prefs_proxy
-                    )
-                except BaseException as _exc:  # propagate every failure to the worker
-                    _gen_result["error"] = _exc
-                finally:
-                    _gen_done.set()
-                return None  # one-shot timer
+                def _main_thread_generate():
+                    # Defer if a render/mixdown/save owns the sequencer — running
+                    # generate() reentrantly inside a pumped render loop faults torch.
+                    if sequencer_busy():
+                        return 0.05  # retry shortly
+                    try:
+                        _gen_result["value"] = plugin.generate(
+                            pipe_obj, inputs, scene_proxy, prefs_proxy
+                        )
+                    except BaseException as _exc:  # propagate every failure to the worker
+                        _gen_result["error"] = _exc
+                    finally:
+                        _gen_done.set()
+                    return None  # one-shot timer
 
-            bpy.app.timers.register(_main_thread_generate, first_interval=0)
-            _gen_done.wait()
-            if "error" in _gen_result:
-                raise _gen_result["error"]
-            result = _gen_result["value"]
-        else:
-            result = plugin.generate(pipe_obj, inputs, scene_proxy, prefs_proxy)
+                bpy.app.timers.register(_main_thread_generate, first_interval=0)
+                _gen_done.wait()
+                if "error" in _gen_result:
+                    raise _gen_result["error"]
+                result = _gen_result["value"]
+            else:
+                result = plugin.generate(pipe_obj, inputs, scene_proxy, prefs_proxy)
+        finally:
+            _dl_restore()
 
         if cancel_event.is_set():
             result_queue.put({"job_id": job_id, "status": "CANCELLED"})
@@ -1253,9 +1300,13 @@ class SEQUENCER_OT_add_to_queue(Operator):
           FLF  (2 images, different frame_starts, no MOVIE):
               movie_path      = first image (lower frame_start)
               last_image_path = second image (higher frame_start)
-          LFO  (1 image whose frame_start > all other children, no MOVIE):
+          LFO  (1 image whose frame_start > any MOVIE child's frame_start,
+                no other MOVIE anchoring it as the first frame):
               movie_path      = ""
               last_image_path = that image
+        A META with a single image and only TEXT/SOUND siblings (no MOVIE) —
+        the standard screenwriter previz pattern — always resolves to
+        image_path (first-frame appearance condition), never last_image_path.
         """
         image_path = movie_path = sound_path = last_image_path = middle_images_json = ""
         control_video_path = control_audio_path = ""
@@ -1353,10 +1404,20 @@ class SEQUENCER_OT_add_to_queue(Operator):
                 movie_path      = _sorted[0][0]
                 last_image_path = _sorted[1][0]
             elif not movie_path and len(_meta_images) == 1:
-                # Check LFO: image's frame_start > all other media children's frame_start.
-                # Exclude TEXT strips — they carry prompts, not temporal anchors, and a
-                # late-positioned TEXT strip would otherwise block LFO detection.
-                _other_starts = [c.frame_start for c in strip.strips if c.type not in ("IMAGE", "TEXT")]
+                # Check LFO: image's frame_start > all other VISUAL children's
+                # frame_start (MOVIE only). TEXT strips carry prompts, not
+                # temporal anchors, and SOUND strips carry dialogue/driving
+                # audio, not a "this image belongs at the end" signal — a
+                # META's speech track has no bearing on whether its lone
+                # image is a start or end anchor. Excluding SOUND matters in
+                # practice: a screenwriter-built META (IMAGE + TEXT + SOUND)
+                # would otherwise flip between image_path (first-frame
+                # appearance condition) and last_image_path (last-frame-only,
+                # no appearance condition at all) purely based on strip
+                # creation order — the image's raw frame_start vs. the sound
+                # clip's raw frame_start — silently dropping the character's
+                # reference image for the whole clip in the "flipped" case.
+                _other_starts = [c.frame_start for c in strip.strips if c.type == "MOVIE"]
                 if _other_starts and _meta_images[0][1] > max(_other_starts):
                     # LFO: image is the last strip → last-frame-only
                     last_image_path = _meta_images[0][0]
@@ -1829,14 +1890,6 @@ class SEQUENCER_OT_add_to_queue(Operator):
                     insert_dur = strip_dur
                 else:
                     insert_dur = gen_frames
-                # For SOUND strips generating audio or text (e.g. transcription):
-                # store the strip's file as the audio reference so it overrides
-                # the scene-level ref_audio_path and each queued job uses its
-                # own strip rather than the same (first) strip for all jobs.
-                _pi_strip_input = _pi is not None and getattr(_pi, "requires_input_strip", False)
-                strip_audio_path = sound_path if (
-                    sound_path and (otype == "audio" or _pi_strip_input)
-                ) else ""
             else:
                 image_path          = bpy.path.abspath(getattr(scene, "image_path", "") or "")
                 movie_path          = bpy.path.abspath(getattr(scene, "movie_path", "") or "")
@@ -1846,7 +1899,6 @@ class SEQUENCER_OT_add_to_queue(Operator):
                 control_video_path  = ""
                 control_audio_path  = ""
                 _audio_start_time   = 0.0
-                strip_audio_path    = ""
 
                 # Negative raw_frames = "auto" sentinel. In prompt mode there is no
                 # input strip to derive duration from, so fall back to 100 frames.
@@ -2073,9 +2125,9 @@ class SEQUENCER_OT_add_to_queue(Operator):
                         meta_text = ", ".join(meta_texts)
                         job.prompt = (meta_text + ", " + job.prompt) if job.prompt else meta_text
 
-                # Override ref_audio_path from a SOUND strip (wins over scene-level value)
-                if strip_audio_path:
-                    job.ref_audio_path = strip_audio_path
+                # Note: per-strip audio (job.sound_path) is preferred over the
+                # scene-level ref_audio_path at the ModelInputs build sites, so
+                # each job drives on its own audio without clobbering job fields.
 
                 # For strip-input plugins (e.g. Stem Splitter) use the input
                 # filename as the queue job name instead of the text prompt.
@@ -2274,43 +2326,7 @@ def _run_job_main_thread(scene, job) -> None:
                 "total":    0,
             }
 
-            import tqdm.std as _tqdm_std_mt
-
-            _active_bars_mt: dict = {}
-            _dl_bars_mt: set = set()     # ids of bars that are actual network downloads (unit='B')
-            _orig_tqdm_init_mt   = _tqdm_std_mt.tqdm.__init__
-            _orig_tqdm_update_mt = _tqdm_std_mt.tqdm.update
-
-            def _patched_tqdm_init_mt(tqdm_self, *a, **kw):
-                _orig_tqdm_init_mt(tqdm_self, *a, **kw)
-                if not getattr(tqdm_self, "disable", False):
-                    _active_bars_mt[id(tqdm_self)] = [tqdm_self.n or 0, tqdm_self.total or 0]
-                    if getattr(tqdm_self, "unit", "it") == "B":
-                        _dl_bars_mt.add(id(tqdm_self))
-
-            def _patched_tqdm_update_mt(tqdm_self, n=1):
-                result = _orig_tqdm_update_mt(tqdm_self, n)
-                entry = _active_bars_mt.get(id(tqdm_self))
-                if entry is not None:
-                    entry[0] = tqdm_self.n or 0
-                    entry[1] = tqdm_self.total or 0
-                total_b = sum(v[1] for v in _active_bars_mt.values() if v[1] > 0)
-                done_b  = sum(v[0] for v in _active_bars_mt.values())
-                dl_frac = (done_b / total_b) if total_b > 0 else 0.0
-                phase = "Downloading model" if id(tqdm_self) in _dl_bars_mt else "Loading model"
-                _progress_store[job_id] = {
-                    "progress": dl_frac,
-                    "phase":    phase,
-                    "step":     max(0, int(done_b  / 1_048_576)),
-                    "total":    max(1, int(total_b / 1_048_576)),
-                }
-                job.progress = dl_frac
-                job.phase    = phase
-                return result
-
-            _tqdm_std_mt.tqdm.__init__ = _patched_tqdm_init_mt
-            _tqdm_std_mt.tqdm.update   = _patched_tqdm_update_mt
-
+            _dl_restore = _install_download_phase_patch(_progress_store, job_id, job=job)
             try:
                 loaded = plugin.load(
                     prefs, scene,
@@ -2323,10 +2339,7 @@ def _run_job_main_thread(scene, job) -> None:
                     local_files_only=job.local_files_only,
                 )
             finally:
-                _tqdm_std_mt.tqdm.__init__ = _orig_tqdm_init_mt
-                _tqdm_std_mt.tqdm.update   = _orig_tqdm_update_mt
-                _active_bars_mt.clear()
-                _dl_bars_mt.clear()
+                _dl_restore()
 
             if model_cache is not None and isinstance(loaded, dict):
                 model_cache.update(loaded)
@@ -2371,6 +2384,15 @@ def _run_job_main_thread(scene, job) -> None:
             except Exception as _e:
                 print(f"[Queue] middle_images_json parse error (main thread): {_e}")
 
+        # Per-strip input audio (job.sound_path — e.g. a META strip's SOUND
+        # child) drives this job specifically and must win over the shared
+        # scene-level "Audio Ref." (job.ref_audio_path); fall back to the scene
+        # ref only when the strip supplies no valid audio file.
+        if job.sound_path and os.path.isfile(job.sound_path):
+            _mt_audio_ref = job.sound_path
+        else:
+            _mt_audio_ref = job.ref_audio_path or job.sound_path or None
+
         inputs = ModelInputs(
             prompt               = job.prompt,
             neg_prompt           = job.neg_prompt,
@@ -2379,7 +2401,7 @@ def _run_job_main_thread(scene, job) -> None:
             guidance             = job.guidance,
             strength             = job.image_power,
             seed                 = job.seed,
-            audio_ref            = job.ref_audio_path or job.sound_path or None,
+            audio_ref            = _mt_audio_ref,
             video_path           = job.movie_path or None,
             last_image           = _mt_last_image,
             middle_images_paths  = _mt_middle_paths,
@@ -2389,7 +2411,15 @@ def _run_job_main_thread(scene, job) -> None:
             phase_fn            = _phase_fn,
         )
 
-        _result = plugin.generate(pipe_obj, inputs, scene, prefs)
+        # Plugins that load weights lazily inside generate() (e.g. a first-run
+        # download) need the same download-phase detection here as around
+        # load() above, or a download mid-generate() would show whatever phase
+        # the plugin last set instead of "Downloading model".
+        _dl_restore = _install_download_phase_patch(_progress_store, job_id, job=job)
+        try:
+            _result = plugin.generate(pipe_obj, inputs, scene, prefs)
+        finally:
+            _dl_restore()
         del _result  # None for bpy-inserting plugins; discarded intentionally
 
         # plugin handled its own VSE strip creation
