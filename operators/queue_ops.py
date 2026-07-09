@@ -303,6 +303,7 @@ class RenderQueueJob(PropertyGroup):
     ltx23m_audio_modality_scale: FloatProperty(default=1.0)
     ltx23m_audio_noise_scale:    FloatProperty(default=0.0)
     ltx23m_audio_start_time:     FloatProperty(default=0.0)
+    ltx23m_image_strength:       FloatProperty(default=1.0)
 
     # ltx23_multi_ic_lora — IC-LoRA control paths + params
     ltx23ic_control_video_path:  StringProperty(default="")
@@ -606,6 +607,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             ltx23m_audio_modality_scale    = snapshot.get("ltx23m_audio_modality_scale", 1.0),
             ltx23m_audio_noise_scale       = snapshot.get("ltx23m_audio_noise_scale",    0.0),
             ltx23m_audio_start_time        = snapshot.get("ltx23m_audio_start_time",     0.0),
+            ltx23m_image_strength          = snapshot.get("ltx23m_image_strength",       1.0),
             # ltx23_multi_ic_lora params
             ltx23ic_control_video_path     = snapshot.get("ltx23ic_control_video_path",  ""),
             ltx23ic_control_audio_path     = snapshot.get("ltx23ic_control_audio_path",  ""),
@@ -1107,6 +1109,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             "ltx23m_audio_modality_scale": snapshot.get("ltx23m_audio_modality_scale", 1.0),
             "ltx23m_audio_noise_scale":    snapshot.get("ltx23m_audio_noise_scale",    0.0),
             "ltx23m_audio_start_time":     snapshot.get("ltx23m_audio_start_time",     0.0),
+            "ltx23m_image_strength":       snapshot.get("ltx23m_image_strength",       1.0),
             # ltx23_multi_ic_lora
             "ltx23ic_control_video_path":  snapshot.get("ltx23ic_control_video_path",  ""),
             "ltx23ic_control_audio_path":  snapshot.get("ltx23ic_control_audio_path",  ""),
@@ -1634,6 +1637,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
             ltx23m_audio_stg_scale      = getattr(scene, "ltx23m_audio_stg_scale",      0.0),
             ltx23m_audio_modality_scale = getattr(scene, "ltx23m_audio_modality_scale", 1.0),
             ltx23m_audio_noise_scale    = getattr(scene, "ltx23m_audio_noise_scale",    0.0),
+            ltx23m_image_strength       = getattr(scene, "ltx23m_image_strength",       1.0),
             # ltx23_multi_ic_lora params
             ltx23ic_control_strength    = getattr(scene, "ltx23ic_control_strength",    1.0),
             ltx23ic_control_downscale   = getattr(scene, "ltx23ic_control_downscale",   1),
@@ -1705,7 +1709,38 @@ class SEQUENCER_OT_add_to_queue(Operator):
             batch_count = max(1, getattr(scene, "movie_num_batch", 1))
         added = 0
 
+        # LTX-2.3 plugins require every video they see (generated output, main
+        # input, IC-LoRA control video) to be exactly 8n+1 frames — the VAE's
+        # temporal compression ratio is 8. raw_frames == -1 ("match input strip
+        # duration") hands the plugin the strip's raw, essentially never-8n+1
+        # frame_final_duration, which is what actually fails. Pre-align the
+        # temp audio/scene/video renders here so every file the LTX job's
+        # worker loads is already the exact length the plugin will compute.
+        _is_ltx23 = str(model_card).startswith("LTX-2.3")
+
         for strip in strip_list:
+            # Aligned to the SAME formula ltx23_*.py plugins use for their
+            # generated-output length, applied to the strip's own raw
+            # duration — this is exactly what job.frames becomes when
+            # raw_frames == -1, so the pre-trimmed temp files match the
+            # length the plugin will request. None (prompt mode / non-LTX
+            # jobs) leaves every render_*_to_path() call below unaffected.
+            _ltx_num_frames = None
+            if strip is not None and _is_ltx23:
+                from ..utils.helpers import align_frames_8n1
+                # Mirror gen_frames' own raw_frames<0 ↔ strip-duration sentinel
+                # further down (line ~1969) EXACTLY: -1 matches the strip's raw
+                # duration, an explicit value overrides it. Aligning to the
+                # wrong target (e.g. always the strip's duration, even with an
+                # explicit frame count) would pre-trim to a length the plugin
+                # was never going to ask for.
+                _ltx_target_frames = (
+                    strip.frame_final_duration if raw_frames < 0 else max(1, abs(raw_frames))
+                )
+                _ltx_num_frames = align_frames_8n1(_ltx_target_frames)
+                print(f"[Queue][dbg] LTX-2.3 job: strip '{strip.name}' target "
+                      f"{_ltx_target_frames} fr → 8n+1 aligned {_ltx_num_frames} fr")
+
             if strip is not None:
                 image_path, movie_path, sound_path, last_image_path, middle_images_json, control_video_path, control_audio_path = self._paths_from_strip(strip)
                 print(f"[Queue][dbg] loop strip='{strip.name}' type={strip.type} otype={otype} "
@@ -1726,7 +1761,10 @@ class SEQUENCER_OT_add_to_queue(Operator):
                     from ..utils.helpers import render_meta_child_to_path
                     for _c in strip.strips:
                         if _c.type == "SOUND":
-                            _trimmed = render_meta_child_to_path(context, strip, _c, image_output=False)
+                            _trimmed = render_meta_child_to_path(
+                                context, strip, _c, image_output=False,
+                                num_frames=_ltx_num_frames,
+                            )
                             if _trimmed:
                                 sound_path = _trimmed
                                 print(f"[Queue] META SOUND trimmed → {_trimmed!r}")
@@ -1775,6 +1813,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
                         _scene_rendered = render_strip_to_path(
                             context, strip, image_output=not _want_video,
                             downscale_pct=_input_downscale_pct,
+                            num_frames=(_ltx_num_frames if _want_video else None),
                         )
                     except Exception as _scene_err:
                         print(f"[Queue] SCENE render raised: {_scene_err!r}")
@@ -1808,6 +1847,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
                         _trim_mov = render_strip_to_path(
                             context, strip, image_output=False,
                             downscale_pct=_input_downscale_pct,
+                            num_frames=_ltx_num_frames,
                         )
                     except Exception as _mov_err:
                         print(f"[Queue] MOVIE trim render raised: {_mov_err!r}")
@@ -1816,6 +1856,55 @@ class SEQUENCER_OT_add_to_queue(Operator):
                         print(f"[Queue] MOVIE input rendered (trimmed) → {_trim_mov!r}")
                     else:
                         print(f"[Queue] MOVIE trim render failed, keeping raw: {movie_path!r}")
+
+                # META main video child: _paths_from_strip() resolves movie_path
+                # from the META's own (first) MOVIE child but — unlike the
+                # top-level MOVIE branch above and the IC-LoRA control-video
+                # branch below — never trims it, so the model would load the
+                # raw, untrimmed, essentially-never-8n+1 source file as-is.
+                # This is the same class of mismatch the control-video trim
+                # already guards against; align it here too.
+                if strip.type == "META" and otype == "movie" and movie_path and _is_ltx23:
+                    from ..utils.helpers import render_meta_child_to_path
+                    for _c in strip.strips:
+                        try:
+                            _mv = bpy.path.abspath(_c.filepath) if _c.type == "MOVIE" else ""
+                        except Exception:
+                            _mv = ""
+                        if _c.type == "MOVIE" and _mv == movie_path:
+                            _trimmed_mv = render_meta_child_to_path(
+                                context, strip, _c, image_output=False,
+                                downscale_pct=_input_downscale_pct,
+                                num_frames=_ltx_num_frames,
+                            )
+                            if _trimmed_mv:
+                                movie_path = _trimmed_mv
+                                print(f"[Queue] META main MOVIE trimmed → {_trimmed_mv!r}")
+                            else:
+                                print(f"[Queue] META main MOVIE trim failed, keeping raw: {movie_path!r}")
+                            break
+
+                # Still-image inputs never pass through the VSE re-renders above,
+                # so their raw paths would bypass the input-downscale slider.
+                # Resize the main image, FLF last image and N-anchor middle
+                # images the same way SCENE/MOVIE renders are shrunk.
+                if _input_downscale_pct < 100.0:
+                    from ..utils.helpers import downscale_image_file
+                    if image_path:
+                        image_path = downscale_image_file(image_path, _input_downscale_pct)
+                    if last_image_path:
+                        last_image_path = downscale_image_file(last_image_path, _input_downscale_pct)
+                    if middle_images_json:
+                        try:
+                            import json as _json_ds
+                            _mids = _json_ds.loads(middle_images_json)
+                            _mids = [
+                                [downscale_image_file(_mp, _input_downscale_pct), _mf]
+                                for _mp, _mf in _mids
+                            ]
+                            middle_images_json = _json_ds.dumps(_mids)
+                        except Exception as _mid_err:
+                            print(f"[Queue] middle-image downscale failed: {_mid_err!r}")
 
                 # Compute audio start offset (seconds) from SOUND strip position in META
                 _audio_start_time = 0.0
@@ -1837,7 +1926,11 @@ class SEQUENCER_OT_add_to_queue(Operator):
                         except Exception:
                             _cv = ""
                         if _c.type == "MOVIE" and _cv == control_video_path:
-                            _trimmed_cv = render_meta_child_to_path(context, strip, _c, image_output=False)
+                            _trimmed_cv = render_meta_child_to_path(
+                                context, strip, _c, image_output=False,
+                                downscale_pct=_input_downscale_pct,
+                                num_frames=_ltx_num_frames,
+                            )
                             if _trimmed_cv:
                                 control_video_path = _trimmed_cv
                                 print(f"[Queue] IC-LoRA MOVIE trimmed → {_trimmed_cv!r}")
@@ -1853,6 +1946,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
                         _trimmed_cv = render_strip_to_path(
                             context, _ctrl_strip_obj, image_output=False,
                             downscale_pct=_input_downscale_pct,
+                            num_frames=_ltx_num_frames,
                         )
                         if _trimmed_cv:
                             control_video_path = _trimmed_cv
@@ -1868,7 +1962,10 @@ class SEQUENCER_OT_add_to_queue(Operator):
                             except Exception:
                                 _ca = ""
                             if _ca == control_audio_path:
-                                _trimmed_ca = render_meta_child_to_path(context, strip, _c, image_output=False)
+                                _trimmed_ca = render_meta_child_to_path(
+                                    context, strip, _c, image_output=False,
+                                    num_frames=_ltx_num_frames,
+                                )
                                 if _trimmed_ca:
                                     control_audio_path = _trimmed_ca
                                     print(f"[Queue] IC-LoRA SOUND trimmed → {_trimmed_ca!r}")
@@ -2017,6 +2114,19 @@ class SEQUENCER_OT_add_to_queue(Operator):
                         try:
                             _cp = bpy.path.abspath(_ctrl_s.filepath)
                             if os.path.isfile(_cp):
+                                # Raw path is the fast path; a sub-100% input
+                                # downscale, or an LTX-2.3 job that needs the
+                                # clip pre-trimmed to 8n+1 frames, needs a VSE
+                                # re-render instead.
+                                if _input_downscale_pct < 100.0 or _ltx_num_frames is not None:
+                                    from ..utils.helpers import render_strip_to_path
+                                    _cp_ds = render_strip_to_path(
+                                        context, _ctrl_s, image_output=False,
+                                        downscale_pct=_input_downscale_pct,
+                                        num_frames=_ltx_num_frames,
+                                    )
+                                    if _cp_ds:
+                                        _cp = _cp_ds
                                 job.ltx23ic_control_video_path = _cp
                                 print(f"[Queue][dbg] Ref Strip (MOVIE) → control_video_path={_cp!r}")
                         except Exception:
@@ -2028,6 +2138,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
                             _cp = render_strip_to_path(
                                 context, _ctrl_s, image_output=False,
                                 downscale_pct=_input_downscale_pct,
+                                num_frames=_ltx_num_frames,
                             )
                         except Exception as _ctrl_scene_err:
                             print(f"[Queue] Ref Strip SCENE render raised: {_ctrl_scene_err!r}")
@@ -2052,6 +2163,19 @@ class SEQUENCER_OT_add_to_queue(Operator):
                                 if _c.type == "MOVIE" and not job.ltx23ic_control_video_path:
                                     _cp = bpy.path.abspath(_c.filepath)
                                     if os.path.isfile(_cp):
+                                        # Raw path is the fast path; a sub-100%
+                                        # input downscale, or an LTX-2.3 job that
+                                        # needs the clip pre-trimmed to 8n+1
+                                        # frames, needs a re-render.
+                                        if _input_downscale_pct < 100.0 or _ltx_num_frames is not None:
+                                            from ..utils.helpers import render_meta_child_to_path
+                                            _cp_ds = render_meta_child_to_path(
+                                                context, _ctrl_s, _c, image_output=False,
+                                                downscale_pct=_input_downscale_pct,
+                                                num_frames=_ltx_num_frames,
+                                            )
+                                            if _cp_ds:
+                                                _cp = _cp_ds
                                         job.ltx23ic_control_video_path = _cp
                                         print(f"[Queue][dbg] Ref Strip META child '{_c.name}' (MOVIE) → control_video_path={_cp!r}")
                                 elif _c.type == "SCENE" and not job.ltx23ic_control_video_path:
@@ -2059,6 +2183,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
                                     _cp = render_meta_child_to_path(
                                         context, _ctrl_s, _c, image_output=False,
                                         downscale_pct=_input_downscale_pct,
+                                        num_frames=_ltx_num_frames,
                                     )
                                     if _cp:
                                         job.ltx23ic_control_video_path = _cp
@@ -2073,6 +2198,14 @@ class SEQUENCER_OT_add_to_queue(Operator):
                                       and getattr(_c, "sound", None)):
                                     _ap = bpy.path.abspath(_c.sound.filepath)
                                     if os.path.isfile(_ap):
+                                        if _ltx_num_frames is not None:
+                                            from ..utils.helpers import render_meta_child_to_path
+                                            _ap_ds = render_meta_child_to_path(
+                                                context, _ctrl_s, _c, image_output=False,
+                                                num_frames=_ltx_num_frames,
+                                            )
+                                            if _ap_ds:
+                                                _ap = _ap_ds
                                         job.ltx23ic_control_audio_path = _ap
                                         print(f"[Queue][dbg] Ref Strip META child '{_c.name}' (SOUND) → control_audio_path={_ap!r}")
                             except Exception as _child_err:
@@ -2080,6 +2213,14 @@ class SEQUENCER_OT_add_to_queue(Operator):
                     elif _ctrl_s is not None:
                         print(f"[Queue] Ref Strip '{_ctrl_name}' has unsupported type "
                               f"{_ctrl_s.type!r} for IC-LoRA control — no effect")
+
+                # Ref images resolve to raw file paths above — shrink them too
+                # so every IC-LoRA input honours the input-downscale slider.
+                if _input_downscale_pct < 100.0 and job.ltx23ic_ref_image_path:
+                    from ..utils.helpers import downscale_image_file
+                    job.ltx23ic_ref_image_path = downscale_image_file(
+                        job.ltx23ic_ref_image_path, _input_downscale_pct
+                    )
 
                 # ltx23_extend: resolve the picked SOUND strip → file path for the worker.
                 job.ltx23ext_audio_path = ""
@@ -2221,6 +2362,7 @@ def _queue_start_job(scene, job) -> None:
         # ltx23_multi_v2 guidance params
         "ltx23m_modality_scale", "ltx23m_audio_guidance", "ltx23m_audio_stg_scale",
         "ltx23m_audio_modality_scale", "ltx23m_audio_noise_scale", "ltx23m_audio_start_time",
+        "ltx23m_image_strength",
         # ltx23_multi_ic_lora control paths + params
         "ltx23ic_control_video_path", "ltx23ic_control_audio_path",
         "ltx23ic_control_strength", "ltx23ic_control_downscale",
@@ -2743,6 +2885,7 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 ("ltx23m_audio_modality_scale", 1.0),
                 ("ltx23m_audio_noise_scale",    0.0),
                 ("ltx23m_audio_start_time",     0.0),
+                ("ltx23m_image_strength",       1.0),
                 # ltx23_extend params
                 ("ltx23ext_extend_frames",      96),
                 ("ltx23ext_video_strength",     1.0),

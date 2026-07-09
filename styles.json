@@ -165,17 +165,17 @@
 		"negative_prompt": "Wide shot, full body, legs, feet, shoes, distant shot"
 	},
 	{
-		"name": "Camera: Dolly In (Push)",
+		"name": "Camera Motion: Dolly In (Push)",
 		"prompt": "Cinematic, [Push in] {prompt}, the camera physically moves closer, increasing focus and intimate depth, movie still, Dolly-Push",
 		"negative_prompt": "Static shot, zoom out, dolly out, pull out, camera moving away"
 	},
 	{
-		"name": "Camera: Dolly Out (Pull)",
+		"name": "Camera Motion: Dolly Out (Pull)",
 		"prompt": "Cinematic, [Pull out] {prompt}, the camera physically moves further away, revealing environmental context and scale, movie still, Dolly-Pull",
 		"negative_prompt": "Static shot, zoom in, dolly in, push in, camera moving closer"
 	},
 	{
-		"name": "Camera: Drone/Aerial View (Moving)",
+		"name": "Camera Motion: Drone/Aerial View (Moving)",
 		"prompt": "{prompt}, (moving drone aerial shot:1.3), high altitude angle looking down, sweeping panoramic perspective, epic scale, establishing film shot, Drone-Cinematic",
 		"negative_prompt": "ground level, low angle, static camera, close up, interior studio"
 	},
@@ -200,7 +200,7 @@
 		"negative_prompt": "Close-up shot, macro details, tight crop"
 	},
 	{
-		"name": "Camera: Handheld/Shaky Cam",
+		"name": "Camera Motion: Handheld/Shaky Cam",
 		"prompt": "{prompt}, (handheld camera aesthetic:1.2), (slight organic motion blur:1.1), dynamic documentary movement, immediate feel, sense of realism and physical presence, Handheld-Motion",
 		"negative_prompt": "tripod shot, steady cam, smooth movement, static, perfectly stable, CGI"
 	},
@@ -235,22 +235,22 @@
 		"negative_prompt": "Frontal shot, single subject, flat perspective"
 	},
 	{
-		"name": "Camera: Pan Left",
+		"name": "Camera Motion: Pan Left",
 		"prompt": "Cinematic, [Pan left] {prompt}, the camera rotates horizontally left from a fixed tripod point, sweeping reveal, movie still, Pan-Motion",
 		"negative_prompt": "Static shot, truck right, tilt, pan right, camera moving physically"
 	},
 	{
-		"name": "Camera: Pan Right",
+		"name": "Camera Motion: Pan Right",
 		"prompt": "Cinematic, [Pan right] {prompt}, the camera rotates horizontally right from a fixed tripod point, sweeping reveal, movie still, Pan-Motion",
 		"negative_prompt": "Static shot, truck left, tilt, pan left, camera moving physically"
 	},
 	{
-		"name": "Camera: Pedestal Down",
+		"name": "Camera Motion: Pedestal Down",
 		"prompt": "Cinematic, [Pedestal down] {prompt}, the camera physically moves vertically downwards, revealing lower level detail, movie still, Pedestal-Motion",
 		"negative_prompt": "Static shot, tilt up, pedestal up, camera moves up"
 	},
 	{
-		"name": "Camera: Pedestal Up",
+		"name": "Camera Motion: Pedestal Up",
 		"prompt": "Cinematic, [Pedestal up] {prompt}, the camera physically moves vertically upwards, revealing height and scale, movie still, Pedestal-Motion",
 		"negative_prompt": "Static shot, tilt down, pedestal down, camera moves down"
 	},
@@ -265,7 +265,7 @@
 		"negative_prompt": "direct view, no reflective surfaces, simple composition"
 	},
 	{
-		"name": "Camera: Shake",
+		"name": "Camera Motion: Shake",
 		"prompt": "Cinematic, [Shake] {prompt}, intentional shaky camera movement, dynamic action, chaos, realistic physical disruption, handheld, movie still, Dynamic-Shake",
 		"negative_prompt": "Static shot, smooth movement, tripod, steadycam, calm, stable"
 	},
@@ -275,37 +275,37 @@
 		"negative_prompt": "Pan, tilt, zoom, truck, dolly, handheld, shaky, tracking shot, moving camera"
 	},
 	{
-		"name": "Camera: Tilt Down",
+		"name": "Camera Motion: Tilt Down",
 		"prompt": "Cinematic, [Tilt down] {prompt}, camera rotates vertically downwards from a fixed node, movie still, Tilt-Motion",
 		"negative_prompt": "Static shot, pedestal up, tilt up, camera tilts up"
 	},
 	{
-		"name": "Camera: Tilt Up",
+		"name": "Camera Motion: Tilt Up",
 		"prompt": "Cinematic, [Tilt up] {prompt}, camera rotates vertically upwards from a fixed node, movie still, Tilt-Motion",
 		"negative_prompt": "Static shot, pedestal down, tilt down, camera tilts down"
 	},
 	{
-		"name": "Camera: Tracking Shot (Follow)",
+		"name": "Camera Motion: Tracking Shot (Follow)",
 		"prompt": "Cinematic, [Tracking shot] {prompt}, the camera actively travels alongside or behind the moving subject, maintaining consistent distance, movie still, Tracking-Motion",
 		"negative_prompt": "Static shot, subject moves out of frame, zoom"
 	},
 	{
-		"name": "Camera: Truck Left",
+		"name": "Camera Motion: Truck Left",
 		"prompt": "Cinematic, [Truck left] {prompt}, the camera physically rolls horizontally left alongside the scene, parallax depth, movie still, Truck-Motion",
 		"negative_prompt": "Static shot, zoom, pan right, truck right, camera moves right"
 	},
 	{
-		"name": "Camera: Truck Right",
+		"name": "Camera Motion: Truck Right",
 		"prompt": "Cinematic, [Truck right] {prompt}, the camera physically rolls horizontally right alongside the scene, parallax depth, movie still, Truck-Motion",
 		"negative_prompt": "Static shot, zoom, pan left, truck left, camera moves left"
 	},
 	{
-		"name": "Camera: Zoom In",
+		"name": "Camera Motion: Zoom In",
 		"prompt": "Cinematic, [Zoom in] {prompt}, optical change in lens focal length to magnify, distinct compression shift, movie still, Zoom-Effect",
 		"negative_prompt": "Static shot, dolly out, pull out, no zoom, camera zooms out"
 	},
 	{
-		"name": "Camera: Zoom Out",
+		"name": "Camera Motion: Zoom Out",
 		"prompt": "Cinematic, [Zoom out] {prompt}, optical change in lens focal length to expand the field of view, movie still, Zoom-Effect",
 		"negative_prompt": "Static shot, dolly in, push in, no zoom, camera zooms in"
 	},
@@ -688,5 +688,40 @@
 		"name": "Weather: Winter Snowfall",
 		"prompt": "{prompt} during a gentle snowfall in winter. Gentle falling flake textures, pristine white surface blankets, crisp cold air, soft diffused winter daylight, Winter-Weather",
 		"negative_prompt": "hot summer sun, green foliage, dry desert heat, rain"
+	},
+	{
+		"name": "Dialogue Scene: Wide Shot",
+		"prompt": "Cinematic wide shot featuring a dialogue scene set in {prompt}. Full body of character 1 positioned on the left side looking right, and full body of character 2 positioned on the right side looking left, spatial environment context, high-end medium format digital sensor clarity, micro-contrast, sharp focus, natural material textures, visible fine structures, authentic lighting, pristine optical clarity, deep spatial depth",
+		"negative_prompt": "cgi, render, 3d, plastic surfaces, airbrushed, cartoon, anime, illustration, fake, over-sharpened, saturated"
+	},
+	{
+		"name": "Dialogue Scene: Mid Shot",
+		"prompt": "Cinematic mid shot featuring a dialogue scene set in {prompt}. Waist-up view of character 1 on the left side looking right, and waist-up view of character 2 on the right side looking left, engaging conversation framing, high-end medium format digital sensor clarity, micro-contrast, sharp focus, natural material textures, visible fine structures, authentic lighting, pristine optical clarity, deep spatial depth",
+		"negative_prompt": "cgi, render, 3d, plastic surfaces, airbrushed, cartoon, anime, illustration, fake, over-sharpened, saturated"
+	},
+	{
+		"name": "Dialogue Scene: Two Shot",
+		"prompt": "Cinematic two shot featuring a dialogue scene set in {prompt}. Medium full-body view of character 1 on the left looking right, and medium full-body view of character 2 on the right looking left, balanced conversational framing, high-end medium format digital sensor clarity, micro-contrast, sharp focus, natural material textures, visible fine structures, authentic lighting, pristine optical clarity, deep spatial depth",
+		"negative_prompt": "cgi, render, 3d, plastic surfaces, airbrushed, cartoon, anime, illustration, fake, over-sharpened, saturated"
+	},
+	{
+		"name": "Dialogue Scene: Over-the-shoulder of the left character - looking at the right character",
+		"prompt": "Cinematic over-the-shoulder shot set in {prompt}. Foreground featuring the blurred back and shoulder of character 1 on the left, looking across toward character 2 visible on the right, character 2 looking left, high-end medium format digital sensor clarity, micro-contrast, sharp focus, natural material textures, visible fine structures, authentic lighting, pristine optical clarity, deep spatial depth",
+		"negative_prompt": "cgi, render, 3d, plastic surfaces, airbrushed, cartoon, anime, illustration, fake, over-sharpened, saturated"
+	},
+	{
+		"name": "Dialogue Scene: Over-the-shoulder of the right character - looking at the left character",
+		"prompt": "Cinematic over-the-shoulder shot set in {prompt}. Foreground featuring the blurred back and shoulder of character 2 on the right, looking across toward character 1 visible on the left, character 1 looking right, high-end medium format digital sensor clarity, micro-contrast, sharp focus, natural material textures, visible fine structures, authentic lighting, pristine optical clarity, deep spatial depth",
+		"negative_prompt": "cgi, render, 3d, plastic surfaces, airbrushed, cartoon, anime, illustration, fake, over-sharpened, saturated"
+	},
+	{
+		"name": "Dialogue Scene: Close-up of the left character looking right",
+		"prompt": "Cinematic close-up portrait set in {prompt}. Face and shoulders of character 1 positioned on the left side, looking right toward character 2, sharp focus on eyes, high-end medium format digital sensor clarity, micro-contrast, natural material textures, visible fine structures, authentic lighting, pristine optical clarity, deep spatial depth",
+		"negative_prompt": "cgi, render, 3d, plastic surfaces, airbrushed, cartoon, anime, illustration, fake, over-sharpened, saturated"
+	},
+	{
+		"name": "Dialogue Scene: Close-up of the right character looking left",
+		"prompt": "Cinematic close-up portrait set in {prompt}. Face and shoulders of character 2 positioned on the right side, looking left toward character 1, sharp focus on eyes, high-end medium format digital sensor clarity, micro-contrast, natural material textures, visible fine structures, authentic lighting, pristine optical clarity, deep spatial depth",
+		"negative_prompt": "cgi, render, 3d, plastic surfaces, airbrushed, cartoon, anime, illustration, fake, over-sharpened, saturated"
 	}
 ]

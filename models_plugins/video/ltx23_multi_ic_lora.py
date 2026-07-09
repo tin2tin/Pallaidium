@@ -14,9 +14,9 @@ from ...models.base import ModelPlugin, InputSpec, UISection, ParamSpec, ModelIn
 from ...utils.helpers import gfx_device, solve_path, clean_filename, load_first_frame
 
 try:
-    from ._ltx23_control_shared import ensure_ic_lora, resolve_control_inputs, print_input_summary
+    from ._ltx23_control_shared import ensure_ic_lora, resolve_control_inputs, print_input_summary, align_video_frames
 except ImportError:
-    from _ltx23_control_shared import ensure_ic_lora, resolve_control_inputs, print_input_summary
+    from _ltx23_control_shared import ensure_ic_lora, resolve_control_inputs, print_input_summary, align_video_frames
 
 
 def vae_temporal_decode_streaming(vae, latents_cpu, *, decode_device, temb=None):
@@ -139,8 +139,12 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
 
         _cache_dir     = prefs.hf_cache_dir or None
         _lfo           = prefs.local_files_only
-        MODEL_PATH     = "OzzyGT/LTX-2.3-Distilled"
-        SDNQ_PATH      = "OzzyGT/LTX-2.3-Distilled-sdnq-dynamic-int4"
+        # MODEL_PATH     = "OzzyGT/LTX-2.3-Distilled"
+        # SDNQ_PATH      = "OzzyGT/LTX-2.3-Distilled-sdnq-dynamic-int4"
+        # UPSAMPLER_PATH = "OzzyGT/LTX-2.3-upsampler-x2"
+
+        MODEL_PATH     = "OzzyGT/LTX-2.3-Distilled-1.1-sdnq-dynamic-int8"
+        SDNQ_PATH      = "OzzyGT/LTX-2.3-Distilled-1.1-sdnq-dynamic-int8"
         UPSAMPLER_PATH = "OzzyGT/LTX-2.3-upsampler-x2"
 
         torch_dtype    = torch.bfloat16
@@ -160,7 +164,6 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
         _ctrl_downscale   = int(getattr(scene,   "ltx23ic_control_downscale", 1))
         _ctrl_audio_str   = float(getattr(scene, "ltx23ic_control_audio_str", 1.0))
         _identity_guid    = float(getattr(scene, "ltx23ic_identity_guidance",  0.0))
-        _audio_start_time = float(getattr(scene, "ltx23m_audio_start_time",   0.0))
 
         def _flush():
             gc.collect()
@@ -194,6 +197,7 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
         image_input, _video_is_control, control_video_frames = resolve_control_inputs(
             image_input, vid_path, _ref_image_path, _ctrl_video_path, load_first_frame, load_video,
         )
+        control_video_frames = align_video_frames(control_video_frames, tag="LTX23ICLoRAStaged")
 
         explicit_audio = None
         for attr in ["audio_path", "audio", "audio_ref", "sound", "sound_path"]:
@@ -464,8 +468,16 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
                 target_sr = pipe.audio_vae.config.sample_rate
                 try:
                     waveform = load_audio(sound_path, target_sample_rate=target_sr, seconds=dur_s)
+                    # start_time=0.0 always: sound_path is a rendered/trimmed file
+                    # (render_meta_child_to_path for META SOUND children) that ALREADY
+                    # spans the full output duration with the dialogue silence-padded
+                    # to its correct relative offset. Passing that same offset again
+                    # here double-applies the shift and truncates/misaligns the tail
+                    # of the speech relative to what the video was conditioned on,
+                    # even though the final mux (using this file untouched) plays back
+                    # at the correct time — showing up as "audio's right, but no lip-sync".
                     audio_conditions = [LTX2AudioCondition(
-                        audio=waveform, strength=1.0, start_time=_audio_start_time,
+                        audio=waveform, strength=1.0, start_time=0.0,
                     )]
                 except Exception:
                     import traceback; traceback.print_exc()
@@ -561,27 +573,34 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
                 print(f"LTX-2.3 IC-LoRA Stage 2: loading {len(_enabled_loras)} LoRA(s)")
             ensure_ic_lora(refine_pipe, _lora_folder, _enabled_loras, _cache_dir, _lfo)
 
-            # STEP2: load audio from input video since Stage 1 was skipped
-            if _stage_mode == "STEP2":
-                if _ctrl_audio_path and os.path.isfile(_ctrl_audio_path):
-                    if hasattr(refine_pipe, "audio_vae") and refine_pipe.audio_vae:
-                        target_sr = refine_pipe.audio_vae.config.sample_rate
-                        try:
-                            _ctrl_audio_wave = load_audio(_ctrl_audio_path, target_sample_rate=target_sr, seconds=dur_s)
-                            print(f"[LTX23ICLoRAStaged] STEP2: Control audio loaded from {_ctrl_audio_path!r}")
-                        except Exception as _e:
-                            print(f"[LTX23ICLoRAStaged] STEP2: WARNING: failed to load control audio ({_e})")
-
-                if sound_path and hasattr(refine_pipe, "audio_vae") and refine_pipe.audio_vae:
+            # Re-load the SOURCE input audio here so Stage 2 conditions on a
+            # FRESH condition object rather than reusing the Stage-1 one (which
+            # was built before `del pipe` / `_flush()` and may reference an
+            # offloaded/freed device). This must run in FULL mode too, not just
+            # STEP2 — previously it only fired for `_stage_mode == "STEP2"`, so
+            # a FULL-mode job silently carried the stale Stage-1 audio_conditions
+            # into Stage 2 instead of reloading the source file fresh.
+            if _ctrl_audio_wave is None and _ctrl_audio_path and os.path.isfile(_ctrl_audio_path):
+                if hasattr(refine_pipe, "audio_vae") and refine_pipe.audio_vae:
                     target_sr = refine_pipe.audio_vae.config.sample_rate
                     try:
-                        waveform = load_audio(sound_path, target_sample_rate=target_sr, seconds=dur_s)
-                        audio_conditions = [LTX2AudioCondition(
-                            audio=waveform, strength=1.0, start_time=_audio_start_time,
-                        )]
-                        print(f"[LTX23ICLoRAStaged] STEP2: Audio conditions loaded from input video")
-                    except Exception:
-                        import traceback; traceback.print_exc()
+                        _ctrl_audio_wave = load_audio(_ctrl_audio_path, target_sample_rate=target_sr, seconds=dur_s)
+                        print(f"[LTX23ICLoRAStaged] Stage 2: control audio loaded from {_ctrl_audio_path!r}")
+                    except Exception as _e:
+                        print(f"[LTX23ICLoRAStaged] Stage 2: WARNING: failed to load control audio ({_e})")
+
+            if sound_path and hasattr(refine_pipe, "audio_vae") and refine_pipe.audio_vae:
+                target_sr = refine_pipe.audio_vae.config.sample_rate
+                try:
+                    waveform = load_audio(sound_path, target_sample_rate=target_sr, seconds=dur_s)
+                    # start_time=0.0 always — see the Stage 1 comment above; sound_path
+                    # already has its offset baked in via silence padding.
+                    audio_conditions = [LTX2AudioCondition(
+                        audio=waveform, strength=1.0, start_time=0.0,
+                    )]
+                    print(f"[LTX23ICLoRAStaged] Stage 2: source audio conditions (re)loaded from {os.path.basename(sound_path)}")
+                except Exception:
+                    import traceback; traceback.print_exc()
 
             refine_pipe.enable_group_offload(
                 onload_device=onload_device,

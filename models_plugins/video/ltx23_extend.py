@@ -13,6 +13,11 @@ import ctypes
 from ...models.base import ModelPlugin, InputSpec, UISection, ParamSpec, ModelInputs
 from ...utils.helpers import gfx_device, solve_path, clean_filename, load_first_frame
 
+try:
+    from ._ltx23_control_shared import align_video_frames
+except ImportError:
+    from _ltx23_control_shared import align_video_frames
+
 
 def vae_temporal_decode_streaming(vae, latents_cpu, *, decode_device, temb=None):
     import torch
@@ -77,6 +82,7 @@ class LTX2_3ExtendStagedPlugin(ModelPlugin):
             row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = "ltx23ext_audio_select"
         col.prop(scene, "ltx23ext_extend_frames")
         col.prop(scene, "ltx23ext_video_strength")
+        col.prop(scene, "ltx23m_modality_scale")
         return False
 
     def draw_post_seed_ui(self, col, context):
@@ -185,6 +191,7 @@ class LTX2_3ExtendStagedPlugin(ModelPlugin):
         if vid_path:
             try:
                 source_frames = load_video(vid_path)
+                source_frames = align_video_frames(source_frames, tag="LTX23ExtendStaged")
                 src_n = len(source_frames)
                 print(f"[LTX23ExtendStaged] Source clip loaded: {src_n} frames from {vid_path!r}")
             except Exception as e:
@@ -533,6 +540,21 @@ class LTX2_3ExtendStagedPlugin(ModelPlugin):
                     print(f"  Active LoRAs: {_r_names}")
                 else:
                     print("  No compatible LoRAs applied.")
+
+            # Re-load the SOURCE input audio here so Stage 2 conditions on a
+            # FRESH condition object rather than reusing the Stage-1 one (which
+            # was built before `del pipe` / `_flush()` and may reference an
+            # offloaded/freed device). Matches the same fix in ltx23_multi.py /
+            # ltx23_multi_ic_lora.py — without this Stage 2 silently ran on the
+            # stale Stage-1 audio_conditions instead of the source file.
+            if sound_path and hasattr(refine_pipe, "audio_vae") and refine_pipe.audio_vae:
+                target_sr = refine_pipe.audio_vae.config.sample_rate
+                try:
+                    waveform = load_audio(sound_path, target_sample_rate=target_sr, seconds=dur_s)
+                    audio_conditions = [LTX2AudioCondition(audio=waveform, strength=1.0)]
+                    print(f"[LTX23ExtendStaged] Stage 2: source audio conditions (re)loaded from {os.path.basename(sound_path)}")
+                except Exception:
+                    import traceback; traceback.print_exc()
 
             refine_pipe.enable_group_offload(
                 onload_device=onload_device,

@@ -73,6 +73,33 @@ def ensure_ic_lora(pipe, lora_folder, enabled_loras, cache_dir, lfo, *, enable_f
     return names
 
 
+def align_video_frames(frames, tag=""):
+    """Floor-trim a loaded video's frame list to LTX-2.3's required 8k+1 length.
+
+    The VAE's temporal compression ratio is 8, so every video handed to the
+    pipeline (as ``control_video``, or encoded as a video condition) must be
+    exactly 8k+1 frames long — the same constraint every ltx23_*.py plugin
+    already enforces on its own *generated* output length via
+    ``max(9, ((n - 1) // 8) * 8 + 1)``. Loaded control/reference/source clips
+    come from files trimmed to a Blender strip's frame range (single strips
+    or META children), which is essentially never already 8k+1, so without
+    this the pipeline call fails outright instead of just running on a
+    slightly shorter clip. Always rounds DOWN so a clip never grows past
+    what was actually loaded.
+    """
+    if frames is None:
+        return None
+    n = len(frames)
+    if n <= 1:
+        return frames
+    aligned = max(9, ((n - 1) // 8) * 8 + 1)
+    if aligned < n:
+        if tag:
+            print(f"[{tag}] Input video: {n} fr → {aligned} fr (8n+1 alignment)")
+        return frames[:aligned]
+    return frames
+
+
 def resolve_control_inputs(image_input, vid_path, ref_image_path, ctrl_video_path, load_first_frame, load_video):
     """Resolve 3DREAL ref-image override + control-video frames.
 
@@ -117,14 +144,23 @@ def print_input_summary(tag, *, image_input, vid_path, sound_path, ref_image_pat
                          ctrl_video_path, ctrl_audio_path, video_is_control,
                          control_video_frames, control_active, ctrl_strength,
                          ctrl_downscale, ctrl_audio_str, identity_guid,
-                         stage_mode, lora_folder, enabled_loras):
+                         stage_mode, lora_folder, enabled_loras, modality_scale=None):
     """Print every resolved input for this job — one line per input type.
 
     Run with a plain "no control" job to see the baseline, then compare
     against a job that sets a Ref Strip to see exactly which fields change.
     """
     _names = [getattr(i, "name", "?") for i in (enabled_loras or [])]
+    # diffusers is force-reinstalled from latest git by the dependency
+    # installer, so the base LTX2 pipeline can change between sessions with
+    # no Pallaidium commit — pin the build in every log for regression triage.
+    try:
+        import diffusers as _df
+        _df_ver = getattr(_df, "__version__", "?")
+    except Exception:
+        _df_ver = "?"
     print(f"[{tag}] ── Resolved inputs ─────────────────────────────────")
+    print(f"[{tag}]   diffusers build                             : {_df_ver}")
     print(f"[{tag}]   image_input (first-frame/appearance cond.) : "
           f"{'set (' + type(image_input).__name__ + ')' if image_input is not None else 'None'}")
     print(f"[{tag}]   main video   (vid_path)                    : {vid_path or 'None'}")
@@ -138,6 +174,9 @@ def print_input_summary(tag, *, image_input, vid_path, sound_path, ref_image_pat
     print(f"[{tag}]   control_active (gates LoRA auto-fallback)  : {control_active}")
     print(f"[{tag}]   control_strength={ctrl_strength} control_downscale={ctrl_downscale} "
           f"control_audio_strength={ctrl_audio_str} identity_guidance={identity_guid}")
+    if modality_scale is not None:
+        print(f"[{tag}]   modality_scale (audio→video influence)     : {modality_scale}"
+              f"{'  [passed to pipeline]' if (sound_path and modality_scale != 1.0) else '  [NOT passed — sound_path empty or scale==1.0]'}")
     print(f"[{tag}]   stage_mode                                 : {stage_mode}")
     print(f"[{tag}]   lora_folder                                : {lora_folder or 'None'}")
     print(f"[{tag}]   enabled_loras                               : {_names or 'none'}")

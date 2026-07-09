@@ -2073,7 +2073,66 @@ def _set_render_resolution_for_strip(vse_scene, strip, downscale_pct=100.0):
                   f"→ actual {_final_dims()}")
 
 
-def render_strip_to_path(context, strip, image_output=False, downscale_pct=100.0):
+def downscale_image_file(image_path, downscale_pct):
+    """Resize a still-image file to downscale_pct of its width and return the
+    new file's path (original path on no-op or failure).
+
+    Counterpart of _set_render_resolution_for_strip() for inputs that never
+    pass through a VSE render (raw IMAGE strip paths, FLF/anchor images, the
+    IC-LoRA ref image): same closest_divisible_64 width rounding, even final
+    dimensions, output registered in _rendered_temp_paths for bulk cleanup.
+    """
+    if not image_path or not os.path.isfile(image_path):
+        return image_path
+    if not downscale_pct or downscale_pct >= 100:
+        return image_path
+    try:
+        from PIL import Image
+
+        with Image.open(image_path) as im:
+            w, h = im.size
+            target_w = closest_divisible_64(w * downscale_pct / 100.0)
+            if target_w >= w:
+                return image_path
+            target_h = max(2, round(h * target_w / w))
+            if target_h % 2:
+                target_h += 1
+            resized = im.convert("RGB").resize((target_w, target_h), Image.LANCZOS)
+
+        addon_prefs  = bpy.context.preferences.addons[ADDON_ID].preferences
+        rendered_dir = os.path.join(addon_prefs.generator_ai, str(date.today()), "Rendered_Strips")
+        os.makedirs(rendered_dir, exist_ok=True)
+        safe_name   = re.sub(r'[^\w]', '', os.path.splitext(os.path.basename(image_path))[0])
+        output_path = os.path.join(
+            rendered_dir, f"{safe_name}_ds{int(downscale_pct)}_{random.randint(0, 999999)}.png"
+        )
+        resized.save(output_path)
+        _rendered_temp_paths.add(output_path)
+        print(f"[downscale_image_file] {image_path!r} {w}x{h} → "
+              f"{output_path!r} {target_w}x{target_h} ({downscale_pct}%)")
+        return output_path
+    except Exception as e:
+        print(f"[downscale_image_file] failed for {image_path!r}: {e!r} — keeping original")
+        return image_path
+
+
+def align_frames_8n1(n):
+    """Floor n to the nearest 8k+1 frame count (LTX-2.3's required video length).
+
+    The LTX-2.3 VAE has a temporal compression ratio of 8, so every video it
+    encodes or generates must be exactly 8k+1 frames. Rounds DOWN so a
+    pre-trimmed input never grows past what the source strip actually has.
+    Mirrors the ``((n - 1) // 8) * 8 + 1`` formula every ltx23_*.py plugin
+    already uses for its own generated-output length, so queue-side input
+    trimming lands on the exact value the plugin will compute later.
+    """
+    n = int(n)
+    if n <= 1:
+        return 1
+    return max(9, ((n - 1) // 8) * 8 + 1)
+
+
+def render_strip_to_path(context, strip, image_output=False, downscale_pct=100.0, num_frames=None):
     """Render a VSE strip through the pipeline and return the output file path.
 
     Unlike get_render_strip() this does NOT add a new strip to the VSE — it
@@ -2087,6 +2146,12 @@ def render_strip_to_path(context, strip, image_output=False, downscale_pct=100.0
                            >= 100 are a no-op). The result is rounded to the
                            nearest multiple of 64 (min 64) so it stays aligned
                            with models that require 64-divisible dimensions.
+    num_frames           → when given, trims the rendered range to this many
+                           frames instead of the strip's full
+                           frame_final_duration (clamped so it never exceeds
+                           the strip's own length). Used by LTX-2.3 plugins to
+                           pre-align inputs to the model's required 8n+1
+                           frame count before the temp file is even written.
     Returns None on failure.
     """
     print(f"[render_strip_to_path] strip='{getattr(strip, 'name', '?')}' "
@@ -2137,7 +2202,10 @@ def render_strip_to_path(context, strip, image_output=False, downscale_pct=100.0
     seq_editor.use_cache_raw = False
 
     render_start = int(strip.frame_final_start)
-    render_end   = int(strip.frame_final_start + strip.frame_final_duration - 1)
+    _eff_dur     = int(strip.frame_final_duration)
+    if num_frames:
+        _eff_dur = max(1, min(int(num_frames), _eff_dur))
+    render_end   = render_start + _eff_dur - 1
 
     for s in seq_editor.strips:
         s.mute = (s != strip)
@@ -2159,7 +2227,7 @@ def render_strip_to_path(context, strip, image_output=False, downscale_pct=100.0
     # user sees per-frame advancement (cursor + header progress) while the input
     # strip is trimmed/rendered, instead of an opaque UI freeze.
     _wm           = getattr(bpy.context, "window_manager", None)
-    _total_frames = max(1, int(strip.frame_final_duration))
+    _total_frames = max(1, _eff_dur)
     _prog_state   = {"done": 0}
 
     def _render_progress_handler(*_args):
@@ -2299,7 +2367,8 @@ def render_strip_to_path(context, strip, image_output=False, downscale_pct=100.0
     return None
 
 
-def render_meta_child_to_path(context, meta_strip, child_strip, image_output=False, downscale_pct=100.0):
+def render_meta_child_to_path(context, meta_strip, child_strip, image_output=False, downscale_pct=100.0,
+                               num_frames=None):
     """Render one child strip inside a META through the VSE compositor.
 
     Unlike render_strip_to_path(), this keeps the META unmuted (so the child's
@@ -2319,6 +2388,17 @@ def render_meta_child_to_path(context, meta_strip, child_strip, image_output=Fal
                                       render_strip_to_path() (< 100 shrinks,
                                       final dimensions forced even). No effect
                                       on SOUND children.
+    num_frames                     → when given, overrides the effective
+                                      duration (clamped so it never exceeds the
+                                      META's/child's own length): the SOUND
+                                      branch exports this many frames of the
+                                      META's range instead of its full
+                                      frame_final_duration, and the IMAGE/MOVIE/
+                                      SCENE branch trims the child's own range
+                                      the same way render_strip_to_path() does.
+                                      Used by LTX-2.3 plugins so every temp file
+                                      for a job (audio, scene, video) already
+                                      has the model's required 8n+1 frame count.
     Returns the absolute output path, or None on failure.
     """
     vse_scene = getattr(context, 'sequencer_scene', context.scene)
@@ -2357,10 +2437,16 @@ def render_meta_child_to_path(context, meta_strip, child_strip, image_output=Fal
     # For IMAGE/MOVIE: use the child's own range as before.
     if child_strip.type == "SOUND":
         render_start = int(meta_strip.frame_final_start)
-        render_end   = int(meta_strip.frame_final_start + meta_strip.frame_final_duration - 1)
+        _eff_meta_dur = int(meta_strip.frame_final_duration)
+        if num_frames:
+            _eff_meta_dur = max(1, min(int(num_frames), _eff_meta_dur))
+        render_end   = render_start + _eff_meta_dur - 1
     else:
         render_start = int(child_strip.frame_final_start)
-        render_end   = int(child_strip.frame_final_start + child_strip.frame_final_duration - 1)
+        _eff_dur     = int(child_strip.frame_final_duration)
+        if num_frames:
+            _eff_dur = max(1, min(int(num_frames), _eff_dur))
+        render_end   = render_start + _eff_dur - 1
 
     # Keep META unmuted so children composite correctly; mute everything else
     for s in seq_editor.strips:
@@ -2383,7 +2469,7 @@ def render_meta_child_to_path(context, meta_strip, child_strip, image_output=Fal
             output_path = os.path.abspath(
                 os.path.join(rendered_dir, f"{safe_name}_{render_start:06d}_meta_audio.wav"))
             _fps_sound   = vse_scene.render.fps / max(1.0, getattr(vse_scene.render, 'fps_base', 1.0))
-            _expected_s  = meta_strip.frame_final_duration / _fps_sound
+            _expected_s  = _eff_meta_dur / _fps_sound
             # How many seconds the META's trim clips from the child's beginning.
             # When child starts before meta_final_start, that many seconds of the
             # child are invisible; we must skip them in both the source read and

@@ -68,6 +68,7 @@ class LTX2_3LipSyncPlugin(ModelPlugin):
         row = col.row(align=True)
         row.prop(context.scene, "ref_audio_path", text="Audio Ref.")
         row.operator("sequencer.open_audio_filebrowser", text="", icon="FILEBROWSER")
+        col.prop(context.scene, "ltx23m_modality_scale")
         return False
 
     def load(self, prefs, scene, **kw):

@@ -767,6 +767,7 @@ def register():
     bpy.types.Scene.ltx23m_audio_modality_scale = bpy.props.FloatProperty(name="Audio Modality Scale", default=1.0, min=0.0, max=5.0,  description="Audio cross-modal scale")
     bpy.types.Scene.ltx23m_audio_noise_scale    = bpy.props.FloatProperty(name="Audio Noise Scale",    default=0.0, min=0.0, max=1.0,  description="Noise level for unmasked audio regions")
     bpy.types.Scene.ltx23m_audio_start_time     = bpy.props.FloatProperty(name="Audio Start Time",     default=0.0, min=0.0, max=3600.0, description="Audio condition start time in seconds (computed from strip offset)")
+    bpy.types.Scene.ltx23m_image_strength       = bpy.props.FloatProperty(name="Image Strength",       default=1.0, min=0.0, max=1.0,  description="Conditioning strength for every image anchor (first frame, last frame, and any middle anchors). 1.0 hard-locks each anchor frame to its reference image; lower values loosen the lock, trading appearance fidelity for more motion freedom")
 
     # ltx23_multi_ic_lora — IC-LoRA control params
     bpy.types.Scene.ltx23ic_control_strip       = bpy.props.StringProperty(name="IC-LoRA Ref Strip",    default="",  description="Name of the IC-LoRA reference strip (META or MOVIE)")
@@ -1494,6 +1495,7 @@ def unregister():
         "ltx23m_enable_guidance",
         "ltx23m_modality_scale", "ltx23m_audio_guidance", "ltx23m_audio_stg_scale",
         "ltx23m_audio_modality_scale", "ltx23m_audio_noise_scale", "ltx23m_audio_start_time",
+        "ltx23m_image_strength",
         "ltx23ic_control_strip", "ltx23ic_control_strength", "ltx23ic_control_downscale",
         "ltx23ic_control_audio_str", "ltx23ic_identity_guidance",
         "ltx23ic_input_downscale_pct",

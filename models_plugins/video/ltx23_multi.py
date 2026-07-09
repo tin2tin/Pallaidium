@@ -14,9 +14,9 @@ from ...models.base import ModelPlugin, InputSpec, UISection, ParamSpec, ModelIn
 from ...utils.helpers import gfx_device, solve_path, clean_filename, load_first_frame
 
 try:
-    from ._ltx23_control_shared import ensure_ic_lora, resolve_control_inputs, print_input_summary
+    from ._ltx23_control_shared import ensure_ic_lora, resolve_control_inputs, print_input_summary, align_video_frames
 except ImportError:
-    from _ltx23_control_shared import ensure_ic_lora, resolve_control_inputs, print_input_summary
+    from _ltx23_control_shared import ensure_ic_lora, resolve_control_inputs, print_input_summary, align_video_frames
 
 
 def vae_temporal_decode_streaming(vae, latents_cpu, *, decode_device, temb=None):
@@ -104,6 +104,8 @@ class LTX2_3MultiStagedPlugin(ModelPlugin):
         col.prop(scene, "ltx23ic_control_downscale")
         col.prop(scene, "ltx23ic_control_audio_str")
         col.prop(scene, "ltx23ic_identity_guidance")
+        col.prop(scene, "ltx23m_modality_scale")
+        col.prop(scene, "ltx23m_image_strength")
         return False
 
     def draw_post_seed_ui(self, col, context):
@@ -133,6 +135,7 @@ class LTX2_3MultiStagedPlugin(ModelPlugin):
 
         _cache_dir     = prefs.hf_cache_dir or None
         _lfo           = prefs.local_files_only
+        #MODEL_PATH     = "OzzyGT/LTX-2.3-Distilled-1.1"        
         MODEL_PATH     = "OzzyGT/LTX-2.3-Distilled-1.1-sdnq-dynamic-int8"
         SDNQ_PATH      = "OzzyGT/LTX-2.3-Distilled-1.1-sdnq-dynamic-int8"
         UPSAMPLER_PATH = "OzzyGT/LTX-2.3-upsampler-x2"
@@ -152,6 +155,12 @@ class LTX2_3MultiStagedPlugin(ModelPlugin):
         generator = torch.Generator(device="cpu").manual_seed(seed)
         _modality_scale = getattr(scene, "ltx23m_modality_scale", 1.5)
         _stage_mode = getattr(scene, "ltx23_stage_mode", "FULL")
+        # Conditioning strength for EVERY image anchor (first frame, last frame,
+        # and any middle anchors) — was hardcoded to 1.0 (a full hard lock) with
+        # no way to loosen it. A fully-locked frame under the model's few-step
+        # distilled schedule leaves little room to deviate, which can show up
+        # as near-static output with only a slow zoom/parallax.
+        _image_strength = float(getattr(scene, "ltx23m_image_strength", 1.0))
 
         # ── IC-LoRA control params from scene_proxy ─────────────────────────
         _ctrl_video_path  = getattr(scene, "ltx23ic_control_video_path", "")
@@ -161,7 +170,6 @@ class LTX2_3MultiStagedPlugin(ModelPlugin):
         _ctrl_downscale   = int(getattr(scene,   "ltx23ic_control_downscale", 1))
         _ctrl_audio_str   = float(getattr(scene, "ltx23ic_control_audio_str", 1.0))
         _identity_guid    = float(getattr(scene, "ltx23ic_identity_guidance",  0.0))
-        _audio_start_time = float(getattr(scene, "ltx23m_audio_start_time",   0.0))
 
         def _flush():
             gc.collect()
@@ -195,6 +203,7 @@ class LTX2_3MultiStagedPlugin(ModelPlugin):
         image_input, _video_is_control, control_video_frames = resolve_control_inputs(
             image_input, vid_path, _ref_image_path, _ctrl_video_path, load_first_frame, load_video,
         )
+        control_video_frames = align_video_frames(control_video_frames, tag="LTX23MultiStaged")
         _control_active = bool(control_video_frames is not None or _ctrl_audio_path or _ref_image_path)
 
         explicit_audio = None
@@ -308,30 +317,30 @@ class LTX2_3MultiStagedPlugin(ModelPlugin):
         if image_input is not None and last_input is not None and _middle_paths:
             from diffusers.utils import load_image as _load_image
             image_conditions = [
-                LTX2ImageCondition(image=image_input, frame=0, strength=1.0),
+                LTX2ImageCondition(image=image_input, frame=0, strength=_image_strength),
             ]
             for _mp, _frac in _middle_paths:
                 _frame_idx = round(_frac * (num_frames - 1))
                 _frame_idx = max(1, min(num_frames - 2, _frame_idx))
                 try:
                     _mid_pil = _load_image(_mp).convert("RGB").resize((inputs.width, inputs.height))
-                    image_conditions.append(LTX2ImageCondition(image=_mid_pil, frame=_frame_idx, strength=1.0))
+                    image_conditions.append(LTX2ImageCondition(image=_mid_pil, frame=_frame_idx, strength=_image_strength))
                 except Exception as _e:
                     print(f"[LTX23MultiStaged] WARNING: skipping middle anchor {_mp!r}: {_e}")
-            image_conditions.append(LTX2ImageCondition(image=last_input, frame=-1, strength=1.0))
+            image_conditions.append(LTX2ImageCondition(image=last_input, frame=-1, strength=_image_strength))
             _anchor_frames = [0] + [c.frame for c in image_conditions[1:-1]] + [num_frames - 1]
             print(f"[LTX23MultiStaged] MODE: MULTI-ANCHOR — {len(image_conditions)} anchors at frames "
                   f"{_anchor_frames} (of {num_frames})"
                   + (f" [requested {inputs.frames}, adjusted for 8n+1]" if num_frames != inputs.frames else ""))
         elif image_input is not None and last_input is not None:
             image_conditions = [
-                LTX2ImageCondition(image=image_input, frame=0,  strength=1.0),
-                LTX2ImageCondition(image=last_input,  frame=-1, strength=1.0),
+                LTX2ImageCondition(image=image_input, frame=0,  strength=_image_strength),
+                LTX2ImageCondition(image=last_input,  frame=-1, strength=_image_strength),
             ]
         elif last_input is not None:
-            image_conditions = [LTX2ImageCondition(image=last_input, frame=-1, strength=1.0)]
+            image_conditions = [LTX2ImageCondition(image=last_input, frame=-1, strength=_image_strength)]
         elif image_input is not None:
-            image_conditions = [LTX2ImageCondition(image=image_input, frame=0, strength=1.0)]
+            image_conditions = [LTX2ImageCondition(image=image_input, frame=0, strength=_image_strength)]
 
         # ── Step 0: Text encoding (needed for Stage 1 and Stage 2) ──────────
         self.set_phase(inputs, "Text encoding")
@@ -388,6 +397,7 @@ class LTX2_3MultiStagedPlugin(ModelPlugin):
             ctrl_strength=_ctrl_strength, ctrl_downscale=_ctrl_downscale,
             ctrl_audio_str=_ctrl_audio_str, identity_guid=_identity_guid,
             stage_mode=_stage_mode, lora_folder=_lora_folder, enabled_loras=_enabled_loras,
+            modality_scale=_modality_scale,
         )
 
         audio_latent = None
@@ -478,8 +488,20 @@ class LTX2_3MultiStagedPlugin(ModelPlugin):
                 target_sr = pipe.audio_vae.config.sample_rate
                 try:
                     waveform = load_audio(sound_path, target_sample_rate=target_sr, seconds=dur_s)
+                    # start_time=0.0 always: sound_path is a rendered/trimmed file
+                    # (render_meta_child_to_path for META SOUND children) that ALREADY
+                    # spans the full output duration with the dialogue silence-padded
+                    # to its correct relative offset — that's what _audio_start_time
+                    # measures. Passing it here as well double-applies the same shift:
+                    # prepare_audio_latents_with_conditioning truncates the tail of the
+                    # (already-offset) waveform and shifts it forward AGAIN, so the
+                    # model conditions on speech at the wrong time (or with the end cut
+                    # off) even though the final mux — which uses this file untouched —
+                    # plays back at the correct time. That mismatch (audio timing right,
+                    # but the video was never conditioned on it at that timing) is what
+                    # shows up as "audio plays fine, but no lip-sync".
                     audio_conditions =[LTX2AudioCondition(
-                        audio=waveform, strength=1.0, start_time=_audio_start_time,
+                        audio=waveform, strength=1.0, start_time=0.0,
                     )]
                 except Exception as e:
                     import traceback; traceback.print_exc()
@@ -601,8 +623,10 @@ class LTX2_3MultiStagedPlugin(ModelPlugin):
                 target_sr = refine_pipe.audio_vae.config.sample_rate
                 try:
                     waveform = load_audio(sound_path, target_sample_rate=target_sr, seconds=dur_s)
+                    # start_time=0.0 always — see the matching Stage 1 comment above;
+                    # sound_path already has its offset baked in via silence padding.
                     audio_conditions = [LTX2AudioCondition(
-                        audio=waveform, strength=1.0, start_time=_audio_start_time,
+                        audio=waveform, strength=1.0, start_time=0.0,
                     )]
                     print(f"[LTX23MultiStaged] Stage 2: source audio conditions (re)loaded from {os.path.basename(sound_path)}")
                 except Exception:
