@@ -350,6 +350,7 @@ def register():
             ("image", "Image", "Generate Image"),
             ("audio", "Audio", "Generate Audio"),
             ("text", "Text", "Generate Text"),
+            ("3d", "3D", "Generate 3D"),
         ],
         default="image",
         update=input_strips_updated,
@@ -1045,6 +1046,30 @@ def register():
         description="Spoken language. 'Auto-detect' lets Whisper identify it automatically.",
     )
 
+    # Mist / Depth Pass (3D)
+    bpy.types.Scene.mist_range_mode = bpy.props.EnumProperty(
+        name="Range",
+        items=[
+            ("AUTO",   "Auto",         "Compute mist start/depth from camera + scene geometry"),
+            ("CUSTOM", "Custom",       "Use the Start/Depth values below"),
+            ("SCENE",  "Scene World",  "Use the scene's existing World > Mist Settings"),
+        ],
+        default="AUTO",
+        description="How the Mist start/depth range is determined",
+    )
+    bpy.types.Scene.mist_custom_start = bpy.props.FloatProperty(
+        name="Start", default=0.0, min=0.0,
+        description="Distance from the camera where mist begins",
+    )
+    bpy.types.Scene.mist_custom_depth = bpy.props.FloatProperty(
+        name="Depth", default=100.0, min=0.001,
+        description="Distance over which mist fades from 0 to 1",
+    )
+    bpy.types.Scene.mist_invert = bpy.props.BoolProperty(
+        name="Invert (White = Near)", default=True,
+        description="White = close to camera, black = far away",
+    )
+
     # Stem Splitter
     bpy.types.Scene.stem_split_model = bpy.props.EnumProperty(
         name="Model",
@@ -1472,6 +1497,9 @@ def unregister():
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
     for _prop in ("whisper_model_size", "whisper_language"):
+        if hasattr(bpy.types.Scene, _prop):
+            delattr(bpy.types.Scene, _prop)
+    for _prop in ("mist_range_mode", "mist_custom_start", "mist_custom_depth", "mist_invert"):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
     for _prop in ("stem_split_model", "stem_split_vocals", "stem_split_drums",

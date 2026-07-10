@@ -69,6 +69,11 @@ def _text_enum_items(self, context):
     return get_enum_items("text", getattr(self, "model_source", "LOCAL"))
 
 
+def _threed_enum_items(self, context):
+    from ..models import get_enum_items
+    return get_enum_items("3d", getattr(self, "model_source", "LOCAL"))
+
+
 # ---------------------------------------------------------------------------
 # Remote-backend adapter enum + shared discovery helpers
 # ---------------------------------------------------------------------------
@@ -177,6 +182,18 @@ def _text_model_update(self, context):
     self.text_model_card_id = self.text_model_card
     output_strips_updated(self, context)
 
+def _threed_model_update(self, context):
+    self.threed_model_card_id = self.threed_model_card
+    output_strips_updated(self, context)
+    try:
+        from ..models import get_plugin
+        plugin = get_plugin(self.threed_model_card)
+        if plugin is not None and getattr(plugin, "requires_input_strip", False):
+            if context and context.scene:
+                context.scene.input_strips = "input_strips"
+    except Exception:
+        pass
+
 
 def _hf_cache_dir_update(self, context):
     cache_dir = self.hf_cache_dir
@@ -224,6 +241,7 @@ class GeneratorAddonPreferences(AddonPreferences):
     image_model_card_id: StringProperty(default="")
     audio_model_card_id: StringProperty(default="")
     text_model_card_id: StringProperty(default="")
+    threed_model_card_id: StringProperty(default="")
 
     movie_model_card: bpy.props.EnumProperty(
         name="Video Model",
@@ -302,6 +320,12 @@ class GeneratorAddonPreferences(AddonPreferences):
         items=_text_enum_items,
         options={'SKIP_SAVE'},
         update=_text_model_update,
+    )
+    threed_model_card: EnumProperty(
+        name="3D Model",
+        items=_threed_enum_items,
+        options={'SKIP_SAVE'},
+        update=_threed_model_update,
     )
     generator_ai: StringProperty(
         name="Filepath",

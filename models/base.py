@@ -223,7 +223,7 @@ class ModelPlugin:
 
     MODEL_ID:     str = ""   # unique identifier / HuggingFace repo ID
     DISPLAY_NAME: str = ""   # shown in the UI dropdown
-    MODEL_TYPE:   str = ""   # "video" | "image" | "audio" | "text"
+    MODEL_TYPE:   str = ""   # "video" | "image" | "audio" | "text" | "3d"
     DESCRIPTION:  str = ""   # tooltip text shown in the dropdown
 
     # ---- What data to collect from the scene ------------------------------
@@ -249,6 +249,9 @@ class ModelPlugin:
     requires_input_strip:      bool = False  # True  → generation always requires a selected strip
     uses_standard_input_strip: bool = True   # False → plugin provides its own strip input UI
     uses_strip_power:          bool = True   # False → hide the "Strip Power" (image_power) slider
+    strip_power_inpaint_only:  bool = False  # True  → hide "Strip Power" unless an inpaint mask is
+                                             #         selected (plugin only wires strength into its
+                                             #         inpaint pipeline; it's a no-op for txt2img/img2img)
     show_enhance:              bool = True   # False → hide Quality/Speed/Upscale enhance row
     requires_main_thread:      bool = False  # True  → run generate() on main thread (bpy access needed)
     supports_batch:            bool = True   # False → hide "Batch Count" (deterministic single-output

@@ -1,45 +1,76 @@
-"""Text-to-image, img2img, and inpaint via FLUX.2 Klein 4B with 3 reference image slots."""
+"""Text-to-image, img2img, and inpaint via FLUX.2 Klein 9B KV-cache with consistency LoRA and up to 9 reference image slots."""
 
 from ...models.base import ModelPlugin, InputSpec, UISection, ParamSpec, ModelInputs
 from ...utils.helpers import gfx_device, low_vram
 
 
-class Flux2Klein4BPlugin(ModelPlugin):
-    MODEL_ID     = "black-forest-labs/FLUX.2-klein-4B"
-    DISPLAY_NAME = "FLUX.2 Klein 4B"
-    DESCRIPTION  = "Text-to-image via FLUX.2 Klein 4B with up to 3 reference images"
+class Flux2Klein9BKVPlugin(ModelPlugin):
+    MODEL_ID     = "dx8152/Flux2-Klein-9B-Consistency"
+    DISPLAY_NAME = "FLUX.2 Klein 9B KV (Consistency)"
+    DESCRIPTION  = "Multi-reference image generation via FLUX.2 Klein 9B KV-cache with consistency LoRA"
     MODEL_TYPE   = "image"
     INPUTS       = InputSpec.PROMPT | InputSpec.IMAGE | InputSpec.LORA
     UI_SECTIONS  = [
         UISection.PROMPT, UISection.IMAGE_STRIP,
-        UISection.RESOLUTION, UISection.FRAMES, UISection.STEPS, UISection.GUIDANCE,
-        UISection.IMAGE_STRENGTH, UISection.SEED,
+        UISection.RESOLUTION, UISection.FRAMES, UISection.STEPS, UISection.SEED,
+        UISection.IMAGE_STRENGTH,
         UISection.LORA,
     ]
     PARAMS            = ParamSpec(steps=4, guidance=1.0)
-    REQUIRED_PACKAGES = ["torch", "diffusers", "transformers"]
+    REQUIRED_PACKAGES = ["torch", "diffusers", "transformers", "sdnq"]
     supports_inpaint       = True
     inpaint_uses_strength  = True
-    strip_power_inpaint_only = True  # Flux2KleinPipeline has no strength param —
-                                      # image= is a reference list, not a denoise blend.
+    strip_power_inpaint_only = True  # Flux2KleinKVPipeline has no guidance_scale/strength
+                                      # param — image= is KV-cached reference conditioning,
+                                      # not a denoise blend.
 
-    _BASE_PIPELINE = "black-forest-labs/FLUX.2-klein-4B"
+    # black-forest-labs/FLUX.2-klein-9b-kv is a separately step-distilled
+    # checkpoint (4 steps, no CFG) — NOT just the base 9B model wrapped in a
+    # caching pipeline class. It needs its OWN quantized weights; the base
+    # model's BNB transformer (used below for inpaint) is the wrong checkpoint
+    # for this pipeline and silently produces weak/garbled output.
+    _BASE_PIPELINE       = "GeneralShan/FLUX.2-klein-9B-KV-SDNQ-4bit-dynamic-svd-r32"
+    # Flux2KleinInpaintPipeline has no -kv variant, so inpaint mode runs the
+    # base (non-distilled) architecture instead — same checkpoint pairing as
+    # the non-KV plugin.
+    _BASE_PIPELINE_INPAINT = "ModelsLab/FLUX.2-klein-9B"
+    _TRANSFORMER_INPAINT   = "OzzyGT/flux2_klein_9B_bnb_4bit_transformer"
+    _TEXT_ENCODER_INPAINT  = "OzzyGT/flux2_klein_9B_bnb_4bit_text_encoder"
+    _CONSISTENCY_LORA    = "dx8152/Flux2-Klein-9B-Consistency"
+    _CONSISTENCY_WEIGHTS = "Flux2-Klein-9B-consistency-V2.safetensors"
 
     def load(self, prefs, scene, **kw):
         import torch
-        from diffusers import Flux2KleinPipeline
+        from diffusers import Flux2KleinKVPipeline, Flux2Transformer2DModel
+        from transformers import Qwen3ForCausalLM
 
         _cache_dir = prefs.hf_cache_dir or None
         mode = kw.get("mode", "txt2img")
-        print(f"Loading {self.MODEL_ID} ({mode})…")
 
         _lfo = prefs.local_files_only
         if mode == "inpaint":
-            from diffusers import Flux2KleinInpaintPipeline
+            print(f"Loading {self._BASE_PIPELINE_INPAINT} + consistency LoRA ({mode})…")
+            from diffusers import Flux2KleinInpaintPipeline, Flux2Transformer2DModel
 
+            try:
+                from transformers import BitsAndBytesConfig
+                _bnb4 = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16)
+            except Exception:
+                _bnb4 = None
+            _bnb_kw = {"quantization_config": _bnb4} if _bnb4 is not None else {}
+
+            transformer = Flux2Transformer2DModel.from_pretrained(
+                self._TRANSFORMER_INPAINT, torch_dtype=torch.bfloat16, device_map="cpu", cache_dir=_cache_dir,
+                local_files_only=_lfo, **_bnb_kw,
+            )
+            text_encoder = Qwen3ForCausalLM.from_pretrained(
+                self._TEXT_ENCODER_INPAINT, torch_dtype=torch.bfloat16, device_map="cpu", cache_dir=_cache_dir,
+                local_files_only=_lfo, **_bnb_kw,
+            )
             pipe = Flux2KleinInpaintPipeline.from_pretrained(
-                self._BASE_PIPELINE, torch_dtype=torch.bfloat16, cache_dir=_cache_dir,
-                local_files_only=_lfo,
+                self._BASE_PIPELINE_INPAINT,
+                transformer=transformer, text_encoder=text_encoder,
+                torch_dtype=torch.bfloat16, cache_dir=_cache_dir, local_files_only=_lfo,
             )
             if gfx_device == "mps":
                 pipe.to("mps")
@@ -49,16 +80,43 @@ class Flux2Klein4BPlugin(ModelPlugin):
                 pipe.enable_model_cpu_offload()
             return {"pipe": pipe, "converter": None, "refiner": None, "preprocessor": None}
 
+        print(f"Loading {self._BASE_PIPELINE} + consistency LoRA ({mode})…")
+
+        # Registers SDNQ's quantizer with diffusers/transformers so from_pretrained
+        # recognizes quant_method="sdnq" in the configs and wraps the weights with
+        # the dequantizer. Without this import the quantized tensors load raw (no
+        # dequant) → pure noise. See krea2_turbo.py for the same pattern.
+        from sdnq import SDNQConfig  # noqa: F401
+
         dtype = torch.bfloat16
-        pipe = Flux2KleinPipeline.from_pretrained(
-            self._BASE_PIPELINE, torch_dtype=dtype, cache_dir=_cache_dir, local_files_only=_lfo,
+        transformer = Flux2Transformer2DModel.from_pretrained(
+            self._BASE_PIPELINE, subfolder="transformer", torch_dtype=dtype,
+            cache_dir=_cache_dir, local_files_only=_lfo,
         )
+        text_encoder = Qwen3ForCausalLM.from_pretrained(
+            self._BASE_PIPELINE, subfolder="text_encoder", torch_dtype=dtype,
+            cache_dir=_cache_dir, local_files_only=_lfo,
+        )
+        pipe = Flux2KleinKVPipeline.from_pretrained(
+            self._BASE_PIPELINE,
+            transformer=transformer, text_encoder=text_encoder, torch_dtype=dtype,
+            cache_dir=_cache_dir, local_files_only=_lfo,
+        )
+
+        # Consistency LoRA is always active; user LoRAs are appended alongside it
+        pipe.load_lora_weights(
+            self._CONSISTENCY_LORA,
+            weight_name=self._CONSISTENCY_WEIGHTS,
+            adapter_name="consistency",
+        )
+        print(f"Klein KV: consistency LoRA loaded ({self._CONSISTENCY_LORA}, weight=1.00)")
+        names   = ["consistency"]
+        weights = [1.0]
 
         enabled_items = kw.get("enabled_items", [])
         if enabled_items:
             from ...utils.helpers import clean_filename, bpy
             lora_folder = getattr(bpy.context.scene, "lora_folder", "")
-            names, weights = [], []
             for item in enabled_items:
                 name = clean_filename(item.name).replace(".", "")
                 names.append(name)
@@ -68,12 +126,16 @@ class Flux2Klein4BPlugin(ModelPlugin):
                     weight_name=item.name + ".safetensors",
                     adapter_name=name,
                 )
-            pipe.set_adapters(names, adapter_weights=weights)
+                print(f"Klein KV: user LoRA '{item.name}' loaded (adapter='{name}', weight={item.weight_value:.2f})")
+        pipe.set_adapters(names, adapter_weights=weights)
+        print(f"Klein KV: active adapters={names} weights={weights}")
 
+        # KV-cache requires all tensors to stay on device across denoising steps —
+        # enable_model_cpu_offload() evicts layers between steps and breaks the cache.
         if gfx_device == "mps":
             pipe.to("mps")
         else:
-            pipe.enable_model_cpu_offload()
+            pipe.to(gfx_device)
         return {"pipe": pipe, "converter": pipe, "refiner": None, "preprocessor": None}
 
     def draw_custom_ui(self, col, context) -> bool:
@@ -87,7 +149,6 @@ class Flux2Klein4BPlugin(ModelPlugin):
             pass
         if vse_scene.sequence_editor is None:
             return True
-        #col.label(text="Reference Images:")
         for i in range(1, scene.klein_visible_strips + 1):
             row = col.row(align=True)
             row.prop_search(
@@ -109,10 +170,11 @@ class Flux2Klein4BPlugin(ModelPlugin):
             torch.Generator("cuda").manual_seed(seed)
             if torch.cuda.is_available() and seed != 0 else None
         )
+        # Flux2KleinKVPipeline has no guidance_scale param — it's a step-distilled
+        # KV-cache pipeline; passing it would raise a TypeError.
         common = dict(
             prompt=inputs.prompt,
             max_sequence_length=512,
-            guidance_scale=inputs.guidance,
             num_inference_steps=inputs.steps,
             height=inputs.height,
             width=inputs.width,
@@ -130,9 +192,7 @@ class Flux2Klein4BPlugin(ModelPlugin):
                     print(f"Klein ref loaded: {attr} = '{path}' {img.size}")
                 except Exception as e:
                     print(f"Klein ref failed to open '{path}': {e}")
-            else:
-                print(f"Klein ref empty: {attr}")
-        print(f"Klein: {len(ref_images)} reference image(s) loaded, mode={inputs.mode}")
+        print(f"Klein KV: {len(ref_images)} reference image(s) loaded, mode={inputs.mode}")
 
         self.set_phase(inputs, "Generating")
         if inputs.mode == "inpaint":
@@ -158,18 +218,15 @@ class Flux2Klein4BPlugin(ModelPlugin):
             if result.size != (inputs.width, inputs.height):
                 result = result.resize((inputs.width, inputs.height), _PILImage.LANCZOS)
             return result
-        # Pass references as a LIST of separate images: Flux2KleinPipeline VAE-encodes
-        # each element on its own and assigns it a distinct T-coordinate reference slot,
-        # so the model treats each as a real reference (matching the working FLUX.2 Dev
-        # plugin). Concatenating them into one wide image loses that per-reference
-        # conditioning. A visual strip on the active input (image/video/scene frame)
-        # always becomes the first reference, ahead of the named ref slots, regardless
-        # of txt2img/img2img mode.
+        # Flux2KleinKVPipeline's image= is a reference-conditioning list, not a
+        # denoise blend (no strength param) — same as the non-KV Klein pipeline.
+        # The active input (image/video/scene frame) is always the first
+        # reference, ahead of the named ref slots, regardless of txt2img/img2img.
         images = ([inputs.image.convert("RGB")] if inputs.image is not None else []) + ref_images
 
         pipe_key = "converter" if (inputs.mode == "img2img" and inputs.image is not None) else "pipe"
         if images:
-            print(f"Klein {inputs.mode} → pipe images={len(images)} (list of separate refs)")
+            print(f"Klein KV {inputs.mode} → pipe images={len(images)} (list of separate refs)")
             return pipe_obj[pipe_key](**common, image=images,
                                       callback_on_step_end=self.step_callback(inputs)).images[0]
         return pipe_obj["pipe"](**common, callback_on_step_end=self.step_callback(inputs)).images[0]

@@ -137,13 +137,16 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
 
         from diffusers.pipelines.ltx2.pipeline_ltx2_condition import retrieve_latents
 
+        from ...utils.helpers import ensure_group_offload_pin_fallback
+        ensure_group_offload_pin_fallback()
+
         _cache_dir     = prefs.hf_cache_dir or None
         _lfo           = prefs.local_files_only
         # MODEL_PATH     = "OzzyGT/LTX-2.3-Distilled"
         # SDNQ_PATH      = "OzzyGT/LTX-2.3-Distilled-sdnq-dynamic-int4"
         # UPSAMPLER_PATH = "OzzyGT/LTX-2.3-upsampler-x2"
 
-        MODEL_PATH     = "OzzyGT/LTX-2.3-Distilled-1.1-sdnq-dynamic-int8"
+        MODEL_PATH     = "OzzyGT/LTX-2.3-sdnq-dynamic-int8"
         SDNQ_PATH      = "OzzyGT/LTX-2.3-Distilled-1.1-sdnq-dynamic-int8"
         UPSAMPLER_PATH = "OzzyGT/LTX-2.3-upsampler-x2"
 
@@ -170,10 +173,32 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
                 torch.cuda.synchronize()
+                # Also release cached page-locked host memory where a binding
+                # exists. Group offloading pins large host buffers
+                # (cudaHostAlloc); freed ones sit in torch's host-allocator
+                # cache, and on a later job pin_memory() can then fail with
+                # "CUDA error: out of memory" even though VRAM is free.
+                for _n in ("_host_emptyCache", "_cuda_hostEmptyCache"):
+                    _fn = getattr(torch._C, _n, None)
+                    if _fn is not None:
+                        try:
+                            _fn()
+                        except Exception:
+                            pass
+                        break
             try:
                 ctypes.CDLL("libc.so.6").malloc_trim(0)
             except Exception:
                 pass
+
+        # Group offloading must run with use_stream=False: streamed mode pins
+        # every group into page-locked host RAM (cudaHostAlloc) on each
+        # onload, and on Windows with Blender's working set high this fails
+        # mid-forward — as "CUDA error: out of memory" or "resource already
+        # mapped" — even when a probe pin succeeded moments earlier, and even
+        # when failed pins fall back to pageable async copies (those then die
+        # at the next kernel launch). Blocking copies are slower but never
+        # touch pinned memory.
 
         # ── Stage Resolution Match Fix ──────────────────────────────────────
         stage1_w = max(32, round((inputs.width / 2) / 32) * 32)
@@ -342,9 +367,15 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
             )
             embeds_pipe.enable_group_offload(
                 onload_device=onload_device,
-                offload_type="leaf_level",
-                use_stream=True,
+                offload_type="block_level",
+                num_blocks_per_group=4,
+                use_stream=False,
                 low_cpu_mem_usage=True,
+                # VAEs stay fully on-GPU (they're small): block_level parks
+                # unmatched root layers (encoder.conv_in) behind a hook on the
+                # module's own forward(), which never fires because pipelines
+                # call vae.encode()/decode() directly — weights stranded on CPU.
+                exclude_modules=["vae", "audio_vae"],
             )
             with torch.inference_mode():
                 prompt_embeds, prompt_attention_mask, _, _ = embeds_pipe.encode_prompt(
@@ -484,9 +515,15 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
 
             pipe.enable_group_offload(
                 onload_device=onload_device,
-                offload_type="leaf_level",
-                use_stream=True,
+                offload_type="block_level",
+                num_blocks_per_group=4,
+                use_stream=False,
                 low_cpu_mem_usage=True,
+                # VAEs stay fully on-GPU (they're small): block_level parks
+                # unmatched root layers (encoder.conv_in) behind a hook on the
+                # module's own forward(), which never fires because pipelines
+                # call vae.encode()/decode() directly — weights stranded on CPU.
+                exclude_modules=["vae", "audio_vae"],
             )
 
             stage1_kw = dict(
@@ -604,9 +641,15 @@ class LTX2_3MultiICLoRAStagedPlugin(ModelPlugin):
 
             refine_pipe.enable_group_offload(
                 onload_device=onload_device,
-                offload_type="leaf_level",
-                use_stream=True,
+                offload_type="block_level",
+                num_blocks_per_group=4,
+                use_stream=False,
                 low_cpu_mem_usage=True,
+                # VAEs stay fully on-GPU (they're small): block_level parks
+                # unmatched root layers (encoder.conv_in) behind a hook on the
+                # module's own forward(), which never fires because pipelines
+                # call vae.encode()/decode() directly — weights stranded on CPU.
+                exclude_modules=["vae", "audio_vae"],
             )
 
             refine_kw = dict(

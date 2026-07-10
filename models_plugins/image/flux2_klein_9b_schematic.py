@@ -39,6 +39,9 @@ class Flux2Klein9BSchematicPlugin(ModelPlugin):
     requires_input_strip       = True
     requires_no_style          = True
     preserve_image_dimensions  = True
+    uses_strip_power  = False  # no inpaint, and generate() never reads inputs.strength —
+                                # Flux2KleinPipeline's image= is a reference list, not a
+                                # denoise blend, so the slider would always be a no-op.
 
     _BASE_PIPELINE = "ModelsLab/FLUX.2-klein-9B"
     _TRANSFORMER   = "OzzyGT/flux2_klein_9B_bnb_4bit_transformer"

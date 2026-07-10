@@ -51,6 +51,7 @@ _ENUM_ITEMS: dict[str, list] = {
     "image": [],
     "audio": [],
     "text":  [],
+    "3d":    [],
 }
 
 _PLUGINS_DIR = Path(__file__).parent.parent / "models_plugins"
@@ -140,7 +141,7 @@ def _load_plugin_file(py_file: Path) -> list[ModelPlugin]:
     return instances
 
 
-_VALID_MODEL_TYPES = {"video", "image", "audio", "text"}
+_VALID_MODEL_TYPES = {"video", "image", "audio", "text", "3d"}
 _VALID_UI_SECTIONS = {s.value for s in UISection}
 
 

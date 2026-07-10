@@ -20,6 +20,8 @@ class Flux2Klein9BPlugin(ModelPlugin):
     REQUIRED_PACKAGES = ["torch", "diffusers", "transformers"]
     supports_inpaint       = True
     inpaint_uses_strength  = True
+    strip_power_inpaint_only = True  # Flux2KleinPipeline has no strength param —
+                                      # image= is a reference list, not a denoise blend.
 
     _BASE_PIPELINE = "ModelsLab/FLUX.2-klein-9B"
     _TRANSFORMER   = "OzzyGT/flux2_klein_9B_bnb_4bit_transformer"
@@ -98,7 +100,9 @@ class Flux2Klein9BPlugin(ModelPlugin):
                     weight_name=item.name + ".safetensors",
                     adapter_name=name,
                 )
+                print(f"Klein: user LoRA '{item.name}' loaded (adapter='{name}', weight={item.weight_value:.2f})")
             pipe.set_adapters(names, adapter_weights=weights)
+            print(f"Klein: active adapters={names} weights={weights}")
 
         if gfx_device == "mps":
             pipe.to("mps")

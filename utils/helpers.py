@@ -737,6 +737,49 @@ def low_vram():
         print("Torch not found!")
         return True
 
+def ensure_group_offload_pin_fallback():
+    """Make diffusers group offloading survive pin_memory() failures.
+
+    Streamed group offloading (use_stream=True) pins every tensor of a group
+    into page-locked host RAM (cudaHostAlloc) on each onload. On Windows,
+    with Blender's working set high, that allocation can fail mid-forward —
+    surfacing as "CUDA error: out of memory" or "CUDA error: resource already
+    mapped" — even when a probe allocation succeeded moments earlier.
+
+    Patch ModuleGroup._pinned_memory_tensors to fall back per-tensor to the
+    unpinned source on any pin failure: the Host->Device copy for that tensor
+    simply becomes synchronous instead of crashing the job. Safe to call any
+    number of times; no-op if the diffusers internals ever change shape.
+    """
+    try:
+        from diffusers.hooks import group_offloading as _go
+        _cls = _go.ModuleGroup
+    except Exception:
+        return
+    if getattr(_cls, "_pallaidium_pin_fallback", False):
+        return
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _pinned_memory_tensors(self):
+        pinned_dict = {}
+        try:
+            for param, tensor in self.cpu_param_dict.items():
+                if tensor.is_pinned():
+                    pinned_dict[param] = tensor
+                    continue
+                try:
+                    pinned_dict[param] = tensor.pin_memory()
+                except Exception:
+                    pinned_dict[param] = tensor
+            yield pinned_dict
+        finally:
+            pinned_dict = None
+
+    _cls._pinned_memory_tensors = _pinned_memory_tensors
+    _cls._pallaidium_pin_fallback = True
+
+
 def clear_cuda_cache():
     import gc
     gc.collect()
@@ -745,6 +788,19 @@ def clear_cuda_cache():
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
             torch.cuda.reset_max_memory_allocated()
+            # Also release cached page-locked host memory where a binding
+            # exists. Group offloading pins large host buffers
+            # (cudaHostAlloc); freed ones sit in torch's host-allocator
+            # cache, and on a later job pin_memory() can then fail with
+            # "CUDA error: out of memory" even though VRAM is free.
+            for _n in ("_host_emptyCache", "_cuda_hostEmptyCache"):
+                _fn = getattr(torch._C, _n, None)
+                if _fn is not None:
+                    try:
+                        _fn()
+                    except Exception:
+                        pass
+                    break
         if torch.backends.mps.is_available():
             torch.mps.empty_cache()
     except (ImportError, AttributeError, PermissionError, OSError):
@@ -844,6 +900,19 @@ def release_model_cache(cache: dict) -> None:
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
             torch.cuda.reset_max_memory_allocated()
+            # Also release cached page-locked host memory where a binding
+            # exists. Group offloading pins large host buffers
+            # (cudaHostAlloc); freed ones sit in torch's host-allocator
+            # cache, and on a later job pin_memory() can then fail with
+            # "CUDA error: out of memory" even though VRAM is free.
+            for _n in ("_host_emptyCache", "_cuda_hostEmptyCache"):
+                _fn = getattr(torch._C, _n, None)
+                if _fn is not None:
+                    try:
+                        _fn()
+                    except Exception:
+                        pass
+                    break
         if torch.backends.mps.is_available():
             torch.mps.empty_cache()
     except (ImportError, AttributeError, PermissionError, OSError):
@@ -1437,6 +1506,9 @@ def input_strips_updated(self, context):
     if scene_type == "text" and scene.input_strips != "input_strips":
         if addon_prefs.text_model_card != "ZuluVision/MoviiGen1.1_Prompt_Rewriter":
             scene.input_strips = "input_strips"
+    # 3D Type Handling — every 3D plugin operates on a selected strip, never txt2*
+    if scene_type == "3d" and scene.input_strips != "input_strips":
+        scene.input_strips = "input_strips"
     # Image Type Handling
     if scene_type == "image":
 #        if image_model == "Shitao/OmniGen-v1-diffusers": #crash
@@ -1503,7 +1575,7 @@ def input_strips_updated(self, context):
             pass
 
     # Reset style for output types that don't use image styles
-    if scene_type in {"text", "audio"} and hasattr(scene, "generatorai_styles"):
+    if scene_type in {"text", "audio", "3d"} and hasattr(scene, "generatorai_styles"):
         scene.generatorai_styles = "no_style"
 
     # Common Handling for Selected Strip
@@ -1543,6 +1615,10 @@ def output_strips_updated(self, context):
     if type == "text" and scene.input_strips != "input_strips":
         if addon_prefs.text_model_card != "ZuluVision/MoviiGen1.1_Prompt_Rewriter":
             scene.input_strips = "input_strips"
+
+    # 3D Type Handling — every 3D plugin operates on a selected strip, never txt2*
+    if type == "3d" and scene.input_strips != "input_strips":
+        scene.input_strips = "input_strips"
 
     # === IMAGE TYPE === #
     if type == "image":
@@ -1970,7 +2046,7 @@ def _resolve_fallback_camera(vse_scene, strip):
     return None
 
 
-def _set_render_resolution_for_strip(vse_scene, strip, downscale_pct=100.0):
+def _set_render_resolution_for_strip(vse_scene, strip, downscale_pct=100.0, target_res=None):
     """Set vse_scene.render.resolution_x/y/percentage for rendering `strip`.
 
     Shared by render_strip_to_path() and render_meta_child_to_path() so both
@@ -1979,6 +2055,13 @@ def _set_render_resolution_for_strip(vse_scene, strip, downscale_pct=100.0):
 
     - IMAGE/MOVIE strips render at their native (elements[0].orig_*) size so
       the output fills the frame with no letterbox padding.
+    - target_res, when given, overrides the size for strip types that carry
+      no native resolution of their own (SCENE, META, etc.) — see caller
+      comment in _render_named_strip_image() for why this matters: a SCENE
+      strip rendered as a reference/control image (e.g. a Klein depth-pass
+      ref) otherwise falls back to whatever the outer scene's render
+      resolution happens to be, which is unrelated to the paired photo's
+      aspect ratio and silently breaks per-pixel alignment between the two.
     - downscale_pct < 100 shrinks the render via resolution_percentage
       (resolution_x/y are kept at native size — see comment below).
     - Whatever the above produces, the FINAL rendered pixel dimensions are
@@ -1989,8 +2072,9 @@ def _set_render_resolution_for_strip(vse_scene, strip, downscale_pct=100.0):
     # scene render size composites centered with letterbox padding, which makes
     # downstream consumers (Florence-2 Box Editor background, img2img/init
     # frames) misalign with content that was analyzed/resized to fill.
-    target_res = None
-    if strip.type in ("IMAGE", "MOVIE"):
+    if target_res:
+        target_res = (int(target_res[0]), int(target_res[1]))
+    elif strip.type in ("IMAGE", "MOVIE"):
         try:
             elem = strip.elements[0]
             if elem.orig_width and elem.orig_height:
@@ -2132,7 +2216,8 @@ def align_frames_8n1(n):
     return max(9, ((n - 1) // 8) * 8 + 1)
 
 
-def render_strip_to_path(context, strip, image_output=False, downscale_pct=100.0, num_frames=None):
+def render_strip_to_path(context, strip, image_output=False, downscale_pct=100.0, num_frames=None,
+                          target_res=None):
     """Render a VSE strip through the pipeline and return the output file path.
 
     Unlike get_render_strip() this does NOT add a new strip to the VSE — it
@@ -2152,6 +2237,12 @@ def render_strip_to_path(context, strip, image_output=False, downscale_pct=100.0
                            the strip's own length). Used by LTX-2.3 plugins to
                            pre-align inputs to the model's required 8n+1
                            frame count before the temp file is even written.
+    target_res            → (width, height) to force the render resolution to,
+                           overriding the strip's/scene's own resolution. Used
+                           when this render must stay pixel-aligned with a
+                           paired reference image (e.g. a SCENE-strip depth
+                           pass fed alongside a photo into a reference/control
+                           model — see _render_named_strip_image()).
     Returns None on failure.
     """
     print(f"[render_strip_to_path] strip='{getattr(strip, 'name', '?')}' "
@@ -2213,7 +2304,7 @@ def render_strip_to_path(context, strip, image_output=False, downscale_pct=100.0
     vse_scene.frame_start = render_start
     vse_scene.frame_end   = render_end
 
-    _set_render_resolution_for_strip(vse_scene, strip, downscale_pct=downscale_pct)
+    _set_render_resolution_for_strip(vse_scene, strip, downscale_pct=downscale_pct, target_res=target_res)
 
     addon_prefs  = bpy.context.preferences.addons[ADDON_ID].preferences
     rendered_dir = os.path.join(addon_prefs.generator_ai, str(date.today()), "Rendered_Strips")
@@ -2461,6 +2552,32 @@ def render_meta_child_to_path(context, meta_strip, child_strip, image_output=Fal
     safe_name   = re.sub(r'[^\w]', '', child_strip.name) or "strip"
     output_path = None
 
+    # ── Lightweight render progress (video branch only) ──────────────────
+    # Mirrors render_strip_to_path()'s handler: bpy.ops.render.render(animation=True)
+    # below is a blocking main-thread call, so drive the WM progress bar (and
+    # OS cursor) from render_post scaled to the actual frame count being
+    # rendered here, not a generic/indeterminate default.
+    _wm = getattr(bpy.context, "window_manager", None) if child_strip.type not in ("SOUND",) and not image_output else None
+    _total_frames = max(1, render_end - render_start + 1)
+    _prog_state = {"done": 0}
+
+    def _render_progress_handler(*_args):
+        _prog_state["done"] += 1
+        if _wm is not None:
+            try:
+                _wm.progress_update(min(_total_frames, _prog_state["done"]))
+            except Exception:
+                pass
+
+    _progress_active = False
+    if _wm is not None:
+        try:
+            _wm.progress_begin(0, _total_frames)
+            _progress_active = True
+        except Exception:
+            _progress_active = False
+        bpy.app.handlers.render_post.append(_render_progress_handler)
+
     # bpy.ops.render.render() below pumps the event loop; hold the sequencer lock
     # so the render-queue timer can't insert a strip underneath the render.
     sequencer_lock_acquire()
@@ -2569,6 +2686,16 @@ def render_meta_child_to_path(context, meta_strip, child_strip, image_output=Fal
 
     finally:
         sequencer_lock_release()
+        try:
+            if _render_progress_handler in bpy.app.handlers.render_post:
+                bpy.app.handlers.render_post.remove(_render_progress_handler)
+        except Exception:
+            pass
+        if _progress_active and _wm is not None:
+            try:
+                _wm.progress_end()
+            except Exception:
+                pass
         for s, state in orig_mute_states.items():
             if s:
                 s.mute = state

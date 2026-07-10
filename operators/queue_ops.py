@@ -1241,7 +1241,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
         return bpy.path.abspath(path) if path else ""
 
     @staticmethod
-    def _render_named_strip_image(context, scene, strip_name: str) -> str:
+    def _render_named_strip_image(context, scene, strip_name: str, target_res=None) -> str:
         """Resolve a named strip to an image file path suitable for model input.
 
         Mirrors load_strip_as_pil()'s decision tree but runs at queue-add time
@@ -1249,6 +1249,15 @@ class SEQUENCER_OT_add_to_queue(Operator):
           - IMAGE without transforms → raw source file (no letterboxing)
           - MOVIE                    → raw source file (load_first_frame will seek)
           - IMAGE with transforms / SCENE / META / MASK / COLOR → VSE render to PNG
+
+        target_res, when given, forces a SCENE/META render to this (width,
+        height) instead of the outer scene's own render resolution. Without
+        this, a SCENE-strip reference (e.g. a Mist/Depth-Pass strip fed
+        alongside a photo into a reference/control model like Klein) renders
+        at whatever aspect ratio the project scene happens to be set to —
+        unrelated to the paired photo — so the two references no longer
+        correspond pixel-for-pixel and the model can't reconcile them
+        (observed as near-total loss of resemblance to the photo).
         """
         if not strip_name:
             return ""
@@ -1286,7 +1295,11 @@ class SEQUENCER_OT_add_to_queue(Operator):
                 return bpy.path.abspath(path)
 
         # Complex strips (META, SCENE, IMAGE with transforms, etc.) — render through VSE
-        path = render_strip_to_path(context, strip, image_output=True)
+        # target_res only matters for strip types with no native resolution of
+        # their own (SCENE/META); pass-through for those, leave IMAGE-with-
+        # transform's own crop/size logic alone.
+        _res = target_res if strip.type in ("SCENE", "META") else None
+        path = render_strip_to_path(context, strip, image_output=True, target_res=_res)
         return path or ""
 
     @staticmethod
@@ -1469,6 +1482,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
             "movie": prefs.movie_model_card,
             "audio": prefs.audio_model_card,
             "text":  prefs.text_model_card,
+            "3d":    prefs.threed_model_card,
         }.get(otype, "")
 
         if not model_card:
@@ -1557,32 +1571,32 @@ class SEQUENCER_OT_add_to_queue(Operator):
             joyimage_zoom         = getattr(scene, "joyimage_zoom", "unchanged"),
             kontext_strip_1_path  = self._resolve_named_strip_path(seq_scene, getattr(seq_scene, "kontext_strip_1", "")),
             inpaint_mask_path     = self._resolve_named_strip_path(seq_scene, getattr(seq_scene, "inpaint_selected_strip", "")),
-            qwen_strip_1_path     = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "qwen_strip_1", "")),
-            qwen_strip_2_path     = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "qwen_strip_2", "")),
-            qwen_strip_3_path     = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "qwen_strip_3", "")),
+            qwen_strip_1_path     = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "qwen_strip_1", ""), target_res=(x, y)),
+            qwen_strip_2_path     = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "qwen_strip_2", ""), target_res=(x, y)),
+            qwen_strip_3_path     = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "qwen_strip_3", ""), target_res=(x, y)),
             **{f"klein_strip_{_n}_path":
-                   self._render_named_strip_image(context, seq_scene, getattr(seq_scene, f"klein_strip_{_n}", ""))
+                   self._render_named_strip_image(context, seq_scene, getattr(seq_scene, f"klein_strip_{_n}", ""), target_res=(x, y))
                for _n in range(1, 10)},
             klein_visible_strips  = getattr(scene, "klein_visible_strips", 3),
             # Source strip names (carried through to metadata for Redo)
             **{f"klein_strip_{_n}": getattr(seq_scene, f"klein_strip_{_n}", "") for _n in range(1, 10)},
-            minimax_subject_path  = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "minimax_subject", "")),
+            minimax_subject_path  = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "minimax_subject", ""), target_res=(x, y)),
             **{f"flux_strip_{_n}_path":
-                   self._render_named_strip_image(context, seq_scene, getattr(seq_scene, f"flux_strip_{_n}", ""))
+                   self._render_named_strip_image(context, seq_scene, getattr(seq_scene, f"flux_strip_{_n}", ""), target_res=(x, y))
                for _n in range(1, 10)},
             nano_banana_ref_count = getattr(scene, "nano_banana_ref_count", 3),
-            nano_banana_ref_strip_1_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_1", "")),
-            nano_banana_ref_strip_2_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_2", "")),
-            nano_banana_ref_strip_3_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_3", "")),
-            nano_banana_ref_strip_4_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_4", "")),
-            nano_banana_ref_strip_5_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_5", "")),
-            nano_banana_ref_strip_6_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_6", "")),
-            nano_banana_ref_strip_7_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_7", "")),
-            nano_banana_ref_strip_8_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_8", "")),
-            nano_banana_ref_strip_9_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_9", "")),
-            veo_ref_strip_1_path  = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "veo_ref_strip_1", "")),
-            veo_ref_strip_2_path  = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "veo_ref_strip_2", "")),
-            veo_ref_strip_3_path  = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "veo_ref_strip_3", "")),
+            nano_banana_ref_strip_1_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_1", ""), target_res=(x, y)),
+            nano_banana_ref_strip_2_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_2", ""), target_res=(x, y)),
+            nano_banana_ref_strip_3_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_3", ""), target_res=(x, y)),
+            nano_banana_ref_strip_4_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_4", ""), target_res=(x, y)),
+            nano_banana_ref_strip_5_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_5", ""), target_res=(x, y)),
+            nano_banana_ref_strip_6_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_6", ""), target_res=(x, y)),
+            nano_banana_ref_strip_7_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_7", ""), target_res=(x, y)),
+            nano_banana_ref_strip_8_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_8", ""), target_res=(x, y)),
+            nano_banana_ref_strip_9_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_9", ""), target_res=(x, y)),
+            veo_ref_strip_1_path  = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "veo_ref_strip_1", ""), target_res=(x, y)),
+            veo_ref_strip_2_path  = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "veo_ref_strip_2", ""), target_res=(x, y)),
+            veo_ref_strip_3_path  = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "veo_ref_strip_3", ""), target_res=(x, y)),
             # Source strip names (carried through to metadata for Redo)
             nano_banana_ref_strip_1 = getattr(seq_scene, "nano_banana_ref_strip_1", ""),
             nano_banana_ref_strip_2 = getattr(seq_scene, "nano_banana_ref_strip_2", ""),
@@ -1802,7 +1816,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
                 # A failed render is surfaced to the UI so the job never silently
                 # degrades to txt2* (which is what "input is a scene strip but mode
                 # came out txt2img" looks like to the user).
-                if strip.type == "SCENE" and not (image_path or movie_path):
+                if strip.type == "SCENE" and not (image_path or movie_path) and otype != "3d":
                     from ..utils.helpers import render_strip_to_path
                     print(f"[Queue][dbg] SCENE block ENTERED for '{strip.name}', "
                           f"rendering (otype={otype})…")

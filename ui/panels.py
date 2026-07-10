@@ -163,6 +163,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         movie_model_card = addon_prefs.movie_model_card
         image_model_card = addon_prefs.image_model_card
         text_model_card = addon_prefs.text_model_card
+        threed_model_card = addon_prefs.threed_model_card
         scene = context.scene
         # Strip refs (inpaint mask, Kontext ref) live in the scene shown in the
         # VSE (context.sequencer_scene in Blender 5.x), which can differ from the
@@ -198,7 +199,8 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         from ..models import get_plugin as _reg_get_plugin
         from ..models.base import UISection
         _card = {"movie": movie_model_card, "image": image_model_card,
-                 "audio": audio_model_card, "text": text_model_card}.get(type, "")
+                 "audio": audio_model_card, "text": text_model_card,
+                 "3d": threed_model_card}.get(type, "")
         plugin = _reg_get_plugin(_card)
         def _has(sec): return plugin is None or sec in (plugin.UI_SECTIONS or [])
         col = layout.column(align=False)
@@ -221,7 +223,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 pass
 
 
-        if type != "text":
+        if type not in ("text", "3d"):
             if type != "audio":
                 if type == "movie" and plugin is not None and not plugin.uses_standard_input_strip:
                     plugin.draw_custom_ui(col, context)
@@ -233,6 +235,15 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                         or (plugin is not None and getattr(plugin, "inpaint_uses_strength", False))
                     )
                     _usp = getattr(plugin, "uses_strip_power", True)
+                    if (
+                        _usp
+                        and getattr(plugin, "strip_power_inpaint_only", False)
+                        and not getattr(vse_scene, "inpaint_selected_strip", "")
+                    ):
+                        # Strength does nothing outside inpaint for this plugin — showing
+                        # the slider implies lowering it preserves more of the source,
+                        # which isn't true (see strip_power_inpaint_only docstring).
+                        _usp = False
                     # ── Strip-Power gate diagnostic (throttled: prints only when the
                     #    decision changes, so it never spams the redraw loop) ──────────
                     if type == "image":
@@ -499,6 +510,10 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 row.operator(
                     "wm.url_open", text="", icon="URL"
                 ).url = "https://huggingface.co/settings/tokens"
+            if plugin is not None:
+                plugin.draw_custom_ui(col, context)
+        if type == "3d":
+            col.prop(addon_prefs, "threed_model_card", text=" ")
             if plugin is not None:
                 plugin.draw_custom_ui(col, context)
         if type == "image":
