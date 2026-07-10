@@ -286,9 +286,12 @@ class MistDepthPassPlugin(ModelPlugin):
         mist_scene = _find_existing_mist_scene(source_scene)
         if mist_scene is None:
             mist_scene = _duplicate_scene(source_scene)
-            _setup_mist(mist_scene, range_mode, custom_start, custom_depth, invert)
         else:
             print(f"Mist / Depth Pass: Reusing existing scene '{mist_scene.name}'.")
+        # Always (re)apply mist settings — even on a reused scene — so
+        # changing mist_range_mode / mist_invert / custom values and
+        # re-running actually takes effect instead of being a no-op.
+        _setup_mist(mist_scene, range_mode, custom_start, custom_depth, invert)
 
         self.set_phase(inputs, "Inserting Scene strip")
         _ch_hint = inputs.insert_channel if inputs.insert_channel > 0 else strip.channel + 1
