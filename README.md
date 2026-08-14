@@ -134,6 +134,20 @@ The addon panel is located in the **Video Sequence Editor > Sidebar (N-Panel) > 
 
 The generated media will be saved to the directory specified in the addon preferences and automatically added to your VSE timeline on a new channel.
 
+## SiftQ MiniMax H3 (cloud)
+
+Pallaidium includes a direct **SiftQ MiniMax H3 (cloud)** video plugin using the
+MiniMax-H3 V2 contract. Paste the key into the password-masked **Session API
+Key** field in the Generative AI panel, or set `SIFTQ_API_KEY` before starting
+Blender. The session field uses `SKIP_SAVE`; the key is not stored in `.blend`
+files, add-on preferences, metadata or queued jobs. The plugin
+supports text-to-video, first-frame, first+last-frame, and reference-to-video
+with up to 9 reference images plus one reference video and one WAV/MP3 reference
+audio file. Frame pickers snapshot IMAGE/MOVIE/SCENE/META strips to supported
+images at queue-add time, and reference media validation has a stdlib fallback
+when PyAV is unavailable. See [docs/SIFTQ_PROVIDER.md](docs/SIFTQ_PROVIDER.md) for setup,
+limits, cancellation semantics, and the optional `SIFTQ_BASE_URL` override.
+
 ## Remote Backends (optional)
 
 Pallaidium runs models **locally** by default. Optionally, it can also drive an
@@ -216,6 +230,8 @@ The example connectors (mock, ComfyUI, fal.ai) ship in `remote_backends/`, are
 excluded from the built add-on.
 
 ## Change Log
+
+2026-08-13: Add: **SiftQ MiniMax-H3 V2 direct cloud video plugin.** Adds independent SiftQ transport and provider identity, text/first-frame/first+last/reference modes, 768P/2K and 4–15 second controls, up to 9 reference images plus one reference video/audio input, bounded polling, queued-task cancellation, structured redacted errors, validated MP4 download, queue metadata/Redo propagation, and deterministic standalone contract tests. Configure only through the runtime `SIFTQ_API_KEY` environment variable; optional compatible base URL overrides use `SIFTQ_BASE_URL`.
 
 2026-07-10: Add: **3D output type — Mist / Depth Pass.** A new **3D** output category (alongside Video/Image/Audio/Text) hosts non-AI, scene-manipulating plugins; the first is **Mist / Depth Pass**, which duplicates a selected SCENE strip's scene, rigs an EEVEE Mist compositor pass on the copy (Auto/Custom/Scene-World range, Invert toggle), and drops the result as a new Scene strip one channel above the original — runs on the main thread like the Whisper transcribe plugin, no model download. Also new: **FLUX.2 Klein 9B KV (Consistency)** — multi-reference (up to 9 slots) image generation via the KV-cache pipeline with a consistency LoRA, 4-step distilled checkpoint, separate inpaint fallback to the base 9B architecture; and **LTX-2.3 IC-LoRA Distilled** — a distilled two-stage SDNQ variant of the IC-LoRA control plugin (selectable 4-/8-bit stage weights, 2x/1.5x upscale, audio/guidance-rescale controls), keeping all control-video/audio, 3DREAL, anchor, and lip-sync-audio features of the original.
 
@@ -610,5 +626,3 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 - [Marlin Video Captions](https://github.com/HeliosZhao/Marlin)
 
 ![PallAIdium](https://github.com/tin2tin/Generative_AI/assets/1322593/1b1b232f-00d9-4b0b-86fb-5f0f24136d2c)
-
-
