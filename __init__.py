@@ -32,6 +32,42 @@ os.environ.setdefault("HF_DEACTIVATE_ASYNC_LOAD", "1")
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
 
+_siftq_session_key_active = False
+_siftq_session_key_previous = None
+
+
+def _restore_siftq_session_key():
+    """Undo only the environment override created by the masked session field."""
+    global _siftq_session_key_active, _siftq_session_key_previous
+    if not _siftq_session_key_active:
+        return
+    if _siftq_session_key_previous is None:
+        os.environ.pop("SIFTQ_API_KEY", None)
+    else:
+        os.environ["SIFTQ_API_KEY"] = _siftq_session_key_previous
+    _siftq_session_key_active = False
+    _siftq_session_key_previous = None
+
+
+def _siftq_session_key_update(scene, context):
+    """Keep the SiftQ key in this Blender process only.
+
+    The backing RNA property is SKIP_SAVE, and the value is deliberately not
+    copied into preferences, render-queue jobs, metadata, or .blend files.
+    Clearing the field restores any value that existed before this session
+    field overrode it, instead of destroying a launch-time environment key.
+    """
+    global _siftq_session_key_active, _siftq_session_key_previous
+    value = (getattr(scene, "siftq_api_key_session", "") or "").strip()
+    if value:
+        if not _siftq_session_key_active:
+            _siftq_session_key_previous = os.environ.get("SIFTQ_API_KEY")
+        os.environ["SIFTQ_API_KEY"] = value
+        _siftq_session_key_active = True
+    else:
+        _restore_siftq_session_key()
+
+
 def _find_msvc_cl():
     """Return the path to the highest-version MSVC cl.exe, or None.
 
@@ -919,6 +955,84 @@ def register():
         description="How image inputs are interpreted by Veo",
     )
 
+    # ── SiftQ MiniMax-H3 V2 cloud plugin settings ─────────────────────────
+    bpy.types.Scene.siftq_mode = bpy.props.EnumProperty(
+        name="SiftQ Mode",
+        items=[
+            ("TEXT",        "Text to Video",       "Generate from the prompt only"),
+            ("FIRST_FRAME", "First Frame",         "Use the selected strip's image as the first frame"),
+            ("FIRST_LAST",  "First + Last Frame",  "Use a two-image META strip as first and last frames"),
+            ("REFERENCE",   "Reference to Video",   "Use reference image, video and optional audio inputs"),
+        ],
+        default="TEXT",
+        description="How Pallaidium maps inputs to SiftQ MiniMax-H3 V2 content roles",
+    )
+    bpy.types.Scene.siftq_api_key_session = bpy.props.StringProperty(
+        name="Session API Key",
+        description="SiftQ key for this Blender session only; never saved to the .blend file",
+        subtype="PASSWORD",
+        default="",
+        options={"SKIP_SAVE"},
+        update=_siftq_session_key_update,
+    )
+    bpy.types.Scene.siftq_resolution = bpy.props.EnumProperty(
+        name="Resolution",
+        items=[
+            ("768P", "768P", "Generate at the SiftQ 768P tier"),
+            ("2K",   "2K",   "Generate at the SiftQ 2K tier"),
+        ],
+        default="768P",
+        description="SiftQ MiniMax-H3 output resolution tier",
+    )
+    bpy.types.Scene.siftq_duration = bpy.props.IntProperty(
+        name="Duration",
+        default=5,
+        min=4,
+        max=15,
+        description="SiftQ video duration in whole seconds (4–15)",
+    )
+    bpy.types.Scene.siftq_ratio = bpy.props.EnumProperty(
+        name="Text Aspect",
+        items=[
+            ("21:9", "21:9", "Ultrawide"),
+            ("16:9", "16:9", "Landscape"),
+            ("4:3",  "4:3",  "Landscape"),
+            ("1:1",  "1:1",  "Square"),
+            ("3:4",  "3:4",  "Portrait"),
+            ("9:16", "9:16", "Portrait"),
+        ],
+        default="16:9",
+        description="SiftQ text-to-video aspect ratio",
+    )
+    bpy.types.Scene.siftq_reference_ratio = bpy.props.EnumProperty(
+        name="Reference Aspect",
+        items=[
+            ("adaptive", "Adaptive", "Let reference media determine the aspect ratio"),
+            ("21:9", "21:9", "Ultrawide"),
+            ("16:9", "16:9", "Landscape"),
+            ("4:3",  "4:3",  "Landscape"),
+            ("1:1",  "1:1",  "Square"),
+            ("3:4",  "3:4",  "Portrait"),
+            ("9:16", "9:16", "Portrait"),
+        ],
+        default="16:9",
+        description="SiftQ reference-to-video aspect ratio",
+    )
+    bpy.types.Scene.siftq_ref_count = bpy.props.IntProperty(
+        name="Reference Images",
+        default=3,
+        min=1,
+        max=9,
+        description="Number of SiftQ reference-image picker slots to use",
+    )
+    for _i in range(1, 10):
+        setattr(
+            bpy.types.Scene, f"siftq_ref_strip_{_i}",
+            bpy.props.StringProperty(
+                name=f"siftq_ref_strip_{_i}", options={"TEXTEDIT_UPDATE"}, default="",
+            ),
+        )
+
     # Reference-image strip pickers (Nano Banana composition / Veo 3.1 ingredients)
     # Nano Banana supports up to 9 reference images; how many picker rows are
     # shown is driven by nano_banana_ref_count (Nano Banana Pro handles the most).
@@ -1407,6 +1521,9 @@ except Exception:
 
 
 def unregister():
+    # Remove only the key override created by the session field; a launch-time
+    # SIFTQ_API_KEY is restored by the helper.
+    _restore_siftq_session_key()
     # Stop any adapter subprocess Pallaidium launched so it never lingers after
     # the add-on is disabled or Blender quits.
     try:
@@ -1533,6 +1650,10 @@ def unregister():
         "veo_model", "veo_aspect", "veo_resolution", "veo_duration",
         "veo_person_generation",
         "veo_image_mode",
+        "siftq_mode", "siftq_api_key_session", "siftq_resolution", "siftq_duration",
+        "siftq_ratio", "siftq_reference_ratio",
+        "siftq_ref_count",
+        *(f"siftq_ref_strip_{_n}" for _n in range(1, 10)),
         "nano_banana_ref_count",
         *(f"nano_banana_ref_strip_{_n}" for _n in range(1, 10)),
         "veo_ref_strip_1", "veo_ref_strip_2", "veo_ref_strip_3",

@@ -231,6 +231,17 @@ class RenderQueueJob(PropertyGroup):
     veo_ref_strip_1_path: StringProperty()   # Veo 3.1 reference image 1
     veo_ref_strip_2_path: StringProperty()   # Veo 3.1 reference image 2
     veo_ref_strip_3_path: StringProperty()   # Veo 3.1 reference image 3
+    # SiftQ MiniMax-H3 V2 reference images (up to 9)
+    siftq_ref_count: IntProperty(default=3)
+    siftq_ref_strip_1_path: StringProperty()
+    siftq_ref_strip_2_path: StringProperty()
+    siftq_ref_strip_3_path: StringProperty()
+    siftq_ref_strip_4_path: StringProperty()
+    siftq_ref_strip_5_path: StringProperty()
+    siftq_ref_strip_6_path: StringProperty()
+    siftq_ref_strip_7_path: StringProperty()
+    siftq_ref_strip_8_path: StringProperty()
+    siftq_ref_strip_9_path: StringProperty()
     # Source strip names (persisted to metadata so Redo can re-render the refs)
     nano_banana_ref_strip_1: StringProperty()
     nano_banana_ref_strip_2: StringProperty()
@@ -244,6 +255,15 @@ class RenderQueueJob(PropertyGroup):
     veo_ref_strip_1: StringProperty()
     veo_ref_strip_2: StringProperty()
     veo_ref_strip_3: StringProperty()
+    siftq_ref_strip_1: StringProperty()
+    siftq_ref_strip_2: StringProperty()
+    siftq_ref_strip_3: StringProperty()
+    siftq_ref_strip_4: StringProperty()
+    siftq_ref_strip_5: StringProperty()
+    siftq_ref_strip_6: StringProperty()
+    siftq_ref_strip_7: StringProperty()
+    siftq_ref_strip_8: StringProperty()
+    siftq_ref_strip_9: StringProperty()
 
     # Faster Whisper Transcription
     whisper_model_size: StringProperty(default="large-v3-turbo")
@@ -340,6 +360,13 @@ class RenderQueueJob(PropertyGroup):
     veo_duration:                StringProperty(default="8")
     veo_person_generation:       StringProperty(default="allow_adult")
     veo_image_mode:              StringProperty(default="AUTO")
+
+    # SiftQ MiniMax-H3 V2
+    siftq_mode:                   StringProperty(default="TEXT")
+    siftq_resolution:             StringProperty(default="768P")
+    siftq_duration:               IntProperty(default=5)
+    siftq_ratio:                  StringProperty(default="16:9")
+    siftq_reference_ratio:        StringProperty(default="16:9")
 
     # Marlin Video Captions
     marlin_mode:        StringProperty(default="CAPTION")
@@ -577,6 +604,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             ),
             image_path                     = snapshot.get("image_path", ""),
             movie_path                     = snapshot.get("movie_path", ""),
+            last_image_path                = snapshot.get("last_image_path", ""),
             sound_path                     = snapshot.get("sound_path", ""),
             ref_audio_path                 = snapshot.get("ref_audio_path", ""),
             ref_text                       = snapshot.get("ref_text", ""),
@@ -632,6 +660,12 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             veo_duration                   = snapshot.get("veo_duration",           "8"),
             veo_person_generation          = snapshot.get("veo_person_generation",  "allow_adult"),
             veo_image_mode                 = snapshot.get("veo_image_mode",         "AUTO"),
+            siftq_mode                     = snapshot.get("siftq_mode",              "TEXT"),
+            siftq_resolution               = snapshot.get("siftq_resolution",        "768P"),
+            siftq_duration                 = snapshot.get("siftq_duration",          5),
+            siftq_ratio                    = snapshot.get("siftq_ratio",             "16:9"),
+            siftq_reference_ratio          = snapshot.get("siftq_reference_ratio",   "16:9"),
+            siftq_ref_count                = snapshot.get("siftq_ref_count",         3),
             marlin_mode                    = snapshot.get("marlin_mode",                 "CAPTION"),
             marlin_find_query              = snapshot.get("marlin_find_query",           ""),
             marlin_last_query              = "",
@@ -686,6 +720,10 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             veo_ref_strip_1_path   = snapshot.get("veo_ref_strip_1_path",   ""),
             veo_ref_strip_2_path   = snapshot.get("veo_ref_strip_2_path",   ""),
             veo_ref_strip_3_path   = snapshot.get("veo_ref_strip_3_path",   ""),
+            **{f"siftq_ref_strip_{_n}_path": snapshot.get(f"siftq_ref_strip_{_n}_path", "")
+               for _n in range(1, 10)},
+            **{f"siftq_ref_strip_{_n}": snapshot.get(f"siftq_ref_strip_{_n}", "")
+               for _n in range(1, 10)},
         )
 
         mode = snapshot["mode"]
@@ -842,22 +880,25 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
         init_image = None
         img_path = snapshot.get("image_path", "")
         vid_path = snapshot.get("movie_path", "")
-        if img_path and os.path.isfile(img_path):
-            init_image = load_first_frame(img_path)
-            if init_image and not _preserve_dims:
-                init_image = init_image.resize((snapshot["width"], snapshot["height"]))
-        if init_image is None and vid_path and os.path.isfile(vid_path):
-            init_image = load_first_frame(vid_path)
-            if init_image and not _preserve_dims:
-                init_image = init_image.resize((snapshot["width"], snapshot["height"]))
+        _is_siftq = getattr(plugin, "MODEL_ID", "") == "siftq/minimax-h3"
+        if not _is_siftq:
+            if img_path and os.path.isfile(img_path):
+                init_image = load_first_frame(img_path)
+                if init_image and not _preserve_dims:
+                    init_image = init_image.resize((snapshot["width"], snapshot["height"]))
+            if init_image is None and vid_path and os.path.isfile(vid_path):
+                init_image = load_first_frame(vid_path)
+                if init_image and not _preserve_dims:
+                    init_image = init_image.resize((snapshot["width"], snapshot["height"]))
 
         # FLF/LFO last-frame image (LTX Multi)
         _last_image_path = snapshot.get("last_image_path", "")
         _flf_last_image = None
         if _last_image_path and os.path.isfile(_last_image_path):
-            _flf_last_image = load_first_frame(_last_image_path)
-            if _flf_last_image and not _preserve_dims:
-                _flf_last_image = _flf_last_image.resize((snapshot["width"], snapshot["height"]))
+            if not _is_siftq:
+                _flf_last_image = load_first_frame(_last_image_path)
+                if _flf_last_image and not _preserve_dims:
+                    _flf_last_image = _flf_last_image.resize((snapshot["width"], snapshot["height"]))
             # FLF: movie_path holds the first frame as an image file, not a real video;
             # suppress video_path so the plugin doesn't try to open it with av.
             if os.path.splitext(vid_path)[1].lower() in _IMAGE_EXTS:
@@ -1135,8 +1176,14 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             "veo_duration":                snapshot.get("veo_duration",           "8"),
             "veo_person_generation":       snapshot.get("veo_person_generation",  "allow_adult"),
             "veo_image_mode":              snapshot.get("veo_image_mode",         "AUTO"),
+            "siftq_mode":                  snapshot.get("siftq_mode",              "TEXT"),
+            "siftq_resolution":            snapshot.get("siftq_resolution",        "768P"),
+            "siftq_duration":              snapshot.get("siftq_duration",          5),
+            "siftq_ratio":                 snapshot.get("siftq_ratio",             "16:9"),
+            "siftq_reference_ratio":       snapshot.get("siftq_reference_ratio",   "16:9"),
             # Reference strips — names (drive Redo) + resolved paths (record)
             "nano_banana_ref_count":        snapshot.get("nano_banana_ref_count", 3),
+            "siftq_ref_count":              snapshot.get("siftq_ref_count", 3),
             **{f"nano_banana_ref_strip_{_n}":
                    snapshot.get(f"nano_banana_ref_strip_{_n}", "") for _n in range(1, 10)},
             "veo_ref_strip_1":              snapshot.get("veo_ref_strip_1",              ""),
@@ -1147,6 +1194,10 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             "veo_ref_strip_1_path":         snapshot.get("veo_ref_strip_1_path",         ""),
             "veo_ref_strip_2_path":         snapshot.get("veo_ref_strip_2_path",         ""),
             "veo_ref_strip_3_path":         snapshot.get("veo_ref_strip_3_path",         ""),
+            **{f"siftq_ref_strip_{_n}":
+                   snapshot.get(f"siftq_ref_strip_{_n}", "") for _n in range(1, 10)},
+            **{f"siftq_ref_strip_{_n}_path":
+                   snapshot.get(f"siftq_ref_strip_{_n}_path", "") for _n in range(1, 10)},
             # Klein reference strips — names (drive Redo) + resolved paths (record)
             "klein_visible_strips":        snapshot.get("klein_visible_strips", 3),
             **{f"klein_strip_{_n}":      snapshot.get(f"klein_strip_{_n}", "")      for _n in range(1, 10)},
@@ -1241,13 +1292,17 @@ class SEQUENCER_OT_add_to_queue(Operator):
         return bpy.path.abspath(path) if path else ""
 
     @staticmethod
-    def _render_named_strip_image(context, scene, strip_name: str, target_res=None) -> str:
+    def _render_named_strip_image(context, scene, strip_name: str, target_res=None,
+                                  siftq_compatible: bool = False) -> str:
         """Resolve a named strip to an image file path suitable for model input.
 
         Mirrors load_strip_as_pil()'s decision tree but runs at queue-add time
         (main thread, bpy available) and returns a file path instead of a PIL image:
-          - IMAGE without transforms → raw source file (no letterboxing)
-          - MOVIE                    → raw source file (load_first_frame will seek)
+          - SiftQ IMAGE              → raw source file (no VSE letterboxing;
+                                       timeline transforms/crop are not baked)
+          - other IMAGE without transforms → raw source file
+          - MOVIE                    → raw source file normally; SiftQ-compatible
+                                       calls render the visible frame to PNG
           - IMAGE with transforms / SCENE / META / MASK / COLOR → VSE render to PNG
 
         target_res, when given, forces a SCENE/META render to this (width,
@@ -1263,6 +1318,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
             return ""
         from ..utils.helpers import find_strip_by_name, get_strip_path, render_strip_to_path
         strip = find_strip_by_name(scene, strip_name)
+        _siftq_image_exts = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
         if strip is None:
             # Fallback: the slot may hold a direct file path (e.g. a Screenwriter
             # script-to-screen reference) rather than a timeline strip name. This
@@ -1270,12 +1326,29 @@ class SEQUENCER_OT_add_to_queue(Operator):
             # exist in the enqueue scene.
             try:
                 if strip_name and os.path.isfile(bpy.path.abspath(strip_name)):
-                    return bpy.path.abspath(strip_name)
+                    direct_path = bpy.path.abspath(strip_name)
+                    if (not siftq_compatible
+                            or os.path.splitext(direct_path)[1].lower() in _siftq_image_exts):
+                        return direct_path
             except Exception:
                 pass
             return ""
 
         if strip.type == "IMAGE":
+            path = get_strip_path(strip)
+            path = bpy.path.abspath(path) if path else ""
+
+            # SiftQ's frame modes derive their aspect ratio from the uploaded
+            # image.  Rendering an IMAGE strip through the VSE bakes the outer
+            # scene canvas around it, which turns a portrait source into a small
+            # portrait surrounded by black pixels when the project is landscape.
+            # Send the source image itself for every SiftQ image role (first,
+            # last and reference).  Timeline transforms/crop remain editing
+            # instructions and must not silently change the provider input.
+            if (siftq_compatible and path
+                    and os.path.splitext(path)[1].lower() in _siftq_image_exts):
+                return path
+
             try:
                 tx = strip.transform
                 has_transform = (
@@ -1286,10 +1359,11 @@ class SEQUENCER_OT_add_to_queue(Operator):
             except Exception:
                 has_transform = False
             if not has_transform:
-                path = get_strip_path(strip)
-                return bpy.path.abspath(path) if path else ""
+                if (path and (not siftq_compatible
+                              or os.path.splitext(path)[1].lower() in _siftq_image_exts)):
+                    return path
 
-        if strip.type == "MOVIE":
+        if strip.type == "MOVIE" and not siftq_compatible:
             path = get_strip_path(strip)
             if path:
                 return bpy.path.abspath(path)
@@ -1299,7 +1373,21 @@ class SEQUENCER_OT_add_to_queue(Operator):
         # their own (SCENE/META); pass-through for those, leave IMAGE-with-
         # transform's own crop/size logic alone.
         _res = target_res if strip.type in ("SCENE", "META") else None
-        path = render_strip_to_path(context, strip, image_output=True, target_res=_res)
+        _saved_frame = None
+        if siftq_compatible and strip.type == "MOVIE":
+            try:
+                _saved_frame = scene.frame_current
+                scene.frame_set(max(strip.frame_final_start, strip.frame_start))
+            except Exception:
+                _saved_frame = None
+        try:
+            path = render_strip_to_path(context, strip, image_output=True, target_res=_res)
+        finally:
+            if _saved_frame is not None:
+                try:
+                    scene.frame_set(_saved_frame)
+                except Exception:
+                    pass
         return path or ""
 
     @staticmethod
@@ -1522,6 +1610,16 @@ class SEQUENCER_OT_add_to_queue(Operator):
             {"name": f.name, "weight": getattr(f, "weight_value", 1.0), "enabled": f.enabled}
             for f in getattr(scene, "lora_files", [])
         ])
+        _siftq_active = model_card == "siftq/minimax-h3"
+        _siftq_mode = getattr(scene, "siftq_mode", "TEXT")
+        if not _siftq_active or _siftq_mode == "TEXT":
+            _siftq_ref_count = 0
+        elif _siftq_mode == "FIRST_FRAME":
+            _siftq_ref_count = 1
+        elif _siftq_mode == "FIRST_LAST":
+            _siftq_ref_count = 2
+        else:
+            _siftq_ref_count = max(1, min(int(getattr(scene, "siftq_ref_count", 3)), 9))
         # 'frames' and 'audio_length' are per-strip — omitted from common
         common = dict(
             output_type  = otype,
@@ -1583,6 +1681,17 @@ class SEQUENCER_OT_add_to_queue(Operator):
             minimax_subject_path  = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "minimax_subject", ""), target_res=(x, y)),
             **{f"flux_strip_{_n}_path":
                    self._render_named_strip_image(context, seq_scene, getattr(seq_scene, f"flux_strip_{_n}", ""), target_res=(x, y))
+               for _n in range(1, 10)},
+            siftq_ref_count = _siftq_ref_count,
+            **{f"siftq_ref_strip_{_n}_path":
+                   self._render_named_strip_image(
+                        context, seq_scene, getattr(seq_scene, f"siftq_ref_strip_{_n}", ""),
+                        target_res=None, siftq_compatible=True,
+                    ) if _n <= _siftq_ref_count else ""
+               for _n in range(1, 10)},
+            **{f"siftq_ref_strip_{_n}":
+                   (getattr(seq_scene, f"siftq_ref_strip_{_n}", "")
+                    if _siftq_active and _n <= _siftq_ref_count else "")
                for _n in range(1, 10)},
             nano_banana_ref_count = getattr(scene, "nano_banana_ref_count", 3),
             nano_banana_ref_strip_1_path = self._render_named_strip_image(context, seq_scene, getattr(seq_scene, "nano_banana_ref_strip_1", ""), target_res=(x, y)),
@@ -1673,6 +1782,11 @@ class SEQUENCER_OT_add_to_queue(Operator):
             veo_duration                = getattr(scene, "veo_duration",           "8"),
             veo_person_generation       = getattr(scene, "veo_person_generation",  "allow_adult"),
             veo_image_mode              = getattr(scene, "veo_image_mode",         "AUTO"),
+            siftq_mode                  = _siftq_mode,
+            siftq_resolution            = getattr(scene, "siftq_resolution",       "768P"),
+            siftq_duration              = getattr(scene, "siftq_duration",         5),
+            siftq_ratio                 = getattr(scene, "siftq_ratio",            "16:9"),
+            siftq_reference_ratio       = getattr(scene, "siftq_reference_ratio",  "16:9"),
             marlin_mode                 = getattr(scene, "marlin_mode",                 "CAPTION"),
             marlin_find_query           = getattr(scene, "marlin_find_query",           ""),
         )
@@ -2027,11 +2141,59 @@ class SEQUENCER_OT_add_to_queue(Operator):
 
             mode = self._detect_mode(otype, image_path, movie_path,
                                      inpaint_strip if strip is None else "")
-            print(f"[Queue][dbg] mode-detect otype={otype} image_path={image_path!r} "
-                  f"movie_path={movie_path!r} inpaint={inpaint_strip!r} → mode={mode}")
+            if model_card == "siftq/minimax-h3":
+                # SiftQ's dedicated picker inputs are intentionally separate from
+                # Pallaidium's generic image_path/movie_path mode detector.  Show
+                # the provider mode instead, so a valid First Frame request is not
+                # misreported as text-only merely because it was queued from the
+                # Prompts input surface.
+                _siftq_input_source = {
+                    "TEXT": "prompt",
+                    "FIRST_FRAME": "frame-picker",
+                    "FIRST_LAST": "frame-pickers",
+                    "REFERENCE": "reference-pickers",
+                }.get(_siftq_mode, "provider-specific")
+                print(
+                    f"[Queue][SiftQ] provider_mode={_siftq_mode} "
+                    f"input_source={_siftq_input_source}"
+                )
+            else:
+                print(f"[Queue][dbg] mode-detect otype={otype} image_path={image_path!r} "
+                      f"movie_path={movie_path!r} inpaint={inpaint_strip!r} → mode={mode}")
             _diag(f"queue enqueue: strip={(strip.name, strip.type) if strip is not None else None} "
                   f"otype={otype} input_mode={input_mode} image_path={image_path!r} "
                   f"movie_path={movie_path!r} → mode={mode}")
+
+            # SiftQ frame modes snapshot contract-compatible image files on the
+            # Blender main thread. This keeps IMAGE/MOVIE/SCENE/META fallbacks
+            # independent of Pillow/OpenCV in the background worker.
+            _siftq_first_path = common.get("siftq_ref_strip_1_path", "")
+            _siftq_last_path = common.get("siftq_ref_strip_2_path", "")
+            if model_card == "siftq/minimax-h3" and _siftq_mode in {"FIRST_FRAME", "FIRST_LAST"}:
+                _contract_image_exts = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
+                if not _siftq_first_path:
+                    for _candidate in (image_path, movie_path):
+                        if (_candidate and os.path.isfile(_candidate)
+                                and os.path.splitext(_candidate)[1].lower() in _contract_image_exts):
+                            _siftq_first_path = _candidate
+                            break
+                if not _siftq_first_path and strip is not None:
+                    _siftq_first_path = self._render_named_strip_image(
+                        context, seq_scene, strip.name, target_res=None,
+                        siftq_compatible=True,
+                    )
+                if (_siftq_mode == "FIRST_LAST" and not _siftq_last_path
+                        and last_image_path and os.path.isfile(last_image_path)):
+                    _siftq_last_path = last_image_path
+                _roles = ["first_frame"]
+                _ready = [bool(_siftq_first_path and os.path.isfile(_siftq_first_path))]
+                if _siftq_mode == "FIRST_LAST":
+                    _roles.append("last_frame")
+                    _ready.append(bool(_siftq_last_path and os.path.isfile(_siftq_last_path)))
+                print(
+                    f"[Queue][SiftQ] request_mode=image-to-video roles={_roles!r} "
+                    f"media_ready={_ready!r} ratio='adaptive'"
+                )
 
             # Frame cursor for consecutive batch copies. Strip mode: align to the
             # input strip's in-point on the channel just above it. Prompt mode: no
@@ -2119,7 +2281,8 @@ class SEQUENCER_OT_add_to_queue(Operator):
                 # (3DREAL frame-0 appearance reference → the MAIN input video
                 # drives control_video), or a META whose first MOVIE/SCENE/SOUND/
                 # IMAGE children supply the control references.
-                if not control_video_path:
+                if (not control_video_path and _pi is not None
+                        and getattr(_pi, "supports_input_downscale", False)):
                     _ctrl_name = getattr(seq_scene, "ltx23ic_control_strip", "")
                     _ctrl_s = se.strips.get(_ctrl_name) if (_ctrl_name and se) else None
                     print(f"[Queue][dbg] Ref Strip: name={_ctrl_name!r} "
@@ -2251,6 +2414,9 @@ class SEQUENCER_OT_add_to_queue(Operator):
 
                 for attr, val in common.items():
                     setattr(job, attr, val)
+                if model_card == "siftq/minimax-h3":
+                    job.siftq_ref_strip_1_path = _siftq_first_path
+                    job.siftq_ref_strip_2_path = _siftq_last_path
 
                 # For TEXT strips: prepend the strip's text to the prompt,
                 # matching the non-queue behaviour: strip.text + ", " + base_prompt
@@ -2298,7 +2464,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
             self.report({"WARNING"}, "Nothing to queue.")
             return {"CANCELLED"}
 
-        label = f"{added} job(s)" if added > 1 else (prompt[:40] + ("…" if len(prompt) > 40 else ""))
+        label = f"{added} job(s)" if added > 1 else (prompt[:40] + ("..." if len(prompt) > 40 else ""))
         self.report({"INFO"}, f"Queued: {label}")
         return {"FINISHED"}
 
@@ -2361,6 +2527,9 @@ def _queue_start_job(scene, job) -> None:
         *(f"klein_strip_{_n}" for _n in range(1, 10)),
         "klein_visible_strips",
         *(f"flux_strip_{_n}_path" for _n in range(1, 10)),
+        "siftq_ref_count",
+        *(f"siftq_ref_strip_{_n}_path" for _n in range(1, 10)),
+        *(f"siftq_ref_strip_{_n}" for _n in range(1, 10)),
         "minimax_subject_path",
         "nano_banana_ref_count",
         *(f"nano_banana_ref_strip_{_n}_path" for _n in range(1, 10)),
@@ -2389,6 +2558,8 @@ def _queue_start_job(scene, job) -> None:
         "nano_banana_model", "nano_banana_aspect", "nano_banana_resolution",
         "veo_model", "veo_aspect", "veo_resolution", "veo_duration",
         "veo_person_generation", "veo_image_mode",
+        "siftq_mode", "siftq_resolution", "siftq_duration", "siftq_ratio",
+        "siftq_reference_ratio",
         "marlin_mode", "marlin_find_query",
     )}
     _cancel_event.clear()
@@ -2918,6 +3089,12 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 ("veo_duration",           "8"),
                 ("veo_person_generation",  "allow_adult"),
                 ("veo_image_mode",         "AUTO"),
+                # SiftQ MiniMax-H3 V2
+                ("siftq_mode",             "TEXT"),
+                ("siftq_resolution",       "768P"),
+                ("siftq_duration",         5),
+                ("siftq_ratio",            "16:9"),
+                ("siftq_reference_ratio",  "16:9"),
             ]:
                 _v = result.get(_k, _def)
                 if _v != _def:
@@ -2934,6 +3111,15 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 "veo_ref_strip_1", "veo_ref_strip_2", "veo_ref_strip_3",
                 *(f"nano_banana_ref_strip_{_n}_path" for _n in range(1, _nb_count + 1)),
                 "veo_ref_strip_1_path", "veo_ref_strip_2_path", "veo_ref_strip_3_path",
+            ):
+                if result.get(_k):
+                    extra_meta[_k] = result.get(_k)
+            _siftq_count = max(1, min(int(result.get("siftq_ref_count", 3) or 3), 9))
+            if any(result.get(f"siftq_ref_strip_{_n}") for _n in range(1, _siftq_count + 1)):
+                extra_meta["siftq_ref_count"] = _siftq_count
+            for _k in (
+                *(f"siftq_ref_strip_{_n}" for _n in range(1, _siftq_count + 1)),
+                *(f"siftq_ref_strip_{_n}_path" for _n in range(1, _siftq_count + 1)),
             ):
                 if result.get(_k):
                     extra_meta[_k] = result.get(_k)
@@ -3293,6 +3479,19 @@ class SEQUENCER_OT_redo_from_job(Operator):
             scene.veo_duration               = job.veo_duration
             scene.veo_person_generation      = job.veo_person_generation
             scene.veo_image_mode             = job.veo_image_mode
+        # SiftQ MiniMax-H3 V2
+        if hasattr(scene, "siftq_mode"):
+            scene.siftq_mode                 = job.siftq_mode
+            scene.siftq_resolution           = job.siftq_resolution
+            scene.siftq_duration             = job.siftq_duration
+            scene.siftq_ratio                = job.siftq_ratio
+            scene.siftq_reference_ratio      = getattr(job, "siftq_reference_ratio", "16:9")
+            scene.siftq_ref_count            = getattr(job, "siftq_ref_count", 3) or 3
+            for _index in range(1, 10):
+                setattr(
+                    scene, f"siftq_ref_strip_{_index}",
+                    getattr(job, f"siftq_ref_strip_{_index}", ""),
+                )
         # Reference strips (re-rendered from the restored names at queue time)
         if hasattr(scene, "nano_banana_ref_count"):
             scene.nano_banana_ref_count = getattr(job, "nano_banana_ref_count", 3) or 3

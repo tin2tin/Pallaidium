@@ -15,7 +15,7 @@ type = "add-on"
 
 # Optional list defined by Blender and server, see:
 # https://docs.blender.org/manual/en/dev/advanced/extensions/tags.html
-tags = ["Sequencer", "AI", "Media Generation"]
+tags = ["Sequencer"]
 
 blender_version_min = "3.4.0"
 # # Optional: Blender version that the extension does not support, earlier versions are supported.
@@ -58,8 +58,8 @@ license = [
 # # Keep this a single short sentence without a period (.) at the end.
 # # For longer explanations use the documentation or detail page.
 #
-# [permissions]
-# network = "Need to sync motion-capture data to server"
+[permissions]
+network = "Connect to cloud providers for media generation"
 # files = "Import/export FBX from/to disk"
 # clipboard = "Copy and paste bone transforms"
 
@@ -69,12 +69,19 @@ license = [
 paths_exclude_pattern = [
   "__pycache__/",
   "/.git/",
+  "/.claude/",
+  "/.gitignore",
   "/*.zip",
   # Example remote-backend servers (mock + fal.ai adapter): shipped in the repo
   # for the tutorial, but not part of the installable add-on.
   "/remote_backends/",
   # Dev/test artifacts.
+  "/test.py",
+  "/test_models.py",
   "/test_remote_backend.py",
+  "/test_siftq_provider.py",
+  "/test_pkg/",
+  "/_diag_scene_input.log",
 ]
 
 # Additional Information from bl_info

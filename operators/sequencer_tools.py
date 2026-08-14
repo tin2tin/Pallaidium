@@ -16,7 +16,7 @@ class SequencerOpenAudioFile(Operator, ImportHelper):
     bl_idname = "sequencer.open_audio_filebrowser"
     bl_label = "Open Audio File Browser"
     filter_glob: StringProperty(
-        default="*.wav;",
+        default="*.wav;*.mp3;",
         options={"HIDDEN"},
     )
     # Which scene StringProperty to write the chosen path into. Defaults to the
@@ -27,7 +27,7 @@ class SequencerOpenAudioFile(Operator, ImportHelper):
     def execute(self, context):
         scene = context.scene
         if self.filepath and os.path.exists(self.filepath):
-            valid_extensions = {".wav"}
+            valid_extensions = {".wav", ".mp3"}
             filename, extension = os.path.splitext(self.filepath)
             if extension.lower() in valid_extensions:
                 print("Selected audio file:", self.filepath)
@@ -37,7 +37,7 @@ class SequencerOpenAudioFile(Operator, ImportHelper):
                 else:
                     scene.ref_audio_path = bpy.path.abspath(self.filepath)
             else:
-                print("Info: Only wav is allowed.")
+                print("Info: Only WAV or MP3 is allowed.")
         else:
             self.report({"ERROR"}, "Selected file does not exist.")
             return {"CANCELLED"}
@@ -157,6 +157,13 @@ class SEQUENCER_OT_ai_strip_picker(Operator):
                 self.report({"INFO"}, f"Picked '{strip.name}'")
                 if find_strip_by_name(scene, strip.name):
                     setattr(scene, f"veo_ref_strip_{_i}", strip.name)
+                break
+
+        for _i in range(1, 10):
+            if self.action == f"siftq_select{_i}":
+                self.report({"INFO"}, f"Picked '{strip.name}'")
+                if find_strip_by_name(scene, strip.name):
+                    setattr(scene, f"siftq_ref_strip_{_i}", strip.name)
                 break
 
         if self.action == "ltx23ic_control_select":

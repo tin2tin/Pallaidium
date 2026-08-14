@@ -4171,6 +4171,28 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
             except (TypeError, ValueError):
                 pass
 
+        # SiftQ MiniMax-H3 V2 settings and reference-strip names. Resolved
+        # paths are intentionally not restored into scene properties: names
+        # let Add to Queue re-render the current source strips, matching Veo
+        # and Nano Banana's metadata redo behavior.
+        for _attr in [
+            "siftq_mode", "siftq_resolution", "siftq_ratio", "siftq_reference_ratio",
+            *(f"siftq_ref_strip_{_n}" for _n in range(1, 10)),
+        ]:
+            _v = _get(_attr)
+            if _v is not None and hasattr(scene, _attr):
+                try:
+                    setattr(scene, _attr, str(_v))
+                except Exception:
+                    pass
+        for _attr in ("siftq_duration", "siftq_ref_count"):
+            _v = _get(_attr)
+            if _v is not None and hasattr(scene, _attr):
+                try:
+                    setattr(scene, _attr, int(_v))
+                except (TypeError, ValueError):
+                    pass
+
         # Klein reference strips — restoring the names lets the queue re-render
         # the reference images from the source strips on Redo.
         for _attr in (f"klein_strip_{_n}" for _n in range(1, 10)):
