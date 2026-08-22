@@ -305,6 +305,9 @@ class RenderQueueJob(PropertyGroup):
     ltx23m_audio_start_time:     FloatProperty(default=0.0)
     ltx23m_image_strength:       FloatProperty(default=1.0)
 
+    # minimax_h3 — resolved second reference strip path (ref2va)
+    h3_ref_strip_path:           StringProperty(default="")
+
     # ltx23_multi_ic_lora — IC-LoRA control paths + params
     ltx23ic_control_video_path:  StringProperty(default="")
     ltx23ic_control_audio_path:  StringProperty(default="")
@@ -583,6 +586,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             inpaint_selected_strip         = "",
             kontext_strip_1                = "",
             kontext_strip_1_path           = snapshot.get("kontext_strip_1_path", ""),
+            h3_ref_strip_path               = snapshot.get("h3_ref_strip_path", ""),
             qwen_strip_1_path              = snapshot.get("qwen_strip_1_path", ""),
             qwen_strip_2_path              = snapshot.get("qwen_strip_2_path", ""),
             qwen_strip_3_path              = snapshot.get("qwen_strip_3_path", ""),
@@ -2095,6 +2099,34 @@ class SEQUENCER_OT_add_to_queue(Operator):
                 job.last_image_path    = last_image_path
                 job.middle_images_json = middle_images_json
 
+                # minimax_h3 — second reference strip (image or video), resolved
+                # at queue time so the worker doesn't need live scene access.
+                # Long MOVIE refs are trimmed to _H3_REF_VIDEO_MAX_FRAMES before
+                # ever reaching the pipeline: every extra frame adds real cost in
+                # the block-level-offloaded conditioner encode (a 201-frame/8.4s
+                # ref was reported hanging for many minutes on 11GB VRAM), and
+                # the model's own minimum reference length is only 13 frames.
+                job.h3_ref_strip_path = ""
+                _h3_ref_name = getattr(seq_scene, "h3_ref_strip", "")
+                if _h3_ref_name and se:
+                    _h3_ref_s = se.strips.get(_h3_ref_name)
+                    if _h3_ref_s:
+                        _H3_REF_VIDEO_MAX_FRAMES = 72  # ~3s @ 24fps
+                        _h3_p = None
+                        if _h3_ref_s.type == "MOVIE" and _h3_ref_s.frame_final_duration > _H3_REF_VIDEO_MAX_FRAMES:
+                            from ..utils.helpers import render_strip_to_path
+                            _h3_p = render_strip_to_path(
+                                context, _h3_ref_s, image_output=False,
+                                num_frames=_H3_REF_VIDEO_MAX_FRAMES,
+                            )
+                            print(f"[Queue][dbg] H3 Ref Strip '{_h3_ref_s.name}' trimmed "
+                                  f"{_h3_ref_s.frame_final_duration}→{_H3_REF_VIDEO_MAX_FRAMES} frames → {_h3_p!r}")
+                        else:
+                            from ..utils.helpers import get_strip_path as _get_strip_path
+                            _h3_p = _get_strip_path(_h3_ref_s)
+                        if _h3_p and os.path.isfile(_h3_p):
+                            job.h3_ref_strip_path = _h3_p
+
                 # IC-LoRA / V2 — resolved at queue time so the worker is self-contained
                 job.ltx23ic_control_video_path = control_video_path
                 job.ltx23ic_control_audio_path = control_audio_path
@@ -2356,6 +2388,7 @@ def _queue_start_job(scene, job) -> None:
         "moss_ref_audio_path",
         "stem_split_model", "stem_split_vocals", "stem_split_drums",
         "stem_split_bass", "stem_split_other", "stem_split_guitar", "stem_split_piano",
+        "h3_ref_strip_path",
         "qwen_strip_1_path", "qwen_strip_2_path", "qwen_strip_3_path",
         *(f"klein_strip_{_n}_path" for _n in range(1, 10)),
         *(f"klein_strip_{_n}" for _n in range(1, 10)),
@@ -2988,7 +3021,7 @@ def _queue_insert_strip(scene, result: dict) -> None:
             for _k in (
                 "image_path", "last_image_path", "middle_images_json",
                 "movie_path", "sound_path", "ref_audio_path", "ref_text",
-                "kontext_strip_1_path",
+                "kontext_strip_1_path", "h3_ref_strip_path",
                 "qwen_strip_1_path", "qwen_strip_2_path", "qwen_strip_3_path",
                 *(f"klein_strip_{_n}_path" for _n in range(1, 10)),
             ):

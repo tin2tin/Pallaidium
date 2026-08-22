@@ -30,7 +30,7 @@ typer-slim==0.20.0
 rich==13.9.4
 networkx==3.6
 einops==0.8.1
-huggingface_hub==1.15.0
+huggingface_hub==1.25.1
 hf_xet
 smart_open==7.5.0
 platformdirs==4.5.0
@@ -42,7 +42,7 @@ standard-chunk
 standard-sunau
 
 # --- ML Framework Dependencies & Extensions ---
-# sdnq is pinned to ==0.2.0 in DependencyManager.get_phase_3_git_and_extensions (skip-if-present)
+# sdnq is pinned to ==0.2.4 in DependencyManager.get_phase_3_git_and_extensions (skip-if-present)
 optimum-quanto
 timm==1.0.22
 kornia==0.8.2

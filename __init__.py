@@ -770,6 +770,9 @@ def register():
     bpy.types.Scene.ltx23m_audio_start_time     = bpy.props.FloatProperty(name="Audio Start Time",     default=0.0, min=0.0, max=3600.0, description="Audio condition start time in seconds (computed from strip offset)")
     bpy.types.Scene.ltx23m_image_strength       = bpy.props.FloatProperty(name="Image Strength",       default=1.0, min=0.0, max=1.0,  description="Conditioning strength for every image anchor (first frame, last frame, and any middle anchors). 1.0 hard-locks each anchor frame to its reference image; lower values loosen the lock, trading appearance fidelity for more motion freedom")
 
+    # minimax_h3 — second reference strip (ref2va), image or video
+    bpy.types.Scene.h3_ref_strip                = bpy.props.StringProperty(name="H3 Ref Strip",         default="",  description="Name of a second reference strip (image or video) for MiniMax H3's ref2va mode")
+
     # ltx23_multi_ic_lora — IC-LoRA control params
     bpy.types.Scene.ltx23ic_control_strip       = bpy.props.StringProperty(name="IC-LoRA Ref Strip",    default="",  description="Name of the IC-LoRA reference strip (META or MOVIE)")
     bpy.types.Scene.ltx23ic_control_strength    = bpy.props.FloatProperty( name="Control Strength",     default=1.0, min=0.0, max=1.0,  description="Strength of IC-LoRA reference token conditioning")
@@ -1517,6 +1520,9 @@ def unregister():
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
     for _prop in ("chatterbox_mtl_language",):
+        if hasattr(bpy.types.Scene, _prop):
+            delattr(bpy.types.Scene, _prop)
+    for _prop in ("h3_ref_strip",):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
     for _prop in (

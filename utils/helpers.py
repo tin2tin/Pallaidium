@@ -1437,9 +1437,15 @@ class DependencyManager:
             "faster-qwen3-tts",
             #"git+https://github.com/QwenLM/Qwen3-TTS.git",
             #"git+https://github.com/huggingface/parler-tts.git",
-            # Pinned: the git main of sdnq tracks diffusers main too closely and
-            # regresses; 0.2.0 is the known-good release for our quantized loads.
-            "sdnq==0.2.0",
+            # Pinned (was 0.2.0 — git main of sdnq tracks diffusers main too
+            # closely and regresses). Bumped to 0.2.4 for MiniMax H3, which
+            # needs >=0.2.2; 0.2.0->0.2.4 changelog is additive only (new
+            # kernels/env vars, a double-quantization guard). Re-verify the
+            # other SDNQ plugins (ernie, ernie_turbo, krea2_turbo,
+            # marlin_video_captions, ltx23_multi_ic_lora*) still load and
+            # generate correctly before trusting this for release — if any
+            # regress, revert to 0.2.0 here.
+            "sdnq==0.2.4",
             "stable-audio-tools",
             "torcheval",
             "torchao",
