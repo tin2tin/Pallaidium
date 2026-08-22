@@ -5,18 +5,20 @@ from ...utils.helpers import gfx_device, low_vram, solve_path, clean_filename
 
 
 class AceStepPlugin(ModelPlugin):
-    MODEL_ID     = "ACE-Step/acestep-v15-xl-turbo-diffusers"
+    #MODEL_ID     = "ACE-Step/acestep-v15-xl-turbo-diffusers"
+    MODEL_ID     = "Runware/acestep-v15-turbo-diffusers"
     DISPLAY_NAME = "Music: ACE-Step"
     MODEL_TYPE   = "audio"
     DESCRIPTION  = "High-quality text-to-music via ACE-Step (Rectified Flow)"
 
-    INPUTS       = InputSpec.PROMPT | InputSpec.MUSIC_PARAMS
+    INPUTS       = InputSpec.PROMPT | InputSpec.MUSIC_PARAMS | InputSpec.LORA
     UI_SECTIONS  = [
         UISection.PROMPT,
         UISection.AUDIO_DURATION,
         UISection.STEPS, UISection.GUIDANCE,
         UISection.MUSIC_PARAMS,
         UISection.SEED,
+        UISection.LORA,
     ]
     PARAMS            = ParamSpec(steps=60, guidance=3.5, audio_length=30.0)
     REQUIRED_PACKAGES = ["torch", "diffusers", "accelerate"]
@@ -33,6 +35,25 @@ class AceStepPlugin(ModelPlugin):
             self.MODEL_ID, torch_dtype=torch.bfloat16, cache_dir=_cache_dir,
             local_files_only=prefs.local_files_only,
         )
+
+        enabled_items = kw.get("enabled_items", [])
+        if enabled_items:
+            from ...utils.helpers import clean_filename, bpy
+            lora_folder = getattr(bpy.context.scene, "lora_folder", "")
+            names, weights = [], []
+            for item in enabled_items:
+                name = clean_filename(item.name).replace(".", "")
+                names.append(name)
+                weights.append(item.weight_value)
+                pipe.load_lora_weights(
+                    bpy.path.abspath(lora_folder),
+                    weight_name=item.name + ".safetensors",
+                    adapter_name=name,
+                )
+                print(f"ACE-Step: user LoRA '{item.name}' loaded (adapter='{name}', weight={item.weight_value:.2f})")
+            pipe.set_adapters(names, adapter_weights=weights)
+            print(f"ACE-Step: active adapters={names} weights={weights}")
+
         if gfx_device == "mps":
             pipe.to("mps")
         elif low_vram():
