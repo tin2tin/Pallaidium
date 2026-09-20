@@ -134,21 +134,31 @@ class MiniMaxH3Plugin(ModelPlugin):
         # use_stream=False: streamed group-offload pins page-locked host RAM on
         # every onload, which dies mid-forward on this Windows/Blender stack
         # ("CUDA error: out of memory" / "resource already mapped") even when
-        # VRAM is free — see the same fix in ltx23_multi.py. num_blocks_per_group=1
-        # matches the upstream docs' own 24-32GB consumer-card recipe.
+        # VRAM is free — see the same fix in ltx23_multi.py.
         #
         # Both transformer partitions stream here even though their static
-        # weights (~11GB at 4-bit) would fit resident on a 24GB card: for
+        # weights (~11GB each at 4-bit) would fit resident on a 24GB card: for
         # ref2va with a video+image reference, the conditioner's activation
         # memory (attention over many extra vision tokens) is large enough
         # that resident transformers pushed total usage past 24GB — observed
         # as Windows silently spilling into shared GPU memory (reported as
         # ~32GB "VRAM" on a 24GB card) rather than an OOM error, which is far
-        # slower than streaming, not faster. Keep this conservative until
-        # there's a way to actually measure peak activation usage per
-        # workload rather than guess at it.
+        # slower than streaming, not faster.
+        #
+        # `transformer` (the only partition t2va/fl2va ever actually run)
+        # uses num_blocks_per_group=2 as a speed test: a 1280x736x120f fl2va
+        # job measured 19GB/24GB used at group=1 (34.04s/it) — 5GB of
+        # headroom going unused specifically because group=1 maximizes
+        # transfer round-trips over VRAM footprint. Doubling the group size
+        # halves those round-trips per step in exchange for a modest VRAM
+        # bump. `transformer_ref` stays at 1: it's never invoked by t2va/fl2va
+        # (idle weights add ~0 VRAM cost while offloaded), so there's no
+        # speed to gain there, only risk, on the workflow this was tested on.
+        # If this regresses VRAM (spills into shared memory again — check
+        # Task Manager GPU usage, a real number should stay <= 24GB) or
+        # doesn't measurably help, drop it back to 1.
         offload = dict(onload_device=onload_device, offload_device=offload_device, use_stream=False, low_cpu_mem_usage=True)
-        pipe.transformer.enable_group_offload(offload_type="block_level", num_blocks_per_group=1, **offload)
+        pipe.transformer.enable_group_offload(offload_type="block_level", num_blocks_per_group=2, **offload)
         pipe.transformer_ref.enable_group_offload(offload_type="block_level", num_blocks_per_group=1, **offload)
         apply_group_offloading(pipe.text_encoder.model, offload_type="leaf_level", **offload)
         # VAEs stay fully on-GPU: they're small, and block-level offload hooks
