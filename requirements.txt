@@ -30,7 +30,7 @@ typer-slim==0.20.0
 rich==13.9.4
 networkx==3.6
 einops==0.8.1
-huggingface_hub==1.25.1
+huggingface_hub==1.32.0
 hf_xet
 smart_open==7.5.0
 platformdirs==4.5.0
