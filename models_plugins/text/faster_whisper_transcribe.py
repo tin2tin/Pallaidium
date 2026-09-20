@@ -198,7 +198,19 @@ class FasterWhisperTranscribePlugin(ModelPlugin):
         lang_code    = getattr(scene, "whisper_language",   "auto")
         language     = None if lang_code == "auto" else lang_code
 
-        seq_editor = scene.sequence_editor
+        # In Blender 5.x the VSE shows context.workspace.sequencer_scene, which
+        # can differ from the "active" scene (the `scene` param here is the
+        # scene the queue timer was started from). Strips — and therefore the
+        # transcribed subtitles — must land in the sequencer scene, not
+        # necessarily `scene`. Mirrors the same fallback chain used by
+        # SEQUENCER_OT_add_to_queue.execute() (operators/queue_ops.py) and
+        # the Mist/Depth Pass plugin.
+        seq_scene = (
+            getattr(bpy.context, "sequencer_scene", None)
+            or getattr(bpy.context.workspace, "sequencer_scene", None)
+            or scene
+        )
+        seq_editor = seq_scene.sequence_editor
         if not seq_editor:
             print("Whisper Transcribe: No sequence editor found.")
             return None
