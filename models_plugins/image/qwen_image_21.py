@@ -73,8 +73,17 @@ class QwenImage21Plugin(ModelPlugin):
             pipe.set_adapters(names, adapter_weights=weights)
             print(f"Qwen-Image 2.1 Turbo: active adapters={names} weights={weights}")
 
-        # Large outputs (the card samples at 1696x2528) spike VRAM on decode.
-        pipe.vae.enable_tiling()
+        # Large outputs (the card samples at 1696x2528) run the full-frame VAE
+        # decode out of memory, but diffusers' tiling for this VAE leaves
+        # visible seams. Decode (and encode the reference images) in exact row
+        # strips instead: bounded memory, output identical to an untiled pass.
+        # Fall back to tiling if a future diffusers changes the VAE layout.
+        try:
+            from ._qwen_image_21_vae_strips import patch_vae
+            patch_vae(pipe.vae)
+        except Exception as e:
+            print(f"Qwen-Image 2.1 Turbo: strip VAE decode unavailable ({e}); using tiling (may show seams).")
+            pipe.vae.enable_tiling()
 
         # NOT enable_group_offload: leaf-level streaming can leave SDNQ side
         # buffers (scale / zero_point) on CPU → cross-device dequant → noise.
