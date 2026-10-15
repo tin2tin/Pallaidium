@@ -92,11 +92,39 @@ class Florence2LayerData(PropertyGroup):
         name="Color Palette",
         description="Per-element palette, up to 5 #RRGGBB colors",
     )
+    # FLUX.3 layout: the region id the caption tags as <id> (kept stable across
+    # round trips), and the layout-edit source. With a source box set, the
+    # layer's own box is where the region ends up (tgt_bbox).
+    f2_id:       StringProperty(name="Region ID", description="FLUX.3 region id, tagged in the caption as <id>")
+    f2_src_bbox: StringProperty(
+        name="Source Box",
+        description="FLUX.3 layout edit: where this region is in the reference image ([y0,x0,y1,x1], 0-1000). "
+                    "Empty = a new region, not an edit",
+    )
+    f2_from_ref: IntProperty(
+        name="From Ref",
+        description="FLUX.3 layout edit: the reference image the region comes from (<ref_image_N>)",
+        default=0, min=0, max=9,
+    )
+    f2_remove:   BoolProperty(
+        name="Remove",
+        description="FLUX.3 layout edit: remove this region from the reference instead of moving it",
+        default=False,
+    )
 
 
 class Florence2MaskProps(PropertyGroup):
     f2_high_level_description: StringProperty(name="Scene Description")
     f2_background:             StringProperty(name="Background")
+    f2_background_id:          StringProperty(name="Background ID")   # FLUX.3 region id
+    f2_edit_layout:            BoolProperty(
+        name="Edit Layout",
+        description=(
+            "FLUX.3: the layout edits reference images. Boxes without a source box become new content "
+            '("from": "target"). On automatically when any box has a source box'
+        ),
+        default=False,
+    )
     # style_description individual fields
     f2_is_photo:               BoolProperty(
         name="Photo",
@@ -146,6 +174,10 @@ def _add_layer_data(mask, layer_name: str, elem: dict) -> "Florence2LayerData":
     item.f2_color = _parse_color_string(first)
     item.f2_font  = _FONT_ALIAS_MAP.get((elem.get("font") or "").strip().lower(), "small")
     item.f2_bbox  = json.dumps(elem.get("bbox", [0, 0, 1000, 1000]))
+    item.f2_id       = elem.get("id", "") or ""
+    item.f2_src_bbox = json.dumps(elem["src_bbox"]) if elem.get("src_bbox") else ""
+    item.f2_from_ref = int(elem.get("from_ref", 0) or 0)
+    item.f2_remove   = bool(elem.get("remove", False))
     return item
 
 
@@ -341,6 +373,8 @@ def _populate_mask_from_data(mask, data: dict, W: int, H: int) -> None:
     mp = mask.florence2_props
     mp.f2_high_level_description = data.get("high_level_description", "")
     mp.f2_background = data.get("compositional_deconstruction", {}).get("background", "")
+    mp.f2_background_id = data.get("compositional_deconstruction", {}).get("background_id", "")
+    mp.f2_edit_layout   = bool(data.get("compositional_deconstruction", {}).get("edit", False))
     style = data.get("style_description", {})
     mp.f2_style_json = json.dumps(style, ensure_ascii=False)
     mp.f2_is_photo   = "photo" in style
@@ -371,6 +405,9 @@ def _populate_mask_from_data(mask, data: dict, W: int, H: int) -> None:
             _add_layer_data(mask, actual_name, {
                 "type":  elem_type, "desc": desc, "text": text_val,
                 "color": elem.get("color", ""), "font": elem.get("font", ""), "bbox": bbox,
+                "color_palette": elem.get("color_palette") or [],
+                "id": elem.get("id", ""), "src_bbox": elem.get("src_bbox"),
+                "from_ref": elem.get("from_ref", 0), "remove": elem.get("remove", False),
             })
             cx, cy, hx, hy = _bbox_to_mask(bbox, W, H)
             hx = max(hx, 0.001)
@@ -411,10 +448,16 @@ def apply_florence_json_to_mask(json_str: str, source_image_path: str) -> None:
     if not source_image_path:
         source_image_path = meta.get("image", "")
 
+    data, msg = None, ""
     try:
         data = json.loads(clean_json)
     except Exception as exc:
-        msg = f"JSON parse error: {exc}"
+        # Not Box Editor JSON: maybe a FLUX.3 layout prompt (caption + regions).
+        from ..utils.flux3_layout import flux3_to_ideogram
+        data = flux3_to_ideogram(json_str)
+        msg = f"Neither Box Editor JSON nor a FLUX.3 layout prompt ({exc})"
+    if not isinstance(data, dict):
+        msg = msg or "Neither Box Editor JSON nor a FLUX.3 layout prompt"
         _dbg(f"[Florence2Mask] {msg}")
         try:
             bpy.context.window_manager.popup_menu(
@@ -633,6 +676,7 @@ class FLORENCE2_PT_mask_panel(Panel):
         row.operator("florence2.new_box_editor", text="New",  icon="FILE_NEW")
         row.operator("florence2.load_box_json",  text="Load", icon="FILEBROWSER")
         row.operator("florence2.save_box_json",  text="Save", icon="FILE_TICK")
+        layout.operator("florence2.strip_to_box_editor", icon="SEQUENCE")
 
         # ── Scene-level description ──────────────────────────────────────────
         box = layout.box()
@@ -640,6 +684,7 @@ class FLORENCE2_PT_mask_panel(Panel):
         box.textbox(mp, "f2_high_level_description", placeholder="Scene description...")
         box.label(text="Background:")
         box.textbox(mp, "f2_background", placeholder="Background description...")
+        box.prop(mp, "f2_edit_layout", text="FLUX.3 Edit Layout (boxes relative to references)")
 
         # ── Style description ────────────────────────────────────────────────
         box = layout.box()
@@ -690,7 +735,7 @@ class FLORENCE2_PT_mask_panel(Panel):
         active = mask.layers.active
         if active is None:
             layout.separator()
-            layout.operator("florence2.export_strip", icon="SEQUENCE")
+            _draw_export_buttons(layout)
             return
 
         box.separator()
@@ -714,11 +759,120 @@ class FLORENCE2_PT_mask_panel(Panel):
                 box.textbox(ld, "f2_text", placeholder="Text to render in image...")
             box.label(text="Color Palette (up to 5):")
             _draw_palette(box, ld.f2_palette, "layer", layer_name=active.name, limit=5)
+
+            # ── FLUX.3 layout edit ────────────────────────────────────────────
+            sub = box.box().column(align=True)
+            sub.label(text="FLUX.3 Layout", icon="OUTLINER_OB_IMAGE")
+            sub.prop(ld, "f2_id", text="ID")
+            if ld.f2_src_bbox:
+                sub.label(text=f"Source: {ld.f2_src_bbox}")
+                row = sub.row(align=True)
+                row.prop(ld, "f2_from_ref", text="From <ref_image_N>")
+                row.prop(ld, "f2_remove", toggle=True)
+                sub.label(text="Move the box to the target position" if not ld.f2_remove
+                          else "The region will be removed", icon="INFO")
+                row = sub.row(align=True)
+                row.operator("florence2.set_source_box", text="Re-capture Source", icon="FILE_REFRESH")
+                row.operator("florence2.clear_source_box", text="", icon="X")
+            else:
+                if mp.f2_edit_layout or any(l.f2_src_bbox for l in mp.f2_layers):
+                    sub.label(text='New content ("from": "target")', icon="ADD")
+                sub.operator("florence2.set_source_box", icon="PIVOT_BOUNDBOX")
         else:
             box.label(text="(Non-Florence layer)", icon="INFO")
 
         layout.separator()
-        layout.operator("florence2.export_strip", icon="SEQUENCE")
+        _draw_export_buttons(layout)
+
+
+def _draw_export_buttons(layout):
+    col = layout.column(align=True)
+    col.operator("florence2.export_strip", text="Export Ideogram JSON to Strip",
+                 icon="SEQUENCE").format = "IDEOGRAM"
+    col.operator("florence2.export_strip", text="Export FLUX.3 Layout to Strip",
+                 icon="SEQUENCE").format = "FLUX3"
+
+
+def _active_box_layer(context):
+    """(mask, layer, layer_data, W, H) for the active Box Editor layer, or Nones."""
+    space = getattr(context, "space_data", None)
+    mask = getattr(space, "mask", None)
+    if mask is None or mask.layers.active is None:
+        return None, None, None, 0, 0
+    layer = mask.layers.active
+    img = getattr(space, "image", None)
+    W = img.size[0] if img else 1920
+    H = img.size[1] if img else 1080
+    return mask, layer, _get_layer_data(layer, mask), W, H
+
+
+class FLORENCE2_OT_set_source_box(Operator):
+    bl_idname      = "florence2.set_source_box"
+    bl_label       = "Set as Source Box"
+    bl_description = (
+        "FLUX.3 layout edit: store the box's current position as where the region is in the "
+        "reference image. Then move the box to where it should end up"
+    )
+    bl_options     = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        _m, layer, ld, _w, _h = _active_box_layer(context)
+        return ld is not None and bool(layer.splines)
+
+    def execute(self, context):
+        _m, layer, ld, W, H = _active_box_layer(context)
+        ld.f2_src_bbox = json.dumps(_spline_to_bbox(layer.splines[0], W, H))
+        return {"FINISHED"}
+
+
+class FLORENCE2_OT_clear_source_box(Operator):
+    bl_idname      = "florence2.clear_source_box"
+    bl_label       = "Clear Source Box"
+    bl_description = "Make this a new region again instead of a layout edit of a reference"
+    bl_options     = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return _active_box_layer(context)[2] is not None
+
+    def execute(self, context):
+        ld = _active_box_layer(context)[2]
+        ld.f2_src_bbox = ""
+        ld.f2_remove = False
+        return {"FINISHED"}
+
+
+class FLORENCE2_OT_strip_to_box_editor(Operator):
+    bl_idname      = "florence2.strip_to_box_editor"
+    bl_label       = "Active Strip to Box Editor"
+    bl_description = (
+        "Open the active VSE strip's layout in the Box Editor: a text strip's Ideogram JSON or FLUX.3 "
+        "layout prompt, or the prompt stored in a generated strip's metadata (with its image as backdrop)"
+    )
+
+    def execute(self, context):
+        from ..utils.helpers import AI_METADATA_PREFIX
+        seq_scene = getattr(context, "sequencer_scene", None) or context.scene
+        ed = seq_scene.sequence_editor
+        strip = ed.active_strip if ed else None
+        if strip is None:
+            self.report({"WARNING"}, "No active strip in the sequencer")
+            return {"CANCELLED"}
+        text = getattr(strip, "text", "") if strip.type == "TEXT" else ""
+        if not text:
+            try:
+                text = str(strip.get(f"{AI_METADATA_PREFIX}prompt", "") or "")
+            except Exception:
+                text = ""
+        if not text.strip():
+            self.report({"WARNING"}, f"Strip '{strip.name}' holds no layout text or prompt")
+            return {"CANCELLED"}
+        image_path = ""
+        if strip.type == "IMAGE" and len(strip.elements):
+            image_path = bpy.path.abspath(os.path.join(strip.directory, strip.elements[0].filename))
+        apply_florence_json_to_mask(text, image_path)
+        return {"FINISHED"}
 
 
 # ---------------------------------------------------------------------------
@@ -810,6 +964,16 @@ def _mask_to_json_dict(mask, W: int = 1920, H: int = 1080) -> dict:
             elem = {"type": "obj", "bbox": bbox, "desc": ld.f2_desc}
             if cp:
                 elem["color_palette"] = cp
+        # FLUX.3 layout keys (Ideogram ignores them; JSON save/load keeps them)
+        if ld.f2_id:
+            elem["id"] = ld.f2_id
+        if ld.f2_src_bbox:
+            try:
+                elem["src_bbox"] = json.loads(ld.f2_src_bbox)
+                elem["from_ref"] = ld.f2_from_ref
+                elem["remove"]   = ld.f2_remove
+            except Exception:
+                pass
         elements.append(elem)
 
     if mp.f2_aesthetics or mp.f2_lighting or mp.f2_medium:
@@ -830,13 +994,18 @@ def _mask_to_json_dict(mask, W: int = 1920, H: int = 1080) -> dict:
         except Exception:
             style = {}
 
+    comp = {
+        "background": mp.f2_background,
+        "elements":   elements,
+    }
+    if mp.f2_background_id:
+        comp["background_id"] = mp.f2_background_id
+    if mp.f2_edit_layout:
+        comp["edit"] = True
     return {
         "high_level_description": mp.f2_high_level_description,
         "style_description": style,
-        "compositional_deconstruction": {
-            "background": mp.f2_background,
-            "elements":   elements,
-        },
+        "compositional_deconstruction": comp,
     }
 
 
@@ -973,7 +1142,17 @@ class FLORENCE2_OT_save_box_json(Operator):
 class FLORENCE2_OT_export_strip(Operator):
     bl_idname      = "florence2.export_strip"
     bl_label       = "Export JSON to Strip"
-    bl_description = "Re-serialize mask bounding boxes to an Ideogram 4 JSON text strip"
+    bl_description = "Write the Box Editor layout to a text strip, usable as a prompt"
+
+    format: EnumProperty(
+        name="Format",
+        items=[
+            ("IDEOGRAM", "Ideogram 4 JSON", "Structured Ideogram 4 prompt JSON"),
+            ("FLUX3",    "FLUX.3 Layout",   "FLUX.3 caption with <id> tags plus the region box list, "
+                                            "including layout-edit source boxes"),
+        ],
+        default="IDEOGRAM",
+    )
 
     @classmethod
     def poll(cls, context):
@@ -990,7 +1169,11 @@ class FLORENCE2_OT_export_strip(Operator):
         H     = img.size[1] if img else 1080
 
         result   = _mask_to_json_dict(mask, W, H)
-        json_str = json.dumps(result, indent=2, ensure_ascii=False)
+        if self.format == "FLUX3":
+            from ..utils.flux3_layout import ideogram_to_flux3
+            json_str = ideogram_to_flux3(result)
+        else:
+            json_str = json.dumps(result, indent=2, ensure_ascii=False)
 
         seq_scene = getattr(context, "sequencer_scene", None) or context.scene
         if not seq_scene.sequence_editor:
@@ -1164,7 +1347,7 @@ class FLORENCE2_OT_open_box_editor(Operator):
 class FLORENCE2_OT_text_to_box_editor(Operator):
     bl_idname      = "florence2.text_to_box_editor"
     bl_label       = "Text to Box Editor"
-    bl_description = "Parse the current text block as Ideogram 4 JSON and send it to the Box Editor"
+    bl_description = "Parse the current text block (Ideogram 4 JSON or FLUX.3 layout) and send it to the Box Editor"
 
     @classmethod
     def poll(cls, context):
@@ -1515,6 +1698,9 @@ classes = [
     FLORENCE2_OT_layer_new_with_square,
     FLORENCE2_OT_open_box_editor,
     FLORENCE2_OT_text_to_box_editor,
+    FLORENCE2_OT_set_source_box,
+    FLORENCE2_OT_clear_source_box,
+    FLORENCE2_OT_strip_to_box_editor,
     FLORENCE2_PT_mask_panel,
 ]
 

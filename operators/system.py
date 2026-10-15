@@ -29,6 +29,7 @@ from ..utils.helpers import (
     install_requirements_binary_only,
     install_requirements_allow_source,
     repair_clobbered_namespace_packages,
+    prune_stale_dist_infos,
     write_requirements_file,
 )
 
@@ -544,6 +545,9 @@ def _run_install(snapshot: dict, cancel_event: threading.Event):
                 # Clear read-only attrs first so the repair's reinstall can
                 # delete the existing (pip-marked read-only) .pyd files.
                 _fix_site_packages_permissions(site_packages_dir)
+                # pip --target leaves old versions' .dist-info behind; drop them
+                # first so version checks (and the repair below) see one version.
+                prune_stale_dist_infos(on_line=on_line)
                 if repair_clobbered_namespace_packages(pybin, on_line=on_line):
                     _fix_site_packages_permissions(site_packages_dir)
             except Exception as exc:

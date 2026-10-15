@@ -258,6 +258,9 @@ class ModelPlugin:
                                              #         models: captioning, transcription, stem split, …)
     supports_input_downscale:  bool = False  # True  → queue honours ltx23ic_input_downscale_pct when
                                              #         pre-rendering a MOVIE/SCENE main-input strip
+    uses_box_editor:           bool = False  # True  → "Open Box Editor" button (prompt may be layout JSON)
+    LOAD_VARIANT_KEYS:         tuple = ()    # scene props load() reads (e.g. a weight source); a change
+                                             #         makes the queue reload instead of reusing the cache
 
     # -----------------------------------------------------------------------
 

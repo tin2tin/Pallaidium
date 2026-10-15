@@ -217,6 +217,24 @@ excluded from the built add-on.
 
 ## Change Log
 
+2026-10-15: Add: **FLUX.3 Klein** and **FLUX.3 Klein Base** — Black Forest Labs' [FLUX.3 Image Klein](https://huggingface.co/black-forest-labs/flux-3-image-klein) (step-distilled, 16 steps, no CFG) and [Klein Base](https://huggingface.co/black-forest-labs/flux-3-image-klein-base) (50 steps, CFG and negative prompt), via Modular Diffusers. Klein loads OzzyGT's pre-quantized SDNQ weights by default ([8-bit](https://huggingface.co/OzzyGT/Flux_3_Image_Klein_sdnq_dynamic_8bit), ~10 GB, ~15 GB VRAM peak; [4-bit](https://huggingface.co/OzzyGT/Flux_3_Image_Klein_sdnq_dynamic_4bit), ~6 GB). These are **not gated** and work out of the box. The official BFL weights (FP8, BF16, and every Klein Base option) are **gated**: before the first run, log in on the [Klein](https://huggingface.co/black-forest-labs/flux-3-image-klein) / [Klein Base](https://huggingface.co/black-forest-labs/flux-3-image-klein-base) model page with the Hugging Face account whose token Pallaidium uses and accept the FLUX Kommunity License. Otherwise the download is refused. Until a gated model is downloaded, the panel shows whether your account has access, with a button to the license page. Needs the latest diffusers (Flux3 support) and **sdnq 0.2.8** (pin bumped from 0.2.4): run Install Dependencies and restart Blender. Features:
+- **Text-to-image** and **up to 10 reference images**: the active input strip plus the 9 Ref. pickers (shared with the FLUX.2 Klein plugins). To name a reference in the prompt, count them in that order from `<ref_image_0>`: with a strip as input it is `<ref_image_0>` and the first Ref. is `<ref_image_1>`, otherwise the first Ref. is `<ref_image_0>`.
+- **Bounding-box layout**: draw boxes in the **Box Editor** ("Open Box Editor" in the panel) and use "Export FLUX.3 Layout to Strip". Box Editor/Ideogram JSON prompts are also converted on the fly.
+- **Layout edits**: per box, "Set as Source Box" stores where a region sits in a reference image. Move the box to its target, or toggle Remove to delete the region. These become `src_bbox`/`tgt_bbox` edit regions. "Active Strip to Box Editor" (or Text to Box Editor) opens a FLUX.3 layout prompt again for editing.
+- **Prompt Upsampling**: optional official [prompt upsampler](https://huggingface.co/black-forest-labs/flux-3-image-klein-pup) (Qwen3.5-9B, SDNQ int8/uint4 on the fly). It turns a short request (any language) plus references and boxes into the full English scene caption, and the boxes you drew stay exactly where they are. The prompt the model actually received is stored in the strip metadata as *Final Prompt*.
+- **Weights**:
+  - **SDNQ 8-bit** (default), or **SDNQ 4-bit** for GPUs with 12 GB or less.
+  - **FP8 (Official)**: fast on RTX 40xx and newer. On RTX 40xx, Pallaidium works around a missing torch kernel; older GPUs convert the weights back to full precision on every step.
+  - **BF16 (Official)**: the most reliable with LoRAs.
+  - Klein Base has no pre-quantized repo yet, so its SDNQ options quantize the official weights while loading. New SDNQ repos go into `_SDNQ_REPOS` in `models_plugins/image/flux3_klein.py`.
+  - Below the VRAM a weight choice needs, components are offloaded to the CPU.
+  - Changing Weights reloads the model.
+- **User LoRAs**, most reliable on BF16 weights.
+
+All settings go through the queue into the strip metadata, and both Redo from Metadata and Redo Job Settings restore them, together with the reference pickers.
+
+2026-10-15: Fix: Install Dependencies now removes stale `.dist-info` folders left behind by earlier upgrades, which made packages (e.g. sdnq) report an old version after updating. The Hugging Face token field is now only shown for models that need it (FLUX.2 Dev no longer asks for one, as its repos are not gated).
+
 2026-10-15: Add: **Qwen-Image 2.1 Turbo** — fast text-to-image and multi-reference generation via diffusers' `QwenImage21Pipeline`, loaded from the pre-quantized [OzzyGT/Qwen_Image_2_1_Turbo_sdnq_dynamic_8bit](https://huggingface.co/OzzyGT/Qwen_Image_2_1_Turbo_sdnq_dynamic_8bit) (SDNQ int8 with Hadamard rotation; needs sdnq ≥ 0.2.2, pinned at 0.2.4). Distilled to **8 steps**, sampled CFG-free (Guidance 1.0; raise it together with a negative prompt to enable true CFG). The active input strip plus up to **9 reference-image slots** (shared with the FLUX.2 Klein plugins) condition the generation, and user LoRAs are supported. The checkpoint's 8-step sigma schedule is passed explicitly, so it also works with diffusers builds that don't yet read `sample_sigmas` from `model_index.json`.
 
 2026-10-15: Add: **Ming-Image 0.1 Design** — text-to-image for UI mockups, posters and infographics with legible text, via the Modular Diffusers port ([OzzyGT/ming_image_0_1_design_diffusers](https://huggingface.co/OzzyGT/ming_image_0_1_design_diffusers) + `OzzyGT/ming_image_custom_blocks`, `trust_remote_code`). **Transparent (RGBA) output on request:** start the prompt with one of the model's trained openers — e.g. `rgba, 4-channel, transparent background`, `isolated subject, alpha matte, no background` or `cutout png, alpha=0 outside the object` — and the alpha is kept with a cleaned-up cutout; any other prompt gives an opaque RGB image. The 16B MoE text encoder (32 GB in bf16) is quantized on the fly to uint4 and the transformer to int8 with SDNQ, so the whole pipeline stays resident on a 24 GB card (whole-component CPU offload on smaller cards). 12 steps, CFG-free by default (Guidance > 1 enables CFG at double cost); width/height snap to multiples of 16, 2048×2048 recommended.
@@ -602,6 +620,7 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 - [Anima](https://huggingface.co/mrfatso/anima-preview3-diffusers)
 - [Disty0/Ideogram-4-SDNQ-4bit-dynamic-hadamard](https://huggingface.co/Disty0/Ideogram-4-SDNQ-4bit-dynamic-hadamard)
 - [Ming-Image 0.1 Design](https://huggingface.co/OzzyGT/ming_image_0_1_design_diffusers)
+- [black-forest-labs/flux-3-image-klein](https://huggingface.co/black-forest-labs/flux-3-image-klein) / [-base](https://huggingface.co/black-forest-labs/flux-3-image-klein-base) / [-pup](https://huggingface.co/black-forest-labs/flux-3-image-klein-pup)
 
 ### Audio:
 - [Chatterbox / Chatterbox Turbo](https://github.com/resemble-ai/chatterbox)

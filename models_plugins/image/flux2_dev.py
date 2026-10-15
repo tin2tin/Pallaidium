@@ -10,9 +10,11 @@ class Flux2DevPlugin(ModelPlugin):
     MODEL_ID     = "diffusers/FLUX.2-dev-bnb-4bit"
     DISPLAY_NAME = "FLUX.2 Dev (4-bit, multi-image)"
     MODEL_TYPE   = "image"
-    DESCRIPTION  = "Text-to-image with multi-image support via FLUX.2-dev (HF token required)"
+    DESCRIPTION  = "Text-to-image with multi-image support via FLUX.2-dev"
 
-    INPUTS       = InputSpec.PROMPT | InputSpec.MULTI_IMAGE | InputSpec.HF_TOKEN
+    # Neither diffusers/FLUX.2-dev-bnb-4bit nor fal/FLUX.2-dev-Turbo is gated,
+    # so no HF token field.
+    INPUTS       = InputSpec.PROMPT | InputSpec.MULTI_IMAGE
     UI_SECTIONS  = [
         UISection.PROMPT, UISection.MULTI_IMAGES,
         UISection.RESOLUTION, UISection.FRAMES, UISection.STEPS, UISection.GUIDANCE, UISection.SEED,
@@ -30,10 +32,12 @@ class Flux2DevPlugin(ModelPlugin):
 
         _cache_dir = prefs.hf_cache_dir or None
         print(f"Loading {self.MODEL_ID}…")
-        try:
-            login(token=prefs.hugginface_token, add_to_git_credential=True)
-        except Exception as e:
-            raise RuntimeError(f"HuggingFace login failed: {e}")
+        token = getattr(prefs, "hugginface_token", "")
+        if token:
+            try:
+                login(token=token, add_to_git_credential=True)
+            except Exception as e:
+                raise RuntimeError(f"HuggingFace login failed: {e}")
 
         dtype = torch.bfloat16
         _lfo = prefs.local_files_only

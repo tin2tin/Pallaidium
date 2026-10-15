@@ -1066,6 +1066,59 @@ _NS_GENERIC_DIRS = frozenset({
 })
 
 
+def prune_stale_dist_infos(on_line=None):
+    """Remove leftover ``.dist-info`` folders of older/other versions of a package.
+
+    ``pip install --target`` never uninstalls the previous version: the new
+    files overwrite the package directory, but the old ``name-X.dist-info``
+    stays next to the new one. ``importlib.metadata`` then reports whichever it
+    finds first — e.g. sdnq 0.2.0 while the code is 0.2.8 — so libraries that
+    gate on the version (diffusers/transformers' "sdnq is older than 0.2.2")
+    and SmartSkipManager's version check see a stale version.
+
+    For every package with 2+ dist-info folders, keep the one pip wrote last
+    (newest METADATA mtime — right for upgrades and downgrades alike) and delete
+    the rest. Only dist-info metadata is removed, never package code. Returns
+    the number of folders removed.
+    """
+    import shutil
+    log = on_line or print
+    sp = site_packages_dir
+    if not sp or not os.path.isdir(sp):
+        return 0
+
+    by_name: dict = {}
+    for entry in os.listdir(sp):
+        if not entry.endswith(".dist-info"):
+            continue
+        base = entry[: -len(".dist-info")]
+        if "-" not in base:
+            continue
+        name = base.rsplit("-", 1)[0].lower().replace("_", "-").replace(".", "-")
+        path = os.path.join(sp, entry)
+        meta = os.path.join(path, "METADATA")
+        try:
+            mtime = os.path.getmtime(meta if os.path.exists(meta) else path)
+        except OSError:
+            continue
+        by_name.setdefault(name, []).append((mtime, entry, path))
+
+    removed = 0
+    for name, infos in by_name.items():
+        if len(infos) < 2:
+            continue
+        infos.sort()
+        keep = infos[-1][1]
+        for _mtime, entry, path in infos[:-1]:
+            try:
+                shutil.rmtree(path)
+                removed += 1
+                log(f"PALLAIDIUM cleanup: removed stale {entry} (kept {keep})")
+            except Exception as exc:
+                log(f"PALLAIDIUM cleanup: could not remove {entry}: {exc}")
+    return removed
+
+
 def repair_clobbered_namespace_packages(pybin, on_line=None):
     """Reinstall packages clobbered out of a shared namespace directory.
 
@@ -1445,7 +1498,11 @@ class DependencyManager:
             # marlin_video_captions, ltx23_multi_ic_lora*) still load and
             # generate correctly before trusting this for release — if any
             # regress, revert to 0.2.0 here.
-            "sdnq==0.2.4",
+            # Bumped 0.2.4 -> 0.2.8 (2026-10-15) for the OzzyGT FLUX.3 Klein SDNQ
+            # repos, which need >=0.2.8; 0.2.5-0.2.8 changelogs are additive
+            # (double-quantized scales, codebook quant, kernel tuning). Same
+            # re-verification note as above applies.
+            "sdnq==0.2.8",
             "stable-audio-tools",
             "torcheval",
             "torchao",
@@ -4242,6 +4299,47 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
                 except Exception:
                     pass
 
+        # Krea 2 Turbo reference settings — reset every one for a Krea strip
+        # (missing keys → default) so an earlier job's mode never leaks into the
+        # redo. The reference strip names themselves are klein_strip_N (above).
+        if str(model or "") == "OzzyGT/Krea_2_Turbo_sdnq_dynamic_8bit" and hasattr(scene, "krea2_ref_mode"):
+            for _attr, _def in (
+                ("krea2_ref_mode",         "off"),
+                ("krea2_ref_subject",      1.0),
+                ("krea2_ref_style",        1.0),
+                ("krea2_ref_grounding_px", 768),
+            ):
+                _v = _get(_attr)
+                try:
+                    setattr(scene, _attr, type(_def)(_v) if _v is not None else _def)
+                except Exception:
+                    pass
+
+        # FLUX.3 Image Klein settings — reset every one for a FLUX.3 strip
+        # (missing keys → default). Reference strip names ride klein_strip_N and
+        # the layout boxes ride the prompt (both restored above).
+        if str(model or "") in (
+            "black-forest-labs/flux-3-image-klein",
+            "black-forest-labs/flux-3-image-klein-base",
+        ) and hasattr(scene, "flux3_weights"):
+            for _attr, _def in (
+                ("flux3_weights",           "sdnq8"),
+                ("flux3_prompt_upsampling", False),
+                ("flux3_pup_quant",         "int8"),
+            ):
+                _v = _get(_attr)
+                if _v is None:
+                    _v = _def
+                elif _attr == "flux3_weights" and str(_v) == "sdnq":
+                    _v = "sdnq8"  # renamed option (strips made before 8/4-bit)
+                elif isinstance(_def, bool):
+                    # Metadata may hold the bool as text: bool("False") is True.
+                    _v = str(_v).lower() in ("true", "1", "yes")
+                try:
+                    setattr(scene, _attr, type(_def)(_v))
+                except Exception:
+                    pass
+
         # Transcription (Faster Whisper / Whistle subtitle strips)
         for _attr in ("whisper_model_size", "whisper_language", "whistle_keywords"):
             _v = _get(_attr)
@@ -4373,6 +4471,8 @@ class AI_Metadata_PT_Panel(bpy.types.Panel):
             "yue2_cot", "yue2_abc_path", "yue2_max_length",
             "yue2_temperature", "yue2_top_p", "yue2_top_k", "yue2_repetition_penalty",
             "yue2_guidance", "yue2_vae_tile_frames", "yue2_vae_tile_overlap",
+            "krea2_ref_mode", "krea2_ref_subject", "krea2_ref_style", "krea2_ref_grounding_px",
+            "flux3_weights", "flux3_prompt_upsampling", "flux3_pup_quant", "flux3_final_prompt",
             "whisper_model_size", "whisper_language", "detected_language", "whistle_keywords",
             "lora_folder",
         ]
@@ -4385,6 +4485,10 @@ class AI_Metadata_PT_Panel(bpy.types.Panel):
             "yue2_top_p": "Top-p", "yue2_top_k": "Top-k",
             "yue2_repetition_penalty": "Repetition Penalty", "yue2_guidance": "Song Guidance",
             "yue2_vae_tile_frames": "Decode Tile", "yue2_vae_tile_overlap": "Decode Overlap",
+            "krea2_ref_mode": "Reference Mode", "krea2_ref_subject": "Ref. Subject",
+            "krea2_ref_style": "Ref. Style", "krea2_ref_grounding_px": "Grounding (px)",
+            "flux3_weights": "Weights", "flux3_prompt_upsampling": "Prompt Upsampling",
+            "flux3_pup_quant": "Upsampler Quant", "flux3_final_prompt": "Final Prompt",
             "whisper_model_size": "Model Size", "whisper_language": "Language",
             "detected_language": "Detected Language", "whistle_keywords": "Keywords",
         }

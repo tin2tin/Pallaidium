@@ -432,8 +432,14 @@ class GeneratorAddonPreferences(AddonPreferences):
         from ..models import get_plugin as _gp
         from ..models.base import InputSpec as _IS
         _img_plugin = _gp(self.image_model_card)
+        _img_needs_token = _img_plugin is not None and _IS.HF_TOKEN in _img_plugin.INPUTS
+        if _img_plugin is not None and callable(getattr(_img_plugin, "needs_hf_token", None)):
+            try:
+                _img_needs_token = bool(_img_plugin.needs_hf_token(context))
+            except Exception:
+                pass
         if (
-            (_img_plugin is not None and _IS.HF_TOKEN in _img_plugin.INPUTS)
+            _img_needs_token
             or (self.image_model_card == "ChuckMcSneed/FLUX.1-dev" and os_platform == "Darwin")
             or (self.image_model_card == "lzyvegetable/FLUX.1-schnell" and os_platform == "Darwin")
         ):

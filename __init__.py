@@ -1314,6 +1314,75 @@ def register():
         description="Show YuE2 sampling and decode settings",
     )
 
+    # Krea 2 Turbo reference images (the images ride the klein_strip_N pickers)
+    bpy.types.Scene.krea2_ref_mode = bpy.props.EnumProperty(
+        name="Reference Mode",
+        items=[
+            ("off",     "Vision",        "References condition through the Qwen3-VL vision path only. No LoRA"),
+            ("append",  "Style",         "Vision plus clean reference latents after the target, with the "
+                                         "ostris style-reference LoRA (downloaded on first use)"),
+            ("prepend", "Identity Edit", "Vision plus the clean source before the target, with the "
+                                         "Identity-Edit LoRA (downloaded on first use). Prompt the edit"),
+        ],
+        default="off",
+        description="How Krea 2 Turbo uses the reference images",
+    )
+    bpy.types.Scene.krea2_ref_subject = bpy.props.FloatProperty(
+        name="Subject",
+        default=1.0, min=0.0, soft_max=2.0, max=4.0,
+        description="Scale on each reference's content/subject. 0 drops it, keeping only its look",
+    )
+    bpy.types.Scene.krea2_ref_style = bpy.props.FloatProperty(
+        name="Style",
+        default=1.0, min=0.0, soft_max=2.0, max=4.0,
+        description="Scale on each reference's texture/style. 0 drops it, keeping only its content",
+    )
+    bpy.types.Scene.krea2_ref_grounding_px = bpy.props.IntProperty(
+        name="Grounding (px)",
+        default=768, min=0, soft_max=2048, max=4096,
+        description=(
+            "Identity Edit only: longest side of the view the vision encoder sees. Lower follows "
+            "the prompt (stronger edit), higher holds the reference. 0 = native resolution"
+        ),
+    )
+
+    # FLUX.3 Image Klein (reference images ride the klein_strip_N pickers; layout
+    # boxes ride the prompt text, written by the Box Editor)
+    bpy.types.Scene.flux3_weights = bpy.props.EnumProperty(
+        name="Weights",
+        items=[
+            ("sdnq8", "SDNQ 8-bit",      "Pre-quantized 8-bit transformer + text encoder (~10 GB download, "
+                                         "~15 GB VRAM peak; not gated). Quality close to the original. "
+                                         "Models without a pre-quantized repo are quantized while loading"),
+            ("sdnq4", "SDNQ 4-bit",      "Pre-quantized 4-bit transformer + text encoder (~6 GB download, "
+                                         "not gated). For GPUs with 12 GB or less"),
+            ("fp8r",  "FP8 (Official)",  "Black Forest Labs' FP8 transformer (~15 GB download). Gated: accept "
+                                         "the license on the model page and set an HF token"),
+            ("bf16",  "BF16 (Official)", "Black Forest Labs' full-precision weights (~20 GB download, needs "
+                                         "~24 GB+ VRAM or CPU offload). Gated. Most reliable with LoRAs"),
+        ],
+        default="sdnq8",
+        description="Which FLUX.3 weights to load. Changing it reloads the model",
+    )
+    bpy.types.Scene.flux3_prompt_upsampling = bpy.props.BoolProperty(
+        name="Prompt Upsampling",
+        default=False,
+        description=(
+            "Expand the prompt with the official FLUX.3 prompt upsampler (9B, downloaded on first use) "
+            "into the full scene caption the model expects. Reads the reference images and layout boxes too. "
+            "Any input language; the result is English"
+        ),
+    )
+    bpy.types.Scene.flux3_pup_quant = bpy.props.EnumProperty(
+        name="Upsampler Quant",
+        items=[
+            ("int8",  "Int8",  "Upsampler quantized to int8 on the fly (~10 GB VRAM)"),
+            ("uint4", "UInt4", "Upsampler quantized to 4-bit on the fly (~6 GB VRAM)"),
+        ],
+        default="int8",
+        description="Precision of the prompt upsampler",
+    )
+
     # Fix read-only file attributes pip sometimes leaves on Windows.
     # Runs in a daemon thread so it doesn't slow down Blender startup.
     import threading as _threading
@@ -1626,6 +1695,12 @@ def unregister():
     for _prop in ("yue2_cot", "yue2_max_length", "yue2_temperature", "yue2_top_p",
                   "yue2_top_k", "yue2_repetition_penalty", "yue2_guidance", "yue2_abc_path",
                   "yue2_vae_tile_frames", "yue2_vae_tile_overlap", "yue2_show_advanced"):
+        if hasattr(bpy.types.Scene, _prop):
+            delattr(bpy.types.Scene, _prop)
+    for _prop in ("krea2_ref_mode", "krea2_ref_subject", "krea2_ref_style", "krea2_ref_grounding_px"):
+        if hasattr(bpy.types.Scene, _prop):
+            delattr(bpy.types.Scene, _prop)
+    for _prop in ("flux3_weights", "flux3_prompt_upsampling", "flux3_pup_quant"):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
     if hasattr(bpy.types.Scene, "drama3_voices"):

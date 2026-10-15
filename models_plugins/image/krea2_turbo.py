@@ -1,9 +1,23 @@
-"""Text-to-image via Krea 2 Turbo (distilled 8-step, CFG-free) with SDNQ 8-bit weights."""
+"""Text-to-image and reference-image generation via Krea 2 Turbo (distilled 8-step) with SDNQ 8-bit weights."""
 
 import os
 
 from ...models.base import ModelPlugin, InputSpec, UISection, ParamSpec, ModelInputs
 from ...utils.helpers import gfx_device, low_vram
+
+
+# Reference conditioning runs through OzzyGT's Modular Diffusers blocks, which
+# feed the references through Qwen3-VL's vision tower (Krea 2's text encoder is
+# the full VLM) and, in the LoRA modes, into the transformer as clean latents.
+_REF_BLOCKS_ID = "OzzyGT/krea2_reference_blocks"
+
+# reference_mode -> (adapter name, LoRA repo, weight file). "off" needs none.
+_REF_MODE_LORAS = {
+    "append":  ("krea2_ref_style", "ostris/krea2_turbo_style_reference",
+                "krea2_style_reference.safetensors"),
+    "prepend": ("krea2_ref_identity", "conradlocke/krea2-identity-edit",
+                "krea2_identity_edit_v1_2.safetensors"),
+}
 
 
 def _registered_adapters(pipe):
@@ -74,11 +88,12 @@ def _load_krea2_lora(pipe, file_path, adapter_name):
 class Krea2TurboPlugin(ModelPlugin):
     MODEL_ID     = "OzzyGT/Krea_2_Turbo_sdnq_dynamic_8bit"
     DISPLAY_NAME = "Krea 2 Turbo"
-    DESCRIPTION  = "Fast text-to-image via Krea 2 Turbo (12.9B MMDiT, distilled to 8 steps, CFG-free, SDNQ 8-bit)"
+    DESCRIPTION  = ("Fast text-to-image via Krea 2 Turbo (12.9B MMDiT, distilled to 8 steps, SDNQ 8-bit) "
+                    "with up to 9 reference images (vision, style or identity edit)")
     MODEL_TYPE   = "image"
-    INPUTS       = InputSpec.PROMPT | InputSpec.NEG_PROMPT | InputSpec.LORA
+    INPUTS       = InputSpec.PROMPT | InputSpec.NEG_PROMPT | InputSpec.IMAGE | InputSpec.LORA
     UI_SECTIONS  = [
-        UISection.PROMPT, UISection.NEG_PROMPT,
+        UISection.PROMPT, UISection.NEG_PROMPT, UISection.IMAGE_STRIP,
         UISection.RESOLUTION, UISection.FRAMES, UISection.STEPS, UISection.GUIDANCE, UISection.SEED,
         UISection.LORA,
     ]
@@ -89,6 +104,8 @@ class Krea2TurboPlugin(ModelPlugin):
     PARAMS            = ParamSpec(steps=8, guidance=1.0)
     REQUIRED_PACKAGES = ["torch", "diffusers", "transformers", "sdnq"]
     supports_inpaint  = False
+    # image= is reference conditioning (vision tokens + optional clean latents),
+    # not a denoise blend — there is no strength for the Image Strength slider.
     supports_img2img  = False
 
     def load(self, prefs, scene, **kw):
@@ -120,9 +137,9 @@ class Krea2TurboPlugin(ModelPlugin):
             self.MODEL_ID, subfolder="transformer", torch_dtype=dtype,
             cache_dir=_cache_dir, local_files_only=_lfo,
         )
-        # Krea 2 uses the Qwen3-VL text encoder for text-only conditioning, so its
-        # vision tower is loaded but never run; silence the resulting "missing
-        # weights" / group-offload "unexecuted layers" noise (benign, same as LTX).
+        # Text-only prompts never run the Qwen3-VL vision tower (only reference
+        # jobs do); silence the resulting "missing weights" / group-offload
+        # "unexecuted layers" noise (benign, same as LTX).
         print("Loading text encoder...")
         with suppress_text_encoder_warnings():
             text_encoder = Qwen3VLModel.from_pretrained(
@@ -153,6 +170,9 @@ class Krea2TurboPlugin(ModelPlugin):
             # never raises on a name the key/prefix mismatch left unregistered.
             if names:
                 pipe.set_adapters(names, adapter_weights=weights)
+                # Remembered so each job can re-activate them alongside (or
+                # without) a reference-mode LoRA — see _activate_adapters.
+                pipe._krea2_user_adapters = (names, weights)
             else:
                 print("Krea 2 Turbo: no enabled LoRA matched the transformer; "
                       "generating without LoRA.")
@@ -181,7 +201,122 @@ class Krea2TurboPlugin(ModelPlugin):
             pipe.enable_sequential_cpu_offload()
         else:
             pipe.enable_model_cpu_offload()
-        return {"pipe": pipe, "converter": None, "refiner": None, "preprocessor": None}
+        # krea2_ref_pipe is built on the first reference job (_reference_pipe).
+        # The explicit None resets a stale one: the queue reloads for a LoRA
+        # change via model_cache.update() without releasing the old keys.
+        return {"pipe": pipe, "converter": None, "refiner": None, "preprocessor": None,
+                "krea2_ref_pipe": None}
+
+    def draw_custom_ui(self, col, context) -> bool:
+        scene = context.scene
+        # Strip refs live in the scene shown in the VSE (context.sequencer_scene
+        # in Blender 5.x), which can differ from the active scene. Reuses the
+        # klein_strip_N / klein_visible_strips pickers shared by every
+        # up-to-9-reference plugin (Klein, Qwen-Image 2.1), whose strip names and
+        # rendered paths already flow through the queue, metadata and Redo.
+        vse_scene = getattr(context, "sequencer_scene", None) or context.scene
+        try:
+            col.prop(scene, "input_strips", text="Input")
+        except Exception:
+            pass
+        if vse_scene.sequence_editor is None:
+            return True
+        for i in range(1, scene.klein_visible_strips + 1):
+            row = col.row(align=True)
+            row.prop_search(
+                vse_scene, f"klein_strip_{i}", vse_scene.sequence_editor, "strips",
+                text="Ref.", icon="FILE_IMAGE",
+            )
+            row.operator("sequencer.strip_picker", text="", icon="EYEDROPPER").action = f"klein_select{i}"
+            if i == scene.klein_visible_strips and scene.klein_visible_strips < 9:
+                if scene.klein_visible_strips > 3:
+                    row.operator("object.klein_hide_strip", text="", icon="REMOVE").strip_index = i
+                row.operator("object.klein_add_strip", text="", icon="ADD")
+        if hasattr(scene, "krea2_ref_mode"):
+            col.prop(scene, "krea2_ref_mode", text="Mode")
+            row = col.row(align=True)
+            row.prop(scene, "krea2_ref_subject")
+            row.prop(scene, "krea2_ref_style")
+            if scene.krea2_ref_mode == "prepend":
+                col.prop(scene, "krea2_ref_grounding_px")
+        return True
+
+    @staticmethod
+    def _collect_references(inputs, scene):
+        """The active input (strip/scene frame) first, then the filled reference slots."""
+        from PIL import Image as _PILImage
+        images = [inputs.image.convert("RGB")] if inputs.image is not None else []
+        for attr in (f"klein_strip_{i}_path" for i in range(1, 10)):
+            path = getattr(scene, attr, None)
+            if path and os.path.isfile(path):
+                try:
+                    images.append(_PILImage.open(path).convert("RGB"))
+                except Exception as e:
+                    print(f"Krea 2 Turbo: reference '{path}' failed to open: {e}")
+        return images
+
+    @staticmethod
+    def _activate_adapters(pipe, mode_adapter=None):
+        """Enable the user's LoRAs plus, for a LoRA reference mode, its adapter.
+
+        Mode LoRAs stay attached to the shared transformer once downloaded, so
+        every job sets the active list: plain text-to-image and the other modes
+        must run with them switched off.
+        """
+        if not _registered_adapters(pipe):
+            return
+        names, weights = getattr(pipe, "_krea2_user_adapters", ([], []))
+        names, weights = list(names), list(weights)
+        if mode_adapter:
+            names.append(mode_adapter)
+            weights.append(1.0)
+        if names:
+            pipe.enable_lora()
+            pipe.set_adapters(names, adapter_weights=weights)
+        else:
+            pipe.disable_lora()
+
+    @staticmethod
+    def _ensure_mode_lora(pipe, ref_mode, prefs):
+        """Download and attach the LoRA a reference mode needs; returns its adapter name."""
+        entry = _REF_MODE_LORAS.get(ref_mode)
+        if entry is None:
+            return None
+        adapter, repo_id, weight_name = entry
+        if adapter not in _registered_adapters(pipe):
+            print(f"Krea 2 Turbo: loading {repo_id} for reference mode '{ref_mode}'…")
+            pipe.load_lora_weights(
+                repo_id, weight_name=weight_name, adapter_name=adapter,
+                cache_dir=prefs.hf_cache_dir or None, local_files_only=prefs.local_files_only,
+            )
+            if adapter not in _registered_adapters(pipe):
+                raise RuntimeError(f"Krea 2 Turbo: the {repo_id} LoRA did not attach to the transformer.")
+        return adapter
+
+    @staticmethod
+    def _reference_pipe(pipe_obj, prefs):
+        """The modular reference pipeline, built once over the loaded components.
+
+        Shares the transformer/text encoder/VAE (with their offload hooks and
+        LoRA adapters) with the stock pipeline, so no weights load twice.
+        """
+        ref_pipe = pipe_obj.get("krea2_ref_pipe")
+        if ref_pipe is not None:
+            return ref_pipe
+        from diffusers import ModularPipelineBlocks
+        pipe = pipe_obj["pipe"]
+        print(f"Krea 2 Turbo: building reference pipeline from {_REF_BLOCKS_ID}…")
+        blocks = ModularPipelineBlocks.from_pretrained(
+            _REF_BLOCKS_ID, trust_remote_code=True,
+            cache_dir=prefs.hf_cache_dir or None, local_files_only=prefs.local_files_only,
+        )
+        ref_pipe = blocks.init_pipeline()
+        ref_pipe.update_components(
+            transformer=pipe.transformer, text_encoder=pipe.text_encoder,
+            tokenizer=pipe.tokenizer, vae=pipe.vae, scheduler=pipe.scheduler,
+        )
+        pipe_obj["krea2_ref_pipe"] = ref_pipe
+        return ref_pipe
 
     def generate(self, pipe_obj, inputs: ModelInputs, scene, prefs):
         import torch
@@ -191,6 +326,12 @@ class Krea2TurboPlugin(ModelPlugin):
         seed = inputs.seed
         # CPU generator: with offloading the component .device reports CPU.
         generator = torch.Generator("cpu").manual_seed(seed) if seed != 0 else None
+
+        references = self._collect_references(inputs, scene)
+        if references:
+            return self._generate_with_references(pipe_obj, inputs, scene, prefs, references, generator)
+
+        self._activate_adapters(pipe)
         self.set_phase(inputs, "Generating")
         # suppress the vision-tower "unexecuted layers" group-offload trace warning.
         with torch.inference_mode(), suppress_text_encoder_warnings():
@@ -207,3 +348,71 @@ class Krea2TurboPlugin(ModelPlugin):
                 generator=generator,
                 callback_on_step_end=self.step_callback(inputs),
             ).images[0]
+
+    def _generate_with_references(self, pipe_obj, inputs, scene, prefs, references, generator):
+        import torch
+        from ...utils.helpers import suppress_text_encoder_warnings
+
+        pipe = pipe_obj["pipe"]
+        ref_mode = getattr(scene, "krea2_ref_mode", "off") or "off"
+        if ref_mode not in ("off", "append", "prepend"):
+            ref_mode = "off"
+        self.set_phase(inputs, "Preparing references")
+        self._activate_adapters(pipe, self._ensure_mode_lora(pipe, ref_mode, prefs))
+        ref_pipe = self._reference_pipe(pipe_obj, prefs)
+        print(f"Krea 2 Turbo: {len(references)} reference image(s), mode={ref_mode}")
+
+        # Krea 2 latents are packed in 16 px patches.
+        width = max(16, int(inputs.width) // 16 * 16)
+        height = max(16, int(inputs.height) // 16 * 16)
+
+        # The reference-latent step encodes with pixels.to(vae.device), which is
+        # the CPU (or meta) under model/sequential offload while the offload hook
+        # runs the VAE on the GPU. Report the execution device for the run.
+        vae = ref_pipe.vae
+        exec_device = ref_pipe._execution_device
+        vae_cls = vae.__class__
+        vae.__class__ = type(vae_cls.__name__, (vae_cls,), {"device": property(lambda self: exec_device)})
+
+        # Modular pipelines take no callback_on_step_end, so report progress
+        # from the scheduler step, which runs once per denoising step.
+        scheduler = ref_pipe.scheduler
+        original_step = scheduler.step
+        progress_fn = inputs.progress_fn
+        total = max(1, inputs.steps)
+        counter = [0]
+
+        def _step(*args, **kwargs):
+            out = original_step(*args, **kwargs)
+            counter[0] += 1
+            if progress_fn is not None:
+                progress_fn(counter[0], total)
+            return out
+
+        kwargs = dict(
+            prompt=inputs.prompt,
+            reference_images=references,
+            reference_mode=ref_mode,
+            reference_subject_strength=float(getattr(scene, "krea2_ref_subject", 1.0)),
+            reference_style_strength=float(getattr(scene, "krea2_ref_style", 1.0)),
+            height=height,
+            width=width,
+            num_inference_steps=inputs.steps,
+            max_sequence_length=512,
+            generator=generator,
+            output="images",
+        )
+        if ref_mode == "prepend":
+            # Identity-Edit recipe from the model card's example script.
+            kwargs["grounding_px"] = int(getattr(scene, "krea2_ref_grounding_px", 768))
+            kwargs["mask_reference_latents"] = True
+
+        scheduler.step = _step
+        self.set_phase(inputs, "Generating")
+        try:
+            # The distilled reference blocks run CFG-free: no negative prompt.
+            with torch.inference_mode(), suppress_text_encoder_warnings():
+                return ref_pipe(**kwargs)[0]
+        finally:
+            scheduler.step = original_step
+            vae.__class__ = vae_cls

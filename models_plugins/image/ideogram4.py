@@ -39,6 +39,7 @@ class Ideogram4Plugin(ModelPlugin):
     REQUIRED_PACKAGES = ["torch", "diffusers", "transformers", "outlines"]
     supports_inpaint      = False
     supports_img2img      = False
+    uses_box_editor       = True   # prompt can be Box Editor JSON
 
     _ENHANCER = "diffusers/qwen3-vl-8b-instruct-lm-head"
 

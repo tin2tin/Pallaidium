@@ -49,6 +49,26 @@ from ..utils.helpers import *
 from ..properties.scene_props import *
 from ..properties.preferences import *
 
+
+def _needs_hf_token(plugin, context) -> bool:
+    """Show the Hugging Face token field only when the model needs it.
+
+    A plugin can decide per setting with ``needs_hf_token(context)`` (e.g.
+    FLUX.3: only for the gated official weights); otherwise the HF_TOKEN input
+    flag decides.
+    """
+    if plugin is None:
+        return False
+    check = getattr(plugin, "needs_hf_token", None)
+    if callable(check):
+        try:
+            return bool(check(context))
+        except Exception:
+            pass
+    from ..models.base import InputSpec as _InputSpec
+    return _InputSpec.HF_TOKEN in plugin.INPUTS
+
+
 def _draw_queue(layout, context):
     """Draw the render queue section at the bottom of the Pallaidium panel."""
     from ..operators.queue_ops import _queue_tick
@@ -503,8 +523,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
             col.prop(addon_prefs, "audio_model_card", text=" ")
         if type == "text":
             col.prop(addon_prefs, "text_model_card", text=" ")
-            from ..models.base import InputSpec as _InputSpec
-            if plugin is not None and _InputSpec.HF_TOKEN in plugin.INPUTS:
+            if _needs_hf_token(plugin, context):
                 row = col.row(align=True)
                 row.prop(addon_prefs, "hugginface_token")
                 row.operator(
@@ -518,13 +537,16 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
                 plugin.draw_custom_ui(col, context)
         if type == "image":
             col.prop(addon_prefs, "image_model_card", text=" ")
-            from ..models.base import InputSpec as _InputSpec
-            if plugin is not None and _InputSpec.HF_TOKEN in plugin.INPUTS:
+            if _needs_hf_token(plugin, context):
                 row = col.row(align=True)
                 row.prop(addon_prefs, "hugginface_token")
                 row.operator(
                     "wm.url_open", text="", icon="URL"
                 ).url = "https://huggingface.co/settings/tokens"
+        # Model-level options (weight source, prompt upsampling, …): after the
+        # model selector / HF token, before Batch Count.
+        if plugin is not None and hasattr(plugin, "draw_model_options_ui"):
+            plugin.draw_model_options_ui(col, context)
         # Batch Count: shown only when the active plugin actually produces
         # multiple distinct outputs per run. Deterministic single-output models
         # (captioning, transcription, stem split, external single-shot APIs)
@@ -536,7 +558,7 @@ class SEQUENCER_PT_pallaidium_panel(Panel):  # UI
         if plugin is not None and hasattr(plugin, "draw_post_seed_ui"):
             plugin.draw_post_seed_ui(col, context)
         if type == "image":
-            if plugin.__class__.__name__ == "Ideogram4Plugin":
+            if plugin is not None and getattr(plugin, "uses_box_editor", False):
                 col.operator("florence2.open_box_editor", text="Open Box Editor", icon="MOD_MASK")
 
         # Generate.

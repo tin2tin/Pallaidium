@@ -67,6 +67,28 @@ _YUE2_DEFAULTS = (
     ("yue2_vae_tile_overlap",   16),
 )
 
+# Krea 2 Turbo reference-image settings carried through the queue: (name, default).
+# The reference images themselves ride the shared klein_strip_N pickers.
+_KREA2_REF_DEFAULTS = (
+    ("krea2_ref_mode",         "off"),
+    ("krea2_ref_subject",      1.0),
+    ("krea2_ref_style",        1.0),
+    ("krea2_ref_grounding_px", 768),
+)
+
+# FLUX.3 Image Klein settings carried through the queue: (name, default).
+# The reference images ride the shared klein_strip_N pickers; the layout boxes
+# ride the prompt text itself.
+_FLUX3_DEFAULTS = (
+    ("flux3_weights",           "sdnq8"),
+    ("flux3_prompt_upsampling", False),
+    ("flux3_pup_quant",         "int8"),
+)
+_FLUX3_CARDS = (
+    "black-forest-labs/flux-3-image-klein",
+    "black-forest-labs/flux-3-image-klein-base",
+)
+
 # ---------------------------------------------------------------------------
 # Reload / scene-input diagnostic — shared log file with main_ops.py so a single
 # file shows what BOTH the immediate path and the queue path decided.
@@ -297,6 +319,17 @@ class RenderQueueJob(PropertyGroup):
     yue2_abc_path:           StringProperty(default="")
     yue2_vae_tile_frames:    IntProperty(default=1024)
     yue2_vae_tile_overlap:   IntProperty(default=16)
+
+    # Krea 2 Turbo reference images (see _KREA2_REF_DEFAULTS)
+    krea2_ref_mode:          StringProperty(default="off")
+    krea2_ref_subject:       FloatProperty(default=1.0)
+    krea2_ref_style:         FloatProperty(default=1.0)
+    krea2_ref_grounding_px:  IntProperty(default=768)
+
+    # FLUX.3 Image Klein (see _FLUX3_DEFAULTS)
+    flux3_weights:           StringProperty(default="sdnq8")
+    flux3_prompt_upsampling: BoolProperty(default=False)
+    flux3_pup_quant:         StringProperty(default="int8")
 
     # Fish Audio Drama 3 voices: JSON [{speaker, audio, text}, ...]
     drama3_voices_json:   StringProperty(default="")
@@ -702,6 +735,9 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             moss_top_k            = snapshot.get("moss_top_k",            25),
             moss_ref_audio_path   = snapshot.get("moss_ref_audio_path",   ""),
             **{_k: snapshot.get(_k, _d) for _k, _d in _YUE2_DEFAULTS},
+            **{_k: snapshot.get(_k, _d) for _k, _d in _KREA2_REF_DEFAULTS},
+            **{_k: snapshot.get(_k, _d) for _k, _d in _FLUX3_DEFAULTS},
+            flux3_final_prompt    = "",  # set by the FLUX.3 plugin when PUP/layout rewrote the prompt
             drama3_voices_json    = snapshot.get("drama3_voices_json",    ""),
             florence2_mode         = snapshot.get("florence2_mode",         "CAPTION"),
             florence2_send_to_mask = snapshot.get("florence2_send_to_mask", False),
@@ -756,13 +792,20 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
         # model, so we include `last_mode` in the hit check.
         _schematic_mode = snapshot.get("klein_schematic_mode", "")
         _lora_key = snapshot.get("lora_files_json", "[]")
-        _cache_skip = {"last_model_card", "last_mode", "last_schematic_mode", "last_lora_key"}
+        # Scene props a plugin's load() reads (e.g. FLUX.3 weight source): a
+        # change must reload, never reuse the pipeline built for the old value.
+        _load_variant = "|".join(
+            str(snapshot.get(_k, "")) for _k in getattr(plugin, "LOAD_VARIANT_KEYS", ())
+        )
+        _cache_skip = {"last_model_card", "last_mode", "last_schematic_mode", "last_lora_key",
+                       "last_load_variant"}
         cache_hit = (
             model_cache is not None
             and model_cache.get("last_model_card") == model_card
             and model_cache.get("last_mode") == mode
             and model_cache.get("last_schematic_mode", "") == _schematic_mode
             and model_cache.get("last_lora_key", "[]") == _lora_key
+            and model_cache.get("last_load_variant", "") == _load_variant
             and any(v is not None for k, v in model_cache.items() if k not in _cache_skip)
         )
 
@@ -774,7 +817,8 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             if (model_cache is not None
                     and (model_cache.get("last_model_card") != model_card
                          or model_cache.get("last_mode") != mode
-                         or model_cache.get("last_schematic_mode", "") != _schematic_mode)):
+                         or model_cache.get("last_schematic_mode", "") != _schematic_mode
+                         or model_cache.get("last_load_variant", "") != _load_variant)):
                 release_model_cache(model_cache)
             clear_cuda_cache()
             apply_hf_env(prefs_proxy)
@@ -864,6 +908,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
                 model_cache["last_mode"] = mode
                 model_cache["last_schematic_mode"] = _schematic_mode
                 model_cache["last_lora_key"] = _lora_key
+                model_cache["last_load_variant"] = _load_variant
                 pipe_obj = model_cache
             else:
                 pipe_obj = loaded
@@ -1210,6 +1255,11 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             "moss_ref_audio_path":  snapshot.get("moss_ref_audio_path",  ""),
             # YuE2
             **{_k: snapshot.get(_k, _d) for _k, _d in _YUE2_DEFAULTS},
+            **{_k: snapshot.get(_k, _d) for _k, _d in _KREA2_REF_DEFAULTS},
+            **{_k: snapshot.get(_k, _d) for _k, _d in _FLUX3_DEFAULTS},
+            # FLUX.3 — the prompt the model actually received (upsampled and/or
+            # converted from Box Editor JSON); read back from the proxy.
+            "flux3_final_prompt":   getattr(scene_proxy, "flux3_final_prompt", ""),
             # Fish Audio Drama 3 — read back from the proxy: the plugin fills in
             # Whisper transcripts for voices whose text was left empty.
             "drama3_voices_json":   getattr(scene_proxy, "drama3_voices_json", None)
@@ -1685,6 +1735,8 @@ class SEQUENCER_OT_add_to_queue(Operator):
             moss_top_k            = getattr(scene, "moss_top_k",            25),
             moss_ref_audio_path   = getattr(scene, "moss_ref_audio_path",   ""),
             **{_k: getattr(scene, _k, _d) for _k, _d in _YUE2_DEFAULTS},
+            **{_k: getattr(scene, _k, _d) for _k, _d in _KREA2_REF_DEFAULTS},
+            **{_k: getattr(scene, _k, _d) for _k, _d in _FLUX3_DEFAULTS},
             drama3_voices_json    = drama3_voices_to_json(scene),
             florence2_mode         = getattr(scene, "florence2_mode",         "CAPTION"),
             florence2_send_to_mask = getattr(scene, "florence2_send_to_mask", False),
@@ -2436,6 +2488,8 @@ def _queue_start_job(scene, job) -> None:
         "moss_max_new_tokens", "moss_temperature", "moss_top_p", "moss_top_k",
         "moss_ref_audio_path",
         *(_k for _k, _d in _YUE2_DEFAULTS),
+        *(_k for _k, _d in _KREA2_REF_DEFAULTS),
+        *(_k for _k, _d in _FLUX3_DEFAULTS),
         "drama3_voices_json",
         "stem_split_model", "stem_split_vocals", "stem_split_drums",
         "stem_split_bass", "stem_split_other", "stem_split_guitar", "stem_split_piano",
@@ -3108,6 +3162,22 @@ def _queue_insert_strip(scene, result: dict) -> None:
                         # FloatProperty is float32: 0.95 reads back as 0.949999…
                         _v = round(float(_v), 4)
                     extra_meta[_k] = _v
+            # Krea 2 Turbo reference settings — always written for Krea jobs so
+            # Redo resets every one (the reference strip names ride klein_strip_N).
+            if result.get("model_card", "") == "OzzyGT/Krea_2_Turbo_sdnq_dynamic_8bit":
+                for _k, _def in _KREA2_REF_DEFAULTS:
+                    _v = result.get(_k, _def)
+                    if isinstance(_def, float):
+                        _v = round(float(_v), 4)
+                    extra_meta[_k] = _v
+            # FLUX.3 Image Klein — settings always written so Redo resets every
+            # one; the final prompt only when it differs from the typed prompt.
+            if result.get("model_card", "") in _FLUX3_CARDS:
+                for _k, _def in _FLUX3_DEFAULTS:
+                    extra_meta[_k] = result.get(_k, _def)
+                _final = result.get("flux3_final_prompt", "")
+                if _final and _final != result.get("prompt", ""):
+                    extra_meta["flux3_final_prompt"] = _final
             # Fish Audio Drama 3 voices
             if result.get("model_card", "") == "fishaudio/drama-3" and result.get("drama3_voices_json", ""):
                 extra_meta["drama3_voices_json"] = result.get("drama3_voices_json", "")
@@ -3460,6 +3530,23 @@ class SEQUENCER_OT_redo_from_job(Operator):
             for _k, _d in _YUE2_DEFAULTS:
                 try:
                     setattr(scene, _k, getattr(job, _k))
+                except Exception:
+                    pass
+        # Krea 2 Turbo reference settings
+        if hasattr(scene, "krea2_ref_mode"):
+            for _k, _d in _KREA2_REF_DEFAULTS:
+                try:
+                    setattr(scene, _k, getattr(job, _k))
+                except Exception:
+                    pass
+        # FLUX.3 Image Klein settings
+        if hasattr(scene, "flux3_weights"):
+            for _k, _d in _FLUX3_DEFAULTS:
+                _v = getattr(job, _k)
+                if _k == "flux3_weights" and _v == "sdnq":
+                    _v = "sdnq8"  # renamed option
+                try:
+                    setattr(scene, _k, _v)
                 except Exception:
                     pass
         # Fish Audio Drama 3
