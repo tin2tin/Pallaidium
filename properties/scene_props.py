@@ -49,3 +49,20 @@ class LORABrowserFileItem(PropertyGroup):
     enabled: bpy.props.BoolProperty(default=True)
     weight_value: bpy.props.FloatProperty(default=1.0)
     index: bpy.props.IntProperty(name="Index", default=0)
+
+class Drama3VoiceItem(PropertyGroup):
+    """One Fish Audio Drama 3 voice: list position N is <|speaker:N|>."""
+    audio_path: bpy.props.StringProperty(
+        name="Audio",
+        description="Reference clip for this speaker (WAV, up to ~60 s; 5-20 s works well)",
+        subtype="FILE_PATH",
+        default="",
+    )
+    ref_text: bpy.props.StringProperty(
+        name="Text",
+        description=(
+            "Exact transcript of the reference clip. Leave empty to transcribe it "
+            "automatically with Whisper"
+        ),
+        default="",
+    )

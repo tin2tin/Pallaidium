@@ -209,3 +209,33 @@ class SEQUENCER_OT_ai_strip_picker(Operator):
         else:
             self.report({'WARNING'}, "This operator only works in the Video Sequence Editor")
             return {"CANCELLED"}
+
+
+class SEQUENCER_OT_drama3_voice_add(Operator):
+    """Add a voice (speaker reference) for Fish Audio Drama 3"""
+    bl_idname = "sequencer.drama3_voice_add"
+    bl_label = "Add Voice"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        voices = context.scene.drama3_voices
+        if len(voices) >= 16:
+            self.report({"WARNING"}, "Drama 3 supports at most 16 speakers.")
+            return {"CANCELLED"}
+        voices.add()
+        return {"FINISHED"}
+
+
+class SEQUENCER_OT_drama3_voice_remove(Operator):
+    """Remove this voice; later voices move up one speaker number"""
+    bl_idname = "sequencer.drama3_voice_remove"
+    bl_label = "Remove Voice"
+    bl_options = {"REGISTER", "UNDO"}
+
+    index: bpy.props.IntProperty(default=-1, options={"HIDDEN"})
+
+    def execute(self, context):
+        voices = context.scene.drama3_voices
+        if 0 <= self.index < len(voices):
+            voices.remove(self.index)
+        return {"FINISHED"}

@@ -118,6 +118,7 @@ sox
 onnxruntime
 demucs-onnx
 faster-whisper
+cactus-needle==3.2.1 # Whistle CPU ASR (ctypes engine + weights fetched from HF on first use)
 wheel
 ctranslate2
 
@@ -148,6 +149,7 @@ llvmlite
 
 # --- Text & UI ---
 sentencepiece
+tiktoken
 gradio
 gradio_client
 resemble-perth

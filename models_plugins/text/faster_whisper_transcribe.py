@@ -26,6 +26,7 @@ import re
 import time
 
 from ...models.base import ModelPlugin, InputSpec, ParamSpec, ModelInputs
+from ...utils.helpers import set_ai_metadata_from_dict
 
 
 # ---------------------------------------------------------------------------
@@ -380,6 +381,17 @@ class FasterWhisperTranscribePlugin(ModelPlugin):
 
         print(f"Whisper Transcribe: Inserting {len(all_subs)} strips on channel {channel}")
 
+        # Stamped on every subtitle strip: the metadata viewer shows the run's
+        # settings and Redo restores them from whichever subtitle is selected.
+        meta = {
+            "output_type":        "text",
+            "model":              self.MODEL_ID,
+            "whisper_model_size": model_size,
+            "whisper_language":   lang_code,
+            "detected_language":  detected_lang or "",
+            "sound_path":         audio_path,
+        }
+
         created = 0
         for sub in all_subs:
             sub_start_f = strip_start_frame + int((sub["start"] - audio_offset) * fps)
@@ -414,6 +426,7 @@ class FasterWhisperTranscribePlugin(ModelPlugin):
             new_strip.use_shadow  = True
             new_strip.use_box     = True
             new_strip.box_color   = (0, 0, 0, 0.7)
+            set_ai_metadata_from_dict(new_strip, meta, verbose=False)
             created += 1
 
         print(

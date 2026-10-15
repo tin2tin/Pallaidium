@@ -42,6 +42,8 @@ from ..utils.helpers import (
     clean_filename,
     clear_cuda_cache,
     closest_divisible_32,
+    drama3_voices_from_json,
+    drama3_voices_to_json,
     load_first_frame,
     release_model_cache,
     sequencer_busy,
@@ -49,6 +51,20 @@ from ..utils.helpers import (
     set_system_console_topmost,
     show_system_console,
     style_prompt,
+)
+
+# YuE2 (songs) scene props carried through the queue: (name, default).
+_YUE2_DEFAULTS = (
+    ("yue2_cot",                "full"),
+    ("yue2_max_length",         0),
+    ("yue2_temperature",        1.0),
+    ("yue2_top_p",              0.95),
+    ("yue2_top_k",              100),
+    ("yue2_repetition_penalty", 1.2),
+    ("yue2_guidance",           0.0),
+    ("yue2_abc_path",           ""),
+    ("yue2_vae_tile_frames",    1024),
+    ("yue2_vae_tile_overlap",   16),
 )
 
 # ---------------------------------------------------------------------------
@@ -248,6 +264,7 @@ class RenderQueueJob(PropertyGroup):
     # Faster Whisper Transcription
     whisper_model_size: StringProperty(default="large-v3-turbo")
     whisper_language:   StringProperty(default="auto")
+    whistle_keywords:   StringProperty(default="")
 
     # OmniVoice
     omnivoice_instruct:    StringProperty(default="")
@@ -268,6 +285,21 @@ class RenderQueueJob(PropertyGroup):
     moss_top_p:           FloatProperty(default=0.8)
     moss_top_k:           IntProperty(default=25)
     moss_ref_audio_path:  StringProperty(default="")
+
+    # YuE2 (songs)
+    yue2_cot:                StringProperty(default="full")
+    yue2_max_length:         IntProperty(default=0)
+    yue2_temperature:        FloatProperty(default=1.0)
+    yue2_top_p:              FloatProperty(default=0.95)
+    yue2_top_k:              IntProperty(default=100)
+    yue2_repetition_penalty: FloatProperty(default=1.2)
+    yue2_guidance:           FloatProperty(default=0.0)
+    yue2_abc_path:           StringProperty(default="")
+    yue2_vae_tile_frames:    IntProperty(default=1024)
+    yue2_vae_tile_overlap:   IntProperty(default=16)
+
+    # Fish Audio Drama 3 voices: JSON [{speaker, audio, text}, ...]
+    drama3_voices_json:   StringProperty(default="")
 
     # Stem Splitter
     stem_split_model:  StringProperty(default="htdemucs_ft")
@@ -647,6 +679,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             sequencer_scene_name = snapshot.get("sequencer_scene_name", ""),
             whisper_model_size = snapshot.get("whisper_model_size", "large-v3-turbo"),
             whisper_language   = snapshot.get("whisper_language",   ""),
+            whistle_keywords   = snapshot.get("whistle_keywords",   ""),
             stem_split_model  = snapshot.get("stem_split_model",  "htdemucs_ft"),
             stem_split_vocals = snapshot.get("stem_split_vocals", True),
             stem_split_drums  = snapshot.get("stem_split_drums",  True),
@@ -668,6 +701,8 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             moss_top_p            = snapshot.get("moss_top_p",            0.8),
             moss_top_k            = snapshot.get("moss_top_k",            25),
             moss_ref_audio_path   = snapshot.get("moss_ref_audio_path",   ""),
+            **{_k: snapshot.get(_k, _d) for _k, _d in _YUE2_DEFAULTS},
+            drama3_voices_json    = snapshot.get("drama3_voices_json",    ""),
             florence2_mode         = snapshot.get("florence2_mode",         "CAPTION"),
             florence2_send_to_mask = snapshot.get("florence2_send_to_mask", False),
             klein_schematic_mode   = snapshot.get("klein_schematic_mode",   "DEPTH"),
@@ -1096,6 +1131,11 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             "width":           snapshot["width"],
             "height":          snapshot["height"],
             "frames":          snapshot["frames"],
+            # Music params (ACE-Step, YuE2, …)
+            "music_bpm":            snapshot.get("music_bpm", 0),
+            "music_lyrics":         snapshot.get("music_lyrics", ""),
+            "music_key_scale":      snapshot.get("music_key_scale", ""),
+            "music_time_signature": snapshot.get("music_time_signature", ""),
             "lora_files_json":        snapshot.get("lora_files_json", "[]"),
             "lora_folder":            snapshot.get("lora_folder", ""),
             "img_guidance_scale":     snapshot.get("img_guidance_scale", 1.6),
@@ -1168,6 +1208,12 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             "moss_top_p":           snapshot.get("moss_top_p",           0.8),
             "moss_top_k":           snapshot.get("moss_top_k",           25),
             "moss_ref_audio_path":  snapshot.get("moss_ref_audio_path",  ""),
+            # YuE2
+            **{_k: snapshot.get(_k, _d) for _k, _d in _YUE2_DEFAULTS},
+            # Fish Audio Drama 3 — read back from the proxy: the plugin fills in
+            # Whisper transcripts for voices whose text was left empty.
+            "drama3_voices_json":   getattr(scene_proxy, "drama3_voices_json", None)
+                                    or snapshot.get("drama3_voices_json", ""),
         })
 
     except KeyboardInterrupt:
@@ -1616,6 +1662,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
             veo_ref_strip_3       = getattr(seq_scene, "veo_ref_strip_3", ""),
             whisper_model_size = getattr(scene, "whisper_model_size", "large-v3-turbo"),
             whisper_language   = getattr(scene, "whisper_language",   ""),
+            whistle_keywords   = getattr(scene, "whistle_keywords",   ""),
             stem_split_model  = getattr(scene, "stem_split_model",  "htdemucs_ft"),
             stem_split_vocals = getattr(scene, "stem_split_vocals", True),
             stem_split_drums  = getattr(scene, "stem_split_drums",  True),
@@ -1637,6 +1684,8 @@ class SEQUENCER_OT_add_to_queue(Operator):
             moss_top_p            = getattr(scene, "moss_top_p",            0.8),
             moss_top_k            = getattr(scene, "moss_top_k",            25),
             moss_ref_audio_path   = getattr(scene, "moss_ref_audio_path",   ""),
+            **{_k: getattr(scene, _k, _d) for _k, _d in _YUE2_DEFAULTS},
+            drama3_voices_json    = drama3_voices_to_json(scene),
             florence2_mode         = getattr(scene, "florence2_mode",         "CAPTION"),
             florence2_send_to_mask = getattr(scene, "florence2_send_to_mask", False),
             klein_schematic_mode   = getattr(scene, "klein_schematic_mode",   "DEPTH"),
@@ -2379,13 +2428,15 @@ def _queue_start_job(scene, job) -> None:
         "insert_channel", "insert_duration",
         "sequencer_scene_name",
         "should_unload",
-        "whisper_model_size", "whisper_language",
+        "whisper_model_size", "whisper_language", "whistle_keywords",
         "omnivoice_instruct", "omnivoice_language",
         "omnivoice_preprocess", "omnivoice_denoise", "omnivoice_postprocess",
         "chatterbox_mtl_language",
         "moss_model_variant", "moss_language", "moss_duration_tokens",
         "moss_max_new_tokens", "moss_temperature", "moss_top_p", "moss_top_k",
         "moss_ref_audio_path",
+        *(_k for _k, _d in _YUE2_DEFAULTS),
+        "drama3_voices_json",
         "stem_split_model", "stem_split_vocals", "stem_split_drums",
         "stem_split_bass", "stem_split_other", "stem_split_guitar", "stem_split_piano",
         "h3_ref_strip_path",
@@ -2431,6 +2482,12 @@ def _queue_start_job(scene, job) -> None:
         daemon=True,
     )
     _worker_thread.start()
+
+
+# Job settings applied to the live scene while a main-thread job runs (see
+# _run_job_main_thread). Enum props skip the "" not-snapshotted value.
+_MAIN_THREAD_JOB_SCENE_PROPS = ("whisper_model_size", "whisper_language", "whistle_keywords")
+_MAIN_THREAD_JOB_ENUM_PROPS  = ("whisper_model_size", "whisper_language")
 
 
 def _run_job_main_thread(scene, job) -> None:
@@ -2604,11 +2661,32 @@ def _run_job_main_thread(scene, job) -> None:
         # download) need the same download-phase detection here as around
         # load() above, or a download mid-generate() would show whatever phase
         # the plugin last set instead of "Downloading model".
+        # Main-thread plugins read their settings from the live scene, so put
+        # this job's snapshot values there for the run — otherwise every queued
+        # job would use whatever the panel shows now — and restore afterwards.
+        _scene_saved = {}
+        for _attr in _MAIN_THREAD_JOB_SCENE_PROPS:
+            _jv = getattr(job, _attr, None)
+            if _jv is None or not hasattr(scene, _attr):
+                continue
+            if _jv == "" and _attr in _MAIN_THREAD_JOB_ENUM_PROPS:
+                continue  # empty = not snapshotted; "" is not a valid enum item
+            try:
+                _scene_saved[_attr] = getattr(scene, _attr)
+                setattr(scene, _attr, _jv)
+            except Exception:
+                _scene_saved.pop(_attr, None)
+
         _dl_restore = _install_download_phase_patch(_progress_store, job_id, job=job)
         try:
             _result = plugin.generate(pipe_obj, inputs, scene, prefs)
         finally:
             _dl_restore()
+            for _attr, _old in _scene_saved.items():
+                try:
+                    setattr(scene, _attr, _old)
+                except Exception:
+                    pass
         del _result  # None for bpy-inserting plugins; discarded intentionally
 
         # plugin handled its own VSE strip creation
@@ -3013,6 +3091,26 @@ def _queue_insert_strip(scene, result: dict) -> None:
                     # variant always written (identifies the run); others only if non-default
                     if _k == "moss_model_variant" or _v != _def:
                         extra_meta[_k] = _v
+            # Music params — written for every model that takes them, so the
+            # metadata viewer shows the lyrics and Redo restores them.
+            from ..models import get_plugin as _get_plugin_meta
+            from ..models.base import InputSpec as _InputSpec
+            _pm = _get_plugin_meta(result.get("model_card", ""))
+            if _pm is not None and (_pm.INPUTS & _InputSpec.MUSIC_PARAMS):
+                for _k in ("music_bpm", "music_lyrics", "music_key_scale", "music_time_signature"):
+                    extra_meta[_k] = result.get(_k, "")
+            # YuE2 — all settings always written: Redo must reset every one,
+            # or a previous job's non-default value would leak into the redo.
+            if result.get("model_card", "") == "OzzyGT/YuE2-3B-Diffusers":
+                for _k, _def in _YUE2_DEFAULTS:
+                    _v = result.get(_k, _def)
+                    if isinstance(_def, float):
+                        # FloatProperty is float32: 0.95 reads back as 0.949999…
+                        _v = round(float(_v), 4)
+                    extra_meta[_k] = _v
+            # Fish Audio Drama 3 voices
+            if result.get("model_card", "") == "fishaudio/drama-3" and result.get("drama3_voices_json", ""):
+                extra_meta["drama3_voices_json"] = result.get("drama3_voices_json", "")
 
             # Generic input paths — write so redo-from-metadata can reconstruct the
             # inputs even when the metadata carrier is a TEXT strip (Screenwriter
@@ -3096,6 +3194,8 @@ def _queue_tick() -> float | None:
                 elif status == "COMPLETED":
                     job.output_path = result.get("output_path", "")
                     job.tokens_info = result.get("result_note", "")
+                    if result.get("drama3_voices_json"):
+                        job.drama3_voices_json = result["drama3_voices_json"]
                     job.status      = "COMPLETED"
                     job.progress    = 1.0
                     _queue_insert_strip(scene, result)
@@ -3310,6 +3410,8 @@ class SEQUENCER_OT_redo_from_job(Operator):
             scene.whisper_model_size         = job.whisper_model_size
         if hasattr(scene, "whisper_language") and job.whisper_language:
             scene.whisper_language           = job.whisper_language
+        if hasattr(scene, "whistle_keywords"):
+            scene.whistle_keywords           = job.whistle_keywords
         # ltx23 staged
         if hasattr(scene, "ltx23_stage_mode"):
             scene.ltx23_stage_mode           = job.ltx23_stage_mode
@@ -3353,6 +3455,16 @@ class SEQUENCER_OT_redo_from_job(Operator):
             scene.moss_top_p                 = job.moss_top_p
             scene.moss_top_k                 = job.moss_top_k
             scene.moss_ref_audio_path        = job.moss_ref_audio_path
+        # YuE2
+        if hasattr(scene, "yue2_cot"):
+            for _k, _d in _YUE2_DEFAULTS:
+                try:
+                    setattr(scene, _k, getattr(job, _k))
+                except Exception:
+                    pass
+        # Fish Audio Drama 3
+        if hasattr(scene, "drama3_voices"):
+            drama3_voices_from_json(scene, job.drama3_voices_json)
 
         # Restore LoRA: scan full folder so all files appear in the UIList,
         # then apply saved enabled state and weights from the job snapshot.

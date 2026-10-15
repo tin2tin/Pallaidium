@@ -217,6 +217,16 @@ excluded from the built add-on.
 
 ## Change Log
 
+2026-10-15: Add: **Qwen-Image 2.1 Turbo** — fast text-to-image and multi-reference generation via diffusers' `QwenImage21Pipeline`, loaded from the pre-quantized [OzzyGT/Qwen_Image_2_1_Turbo_sdnq_dynamic_8bit](https://huggingface.co/OzzyGT/Qwen_Image_2_1_Turbo_sdnq_dynamic_8bit) (SDNQ int8 with Hadamard rotation; needs sdnq ≥ 0.2.2, pinned at 0.2.4). Distilled to **8 steps**, sampled CFG-free (Guidance 1.0; raise it together with a negative prompt to enable true CFG). The active input strip plus up to **9 reference-image slots** (shared with the FLUX.2 Klein plugins) condition the generation, and user LoRAs are supported. The checkpoint's 8-step sigma schedule is passed explicitly, so it also works with diffusers builds that don't yet read `sample_sigmas` from `model_index.json`.
+
+2026-10-15: Add: **Ming-Image 0.1 Design** — text-to-image for UI mockups, posters and infographics with legible text, via the Modular Diffusers port ([OzzyGT/ming_image_0_1_design_diffusers](https://huggingface.co/OzzyGT/ming_image_0_1_design_diffusers) + `OzzyGT/ming_image_custom_blocks`, `trust_remote_code`). **Transparent (RGBA) output on request:** start the prompt with one of the model's trained openers — e.g. `rgba, 4-channel, transparent background`, `isolated subject, alpha matte, no background` or `cutout png, alpha=0 outside the object` — and the alpha is kept with a cleaned-up cutout; any other prompt gives an opaque RGB image. The 16B MoE text encoder (32 GB in bf16) is quantized on the fly to uint4 and the transformer to int8 with SDNQ, so the whole pipeline stays resident on a 24 GB card (whole-component CPU offload on smaller cards). 12 steps, CFG-free by default (Guidance > 1 enables CFG at double cost); width/height snap to multiples of 16, 2048×2048 recommended.
+
+2026-10-15: Add: **YuE2 (Songs)** — full songs with vocals from a style prompt (genre, voice, instruments, tempo) plus section-tagged lyrics (`[Verse]`, `[Chorus]` …) via [OzzyGT/YuE2-3B-Diffusers](https://huggingface.co/OzzyGT/YuE2-3B-Diffusers) (Modular Diffusers blocks). Plans an ABC score, generates codec tokens, then synthesizes and decodes **48 kHz stereo**; song length follows the lyrics (up to ≈6 min). On Windows, where torch ships without FlashAttention, the plugin patches the CUDA-graph token decoder with a graph-capturable attention: ~90–100 tok/s instead of 12–25 tok/s on an RTX 4090. YuE2 alone uses ~10–12 GB VRAM. Weights are **CC BY-NC 4.0** (non-commercial). Adds `tiktoken` to the requirements.
+
+2026-10-15: Add: **Whistle Transcribe (CPU)** — tiny (17 MB) on-device speech-to-text from [Cactus-Compute/whistle](https://huggingface.co/Cactus-Compute/whistle), writing subtitles straight into VSE text strips. Runs on the Needle C engine via ctypes — no torch, no GPU — so it never competes with diffusion models for VRAM. English, German, French, Spanish, Italian, Dutch and Polish (auto-detected or chosen), with optional keywords to bias names and terms. Unlike Faster Whisper's proportional timing, subtitles are cut on **word-level timestamps**, so each one starts and ends on the spoken words. Select a SOUND strip, pick "Transcribe: Whistle (CPU)" in the Text panel, and Generate. Adds `cactus-needle==3.2.1` (engine and weights download on first use; telemetry disabled).
+
+2026-10-14: Add: **Fish Audio Drama 3** — multi-speaker dramatic TTS (35B MoE, 80+ languages) with `[sighs]`/`[laughs]` tags and up to 16 cloned voices: the panel's voice list maps entry N (reference clip + transcript, auto-transcribed with Whisper when empty) to `<|speaker:N|>` in the prompt. Runs locally through the native [audio.cpp drama-3-native](https://github.com/JarodMica/audio.cpp/blob/drama-3-native/docs/models/fish_drama3.md) port with [Jmica/Drama-3-GGUF](https://huggingface.co/Jmica/Drama-3-GGUF) weights: the plugin downloads the GGUF, picks a package/CPU-expert-offload profile from your VRAM, and starts/stops `audiocpp_server` itself (weights unload after 5 idle minutes). audio.cpp must be built once (no prebuilt Drama 3 binaries) — see the docstring in `models_plugins/audio/fish_drama3.py`. `DRAMA3_SERVER_URL` points it at an external audio.cpp/SGLang-Omni server instead.
+
 2026-07-10: Add: **3D output type — Mist / Depth Pass.** A new **3D** output category (alongside Video/Image/Audio/Text) hosts non-AI, scene-manipulating plugins; the first is **Mist / Depth Pass**, which duplicates a selected SCENE strip's scene, rigs an EEVEE Mist compositor pass on the copy (Auto/Custom/Scene-World range, Invert toggle), and drops the result as a new Scene strip one channel above the original — runs on the main thread like the Whisper transcribe plugin, no model download. Also new: **FLUX.2 Klein 9B KV (Consistency)** — multi-reference (up to 9 slots) image generation via the KV-cache pipeline with a consistency LoRA, 4-step distilled checkpoint, separate inpaint fallback to the base 9B architecture; and **LTX-2.3 IC-LoRA Distilled** — a distilled two-stage SDNQ variant of the IC-LoRA control plugin (selectable 4-/8-bit stage weights, 2x/1.5x upscale, audio/guidance-rescale controls), keeping all control-video/audio, 3DREAL, anchor, and lip-sync-audio features of the original.
 
 2026-07-10: Fix: **Reference-image aspect ratio now matches paired photo.** SCENE-strip references fed alongside a photo into multi-reference models (Klein, Qwen, Nano Banana, Veo, Flux, Minimax) were rendered at the outer project scene's own resolution instead of the paired photo's — breaking pixel alignment (e.g. a Mist/Depth-Pass reference losing correspondence with its source photo). `render_strip_to_path()` / `_render_named_strip_image()` now accept a `target_res` override, and the queue passes the job's own output (x, y) through for every reference-strip render.
@@ -584,19 +594,23 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 - [Shitao/OmniGen-v1-diffusers](https://huggingface.co/Shitao/OmniGen-v1-diffusers)
 - [Qwen/Qwen-VL Image](https://huggingface.co/Qwen)
 - [Qwen Image Edit](https://huggingface.co/Qwen)
+- [Qwen-Image 2.1 Turbo (SDNQ 8-bit)](https://huggingface.co/OzzyGT/Qwen_Image_2_1_Turbo_sdnq_dynamic_8bit)
 - [Ernie / Ernie Turbo](https://huggingface.co/baidu)
 - [Nucleus MOE](https://huggingface.co/NucleusAI)
 - [ZImage](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo)
 - [Schematic](https://huggingface.co/nomadoor/flux-2-klein-9B-schematic-lora)
 - [Anima](https://huggingface.co/mrfatso/anima-preview3-diffusers)
 - [Disty0/Ideogram-4-SDNQ-4bit-dynamic-hadamard](https://huggingface.co/Disty0/Ideogram-4-SDNQ-4bit-dynamic-hadamard)
+- [Ming-Image 0.1 Design](https://huggingface.co/OzzyGT/ming_image_0_1_design_diffusers)
 
 ### Audio:
 - [Chatterbox / Chatterbox Turbo](https://github.com/resemble-ai/chatterbox)
 - [OmniVoice](https://github.com/k2-fsa/OmniVoice)
 - [MOSS-TTS-v1.5](https://huggingface.co/OpenMOSS-Team/MOSS-TTS-v1.5)
+- [Fish Audio Drama 3](https://huggingface.co/fishaudio/drama-3)
 - [MMAudio](https://github.com/hkchengrex/MMAudio)
 - [ACE Step](https://github.com/ace-step/ACE-Step)
+- [YuE2-3B (songs with vocals)](https://huggingface.co/OzzyGT/YuE2-3B-Diffusers)
 - [stabilityai/stable-audio-open-1.0](https://huggingface.co/stabilityai/stable-audio-open-1.0)
 - [Stem Splitter (demucs-onnx)](https://github.com/StemSplit/demucs-onnx)
 
@@ -607,6 +621,7 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 - [Florence-2-large-PromptGen](https://huggingface.co/MiaoshouAI/Florence-2-large-PromptGen-v2.0)
 - [MoviiGen1.1_Prompt_Rewriter](https://huggingface.co/ZuluVision/MoviiGen1.1_Prompt_Rewriter)
 - [Faster Whisper (multilingual ASR)](https://github.com/SYSTRAN/faster-whisper)
+- [Whistle (tiny CPU ASR, EN/DE/FR/ES/IT/NL/PL)](https://huggingface.co/Cactus-Compute/whistle)
 - [Marlin Video Captions](https://github.com/HeliosZhao/Marlin)
 
 ![PallAIdium](https://github.com/tin2tin/Generative_AI/assets/1322593/1b1b232f-00d9-4b0b-86fb-5f0f24136d2c)

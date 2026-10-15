@@ -198,6 +198,9 @@ classes = (
     GENERATOR_OT_dismiss_install_errors,
     GENERATOR_OT_export_requirements,
     SequencerOpenAudioFile,
+    Drama3VoiceItem,
+    SEQUENCER_OT_drama3_voice_add,
+    SEQUENCER_OT_drama3_voice_remove,
     IPAdapterFaceProperties,
     IPAdapterFaceFileBrowserOperator,
     IPAdapterStyleProperties,
@@ -1048,6 +1051,12 @@ def register():
         default="auto",
         description="Spoken language. 'Auto-detect' lets Whisper identify it automatically.",
     )
+    # Whistle Transcription (reuses whisper_language)
+    bpy.types.Scene.whistle_keywords = bpy.props.StringProperty(
+        name="Keywords",
+        default="",
+        description="Comma-separated names, places or terms to bias recognition towards",
+    )
 
     # Mist / Depth Pass (3D)
     bpy.types.Scene.mist_range_mode = bpy.props.EnumProperty(
@@ -1199,6 +1208,8 @@ def register():
         soft_max=200,
         description="Audio top-k sampling cutoff (MOSS default 25; 0 disables top-k)",
     )
+    # Fish Audio Drama 3: ordered voices (list index N = <|speaker:N|>)
+    bpy.types.Scene.drama3_voices = bpy.props.CollectionProperty(type=Drama3VoiceItem)
     bpy.types.Scene.moss_ref_audio_path = bpy.props.StringProperty(
         name="moss_ref_audio_path",
         default="",
@@ -1208,6 +1219,99 @@ def register():
             "from the prompt text."
         ),
         options={"TEXTEDIT_UPDATE"},
+    )
+
+    # YuE2 (songs)
+    bpy.types.Scene.yue2_cot = bpy.props.EnumProperty(
+        name="Score Mode",
+        items=[
+            ("full",   "Full Score",  "Plan a chord-annotated ABC score first, then the song (model default)"),
+            ("melody", "Melody Only", "Plan a melody-only ABC score (no chord symbols), then the song"),
+            ("off",    "Off",         "No score planning: generate the song directly from style + lyrics"),
+        ],
+        default="full",
+        description="How YuE2 plans the song before generating audio",
+    )
+    bpy.types.Scene.yue2_max_length = bpy.props.IntProperty(
+        name="Max Length (s)",
+        default=0,
+        min=0,
+        max=360,
+        description=(
+            "Upper limit on song length in seconds (0 = model limit, ~6 min). Song length "
+            "normally follows the lyrics; a song longer than this is cut off. Lower values "
+            "also shrink the KV cache and so lower VRAM use"
+        ),
+    )
+    bpy.types.Scene.yue2_temperature = bpy.props.FloatProperty(
+        name="Temperature",
+        default=1.0,
+        min=0.0,
+        max=5.0,
+        soft_max=2.0,
+        description="Song-token sampling temperature (YuE2 default 1.0). Lower = safer, higher = more varied",
+    )
+    bpy.types.Scene.yue2_top_p = bpy.props.FloatProperty(
+        name="Top-p",
+        default=0.95,
+        min=0.01,
+        max=1.0,
+        description="Song-token nucleus-sampling probability mass (YuE2 default 0.95)",
+    )
+    bpy.types.Scene.yue2_top_k = bpy.props.IntProperty(
+        name="Top-k",
+        default=100,
+        min=1,
+        soft_max=500,
+        description="Song-token top-k sampling cutoff (YuE2 default 100)",
+    )
+    bpy.types.Scene.yue2_repetition_penalty = bpy.props.FloatProperty(
+        name="Repetition Penalty",
+        default=1.2,
+        min=0.01,
+        soft_min=1.0,
+        soft_max=2.0,
+        description="Penalty on recently repeated song tokens (YuE2 default 1.2; 1.0 = off)",
+    )
+    bpy.types.Scene.yue2_guidance = bpy.props.FloatProperty(
+        name="Guidance",
+        default=0.0,
+        min=0.0,
+        max=20.0,
+        soft_max=3.0,
+        description=(
+            "Classifier-free guidance on song tokens (0 = model default: 1.0, or 1.01 with "
+            "Score Mode Off). Values other than 1 run a second, unconditioned branch: slower, more VRAM"
+        ),
+    )
+    bpy.types.Scene.yue2_abc_path = bpy.props.StringProperty(
+        name="Re-take Score",
+        default="",
+        subtype="FILE_PATH",
+        description=(
+            "Optional ABC score (.abc) to use instead of planning a new one. Every YuE2 song "
+            "saves its score next to the .wav, so point this at one to re-take that song with "
+            "the same melody and chords. Ignored with Score Mode Off"
+        ),
+    )
+    bpy.types.Scene.yue2_vae_tile_frames = bpy.props.IntProperty(
+        name="Decode Tile",
+        default=1024,
+        min=16,
+        soft_max=4096,
+        description="Latent frames decoded per VAE tile (YuE2 default 1024). Lower = less VRAM while decoding",
+    )
+    bpy.types.Scene.yue2_vae_tile_overlap = bpy.props.IntProperty(
+        name="Decode Overlap",
+        default=16,
+        min=0,
+        soft_max=128,
+        description="Context frames decoded on each side of a tile and cropped away (YuE2 default 16)",
+    )
+    bpy.types.Scene.yue2_show_advanced = bpy.props.BoolProperty(
+        name="Advanced",
+        default=False,
+        description="Show YuE2 sampling and decode settings",
     )
 
     # Fix read-only file attributes pip sometimes leaves on Windows.
@@ -1499,7 +1603,7 @@ def unregister():
     for _prop in ("marlin_mode", "marlin_find_query", "marlin_last_query"):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
-    for _prop in ("whisper_model_size", "whisper_language"):
+    for _prop in ("whisper_model_size", "whisper_language", "whistle_keywords"):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
     for _prop in ("mist_range_mode", "mist_custom_start", "mist_custom_depth", "mist_invert"):
@@ -1519,6 +1623,13 @@ def unregister():
                   "moss_ref_audio_path"):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
+    for _prop in ("yue2_cot", "yue2_max_length", "yue2_temperature", "yue2_top_p",
+                  "yue2_top_k", "yue2_repetition_penalty", "yue2_guidance", "yue2_abc_path",
+                  "yue2_vae_tile_frames", "yue2_vae_tile_overlap", "yue2_show_advanced"):
+        if hasattr(bpy.types.Scene, _prop):
+            delattr(bpy.types.Scene, _prop)
+    if hasattr(bpy.types.Scene, "drama3_voices"):
+        del bpy.types.Scene.drama3_voices
     for _prop in ("chatterbox_mtl_language",):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)

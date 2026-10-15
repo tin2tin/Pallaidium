@@ -3918,7 +3918,7 @@ def delete_linked_audio(context, movie_strip):
 
 AI_METADATA_PREFIX = "ai_meta_"
 
-def set_ai_metadata_from_dict(strip: bpy.types.Strip, params_dict: dict):
+def set_ai_metadata_from_dict(strip: bpy.types.Strip, params_dict: dict, verbose: bool = True):
     """
     Sets AI metadata custom properties on a VSE strip from a dictionary.
 
@@ -3928,6 +3928,8 @@ def set_ai_metadata_from_dict(strip: bpy.types.Strip, params_dict: dict):
     Args:
         strip: The VSE strip (Image, Movie, Text, or Sound) to add metadata to.
         params_dict: The dictionary containing the inference parameters.
+        verbose: False skips the per-strip console lines (subtitle plugins
+            stamp hundreds of strips).
     """
     if not strip or strip.type not in {'IMAGE', 'MOVIE', 'TEXT', 'SOUND'}:
         print(f"Error: Cannot set metadata. Invalid strip: {strip}")
@@ -3936,7 +3938,8 @@ def set_ai_metadata_from_dict(strip: bpy.types.Strip, params_dict: dict):
         print(f"Error: Second argument must be a dictionary.")
         return False
 
-    print(f"Setting AI Metadata on strip: {strip.name} from dictionary")
+    if verbose:
+        print(f"Setting AI Metadata on strip: {strip.name} from dictionary")
     set_count = 0
 
     # Optional: Clear existing AI metadata first?
@@ -3994,7 +3997,8 @@ def set_ai_metadata_from_dict(strip: bpy.types.Strip, params_dict: dict):
            strip.frame_final_duration = strip.frame_final_duration
         except AttributeError: pass
 
-    print(f"Finished setting {set_count} metadata properties.")
+    if verbose:
+        print(f"Finished setting {set_count} metadata properties.")
     return True
 
 class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
@@ -4041,6 +4045,7 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
         model_attr = {
             "movie": "movie_model_card",
             "audio": "audio_model_card",
+            "text":  "text_model_card",
         }.get(output_type, "image_model_card")
         if model:
             try:
@@ -4203,6 +4208,11 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
             ("moss_top_p",           float),
             ("moss_top_k",           int),
             ("moss_ref_audio_path",  str),
+            # Music params (ACE-Step, YuE2, …)
+            ("music_bpm",            int),
+            ("music_lyrics",         str),
+            ("music_key_scale",      str),
+            ("music_time_signature", str),
         ]:
             _v = _get(_attr)
             if _v is not None and hasattr(scene, _attr):
@@ -4210,6 +4220,41 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
                     setattr(scene, _attr, _cast(_v))
                 except Exception:
                     pass
+
+        # YuE2 (songs) — reset EVERY setting for a YuE2 strip (missing keys →
+        # default), so values left over from an earlier job never leak into the redo.
+        if str(model or "") == "OzzyGT/YuE2-3B-Diffusers" and hasattr(scene, "yue2_cot"):
+            for _attr, _def in (
+                ("yue2_cot",                "full"),
+                ("yue2_max_length",         0),
+                ("yue2_temperature",        1.0),
+                ("yue2_top_p",              0.95),
+                ("yue2_top_k",              100),
+                ("yue2_repetition_penalty", 1.2),
+                ("yue2_guidance",           0.0),
+                ("yue2_abc_path",           ""),
+                ("yue2_vae_tile_frames",    1024),
+                ("yue2_vae_tile_overlap",   16),
+            ):
+                _v = _get(_attr)
+                try:
+                    setattr(scene, _attr, type(_def)(_v) if _v is not None else _def)
+                except Exception:
+                    pass
+
+        # Transcription (Faster Whisper / Whistle subtitle strips)
+        for _attr in ("whisper_model_size", "whisper_language", "whistle_keywords"):
+            _v = _get(_attr)
+            if _v is not None and hasattr(scene, _attr):
+                try:
+                    setattr(scene, _attr, str(_v))
+                except Exception:
+                    pass
+
+        # Fish Audio Drama 3 voices (JSON list -> scene.drama3_voices)
+        _v = _get("drama3_voices_json")
+        if _v:
+            drama3_voices_from_json(scene, str(_v))
 
         # Generic input paths — restore into the scene props the queue builder reads,
         # so a metadata-only carrier (e.g. a Screenwriter script-to-screen TEXT strip)
@@ -4320,12 +4365,29 @@ class AI_Metadata_PT_Panel(bpy.types.Panel):
             col.label(text="to add data.")
             return
 
-        _SKIP = {"lora_files_json"}
+        _SKIP = {"lora_files_json", "drama3_voices_json"}
         _ORDER = [
             "model", "mode", "prompt", "negative_prompt",
             "seed", "width", "height", "frames", "steps", "guidance",
+            "music_lyrics", "music_bpm", "music_key_scale", "music_time_signature",
+            "yue2_cot", "yue2_abc_path", "yue2_max_length",
+            "yue2_temperature", "yue2_top_p", "yue2_top_k", "yue2_repetition_penalty",
+            "yue2_guidance", "yue2_vae_tile_frames", "yue2_vae_tile_overlap",
+            "whisper_model_size", "whisper_language", "detected_language", "whistle_keywords",
             "lora_folder",
         ]
+        # Readable labels where the key→Title Case default reads badly.
+        _LABELS = {
+            "music_lyrics": "Lyrics", "music_bpm": "BPM",
+            "music_key_scale": "Key", "music_time_signature": "Time Sig.",
+            "yue2_cot": "Score Mode", "yue2_abc_path": "Re-take Score",
+            "yue2_max_length": "Max Length (s)", "yue2_temperature": "Temperature",
+            "yue2_top_p": "Top-p", "yue2_top_k": "Top-k",
+            "yue2_repetition_penalty": "Repetition Penalty", "yue2_guidance": "Song Guidance",
+            "yue2_vae_tile_frames": "Decode Tile", "yue2_vae_tile_overlap": "Decode Overlap",
+            "whisper_model_size": "Model Size", "whisper_language": "Language",
+            "detected_language": "Detected Language", "whistle_keywords": "Keywords",
+        }
         _order_map = {f"{AI_METADATA_PREFIX}{k}": i for i, k in enumerate(_ORDER)}
         ai_prop_keys = sorted(
             ai_prop_keys,
@@ -4338,13 +4400,39 @@ class AI_Metadata_PT_Panel(bpy.types.Panel):
             param_name = prop_key[len(AI_METADATA_PREFIX):]
             if param_name in _SKIP:
                 continue
-            label_text = param_name.replace('_', ' ').title()
+            label_text = _LABELS.get(param_name) or param_name.replace('_', ' ').title()
             col.prop(strip, f'["{prop_key}"]', text=label_text)
             displayed_anything = True
+
+        _draw_drama3_voices_meta(col, strip.get(f"{AI_METADATA_PREFIX}drama3_voices_json"))
 
         row = col.row()
         row.alignment = 'RIGHT'
         row.operator("sequencer.redo_from_metadata", text="", icon="LOOP_BACK")
+
+
+def _draw_drama3_voices_meta(col, data) -> None:
+    """Metadata viewer rows for Fish Audio Drama 3 voices (speaker, clip, transcript)."""
+    if not data:
+        return
+    import json as _json
+    try:
+        voices = _json.loads(str(data))
+    except Exception:
+        return
+    if not voices:
+        return
+    col.separator()
+    col.label(text="Voices", icon="OUTLINER_OB_SPEAKER")
+    for v in voices:
+        box = col.box()
+        sub = box.column(align=True)
+        sub.label(text=f"Speaker {v.get('speaker', 0)}:  <|speaker:{v.get('speaker', 0)}|>")
+        sub.label(text=os.path.basename(v.get("audio", "")) or "-", icon="SOUND")
+        text = (v.get("text") or "").strip() or "(no transcript)"
+        # Labels don't wrap; show the transcript in ~60-char lines.
+        for i in range(0, min(len(text), 240), 60):
+            sub.label(text=text[i:i + 60] + ("..." if i + 60 >= 240 and len(text) > 240 else ""))
 
 def get_enum_items(options_dict):
     """Converts a dictionary to the format required by bpy.props.EnumProperty."""
@@ -4413,3 +4501,37 @@ def bench_print(label: str, t0: float = None) -> float:
 
 if __name__ == "__main__":
     pass
+
+def drama3_voices_to_json(scene) -> str:
+    """Serialize scene.drama3_voices for the queue snapshot / strip metadata.
+
+    Only voices with an audio file are kept; each keeps its speaker number
+    (list position) so <|speaker:N|> tags still match after gaps.
+    """
+    import json as _json
+    voices = []
+    for i, v in enumerate(getattr(scene, "drama3_voices", []) or []):
+        path = bpy.path.abspath(v.audio_path) if v.audio_path else ""
+        if path:
+            voices.append({"speaker": i, "audio": path, "text": v.ref_text})
+    return _json.dumps(voices) if voices else ""
+
+
+def drama3_voices_from_json(scene, data: str) -> None:
+    """Restore scene.drama3_voices from drama3_voices_to_json() output (Redo)."""
+    import json as _json
+    if not hasattr(scene, "drama3_voices"):
+        return
+    try:
+        voices = _json.loads(data) if data else []
+    except Exception:
+        return
+    scene.drama3_voices.clear()
+    count = max((int(v.get("speaker", 0)) for v in voices), default=-1) + 1
+    for _ in range(min(count, 16)):
+        scene.drama3_voices.add()
+    for v in voices:
+        i = int(v.get("speaker", 0))
+        if 0 <= i < len(scene.drama3_voices):
+            scene.drama3_voices[i].audio_path = v.get("audio", "")
+            scene.drama3_voices[i].ref_text = v.get("text", "")
