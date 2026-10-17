@@ -1383,6 +1383,68 @@ def register():
         description="Precision of the prompt upsampler",
     )
 
+    # MOSS-Image Base / SFT (layout boxes ride the prompt text, written by the Box Editor)
+    bpy.types.Scene.mossimg_weights = bpy.props.EnumProperty(
+        name="Weights",
+        items=[
+            ("sdnq8", "SDNQ 8-bit", "Transformer and text encoder quantized to 8-bit while loading "
+                                    "(~16 GB VRAM resident; component offload below 22 GB). Quality close "
+                                    "to the original"),
+            ("sdnq4", "SDNQ 4-bit", "Transformer and text encoder quantized to 4-bit while loading "
+                                    "(~10 GB). For GPUs with 16 GB or less"),
+            ("bf16",  "BF16",       "Full-precision transformer, 8-bit text encoder (~21 GB; component "
+                                    "offload below 30 GB VRAM)"),
+        ],
+        default="sdnq8",
+        description="MOSS-Image weight precision (always downloaded in bf16). Changing it reloads the model",
+    )
+    bpy.types.Scene.mossimg_guidance_mode = bpy.props.EnumProperty(
+        name="Layer Guidance",
+        items=[
+            ("uncond", "Uncond Skip", "Run CFG's negative branch with the Skip Layers bypassed (official "
+                                      "default, layer 22). Two passes per step"),
+            ("slg",    "Standard SLG", "Skip Layer Guidance: an extra positive pass with the Skip Layers "
+                                       "bypassed, from 1% of the schedule on. Three passes per step"),
+            ("off",    "Off",          "Plain CFG: the most realistic look, but fine details may collapse"),
+        ],
+        default="uncond",
+        description="Layer-skipping guidance on top of CFG",
+    )
+    bpy.types.Scene.mossimg_skip_layers = bpy.props.StringProperty(
+        name="Skip Layers",
+        default="22",
+        description="Transformer blocks (0-41, comma separated) bypassed by Layer Guidance. "
+                    "22 is recommended; 22, 24 and 26 all help image quality",
+    )
+    bpy.types.Scene.mossimg_slg_scale = bpy.props.FloatProperty(
+        name="SLG Scale",
+        default=3.0, min=0.0, soft_max=6.0, max=20.0, step=10, precision=2,
+        description="Strength of Standard SLG (3 recommended)",
+    )
+    bpy.types.Scene.mossimg_shift = bpy.props.FloatProperty(
+        name="Shift",
+        default=5.0, min=0.1, soft_max=10.0, max=20.0, step=10, precision=2,
+        description="Flow-matching timestep shift (5 recommended). Higher spends more steps on composition",
+    )
+
+    # Plapre 3 (Danish TTS)
+    bpy.types.Scene.plapre_speaker = bpy.props.EnumProperty(
+        name="Speaker",
+        items=[(_n, _n.capitalize(), "Built-in Plapre voice") for _n in ("tor", "ida", "liv", "ask", "kaj")],
+        default="tor",
+        description="Built-in Plapre voice. Ignored when a Speaker Ref. clip is set (that voice is cloned)",
+    )
+    bpy.types.Scene.plapre_sentence_pause = bpy.props.FloatProperty(
+        name="Sentence Pause",
+        default=0.1, min=0.0, soft_max=1.0, max=3.0, step=1, precision=2, unit="TIME_ABSOLUTE",
+        description="Silence inserted between sentences (each sentence's own leading/trailing silence is trimmed)",
+    )
+    bpy.types.Scene.plapre_max_pause = bpy.props.FloatProperty(
+        name="Max Pause",
+        default=0.3, min=0.0, soft_max=1.0, max=3.0, step=1, precision=2, unit="TIME_ABSOLUTE",
+        description="Pauses inside a sentence (e.g. at commas) longer than this are shortened to it. 0 = keep the model's pauses",
+    )
+
     # Fix read-only file attributes pip sometimes leaves on Windows.
     # Runs in a daemon thread so it doesn't slow down Blender startup.
     import threading as _threading
@@ -1701,6 +1763,13 @@ def unregister():
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
     for _prop in ("flux3_weights", "flux3_prompt_upsampling", "flux3_pup_quant"):
+        if hasattr(bpy.types.Scene, _prop):
+            delattr(bpy.types.Scene, _prop)
+    for _prop in ("mossimg_weights", "mossimg_guidance_mode", "mossimg_skip_layers",
+                  "mossimg_slg_scale", "mossimg_shift"):
+        if hasattr(bpy.types.Scene, _prop):
+            delattr(bpy.types.Scene, _prop)
+    for _prop in ("plapre_speaker", "plapre_sentence_pause", "plapre_max_pause"):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
     if hasattr(bpy.types.Scene, "drama3_voices"):

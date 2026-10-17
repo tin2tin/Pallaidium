@@ -84,8 +84,9 @@ class LTX2_3LipSyncPlugin(ModelPlugin):
         from diffusers.pipelines.ltx2.utils import DISTILLED_SIGMA_VALUES
         from sdnq import SDNQConfig  # noqa: F401 — registers SDNQ weight loader
 
-        from ...utils.helpers import ensure_group_offload_pin_fallback
+        from ...utils.helpers import ensure_group_offload_pin_fallback, ensure_group_offload_keep_cpu_weights
         ensure_group_offload_pin_fallback()
+        ensure_group_offload_keep_cpu_weights()
 
         try:
             from ._pipeline_ltx2_multimodal import LTX2MultiModalPipeline, LTX2AudioCondition, LTX2ImageCondition, load_audio

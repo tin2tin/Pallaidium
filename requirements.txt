@@ -108,6 +108,9 @@ audioop-lts
 descript-audio-codec==1.0.0
 descript-audiotools==0.7.2
 vocos==0.1.0
+# Plapre 3: Kanade codec config loader + Danish number normalization
+jsonargparse
+num2words
 auraloss==0.4.0
 aura-sr==0.0.4
 librosa==0.11.0

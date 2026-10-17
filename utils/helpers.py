@@ -780,6 +780,68 @@ def ensure_group_offload_pin_fallback():
     _cls._pallaidium_pin_fallback = True
 
 
+def ensure_group_offload_keep_cpu_weights():
+    """Make unstreamed group offloading reuse the original CPU weights.
+
+    With use_stream=False, diffusers' ModuleGroup offloads by calling
+    `.to("cpu")` on each group, so every step copies the weights back from the
+    GPU into fresh host allocations. One generation moves the whole model from
+    its safetensors mmap into ~20GB+ of new heap. Blender's allocator
+    (tbbmalloc_proxy) never returns that commit to Windows after release, so
+    the next job's mmap-backed load overruns the commit limit and crashes in
+    torch_cpu (EXCEPTION_ACCESS_VIOLATION in transformers' _materialize_copy).
+
+    Snapshot each tensor's CPU data on its group's first onload and restore it
+    on offload instead of copying. Weights are frozen during inference, so the
+    GPU copy is simply dropped. No pinning is involved, so this keeps the
+    use_stream=False safety. Streamed, disk and TorchAO groups are untouched.
+    Safe to call any number of times; no-op if diffusers internals change.
+    """
+    try:
+        from diffusers.hooks import group_offloading as _go
+        _cls = _go.ModuleGroup
+        _orig_onload = _cls._onload_from_memory
+        _orig_offload = _cls._offload_to_memory
+        _is_torchao = _go._is_torchao_tensor
+    except Exception:
+        return
+    if getattr(_cls, "_pallaidium_keep_cpu", False):
+        return
+
+    def _group_tensors(self):
+        for module in self.modules:
+            yield from module.parameters()
+            yield from module.buffers()
+        yield from self.parameters
+        yield from self.buffers
+
+    def _onload_from_memory(self):
+        if (self.stream is None and self.offload_device.type == "cpu"
+                and getattr(self, "_pallaidium_cpu_data", None) is None):
+            snapshot = {}
+            for tensor in _group_tensors(self):
+                if _is_torchao(tensor) or tensor.device.type != "cpu":
+                    snapshot = False
+                    break
+                snapshot[tensor] = tensor.data
+            self._pallaidium_cpu_data = snapshot
+        return _orig_onload(self)
+
+    def _offload_to_memory(self):
+        snapshot = getattr(self, "_pallaidium_cpu_data", None)
+        if self.stream is None and snapshot:
+            tensors = list(_group_tensors(self))
+            if all(t in snapshot for t in tensors):
+                for tensor in tensors:
+                    tensor.data = snapshot[tensor]
+                return
+        return _orig_offload(self)
+
+    _cls._onload_from_memory = _onload_from_memory
+    _cls._offload_to_memory = _offload_to_memory
+    _cls._pallaidium_keep_cpu = True
+
+
 def clear_cuda_cache():
     import gc
     gc.collect()
@@ -1246,6 +1308,8 @@ class SmartSkipManager:
     def extract_package_name(line):
         line = line.strip()
         if not line or line.startswith("#") or line.startswith("--"): return None
+        if " @ " in line:  # PEP 508 direct reference: "name @ git+https://..."
+            return line.split(" @ ")[0].strip()
         if "git+" in line or "http" in line:
             basename = line.split('/')[-1]
             clean = basename.replace('.git', '').replace('.whl', '')
@@ -1504,6 +1568,8 @@ class DependencyManager:
             # re-verification note as above applies.
             "sdnq==0.2.8",
             "stable-audio-tools",
+            # Kanade codec for Plapre 3 (deps jsonargparse/vocos come from requirements.txt)
+            "kanade-tokenizer @ git+https://github.com/frothywater/kanade-tokenizer.git",
             "torcheval",
             "torchao",
             # spacy and model wheel: Windows/macOS install here; Linux uses get_phase_linux_binary_only()
@@ -4340,6 +4406,39 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
                 except Exception:
                     pass
 
+        # MOSS-Image — reset every setting for a MOSS-Image strip (missing keys →
+        # default). The layout boxes ride the prompt (restored above).
+        if str(model or "") in (
+            "OpenMOSS-Team/MOSS-Image-Base",
+            "OpenMOSS-Team/MOSS-Image-SFT",
+            "akhaliq/MOSS-Image-SFT-4-steps",
+        ) and hasattr(scene, "mossimg_weights"):
+            for _attr, _def in (
+                ("mossimg_weights",       "sdnq8"),
+                ("mossimg_guidance_mode", "uncond"),
+                ("mossimg_skip_layers",   "22"),
+                ("mossimg_slg_scale",     3.0),
+                ("mossimg_shift",         5.0),
+            ):
+                _v = _get(_attr)
+                try:
+                    setattr(scene, _attr, type(_def)(_v) if _v is not None else _def)
+                except Exception:
+                    pass
+
+        # Plapre 3 — reset every setting for a Plapre strip (missing keys → default)
+        if str(model or "") == "syvai/plapre-3" and hasattr(scene, "plapre_speaker"):
+            for _attr, _def in (
+                ("plapre_speaker",        "tor"),
+                ("plapre_sentence_pause", 0.1),
+                ("plapre_max_pause",      0.3),
+            ):
+                _v = _get(_attr)
+                try:
+                    setattr(scene, _attr, type(_def)(_v) if _v not in (None, "") else _def)
+                except Exception:
+                    pass
+
         # Transcription (Faster Whisper / Whistle subtitle strips)
         for _attr in ("whisper_model_size", "whisper_language", "whistle_keywords"):
             _v = _get(_attr)
@@ -4473,6 +4572,9 @@ class AI_Metadata_PT_Panel(bpy.types.Panel):
             "yue2_guidance", "yue2_vae_tile_frames", "yue2_vae_tile_overlap",
             "krea2_ref_mode", "krea2_ref_subject", "krea2_ref_style", "krea2_ref_grounding_px",
             "flux3_weights", "flux3_prompt_upsampling", "flux3_pup_quant", "flux3_final_prompt",
+            "mossimg_weights", "mossimg_guidance_mode", "mossimg_skip_layers",
+            "mossimg_slg_scale", "mossimg_shift",
+            "plapre_speaker", "plapre_sentence_pause", "plapre_max_pause",
             "whisper_model_size", "whisper_language", "detected_language", "whistle_keywords",
             "lora_folder",
         ]
@@ -4489,6 +4591,11 @@ class AI_Metadata_PT_Panel(bpy.types.Panel):
             "krea2_ref_style": "Ref. Style", "krea2_ref_grounding_px": "Grounding (px)",
             "flux3_weights": "Weights", "flux3_prompt_upsampling": "Prompt Upsampling",
             "flux3_pup_quant": "Upsampler Quant", "flux3_final_prompt": "Final Prompt",
+            "mossimg_weights": "Weights", "mossimg_guidance_mode": "Layer Guidance",
+            "mossimg_skip_layers": "Skip Layers", "mossimg_slg_scale": "SLG Scale",
+            "mossimg_shift": "Shift",
+            "plapre_speaker": "Speaker", "plapre_sentence_pause": "Sentence Pause",
+            "plapre_max_pause": "Max Pause",
             "whisper_model_size": "Model Size", "whisper_language": "Language",
             "detected_language": "Detected Language", "whistle_keywords": "Keywords",
         }

@@ -133,8 +133,9 @@ class LTX2_3MultiStagedPlugin(ModelPlugin):
 
         from diffusers.pipelines.ltx2.pipeline_ltx2_condition import retrieve_latents
 
-        from ...utils.helpers import ensure_group_offload_pin_fallback
+        from ...utils.helpers import ensure_group_offload_pin_fallback, ensure_group_offload_keep_cpu_weights
         ensure_group_offload_pin_fallback()
+        ensure_group_offload_keep_cpu_weights()
 
         _cache_dir     = prefs.hf_cache_dir or None
         _lfo           = prefs.local_files_only

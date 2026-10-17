@@ -52,15 +52,11 @@ class MiniMaxH3Plugin(ModelPlugin):
 
     def load(self, prefs, scene, **kw):
         import torch
-        from diffusers import AutoencoderKLMiniMaxH3, ModularPipeline
+        from diffusers import ModularPipeline
         from diffusers.hooks import apply_group_offloading
         from sdnq import SDNQConfig  # noqa: F401 — registers the SDNQ weight loader
         from sdnq.common import use_torch_compile as triton_is_available
         from sdnq.loader import apply_sdnq_options_to_model
-
-        # Upstream bug workaround (diffusers-recipes/minimax_h3): the fp32 pin
-        # covers the whole VAE and ignores dtype otherwise.
-        AutoencoderKLMiniMaxH3._keep_in_fp32_modules = []
 
         _cache_dir = prefs.hf_cache_dir or None
         _lfo = prefs.local_files_only
@@ -80,8 +76,41 @@ class MiniMaxH3Plugin(ModelPlugin):
         print(f"Loading {repo_id} (t2va + fl2va + ref2va, all workflows)…")
         # No workflow= at either call: keeps both transformer partitions
         # resident so the plugin can route per-job at generate() time.
-        pipe = ModularPipeline.from_pretrained(repo_id, trust_remote_code=True, cache_dir=_cache_dir, local_files_only=_lfo)
-        pipe.load_components(dtype=dtype, trust_remote_code=True, cache_dir=_cache_dir, local_files_only=_lfo)
+        # Cache-first: once downloaded, load everything (weights AND the repos'
+        # trust_remote_code .py files) from the local HF cache. Going online
+        # every load costs a round-trip per file and silently picks up upstream
+        # code changes — a remote VAE update once broke decode mid-job. Only
+        # fall back to the network for what isn't cached yet. (diffusers still
+        # prints "Downloading code from …" for cached code; nothing downloads.)
+        try:
+            pipe = ModularPipeline.from_pretrained(repo_id, trust_remote_code=True, cache_dir=_cache_dir, local_files_only=True)
+            from_cache = True
+        except (OSError, ValueError):
+            if _lfo:
+                raise
+            pipe = ModularPipeline.from_pretrained(repo_id, trust_remote_code=True, cache_dir=_cache_dir, local_files_only=False)
+            from_cache = False
+        pipe.load_components(dtype=dtype, trust_remote_code=True, cache_dir=_cache_dir, local_files_only=_lfo or from_cache)
+        if from_cache:
+            # Some components fail local-only by repo id even though fully
+            # cached: `processor`'s inner tokenizer probes a processor/config.json
+            # the repo doesn't have — online that's a quick 404, local-only a
+            # hard error. Loading from the cached snapshot folder sidesteps it.
+            from huggingface_hub import snapshot_download
+            for name in [n for n in pipe._component_specs if getattr(pipe, n, None) is None]:
+                repo = pipe._component_specs[name].pretrained_model_name_or_path
+                if not repo:
+                    continue
+                try:
+                    local_dir = snapshot_download(repo, cache_dir=_cache_dir, local_files_only=True)
+                except (OSError, ValueError):
+                    continue
+                pipe.load_components(names=name, pretrained_model_name_or_path=local_dir, dtype=dtype,
+                                     trust_remote_code=True, cache_dir=_cache_dir, local_files_only=True)
+            uncached = [n for n in pipe._component_specs if getattr(pipe, n, None) is None]
+            if uncached and not _lfo:
+                print(f"MiniMax H3: not in local cache, fetching online: {uncached}")
+                pipe.load_components(names=uncached, dtype=dtype, trust_remote_code=True, cache_dir=_cache_dir, local_files_only=False)
         # load_components() logs a per-component failure as a warning and leaves
         # the attribute None instead of raising — fail loudly here instead of
         # letting the first .model/.enable_group_offload() access below crash
@@ -94,6 +123,20 @@ class MiniMaxH3Plugin(ModelPlugin):
                 "text_encoder's ~21-35GB safetensors file couldn't be memory-mapped — increase the "
                 "Windows pagefile size, or free up RAM/close other apps, and try again)."
             )
+
+        # The repo's remote-code MiniMaxH3Fp16DecoderVae keeps the decoder fp16
+        # but pins post_quant_conv to fp32, written for the old decode block
+        # that ran under torch.autocast(float16). Current diffusers dropped the
+        # autocast: decode() casts latents to post_quant_conv's dtype and the
+        # decoder expects post_quant_conv in compute dtype with only its norms
+        # in fp32 — so fp32 activations hit the fp16 decoder.proj_in ("expected
+        # mat1 and mat2 to have the same dtype"). Align to that layout (fp16->fp32
+        # on the norms is lossless; post_quant_conv is a tiny 1x1 conv).
+        vae_compute_dtype = pipe.vae.decoder.proj_in.weight.dtype
+        pipe.vae.post_quant_conv.to(vae_compute_dtype)
+        for name, module in pipe.vae.decoder.named_modules():
+            if isinstance(module, (torch.nn.LayerNorm, torch.nn.RMSNorm)) and name.rsplit(".", 1)[-1].startswith("norm"):
+                module.to(torch.float32)
 
         if triton_is_available and (torch.cuda.is_available() or torch.xpu.is_available()):
             pipe.transformer = apply_sdnq_options_to_model(pipe.transformer, use_quantized_matmul=True)
@@ -157,6 +200,11 @@ class MiniMaxH3Plugin(ModelPlugin):
         # If this regresses VRAM (spills into shared memory again — check
         # Task Manager GPU usage, a real number should stay <= 24GB) or
         # doesn't measurably help, drop it back to 1.
+        # Without this, every offload copies weights GPU->CPU into fresh heap
+        # that Blender's allocator never returns to Windows: the 2nd job's
+        # reload then overruns the commit limit and crashes in torch_cpu.
+        from ...utils.helpers import ensure_group_offload_keep_cpu_weights
+        ensure_group_offload_keep_cpu_weights()
         offload = dict(onload_device=onload_device, offload_device=offload_device, use_stream=False, low_cpu_mem_usage=True)
         pipe.transformer.enable_group_offload(offload_type="block_level", num_blocks_per_group=2, **offload)
         pipe.transformer_ref.enable_group_offload(offload_type="block_level", num_blocks_per_group=1, **offload)
