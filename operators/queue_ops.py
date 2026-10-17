@@ -101,7 +101,6 @@ _MOSSIMG_DEFAULTS = (
 _MOSSIMG_CARDS = (
     "OpenMOSS-Team/MOSS-Image-Base",
     "OpenMOSS-Team/MOSS-Image-SFT",
-    "akhaliq/MOSS-Image-SFT-4-steps",
 )
 
 # Plapre 3 (Danish TTS) settings carried through the queue: (name, default).

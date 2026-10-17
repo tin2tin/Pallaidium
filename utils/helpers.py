@@ -4411,7 +4411,6 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
         if str(model or "") in (
             "OpenMOSS-Team/MOSS-Image-Base",
             "OpenMOSS-Team/MOSS-Image-SFT",
-            "akhaliq/MOSS-Image-SFT-4-steps",
         ) and hasattr(scene, "mossimg_weights"):
             for _attr, _def in (
                 ("mossimg_weights",       "sdnq8"),

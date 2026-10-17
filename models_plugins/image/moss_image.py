@@ -361,25 +361,17 @@ class _MossImageBase(ModelPlugin):
     uses_box_editor       = True   # prompt may be Box Editor JSON
     # Scene props load() reads: a change makes the queue reload the model.
     LOAD_VARIANT_KEYS     = ("mossimg_weights",)
-    TRANSFORMER_REPO      = ""   # repo of the transformer weights; "" = MODEL_ID
 
     # ------------------------------------------------------------------ load
-
-    def _transformer_repo(self) -> str:
-        return self.TRANSFORMER_REPO or self.MODEL_ID
 
     def _missing_download_gb(self, cache_dir) -> int:
         gb = 0
         if not _in_cache(_SHARED_REPO, _SHARED_FILES, cache_dir):
             gb += _SHARED_GB
-        if not _in_cache(self._transformer_repo(), _TRANSFORMER_FILES, cache_dir):
+        if not _in_cache(self.MODEL_ID, _TRANSFORMER_FILES, cache_dir):
             gb += _TRANSFORMER_GB
         return gb
 
-    def _adapt_transformer(self, transformer, hub: dict) -> dict:
-        """Hook after quantization (Turbo attaches its adapters); returns extra
-        entries for the pipeline dict."""
-        return {}
 
     @staticmethod
     def _resident(weights: str) -> bool:
@@ -425,7 +417,7 @@ class _MossImageBase(ModelPlugin):
         # stage it in system RAM instead.
         stage = "cuda" if gfx_device == "cuda" and _total_vram_gib() >= _GPU_STAGE_GIB else "cpu"
         transformer = transformer_cls.from_pretrained(
-            self._transformer_repo(), subfolder="transformer", torch_dtype=torch.bfloat16,
+            self.MODEL_ID, subfolder="transformer", torch_dtype=torch.bfloat16,
             device_map=stage, **hub,
         ).eval()
         enabled_items = kw.get("enabled_items") or []
@@ -439,7 +431,6 @@ class _MossImageBase(ModelPlugin):
                 quantization_device=q_device, return_device=return_device,
                 modules_to_not_convert=list(_KEEP_BF16),
             )
-        extras = self._adapt_transformer(transformer, hub)
         transformer.to(return_device if gfx_device == "cuda" else "cpu")
         if stage == "cuda":
             torch.cuda.empty_cache()
@@ -481,7 +472,7 @@ class _MossImageBase(ModelPlugin):
         else:
             placement = "on CPU (no CUDA GPU found) — expect very slow generation"
         print(f"MOSS-Image: {placement}")
-        return {"pipe": pipe, "converter": None, "refiner": None, "preprocessor": None, **extras}
+        return {"pipe": pipe, "converter": None, "refiner": None, "preprocessor": None}
 
     # ------------------------------------------------------------------ UI
 
@@ -723,177 +714,3 @@ class MossImageSFTPlugin(_MossImageBase):
         "than Base; text-to-image, Box Editor layouts, img2img, inpaint and LoRAs. Shares the text "
         "encoder download with MOSS-Image Base"
     )
-
-
-# ---------------------------------------------------------------------------
-# 4-step Turbo (community distillation of SFT)
-# ---------------------------------------------------------------------------
-# akhaliq/MOSS-Image-SFT-4-steps: data-space DMD on top of MOSS-Image-SFT. It is
-# not a LoRA to fuse: the rank-128 adapters must stay unmerged in fp32 (the
-# distillation delta is below bf16's rounding step), time_embedding/modulation
-# biases are replaced by fp32 tensors, and sampling is its own loop:
-#   x = z + Q @ x0;  v = transformer(x, code_r);  x0 = z - v   (4 codes, no CFG)
-# The base transformer underneath can still be quantized.
-
-_TURBO_REPO    = "akhaliq/MOSS-Image-SFT-4-steps"
-_TURBO_FILES   = ("lora.safetensors", "time_embedding.safetensors", "dataspace.safetensors")
-_TURBO_GB      = 1
-_TURBO_TARGETS = ("q", "k", "v", "o", "ffn_up_gate", "ffn_down")
-
-
-def _lora_branch(base, down, up, alpha):
-    """Wrap *base* (Linear or SDNQ Linear) with an unmerged fp32 LoRA branch,
-    as the checkpoint's reference inference.py does."""
-    import torch
-
-    class _LoRABranch(torch.nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.base = base
-            device = base.weight.device
-            self.lora_down = torch.nn.Linear(down.shape[1], down.shape[0], bias=False, device=device)
-            self.lora_up = torch.nn.Linear(up.shape[1], up.shape[0], bias=False, device=device)
-            with torch.no_grad():
-                self.lora_down.weight.copy_(down.float())
-                self.lora_up.weight.copy_(up.float())
-            self.scale = float(alpha) / down.shape[0]
-
-        @property
-        def weight(self):
-            # The hub blocks read proj['q'].weight.dtype for their activations.
-            return self.base.weight
-
-        def forward(self, x):
-            out = self.base(x)
-            delta = self.lora_up(self.lora_down(x.to(self.lora_down.weight.dtype)))
-            return out + (delta * self.scale).to(out.dtype)
-
-    return _LoRABranch()
-
-
-class MossImageSFTTurboPlugin(_MossImageBase):
-    MODEL_ID          = _TURBO_REPO
-    TRANSFORMER_REPO  = "OpenMOSS-Team/MOSS-Image-SFT"
-    DISPLAY_NAME      = "MOSS-Image SFT Turbo (4 steps)"
-    DESCRIPTION       = (
-        "MOSS-Image SFT distilled to 4 steps, no CFG (akhaliq/MOSS-Image-SFT-4-steps, data-space DMD): "
-        "~10x faster with accurate text; Box Editor layouts and img2img (inpaint: use Base or SFT). Uses "
-        "the MOSS-Image SFT weights plus ~1 GB of adapters"
-    )
-    INPUTS            = InputSpec.PROMPT | InputSpec.IMAGE | InputSpec.LORA
-    UI_SECTIONS       = [
-        UISection.PROMPT, UISection.IMAGE_STRIP,
-        UISection.RESOLUTION, UISection.FRAMES, UISection.STEPS,
-        UISection.IMAGE_STRENGTH, UISection.SEED,
-        UISection.LORA,
-    ]
-    PARAMS            = ParamSpec(steps=4, guidance=1.0)
-    # The few-step sampler is trained on its own estimates: pinning the area
-    # outside a mask to the real source makes it re-render that frame with a
-    # different exposure, so the repaint shows as a box. Inpaint stays on the
-    # 50-step Base/SFT plugins, whose noise-level blending is seamless.
-    supports_inpaint      = False
-    inpaint_uses_strength = False
-
-    def _missing_download_gb(self, cache_dir) -> int:
-        gb = super()._missing_download_gb(cache_dir)
-        if not _in_cache(_TURBO_REPO, _TURBO_FILES, cache_dir):
-            gb += _TURBO_GB
-        return gb
-
-    def _adapt_transformer(self, transformer, hub: dict) -> dict:
-        import torch
-        from huggingface_hub import hf_hub_download
-        from safetensors.torch import load_file
-
-        def _file(name):
-            return load_file(hf_hub_download(_TURBO_REPO, name, **hub))
-
-        with torch.no_grad():
-            for key, value in _file("time_embedding.safetensors").items():
-                param = transformer.get_parameter(key)
-                param.data = value.to(param.device, torch.float32)
-        lora = _file("lora.safetensors")
-        for i, layer in enumerate(transformer.layers):
-            for name in _TURBO_TARGETS:
-                key = f"diffusion_model.layers.{i}.proj.{name}"
-                layer.proj[name] = _lora_branch(
-                    layer.proj[name], lora[f"{key}.lora_down.weight"],
-                    lora[f"{key}.lora_up.weight"], lora[f"{key}.alpha"],
-                )
-        dataspace = _file("dataspace.safetensors")
-        print(f"MOSS-Image Turbo: adapters attached to {len(transformer.layers) * len(_TURBO_TARGETS)} layers")
-        return {"mossimg_q": dataspace["latent_mix.Q"].float(),
-                "mossimg_codes": dataspace["step_codes"].float()}
-
-    def draw_model_options_ui(self, col, context):
-        col.column(align=True).prop(context.scene, "mossimg_weights", text="Weights")
-        self._draw_download_info(col, context)
-
-    def generate(self, pipe_obj, inputs: ModelInputs, scene, prefs):
-        import contextlib
-        import torch
-        from diffusers.utils.torch_utils import randn_tensor
-
-        pipe = pipe_obj["pipe"]
-        transformer = pipe.transformer
-        width = max(16, int(inputs.width) // 16 * 16)
-        height = max(16, int(inputs.height) // 16 * 16)
-        prompt = to_moss_prompt(inputs.prompt, width, height)
-        if prompt != inputs.prompt:
-            print(f"MOSS-Image final prompt: {prompt}")
-        if not prompt.strip():
-            raise RuntimeError("MOSS-Image needs a prompt.")
-
-        codes = pipe_obj["mossimg_codes"]
-        steps = min(max(int(inputs.steps), 1), len(codes))
-        if steps != inputs.steps:
-            print(f"MOSS-Image Turbo: {inputs.steps} steps requested, the model has {len(codes)} — using {steps}")
-
-        src, _mask, denoise = self._source(inputs, width, height)
-        if src is not None and denoise <= 0.0:
-            print("MOSS-Image: Strip Power keeps the whole source — returning it unchanged")
-            return src
-
-        self.set_phase(inputs, "Encoding prompt")
-        with torch.no_grad():
-            pos, pos_mask, _neg, _neg_mask = self._embeds(pipe_obj, prompt, "", False)
-        device = pipe._execution_device
-        Q = pipe_obj["mossimg_q"].to(device)
-        codes = codes.to(device)
-
-        generator = torch.Generator("cpu").manual_seed(inputs.seed) if inputs.seed != 0 else None
-        shape = (1, transformer.config.latent_channels, height // 16, width // 16)
-        noise = randn_tensor(shape, generator=generator, device=device, dtype=torch.float32)
-        x0 = torch.zeros_like(noise)
-
-        # img2img: the loop refines an estimate of the clean latent, so the
-        # source latent seeds it at a later step (fewer steps = closer to it).
-        start = 0
-        if src is not None:
-            start = min(steps - 1, int(round(steps * (1.0 - denoise))))
-            if start:
-                with torch.no_grad():
-                    x0 = self._encode_image(pipe, src, width, height, device)
-        print(f"MOSS-Image Turbo: {inputs.mode} {width}x{height}, {steps - start}/{steps} steps")
-
-        autocast = (torch.autocast("cuda", dtype=torch.bfloat16) if device.type == "cuda"
-                    else contextlib.nullcontext())
-        self.set_phase(inputs, "Generating")
-        total = max(1, steps - start)
-        try:
-            with torch.no_grad():
-                for r in range(start, steps):
-                    if inputs.should_cancel is not None and inputs.should_cancel():
-                        raise KeyboardInterrupt("MOSS-Image: cancelled")
-                    x = noise + torch.einsum("oc,bchw->bohw", Q, x0)
-                    with autocast:
-                        v = transformer(x, codes[r], pos, pos_mask).sample.float()
-                    x0 = noise - v
-                    if inputs.progress_fn is not None:
-                        inputs.progress_fn(r - start + 1, total)
-                self.set_phase(inputs, "Decoding")
-                image = self._decode(pipe, x0, width, height)
-        finally:
-            pipe.maybe_free_model_hooks()
-        return image.convert("RGB")
