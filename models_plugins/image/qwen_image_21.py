@@ -94,6 +94,13 @@ class QwenImage21Plugin(ModelPlugin):
             pipe.enable_sequential_cpu_offload()
         else:
             pipe.enable_model_cpu_offload()
+        # After offloading is set up. Never fatal: without it jobs just read the
+        # reference images every time, as they always did.
+        try:
+            from ._qwen_image_21_vision_cache import patch_vision_cache
+            patch_vision_cache(pipe.text_encoder)
+        except Exception as e:
+            print(f"{self.DISPLAY_NAME}: vision cache unavailable ({e})")
         return {"pipe": pipe, "converter": pipe, "refiner": None, "preprocessor": None}
 
     def draw_custom_ui(self, col, context) -> bool:

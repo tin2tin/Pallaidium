@@ -312,6 +312,18 @@ class _Flux3KleinBase(ModelPlugin):
             import sdnq  # noqa: F401
 
         pipe = ModularPipeline.from_pretrained(repo, **hub)
+        # Newer diffusers runs BFL's prompt upsampler as the first block of the
+        # Flux3 pipelines. We run our own (optional, quantized, offloaded) in
+        # generate(), so drop the built-in step and its 19 GB components —
+        # otherwise every job fails with "'NoneType' has no apply_chat_template".
+        blocks = getattr(pipe, "_blocks", None)
+        sub_blocks = getattr(blocks, "sub_blocks", None)
+        if sub_blocks is not None and "prompt_upsampler" in sub_blocks:
+            sub_blocks.pop("prompt_upsampler")
+        specs = getattr(pipe, "_component_specs", None)
+        if isinstance(specs, dict):
+            for name in ("prompt_upsampler", "prompt_upsampler_processor"):
+                specs.pop(name, None)
         # The VAE runs in fp32, as BFL and the diffusers docs recommend.
         dtype = {"vae": torch.float32, "default": torch.bfloat16}
         others = [n for n in pipe.pretrained_component_names if n != "transformer"]

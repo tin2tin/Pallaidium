@@ -328,6 +328,10 @@ class MiniMaxH3Plugin(ModelPlugin):
         # .encode()/.decode() calls never trigger — so onload per call instead.
         _onload_vae_per_call(pipe.vae, onload_device)
         _onload_vae_per_call(pipe.audio_vae, onload_device)
+        # Qwen3-VL conditioner: query-chunked attention + stop at hidden_states[50]
+        # (diffusers' version spikes ~23 GB with an image/video reference).
+        from ._h3_conditioner import install_lean_conditioner
+        install_lean_conditioner("diffusers.modular_pipelines.minimax_h3.encoders")
 
         return {"pipe": pipe, "bits": bits}
 

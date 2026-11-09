@@ -2184,6 +2184,40 @@ def _resolve_fallback_camera(vse_scene, strip):
     return None
 
 
+def _rebase_strip_transform(vse_scene, strip, native_res):
+    """Convert a strip's scene-relative transform for a render at native_res.
+
+    A strip's scale and offset are relative to the scene canvas: a 768px clip
+    in a 1024px scene is added with scale 1.333 to fit. Rendering that on a
+    768px canvas would zoom in and crop the clip, so express the transform
+    relative to the fit scale instead: an auto-fitted strip renders at 1.0
+    (the whole source) and a user's extra zoom/offset is kept. Scale is never
+    taken below 1.0, which would bring back the letterbox margins.
+
+    Returns the original (scale_x, scale_y, offset_x, offset_y) for
+    _restore_strip_transform().
+    """
+    tx = strip.transform
+    orig = (tx.scale_x, tx.scale_y, tx.offset_x, tx.offset_y)
+    factor = max(
+        native_res[0] / vse_scene.render.resolution_x,
+        native_res[1] / vse_scene.render.resolution_y,
+    )
+    tx.scale_x  = max(1.0, orig[0] * factor)
+    tx.scale_y  = max(1.0, orig[1] * factor)
+    tx.offset_x = orig[2] * factor
+    tx.offset_y = orig[3] * factor
+    return orig
+
+
+def _restore_strip_transform(strip, orig):
+    """Undo _rebase_strip_transform(); orig may be None (nothing was changed)."""
+    if orig is None:
+        return
+    tx = strip.transform
+    tx.scale_x, tx.scale_y, tx.offset_x, tx.offset_y = orig
+
+
 def _set_render_resolution_for_strip(vse_scene, strip, downscale_pct=100.0, target_res=None):
     """Set vse_scene.render.resolution_x/y/percentage for rendering `strip`.
 
@@ -2204,12 +2238,17 @@ def _set_render_resolution_for_strip(vse_scene, strip, downscale_pct=100.0, targ
       (resolution_x/y are kept at native size — see comment below).
     - Whatever the above produces, the FINAL rendered pixel dimensions are
       then forced even (H.264 requires it), regardless of the path taken.
+
+    Returns the strip's original transform when it had to be rebased onto the
+    native canvas (see _rebase_strip_transform); the caller must hand it to
+    _restore_strip_transform() once the render is done.
     """
     # Render IMAGE/MOVIE strips at their native resolution so the output fills
     # the frame with no transparent margins. Otherwise a strip smaller than the
     # scene render size composites centered with letterbox padding, which makes
     # downstream consumers (Florence-2 Box Editor background, img2img/init
     # frames) misalign with content that was analyzed/resized to fill.
+    orig_transform = None
     if target_res:
         target_res = (int(target_res[0]), int(target_res[1]))
     elif strip.type in ("IMAGE", "MOVIE"):
@@ -2217,6 +2256,7 @@ def _set_render_resolution_for_strip(vse_scene, strip, downscale_pct=100.0, targ
             elem = strip.elements[0]
             if elem.orig_width and elem.orig_height:
                 target_res = (elem.orig_width, elem.orig_height)
+                orig_transform = _rebase_strip_transform(vse_scene, strip, target_res)
         except Exception:
             target_res = None
     if target_res:
@@ -2293,6 +2333,8 @@ def _set_render_resolution_for_strip(vse_scene, strip, downscale_pct=100.0, targ
                   f"resolution_y={vse_scene.render.resolution_y} "
                   f"resolution_percentage={vse_scene.render.resolution_percentage} "
                   f"→ actual {_final_dims()}")
+
+    return orig_transform
 
 
 def downscale_image_file(image_path, downscale_pct):
@@ -2442,7 +2484,7 @@ def render_strip_to_path(context, strip, image_output=False, downscale_pct=100.0
     vse_scene.frame_start = render_start
     vse_scene.frame_end   = render_end
 
-    _set_render_resolution_for_strip(vse_scene, strip, downscale_pct=downscale_pct, target_res=target_res)
+    orig_transform = _set_render_resolution_for_strip(vse_scene, strip, downscale_pct=downscale_pct, target_res=target_res)
 
     addon_prefs  = bpy.context.preferences.addons[ADDON_ID].preferences
     rendered_dir = os.path.join(addon_prefs.generator_ai, str(date.today()), "Rendered_Strips")
@@ -2584,6 +2626,7 @@ def render_strip_to_path(context, strip, image_output=False, downscale_pct=100.0
         vse_scene.render.resolution_y          = orig_res_y
         vse_scene.render.resolution_percentage = orig_res_pct
         vse_scene.camera = orig_camera
+        _restore_strip_transform(strip, orig_transform)
 
     if output_path and os.path.exists(output_path):
         _rendered_temp_paths.add(output_path)
@@ -2658,8 +2701,9 @@ def render_meta_child_to_path(context, meta_strip, child_strip, image_output=Fal
     seq_editor.use_prefetch  = False
     seq_editor.use_cache_raw = False
 
+    orig_transform = None
     if child_strip.type != "SOUND":
-        _set_render_resolution_for_strip(vse_scene, child_strip, downscale_pct=downscale_pct)
+        orig_transform = _set_render_resolution_for_strip(vse_scene, child_strip, downscale_pct=downscale_pct)
 
     # For SOUND: render the full META range so the exported audio duration equals
     # the META duration and the child's audio lands at its correct relative offset.
@@ -2851,6 +2895,7 @@ def render_meta_child_to_path(context, meta_strip, child_strip, image_output=Fal
         vse_scene.render.resolution_x          = orig_res_x
         vse_scene.render.resolution_y          = orig_res_y
         vse_scene.render.resolution_percentage = orig_res_pct
+        _restore_strip_transform(child_strip, orig_transform)
 
     if output_path and os.path.exists(output_path):
         _rendered_temp_paths.add(output_path)

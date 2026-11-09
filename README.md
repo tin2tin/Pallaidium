@@ -217,6 +217,14 @@ excluded from the built add-on.
 
 ## Change Log
 
+2026-11-09: Add: **Open-H3 Regenerate IC (video upscale to 1080p)** — NVIDIA's in-context refiner for MiniMax-H3 ([Efficient-Large-Model/Open-H3-Regenerate-2K-IC](https://huggingface.co/Efficient-Large-Model/Open-H3-Regenerate-2K-IC), MiniMax H3 Community License). It re-renders an existing clip at a higher resolution with added detail while keeping its layout, motion and lettering. Select a MOVIE strip as the input (any video works; MiniMax H3 / Pika H3 Flex output at 1344×768 suits it best); the prompt is optional. The output is **1920×1080** (Resolution height ≥ 800) or 768p (lower heights), 124 frames at 24 fps (about 5.2 s), with the source audio muxed back in. **Steps** chooses the sampler: 3 (fastest), 4, or 8 (HyperFlow, the best quality). It runs on the pruned SDNQ MiniMax-H3 (4-bit with under 64 GB RAM or Low VRAM on, otherwise 8-bit) with the IC, HyperFlow and LMS Sharp LoRAs applied unmerged, plus a vendored 3D latent upscaler (MIT). About 20 min per clip at 1080p on an RTX 4090. 2K needs more than 24 GB VRAM and only runs with the environment variable `PALLAIDIUM_H3IC_ALLOW_2K=1`.
+
+Fix: **MiniMax H3 / Pika H3 Flex** — the Qwen3-VL prompt encoder now runs its attention in chunks and stops at the layer it needs (same output, bit-identical). With long image or video references it peaked at about 23 GB VRAM before and spilled into shared memory; it now stays around 7 GB.
+
+2026-11-08: Add: **ControlFoley** — Xiaomi's controllable video-to-audio (Foley) model ([YJX-Xiaomi/ControlFoley](https://huggingface.co/YJX-Xiaomi/ControlFoley), [code](https://github.com/xiaomi-research/controlfoley)), 44.1 kHz. Pick "Video to Audio: ControlFoley" in the Audio panel; the task follows your inputs: **MOVIE strip + prompt** = sound effects synced to the picture, steered by text (a prompt that contradicts the picture wins: text-controlled V2A); **MOVIE strip + Speaker Ref.** (a 2–4 s sound) = the picture-synced audio takes on the reference's timbre (prompt optional); **MOVIE strip alone** = Foley from the picture; **prompt alone** = text-to-audio. The result is a mono WAV SOUND strip as long as the strip (up to the Duration setting); the model was trained on ~8 s clips. A MOVIE input is rendered through the VSE first, so the sound matches the strip's trimmed range. Runs in bf16: about 13 GB VRAM resident (14 GB peak) and ~9 s for 8 s of audio on an RTX 4090. First use downloads ~17 GB from YJX-Xiaomi/ControlFoley plus MusicGen-Style, DFN5B-CLIP-ViT-H-14-384 and the BigVGAN-v2 vocoder, and fetches the pinned ControlFoley source (not a pip package) into `%LOCALAPPDATA%/Pallaidium/controlfoley`; no Install Dependencies step and nothing added to site-packages. Needs a CUDA GPU. Code is Apache-2.0, but the **weights are CC BY-NC 4.0 (non-commercial)**.
+
+2026-11-01: Add: **Qwen-Image 2.1 DMD2 (2 steps)** — base Qwen-Image 2.1 (SDNQ 8-bit) with the [DMD2 distillation LoRA](https://huggingface.co/linoyts/Qwen-Image-2.1-DMD2-2steps) (v1.5), generating in **2 steps** (fixed sigmas `[1.0, 0.5]`, no CFG). Text-to-image or up to 9 reference images ("Picture 1", "Picture 2" in the prompt); extra user LoRAs stack on top. About 18.6 GB download, ~10 GB VRAM peak. Qwen Research License: non-commercial research and evaluation only.
+
 2026-10-29: Add: **Pika H3 Flex** — Pika's six-step post-train of MiniMax-H3 ([Pika-Labs/Pika-H3-Flex](https://huggingface.co/Pika-Labs/Pika-H3-Flex), MiniMax H3 Community License). It generates video with a synchronized 32 kHz stereo soundtrack in **6 steps** (fixed; no CFG, no negative prompt). The mode follows the inputs:
 - **Text to video + audio:** prompt only.
 - **First / last / first+last frame:** the Input image and/or the new **Last Frame** strip picker (an image strip, or a movie strip's first frame). A META strip holding two images at different frame starts also works as first + last.
@@ -623,6 +631,7 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 - [Wan-AI/Wan2.1-I2V](https://huggingface.co/Wan-AI)
 - [SkyReels-V1-Hunyuan-I2V/T2V](https://huggingface.co/Skywork/SkyReels-V1-Hunyuan-I2V)
 - [MiniMax Cloud API](https://www.minimaxi.com/)
+- [Open-H3-Regenerate-2K-IC](https://huggingface.co/Efficient-Large-Model/Open-H3-Regenerate-2K-IC) (video upscale/refine) on [OzzyGT/MiniMax_H3_sdnq_4bit_pruned](https://huggingface.co/OzzyGT/MiniMax_H3_sdnq_4bit_pruned) / [8bit_pruned](https://huggingface.co/OzzyGT/MiniMax_H3_sdnq_8bit_pruned), with LBH-123-AI's Comfyui_Minimax_h3_latent_Upscaler node ([MIT](https://huggingface.co/Efficient-Large-Model/Open-H3-Regenerate-2K-IC/blob/main/infer/ref2va_ic/LICENSE-upscaler-node.txt))
 - [Pika-Labs/Pika-H3-Flex](https://huggingface.co/Pika-Labs/Pika-H3-Flex) adapters on [OzzyGT/MiniMax_H3_sdnq_4bit_pruned](https://huggingface.co/OzzyGT/MiniMax_H3_sdnq_4bit_pruned) / [8bit_pruned](https://huggingface.co/OzzyGT/MiniMax_H3_sdnq_8bit_pruned)
 
 ### Image:
@@ -637,6 +646,7 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 - [Qwen/Qwen-VL Image](https://huggingface.co/Qwen)
 - [Qwen Image Edit](https://huggingface.co/Qwen)
 - [Qwen-Image 2.1 Turbo (SDNQ 8-bit)](https://huggingface.co/OzzyGT/Qwen_Image_2_1_Turbo_sdnq_dynamic_8bit)
+- [Qwen-Image 2.1 DMD2 (2 steps)](https://huggingface.co/linoyts/Qwen-Image-2.1-DMD2-2steps)
 - [Ernie / Ernie Turbo](https://huggingface.co/baidu)
 - [Nucleus MOE](https://huggingface.co/NucleusAI)
 - [ZImage](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo)
@@ -655,6 +665,7 @@ https://github.com/tin2tin/Generative_AI/assets/1322593/2dd2d2f1-a1f6-4562-8116-
 - [MOSS-TTS-v1.5](https://huggingface.co/OpenMOSS-Team/MOSS-TTS-v1.5)
 - [Fish Audio Drama 3](https://huggingface.co/fishaudio/drama-3)
 - [MMAudio](https://github.com/hkchengrex/MMAudio)
+- [ControlFoley (controllable Foley, V2A/T2A)](https://github.com/xiaomi-research/controlfoley) ([weights](https://huggingface.co/YJX-Xiaomi/ControlFoley), CC BY-NC 4.0)
 - [ACE Step](https://github.com/ace-step/ACE-Step)
 - [YuE2-3B (songs with vocals)](https://huggingface.co/OzzyGT/YuE2-3B-Diffusers)
 - [stabilityai/stable-audio-open-1.0](https://huggingface.co/stabilityai/stable-audio-open-1.0)

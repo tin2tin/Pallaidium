@@ -249,6 +249,8 @@ class PikaH3FlexPlugin(ModelPlugin):
         apply_group_offloading(pipe.text_encoder.model, offload_type="leaf_level", **offload)
         _onload_vae_per_call(pipe.vae, onload_device)
         _onload_vae_per_call(pipe.audio_vae, onload_device)
+        from ._h3_conditioner import install_lean_conditioner
+        install_lean_conditioner("diffusers.modular_pipelines.pika_h3_flex.encoders")
 
         return {"pipe": pipe, "bits": bits}
 

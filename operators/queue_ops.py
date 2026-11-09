@@ -2049,7 +2049,12 @@ class SEQUENCER_OT_add_to_queue(Operator):
                 # speed/transform baked in — instead of the full untrimmed source file.
                 # Mirrors the SCENE branch; a failed render keeps the raw path so the
                 # job still runs.
-                if strip.type == "MOVIE" and otype == "movie" and movie_path:
+                # Video-to-audio plugins (trim_movie_input, e.g. ControlFoley) need the same
+                # trimmed render: the sound must line up with the strip's visible range.
+                if (strip.type == "MOVIE" and movie_path
+                        and (otype == "movie"
+                             or (otype == "audio" and _pi is not None
+                                 and getattr(_pi, "trim_movie_input", False)))):
                     from ..utils.helpers import render_strip_to_path
                     _trim_mov = None
                     try:
