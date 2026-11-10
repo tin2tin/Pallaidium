@@ -4512,6 +4512,28 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
                 except Exception:
                     pass
 
+        # MiniMax H3 Image — reset every setting for an H3 Image strip (missing
+        # keys → default). Reference strip names ride klein_strip_N (restored above).
+        if str(model or "") == "MiniMaxAI/MiniMax-H3-Image" and hasattr(scene, "h3img_weights"):
+            for _attr, _def in (
+                ("h3img_weights",          "sdnq4"),
+                ("h3img_min_area",         "4mp"),
+                ("h3img_crop_refs",        False),
+                ("h3img_prompt_expansion", False),
+                ("h3img_pe_aspect",        False),
+                ("h3img_pe_quant",         "int8"),
+            ):
+                _v = _get(_attr)
+                if _v is None:
+                    _v = _def
+                elif isinstance(_def, bool):
+                    # Metadata may hold the bool as text: bool("False") is True.
+                    _v = str(_v).lower() in ("true", "1", "yes")
+                try:
+                    setattr(scene, _attr, type(_def)(_v))
+                except Exception:
+                    pass
+
         # Plapre 3 — reset every setting for a Plapre strip (missing keys → default)
         if str(model or "") == "syvai/plapre-3" and hasattr(scene, "plapre_speaker"):
             for _attr, _def in (
@@ -4661,6 +4683,8 @@ class AI_Metadata_PT_Panel(bpy.types.Panel):
             "fibo2_weights", "fibo2_render_text", "fibo2_font_path",
             "mossimg_weights", "mossimg_guidance_mode", "mossimg_skip_layers",
             "mossimg_slg_scale", "mossimg_shift",
+            "h3img_weights", "h3img_min_area", "h3img_crop_refs", "h3img_prompt_expansion", "h3img_pe_aspect",
+            "h3img_pe_quant", "h3img_final_prompt",
             "plapre_speaker", "plapre_sentence_pause", "plapre_max_pause",
             "whisper_model_size", "whisper_language", "detected_language", "whistle_keywords",
             "lora_folder",
@@ -4683,6 +4707,9 @@ class AI_Metadata_PT_Panel(bpy.types.Panel):
             "mossimg_weights": "Weights", "mossimg_guidance_mode": "Layer Guidance",
             "mossimg_skip_layers": "Skip Layers", "mossimg_slg_scale": "SLG Scale",
             "mossimg_shift": "Shift",
+            "h3img_weights": "Weights", "h3img_min_area": "Min Area",
+            "h3img_crop_refs": "Crop Refs", "h3img_prompt_expansion": "Prompt Expansion", "h3img_pe_aspect": "Suggested Aspect",
+            "h3img_pe_quant": "Expander Quant", "h3img_final_prompt": "Final Prompt",
             "plapre_speaker": "Speaker", "plapre_sentence_pause": "Sentence Pause",
             "plapre_max_pause": "Max Pause",
             "whisper_model_size": "Model Size", "whisper_language": "Language",

@@ -83,6 +83,10 @@ class QwenImage21DMD2Plugin(ModelPlugin):
             self.MODEL_ID, torch_dtype=torch.bfloat16,
             cache_dir=_cache_dir, local_files_only=_lfo,
         )
+        # References go through Qwen3-VL's vision tower: its bf16 Conv3d patch embed
+        # is pathologically slow on this torch/cuDNN — run it as a matmul.
+        from ...utils.fast_patch_embed import install_fast_patch_embed
+        install_fast_patch_embed(pipe.text_encoder, "Qwen-Image 2.1 DMD2")
         # The stored config applies resolution-based shifting and a 0.02 terminal
         # stretch, either of which would move the trained sigmas.
         pipe.scheduler = FlowMatchEulerDiscreteScheduler.from_config(

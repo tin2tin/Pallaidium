@@ -153,6 +153,10 @@ class _BriaFibo2Base(ModelPlugin):
         pipe = BriaFibo2Pipeline.from_pretrained(
             self.MODEL_ID, torch_dtype=torch.bfloat16, **components, **hub,
         )
+        # Edit images go through Qwen3-VL's vision tower: its bf16 Conv3d patch embed
+        # is pathologically slow on this torch/cuDNN — run it as a matmul.
+        from ...utils.fast_patch_embed import install_fast_patch_embed
+        install_fast_patch_embed(pipe.text_encoder, "Fibo 2")
 
         self._load_loras(pipe, scene, kw.get("enabled_items") or [], weights)
 

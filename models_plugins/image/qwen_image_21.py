@@ -54,6 +54,10 @@ class QwenImage21Plugin(ModelPlugin):
             self.MODEL_ID, torch_dtype=dtype,
             cache_dir=_cache_dir, local_files_only=_lfo,
         )
+        # References go through Qwen3-VL's vision tower: its bf16 Conv3d patch embed
+        # is pathologically slow on this torch/cuDNN — run it as a matmul.
+        from ...utils.fast_patch_embed import install_fast_patch_embed
+        install_fast_patch_embed(pipe.text_encoder, "Qwen-Image 2.1 Turbo")
 
         enabled_items = kw.get("enabled_items", [])
         if enabled_items:

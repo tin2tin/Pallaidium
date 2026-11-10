@@ -615,7 +615,8 @@ class OpenH3Regenerate2KPlugin(ModelPlugin):
         if from_cache:
             for name in _todo():
                 try:
-                    local_dir = _cached_snapshot_dir(pipe._component_specs[name].pretrained_model_name_or_path, _cache_dir)
+                    local_dir = _cached_snapshot_dir(pipe._component_specs[name].pretrained_model_name_or_path, _cache_dir,
+                                                    getattr(pipe._component_specs[name], "subfolder", None))
                 except OSError:
                     continue  # not cached — fetched online below
                 pipe.load_components(names=name, pretrained_model_name_or_path=local_dir, dtype=dtype,
@@ -711,6 +712,10 @@ class OpenH3Regenerate2KPlugin(ModelPlugin):
         _embed_forward = embed.forward
         embed.forward = lambda ids, _f=_embed_forward, _m=embed: _f(ids.to(_m.weight.device)).to(ids.device)
         _onload_vae_per_call(pipe.vae, onload_device)
+        # The draft video goes through the vision tower: its bf16 Conv3d patch embed is ~14 ms/patch
+        # on this torch/cuDNN, a matmul ~0 (see _h3_conditioner.py).
+        from ._h3_conditioner import install_fast_patch_embed
+        install_fast_patch_embed(pipe.text_encoder)
 
         return {"pipe": pipe, "bits": bits, "grid": grid, "silence": silence, "upscaler": upscaler, "context": context}
 

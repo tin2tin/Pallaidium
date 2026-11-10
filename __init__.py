@@ -1465,6 +1465,67 @@ def register():
         description="Flow-matching timestep shift (5 recommended). Higher spends more steps on composition",
     )
 
+    # MiniMax H3 Image (reference images ride the klein_strip_N pickers; the prompt
+    # names them <Picture 1>, <Picture 2>, ...)
+    bpy.types.Scene.h3img_weights = bpy.props.EnumProperty(
+        name="Weights",
+        items=[
+            ("sdnq4", "SDNQ 4-bit", "Pruned transformer quantized to 4-bit once and saved (~10 GB; resident on "
+                                    "20 GB+ GPUs) + 4-bit text encoder (~16 GB, shared with MiniMax H3 video). "
+                                    "Fits 24 GB VRAM / 32 GB RAM"),
+            ("sdnq8", "SDNQ 8-bit", "Pruned transformer quantized to 8-bit once and saved (~20 GB; streamed below "
+                                    "32 GB VRAM) + 8-bit text encoder (~27 GB). Needs 64 GB RAM"),
+        ],
+        default="sdnq4",
+        description="MiniMax H3 Image weight precision. The first load downloads the ~40 GB bf16 transformer "
+                    "and quantizes it once. Changing it reloads the model",
+    )
+    bpy.types.Scene.h3img_min_area = bpy.props.EnumProperty(
+        name="Min Generation Area",
+        items=[
+            ("4mp", "4 MP (Official)", "Smaller sizes are generated on a 4-megapixel canvas of the same aspect "
+                                       "ratio and resized back (the released default, best quality)"),
+            ("2mp", "2 MP",            "Generate at 2 megapixels or more"),
+            ("1mp", "1 MP",            "Generate at 1 megapixel or more"),
+            ("off", "Requested Size",  "Always generate at the requested size (fastest; small sizes lose detail)"),
+        ],
+        default="4mp",
+        description="The model works best at 4 megapixels or more: a smaller resolution is generated on a larger "
+                    "canvas and resized back, so 1024x1024 costs as much as 2048x2048",
+    )
+    bpy.types.Scene.h3img_crop_refs = bpy.props.BoolProperty(
+        name="Crop Refs to Subject",
+        default=False,
+        description=(
+            "Crop each Ref. image shot on a plain backdrop (studio portrait, character sheet) to its subject. "
+            "Fewer reference tokens (a 2-reference edit runs ~30% faster) and more pixels on the face and "
+            "clothing. Scenes are left whole, and the Input image is never cropped"
+        ),
+    )
+    bpy.types.Scene.h3img_prompt_expansion = bpy.props.BoolProperty(
+        name="Prompt Expansion",
+        default=False,
+        description=(
+            "Rewrite the prompt into the long, complete description the model works best with, using MiniMax's "
+            "official prompt-expansion task prompts on Qwen3-VL-8B (~18 GB, downloaded on first use). Reads the "
+            "reference images for edits. Any input language; the result is English"
+        ),
+    )
+    bpy.types.Scene.h3img_pe_aspect = bpy.props.BoolProperty(
+        name="Use Suggested Aspect Ratio",
+        default=False,
+        description="Let prompt expansion choose the aspect ratio; the image keeps the area of the set resolution",
+    )
+    bpy.types.Scene.h3img_pe_quant = bpy.props.EnumProperty(
+        name="Expander Quant",
+        items=[
+            ("int8",  "Int8",  "Expander quantized to int8 on the fly (~13 GB VRAM while it runs)"),
+            ("uint4", "UInt4", "Expander quantized to 4-bit on the fly (~9 GB VRAM while it runs)"),
+        ],
+        default="int8",
+        description="Precision of the prompt expander",
+    )
+
     # Plapre 3 (Danish TTS)
     bpy.types.Scene.plapre_speaker = bpy.props.EnumProperty(
         name="Speaker",
@@ -1808,6 +1869,10 @@ def unregister():
             delattr(bpy.types.Scene, _prop)
     for _prop in ("mossimg_weights", "mossimg_guidance_mode", "mossimg_skip_layers",
                   "mossimg_slg_scale", "mossimg_shift"):
+        if hasattr(bpy.types.Scene, _prop):
+            delattr(bpy.types.Scene, _prop)
+    for _prop in ("h3img_weights", "h3img_min_area", "h3img_crop_refs", "h3img_prompt_expansion",
+                  "h3img_pe_aspect", "h3img_pe_quant"):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
     for _prop in ("plapre_speaker", "plapre_sentence_pause", "plapre_max_pause"):

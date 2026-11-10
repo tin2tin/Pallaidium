@@ -148,7 +148,8 @@ class PikaH3FlexPlugin(ModelPlugin):
                 if spec.default_creation_method != "from_pretrained" or getattr(pipe, name, None) is not None:
                     continue
                 try:
-                    local_dir = _cached_snapshot_dir(spec.pretrained_model_name_or_path, _cache_dir)
+                    local_dir = _cached_snapshot_dir(spec.pretrained_model_name_or_path, _cache_dir,
+                                                    getattr(spec, "subfolder", None))
                 except OSError:
                     continue  # not cached — fetched online below
                 pipe.load_components(names=name, pretrained_model_name_or_path=local_dir, dtype=dtype,
@@ -249,8 +250,9 @@ class PikaH3FlexPlugin(ModelPlugin):
         apply_group_offloading(pipe.text_encoder.model, offload_type="leaf_level", **offload)
         _onload_vae_per_call(pipe.vae, onload_device)
         _onload_vae_per_call(pipe.audio_vae, onload_device)
-        from ._h3_conditioner import install_lean_conditioner
+        from ._h3_conditioner import install_fast_patch_embed, install_lean_conditioner
         install_lean_conditioner("diffusers.modular_pipelines.pika_h3_flex.encoders")
+        install_fast_patch_embed(pipe.text_encoder)  # bf16 Conv3d patch embed is pathologically slow
 
         return {"pipe": pipe, "bits": bits}
 

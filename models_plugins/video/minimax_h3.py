@@ -33,13 +33,18 @@ from ...utils.helpers import gfx_device, low_vram, solve_path, clean_filename
 _VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v"}
 
 
-def _cached_snapshot_dir(repo_id, cache_dir=None):
+def _cached_snapshot_dir(repo_id, cache_dir=None, subfolder=None):
     """Newest-by-ref snapshot folder of a repo in the local HF cache.
 
     huggingface_hub.snapshot_download(local_files_only=True) refuses a repo
     whose README/LICENSE/.gitattributes were never fetched ("incomplete
     snapshot") even when every file the pipeline needs is present, so resolve
     the folder from refs/main directly. Raises OSError when nothing is cached.
+
+    With `subfolder`, also raises when that component's folder is missing or
+    empty: a snapshot can hold only the index, and a tokenizer "loaded" from a
+    missing folder comes back with no vocabulary instead of failing (seen in
+    MiniMax H3 Image: 0 prompt tokens -> reshape error in the conditioner).
     """
     import os
     from huggingface_hub import constants
@@ -48,6 +53,10 @@ def _cached_snapshot_dir(repo_id, cache_dir=None):
         snap = os.path.join(root, "snapshots", f.read().strip())
     if not os.path.isdir(snap):
         raise FileNotFoundError(snap)
+    if subfolder:
+        part = os.path.join(snap, subfolder)
+        if not os.path.isdir(part) or not os.listdir(part):
+            raise FileNotFoundError(part)
     return snap
 
 
@@ -206,7 +215,8 @@ class MiniMaxH3Plugin(ModelPlugin):
                 if spec.default_creation_method != "from_pretrained" or getattr(pipe, name, None) is not None:
                     continue
                 try:
-                    local_dir = _cached_snapshot_dir(spec.pretrained_model_name_or_path, _cache_dir)
+                    local_dir = _cached_snapshot_dir(spec.pretrained_model_name_or_path, _cache_dir,
+                                                    getattr(spec, "subfolder", None))
                 except OSError:
                     continue  # not cached — fetched online below
                 pipe.load_components(names=name, pretrained_model_name_or_path=local_dir, dtype=dtype,
@@ -330,8 +340,11 @@ class MiniMaxH3Plugin(ModelPlugin):
         _onload_vae_per_call(pipe.audio_vae, onload_device)
         # Qwen3-VL conditioner: query-chunked attention + stop at hidden_states[50]
         # (diffusers' version spikes ~23 GB with an image/video reference).
-        from ._h3_conditioner import install_lean_conditioner
+        from ._h3_conditioner import install_fast_patch_embed, install_lean_conditioner
         install_lean_conditioner("diffusers.modular_pipelines.minimax_h3.encoders")
+        # Image/video references and the fl2va frame go through the vision tower: its bf16 Conv3d
+        # patch embed is ~14 ms/patch on this torch/cuDNN, a matmul ~0 (see _h3_conditioner.py).
+        install_fast_patch_embed(pipe.text_encoder)
 
         return {"pipe": pipe, "bits": bits}
 

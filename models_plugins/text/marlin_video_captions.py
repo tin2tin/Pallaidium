@@ -273,6 +273,11 @@ class MarlinVideoCaptionsPlugin(ModelPlugin):
                 _attn = attempt_kwargs.get("attn_implementation", "?")
                 used = f"{_attn}+{'SDNQ-int8' if sdnq_used else 'fallback'}"
                 print(f"Marlin: loaded ({used})")
+                # Video frames are patchified for a Qwen-VL style vision tower; its Conv3d
+                # patch embed is pathologically slow on this torch/cuDNN — run it as a matmul
+                # (no-op when the tower has no such layer).
+                from ...utils.fast_patch_embed import install_fast_patch_embed
+                install_fast_patch_embed(marlin, "Marlin")
                 return {"model": marlin}
             except Exception as e:
                 print(f"Marlin: load attempt failed ({e}), trying next config...")

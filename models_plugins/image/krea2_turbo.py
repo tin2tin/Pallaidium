@@ -151,6 +151,10 @@ class Krea2TurboPlugin(ModelPlugin):
             self.MODEL_ID, transformer=transformer, text_encoder=text_encoder,
             torch_dtype=dtype, cache_dir=_cache_dir, local_files_only=_lfo,
         )
+        # Reference jobs read the images through Qwen3-VL's vision tower, whose bf16
+        # Conv3d patch embed is pathologically slow on this torch/cuDNN.
+        from ...utils.fast_patch_embed import install_fast_patch_embed
+        install_fast_patch_embed(pipe.text_encoder, "Krea 2 Turbo")
 
         enabled_items = kw.get("enabled_items", [])
         if enabled_items:

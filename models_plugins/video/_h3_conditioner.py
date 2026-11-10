@@ -107,6 +107,13 @@ def _lean_get_qwen3vl_prompt_embeds(text_encoder, processor, token_ids, vision_i
     return conditioner_hidden(text_encoder, processor, token_ids, vision_inputs, text_encoder_layer, device, dtype)
 
 
+def install_fast_patch_embed(text_encoder):
+    """Qwen3-VL vision patch embedding as a matmul (bf16 Conv3d is ~240 s for two 1024-px references on
+    torch 2.9.1 / cuDNN 9.10). Shared implementation: utils/fast_patch_embed.py."""
+    from ...utils.fast_patch_embed import install_fast_patch_embed as _install
+    return _install(text_encoder) > 0
+
+
 def install_lean_conditioner(*module_names):
     """Swap diffusers' get_qwen3vl_prompt_embeds for the lean version in the given modular-pipeline encoder
     modules (the encoder blocks look the function up as a module global at call time). Idempotent."""

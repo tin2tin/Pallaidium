@@ -681,6 +681,10 @@ class _Flux3KleinBase(ModelPlugin):
         ).eval()
         if on_cuda:
             model.to("cuda")
+        # The references go through the Qwen3.5 vision tower: its bf16 Conv3d patch
+        # embed is pathologically slow on this torch/cuDNN — run it as a matmul.
+        from ...utils.fast_patch_embed import install_fast_patch_embed
+        install_fast_patch_embed(model, "FLUX.3 prompt upsampler")
         processor = AutoProcessor.from_pretrained(_PUP_ID, **hub)
         with open(hf_hub_download(_PUP_ID, "system_prompts.json", **hub), encoding="utf-8") as fh:
             prompts = json.load(fh)

@@ -118,6 +118,18 @@ _MOSSIMG_CARDS = (
     "OpenMOSS-Team/MOSS-Image-SFT",
 )
 
+# MiniMax H3 Image settings carried through the queue: (name, default).
+# The reference images ride the shared klein_strip_N pickers.
+_H3IMG_DEFAULTS = (
+    ("h3img_weights",          "sdnq4"),
+    ("h3img_min_area",         "4mp"),
+    ("h3img_crop_refs",        False),
+    ("h3img_prompt_expansion", False),
+    ("h3img_pe_aspect",        False),
+    ("h3img_pe_quant",         "int8"),
+)
+_H3IMG_CARDS = ("MiniMaxAI/MiniMax-H3-Image",)
+
 # Plapre 3 (Danish TTS) settings carried through the queue: (name, default).
 _PLAPRE_DEFAULTS = (
     ("plapre_speaker",        "tor"),
@@ -384,6 +396,14 @@ class RenderQueueJob(PropertyGroup):
     mossimg_skip_layers:     StringProperty(default="22")
     mossimg_slg_scale:       FloatProperty(default=3.0)
     mossimg_shift:           FloatProperty(default=5.0)
+
+    # MiniMax H3 Image (see _H3IMG_DEFAULTS)
+    h3img_weights:           StringProperty(default="sdnq4")
+    h3img_min_area:          StringProperty(default="4mp")
+    h3img_crop_refs:         BoolProperty(default=False)
+    h3img_prompt_expansion:  BoolProperty(default=False)
+    h3img_pe_aspect:         BoolProperty(default=False)
+    h3img_pe_quant:          StringProperty(default="int8")
 
     # Plapre 3 (see _PLAPRE_DEFAULTS)
     plapre_speaker:          StringProperty(default="tor")
@@ -804,8 +824,10 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             **{_k: snapshot.get(_k, _d) for _k, _d in _FLUX3_DEFAULTS},
             **{_k: snapshot.get(_k, _d) for _k, _d in _FIBO2_DEFAULTS},
             **{_k: snapshot.get(_k, _d) for _k, _d in _MOSSIMG_DEFAULTS},
+            **{_k: snapshot.get(_k, _d) for _k, _d in _H3IMG_DEFAULTS},
             **{_k: snapshot.get(_k, _d) for _k, _d in _PLAPRE_DEFAULTS},
             flux3_final_prompt    = "",  # set by the FLUX.3 plugin when PUP/layout rewrote the prompt
+            h3img_final_prompt    = "",  # set by the MiniMax H3 Image plugin when prompt expansion ran
             drama3_voices_json    = snapshot.get("drama3_voices_json",    ""),
             florence2_mode         = snapshot.get("florence2_mode",         "CAPTION"),
             florence2_send_to_mask = snapshot.get("florence2_send_to_mask", False),
@@ -1341,10 +1363,13 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             **{_k: snapshot.get(_k, _d) for _k, _d in _FLUX3_DEFAULTS},
             **{_k: snapshot.get(_k, _d) for _k, _d in _FIBO2_DEFAULTS},
             **{_k: snapshot.get(_k, _d) for _k, _d in _MOSSIMG_DEFAULTS},
+            **{_k: snapshot.get(_k, _d) for _k, _d in _H3IMG_DEFAULTS},
             **{_k: snapshot.get(_k, _d) for _k, _d in _PLAPRE_DEFAULTS},
             # FLUX.3 — the prompt the model actually received (upsampled and/or
             # converted from Box Editor JSON); read back from the proxy.
             "flux3_final_prompt":   getattr(scene_proxy, "flux3_final_prompt", ""),
+            # MiniMax H3 Image — the expanded prompt, read back from the proxy.
+            "h3img_final_prompt":   getattr(scene_proxy, "h3img_final_prompt", ""),
             # Fish Audio Drama 3 — read back from the proxy: the plugin fills in
             # Whisper transcripts for voices whose text was left empty.
             "drama3_voices_json":   getattr(scene_proxy, "drama3_voices_json", None)
@@ -1826,6 +1851,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
             **{_k: getattr(scene, _k, _d) for _k, _d in _FLUX3_DEFAULTS},
             **{_k: getattr(scene, _k, _d) for _k, _d in _FIBO2_DEFAULTS},
             **{_k: getattr(scene, _k, _d) for _k, _d in _MOSSIMG_DEFAULTS},
+            **{_k: getattr(scene, _k, _d) for _k, _d in _H3IMG_DEFAULTS},
             **{_k: getattr(scene, _k, _d) for _k, _d in _PLAPRE_DEFAULTS},
             drama3_voices_json    = drama3_voices_to_json(scene),
             florence2_mode         = getattr(scene, "florence2_mode",         "CAPTION"),
@@ -2598,6 +2624,7 @@ def _queue_start_job(scene, job) -> None:
         *(_k for _k, _d in _FLUX3_DEFAULTS),
         *(_k for _k, _d in _FIBO2_DEFAULTS),
         *(_k for _k, _d in _MOSSIMG_DEFAULTS),
+        *(_k for _k, _d in _H3IMG_DEFAULTS),
         *(_k for _k, _d in _PLAPRE_DEFAULTS),
         "drama3_voices_json",
         "stem_split_model", "stem_split_vocals", "stem_split_drums",
@@ -3303,6 +3330,15 @@ def _queue_insert_strip(scene, result: dict) -> None:
                     if isinstance(_def, float):
                         _v = round(float(_v), 4)
                     extra_meta[_k] = _v
+            # MiniMax H3 Image — settings always written so Redo resets every one
+            # (the reference strip names ride klein_strip_N); the expanded prompt
+            # only when it differs from the typed prompt.
+            if result.get("model_card", "") in _H3IMG_CARDS:
+                for _k, _def in _H3IMG_DEFAULTS:
+                    extra_meta[_k] = result.get(_k, _def)
+                _final = result.get("h3img_final_prompt", "")
+                if _final and _final.strip() != (result.get("prompt", "") or "").strip():
+                    extra_meta["h3img_final_prompt"] = _final
             # Plapre 3 — speaker always written so Redo resets it
             if result.get("model_card", "") == "syvai/plapre-3":
                 for _k, _def in _PLAPRE_DEFAULTS:
@@ -3694,6 +3730,13 @@ class SEQUENCER_OT_redo_from_job(Operator):
         # MOSS-Image settings
         if hasattr(scene, "mossimg_weights"):
             for _k, _d in _MOSSIMG_DEFAULTS:
+                try:
+                    setattr(scene, _k, getattr(job, _k))
+                except Exception:
+                    pass
+        # MiniMax H3 Image settings
+        if hasattr(scene, "h3img_weights"):
+            for _k, _d in _H3IMG_DEFAULTS:
                 try:
                     setattr(scene, _k, getattr(job, _k))
                 except Exception:

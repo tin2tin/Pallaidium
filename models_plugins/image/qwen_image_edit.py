@@ -53,6 +53,10 @@ class QwenImageEditPlugin(ModelPlugin):
             cache_dir=_cache_dir,
             local_files_only=_lfo,
         )
+        # The edit images go through Qwen2.5-VL's vision tower: its bf16 Conv3d patch
+        # embed is pathologically slow on this torch/cuDNN — run it as a matmul.
+        from ...utils.fast_patch_embed import install_fast_patch_embed
+        install_fast_patch_embed(text_encoder, "Qwen-Image Edit")
         # Heavy SDNQ transformer: diffusers' from_pretrained(device_map="cpu")
         # faults with EXCEPTION_ACCESS_VIOLATION when materializing safetensors
         # shards on the queue worker thread (torch_cpu storage.__getitem__ is not
