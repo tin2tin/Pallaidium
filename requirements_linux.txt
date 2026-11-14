@@ -73,7 +73,7 @@ laion-clap
 pywavelets
 av
 opt_einsum
-safetensors
+safetensors==0.8.0
 peft
 accelerate
 tokenizers

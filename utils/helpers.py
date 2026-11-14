@@ -1571,7 +1571,11 @@ class DependencyManager:
             # Kanade codec for Plapre 3 (deps jsonargparse/vocos come from requirements.txt)
             "kanade-tokenizer @ git+https://github.com/frothywater/kanade-tokenizer.git",
             "torcheval",
-            "torchao",
+            # Pinned: torchao 0.18+ is built for torch>=2.11 and imports
+            # torch.nn.functional.ScalingType, which torch 2.9.1 lacks. transformers
+            # imports torchao whenever it is present, so a too-new torchao breaks
+            # EVERY model load. Bump only together with the torch pin.
+            "torchao==0.17.0",
             # SAM-Audio (sound isolation). The installer is --no-deps, so only the
             # pieces sam_audio imports are listed: dacvae needs descript-audiotools +
             # argbind; perception-models supplies `core` (xformers/wandb are shimmed
