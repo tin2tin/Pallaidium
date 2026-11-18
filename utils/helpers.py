@@ -4538,6 +4538,24 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
                 except Exception:
                     pass
 
+        # Robin TTS — reset every setting for a Robin strip (missing keys → default)
+        if str(model or "") == "FixedSeed/Robin" and hasattr(scene, "robin_voice"):
+            for _attr, _def in (
+                ("robin_voice",      ""),
+                ("robin_lang",       "en"),
+                ("robin_revoice",    False),
+                ("robin_lora",       False),
+                ("robin_lora_scale", 1.0),
+            ):
+                _v = _get(_attr)
+                try:
+                    if isinstance(_def, bool):
+                        setattr(scene, _attr, (str(_v).lower() in ("1", "true", "yes")) if _v not in (None, "") else _def)
+                    else:
+                        setattr(scene, _attr, type(_def)(_v) if _v not in (None, "") else _def)
+                except Exception:
+                    pass
+
         # Plapre 3 — reset every setting for a Plapre strip (missing keys → default)
         if str(model or "") == "syvai/plapre-3" and hasattr(scene, "plapre_speaker"):
             for _attr, _def in (
@@ -4690,6 +4708,7 @@ class AI_Metadata_PT_Panel(bpy.types.Panel):
             "h3img_weights", "h3img_min_area", "h3img_crop_refs", "h3img_prompt_expansion", "h3img_pe_aspect",
             "h3img_pe_quant", "h3img_final_prompt",
             "plapre_speaker", "plapre_sentence_pause", "plapre_max_pause",
+            "robin_voice", "robin_lang", "robin_revoice", "robin_lora", "robin_lora_scale",
             "whisper_model_size", "whisper_language", "detected_language", "whistle_keywords",
             "lora_folder",
         ]
@@ -4716,6 +4735,8 @@ class AI_Metadata_PT_Panel(bpy.types.Panel):
             "h3img_pe_quant": "Expander Quant", "h3img_final_prompt": "Final Prompt",
             "plapre_speaker": "Speaker", "plapre_sentence_pause": "Sentence Pause",
             "plapre_max_pause": "Max Pause",
+            "robin_voice": "Voice", "robin_lang": "Language", "robin_revoice": "Re-voice",
+            "robin_lora": "Robin LoRA", "robin_lora_scale": "LoRA Strength",
             "whisper_model_size": "Model Size", "whisper_language": "Language",
             "detected_language": "Detected Language", "whistle_keywords": "Keywords",
         }

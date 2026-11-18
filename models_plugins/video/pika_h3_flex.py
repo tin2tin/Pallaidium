@@ -33,7 +33,7 @@ import math
 
 from ...models.base import ModelPlugin, InputSpec, UISection, ParamSpec, ModelInputs
 from ...utils.helpers import gfx_device, low_vram, solve_path, clean_filename
-from .minimax_h3 import _VIDEO_EXTS, _cached_snapshot_dir, _onload_vae_per_call, _queue_progress
+from .minimax_h3 import _VIDEO_EXTS, _cached_snapshot_dir, _onload_vae_per_call, _queue_progress, _trim_cache_before_denoise
 
 _PIKA_REPO = "Pika-Labs/Pika-H3-Flex"
 _PIKA_ADAPTERS = {
@@ -250,6 +250,7 @@ class PikaH3FlexPlugin(ModelPlugin):
         apply_group_offloading(pipe.text_encoder.model, offload_type="leaf_level", **offload)
         _onload_vae_per_call(pipe.vae, onload_device)
         _onload_vae_per_call(pipe.audio_vae, onload_device)
+        _trim_cache_before_denoise(pipe)
         from ._h3_conditioner import install_fast_patch_embed, install_lean_conditioner
         install_lean_conditioner("diffusers.modular_pipelines.pika_h3_flex.encoders")
         install_fast_patch_embed(pipe.text_encoder)  # bf16 Conv3d patch embed is pathologically slow
@@ -307,6 +308,7 @@ class PikaH3FlexPlugin(ModelPlugin):
         from diffusers.utils.export_utils import encode_video
 
         pipe = pipe_obj["pipe"]
+        pipe._h3_trim_armed = True  # empty the CUDA cache once, before the first denoise step
         seed = inputs.seed
         generator = torch.Generator("cpu").manual_seed(seed) if seed != 0 else None
 

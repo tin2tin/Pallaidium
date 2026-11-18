@@ -1544,6 +1544,35 @@ def register():
         description="Pauses inside a sentence (e.g. at commas) longer than this are shortened to it. 0 = keep the model's pauses",
     )
 
+    # Robin (FixedSeed/Robin TTS)
+    bpy.types.Scene.robin_voice = bpy.props.StringProperty(
+        name="Voice",
+        default="",
+        description="The voice in words, e.g. 'a clear, confident woman in her thirties, mid-pitched' (gender, age and manner work best). Empty = the model's default voice. "
+                    "Ignored while a Speaker Ref. clip is set in Speak mode",
+    )
+    bpy.types.Scene.robin_lang = bpy.props.EnumProperty(
+        name="Language",
+        items=[("en", "English", ""), ("ja", "Japanese", ""), ("mix", "English + Japanese", "Both in one line")],
+        default="en",
+    )
+    bpy.types.Scene.robin_revoice = bpy.props.BoolProperty(
+        name="Re-voice",
+        default=False,
+        description="Perform the Speaker Ref. recording (max 45 s) again in the Voice / LoRA voice, keeping its timing and delivery. "
+                    "The prompt must be exactly what the recording says",
+    )
+    bpy.types.Scene.robin_lora = bpy.props.BoolProperty(
+        name="Robin LoRA",
+        default=False,
+        description="Use Robin's own character voice (robin_character_lora)",
+    )
+    bpy.types.Scene.robin_lora_scale = bpy.props.FloatProperty(
+        name="LoRA Strength",
+        default=1.0, min=0.0, soft_max=2.0, max=2.0, step=5, precision=2,
+        description="How strongly the LoRA applies (1 = as trained)",
+    )
+
     # Fix read-only file attributes pip sometimes leaves on Windows.
     # Runs in a daemon thread so it doesn't slow down Blender startup.
     import threading as _threading
@@ -1875,7 +1904,8 @@ def unregister():
                   "h3img_pe_aspect", "h3img_pe_quant"):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
-    for _prop in ("plapre_speaker", "plapre_sentence_pause", "plapre_max_pause"):
+    for _prop in ("plapre_speaker", "plapre_sentence_pause", "plapre_max_pause",
+                  "robin_voice", "robin_lang", "robin_revoice", "robin_lora", "robin_lora_scale"):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
     if hasattr(bpy.types.Scene, "drama3_voices"):

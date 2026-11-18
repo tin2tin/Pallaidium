@@ -137,6 +137,15 @@ _PLAPRE_DEFAULTS = (
     ("plapre_max_pause",      0.3),
 )
 
+# Robin (FixedSeed/Robin TTS) settings carried through the queue: (name, default).
+_ROBIN_DEFAULTS = (
+    ("robin_voice",      ""),
+    ("robin_lang",       "en"),
+    ("robin_revoice",    False),
+    ("robin_lora",       False),
+    ("robin_lora_scale", 1.0),
+)
+
 # ---------------------------------------------------------------------------
 # Reload / scene-input diagnostic — shared log file with main_ops.py so a single
 # file shows what BOTH the immediate path and the queue path decided.
@@ -410,6 +419,13 @@ class RenderQueueJob(PropertyGroup):
     plapre_sentence_pause:   FloatProperty(default=0.1)
     plapre_max_pause:        FloatProperty(default=0.3)
 
+    # Robin TTS (see _ROBIN_DEFAULTS)
+    robin_voice:             StringProperty(default="")
+    robin_lang:              StringProperty(default="en")
+    robin_revoice:           BoolProperty(default=False)
+    robin_lora:              BoolProperty(default=False)
+    robin_lora_scale:        FloatProperty(default=1.0)
+
     # Fish Audio Drama 3 voices: JSON [{speaker, audio, text}, ...]
     drama3_voices_json:   StringProperty(default="")
 
@@ -646,6 +662,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
     progress_store[job_id] = {"progress": 0.0, "phase": "Queued", "step": 0, "total": 0}
     pipe_obj = None
     model_cache = None  # shared cache dict from main_ops; set once otype is known
+    job_completed = False  # a failed/cancelled job must not leave its model warm
 
     try:
         from ..models import get_plugin
@@ -826,6 +843,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             **{_k: snapshot.get(_k, _d) for _k, _d in _MOSSIMG_DEFAULTS},
             **{_k: snapshot.get(_k, _d) for _k, _d in _H3IMG_DEFAULTS},
             **{_k: snapshot.get(_k, _d) for _k, _d in _PLAPRE_DEFAULTS},
+            **{_k: snapshot.get(_k, _d) for _k, _d in _ROBIN_DEFAULTS},
             flux3_final_prompt    = "",  # set by the FLUX.3 plugin when PUP/layout rewrote the prompt
             h3img_final_prompt    = "",  # set by the MiniMax H3 Image plugin when prompt expansion ran
             drama3_voices_json    = snapshot.get("drama3_voices_json",    ""),
@@ -1248,6 +1266,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
                 )
 
         progress_store[job_id] = {"progress": 1.0, "phase": "Done", "step": 0, "total": 0}
+        job_completed = True
         result_queue.put({
             "job_id":               job_id,
             "status":               "COMPLETED",
@@ -1365,6 +1384,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             **{_k: snapshot.get(_k, _d) for _k, _d in _MOSSIMG_DEFAULTS},
             **{_k: snapshot.get(_k, _d) for _k, _d in _H3IMG_DEFAULTS},
             **{_k: snapshot.get(_k, _d) for _k, _d in _PLAPRE_DEFAULTS},
+            **{_k: snapshot.get(_k, _d) for _k, _d in _ROBIN_DEFAULTS},
             # FLUX.3 — the prompt the model actually received (upsampled and/or
             # converted from Box Editor JSON); read back from the proxy.
             "flux3_final_prompt":   getattr(scene_proxy, "flux3_final_prompt", ""),
@@ -1413,7 +1433,10 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
                 torch.cuda.synchronize()
         except (ImportError, AttributeError, RuntimeError):
             pass
-        if snapshot.get("should_unload", True) and model_cache is not None:
+        # An interrupted generate() leaves group-offloaded blocks stuck on the
+        # GPU and the pipeline half-run, so the next same-model job would reuse
+        # that state (slow / hung). Only a completed job may keep its model warm.
+        if (snapshot.get("should_unload", True) or not job_completed) and model_cache is not None:
             release_model_cache(model_cache)
         # Always trim the CUDA cache between jobs, even when the model is kept
         # loaded for the next same-model job: empty_cache() only returns unused
@@ -1853,6 +1876,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
             **{_k: getattr(scene, _k, _d) for _k, _d in _MOSSIMG_DEFAULTS},
             **{_k: getattr(scene, _k, _d) for _k, _d in _H3IMG_DEFAULTS},
             **{_k: getattr(scene, _k, _d) for _k, _d in _PLAPRE_DEFAULTS},
+            **{_k: getattr(scene, _k, _d) for _k, _d in _ROBIN_DEFAULTS},
             drama3_voices_json    = drama3_voices_to_json(scene),
             florence2_mode         = getattr(scene, "florence2_mode",         "CAPTION"),
             florence2_send_to_mask = getattr(scene, "florence2_send_to_mask", False),
@@ -2626,6 +2650,7 @@ def _queue_start_job(scene, job) -> None:
         *(_k for _k, _d in _MOSSIMG_DEFAULTS),
         *(_k for _k, _d in _H3IMG_DEFAULTS),
         *(_k for _k, _d in _PLAPRE_DEFAULTS),
+        *(_k for _k, _d in _ROBIN_DEFAULTS),
         "drama3_voices_json",
         "stem_split_model", "stem_split_vocals", "stem_split_drums",
         "stem_split_bass", "stem_split_other", "stem_split_guitar", "stem_split_piano",
@@ -3346,6 +3371,13 @@ def _queue_insert_strip(scene, result: dict) -> None:
                     if isinstance(_def, float):
                         _v = round(float(_v), 4)
                     extra_meta[_k] = _v
+            # Robin TTS — always written so Redo resets the voice settings
+            if result.get("model_card", "") == "FixedSeed/Robin":
+                for _k, _def in _ROBIN_DEFAULTS:
+                    _v = result.get(_k, _def)
+                    if isinstance(_def, float):
+                        _v = round(float(_v), 4)
+                    extra_meta[_k] = _v
             # Fish Audio Drama 3 voices
             if result.get("model_card", "") == "fishaudio/drama-3" and result.get("drama3_voices_json", ""):
                 extra_meta["drama3_voices_json"] = result.get("drama3_voices_json", "")
@@ -3744,6 +3776,13 @@ class SEQUENCER_OT_redo_from_job(Operator):
         # Plapre 3 settings
         if hasattr(scene, "plapre_speaker"):
             for _k, _d in _PLAPRE_DEFAULTS:
+                try:
+                    setattr(scene, _k, getattr(job, _k))
+                except Exception:
+                    pass
+        # Robin TTS settings
+        if hasattr(scene, "robin_voice"):
+            for _k, _d in _ROBIN_DEFAULTS:
                 try:
                     setattr(scene, _k, getattr(job, _k))
                 except Exception:

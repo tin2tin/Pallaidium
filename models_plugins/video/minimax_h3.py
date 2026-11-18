@@ -99,6 +99,53 @@ def _onload_vae_per_call(vae, device):
     vae.decode = wrap(vae.decode)
 
 
+def _trim_cache_before_denoise(pipe):
+    """Return the conditioner pass's reserved-but-unused VRAM before the first denoise step.
+
+    The Qwen3-VL text/vision pass leaves several GB reserved but unallocated; Windows torch ignores
+    expandable_segments, so that space stays fragmented and the transformer's first big FFN activation
+    (4+ GB) OOMs with ~2 GB "free". Arm once per generate() via `pipe._h3_trim_armed = True`."""
+    import torch
+    pipe._h3_trim_armed = False
+
+    def pre(module, args, kwargs=None):
+        if getattr(pipe, "_h3_trim_armed", False):
+            pipe._h3_trim_armed = False
+            import gc
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
+    for name in ("transformer", "transformer_ref"):
+        m = getattr(pipe, name, None)
+        if m is not None:
+            m.register_forward_pre_hook(pre)
+            _chunk_feed_forward(m)
+
+
+def _chunk_feed_forward(transformer, rows=16384):
+    """Run every transformer block's SwiGLU feed-forward over the packed sequence in row chunks.
+
+    The FFN is position-wise, so this is bit-identical, but its fused gate/up projection (plus the LoRA
+    branch) otherwise allocates one ~4+ GB activation for a long vertical/HD clip, which OOMs a 24 GB card
+    that has the weights, conditioning and a fragmented allocator already resident."""
+    import torch
+    for block in getattr(transformer, "transformer_blocks", None) or getattr(transformer, "blocks", None) or []:
+        ff = getattr(block, "ff", None)
+        if ff is None or getattr(ff, "_h3_chunked", False):
+            continue
+        orig = ff.forward
+
+        def forward(x, *a, _orig=orig, **kw):
+            n = x.shape[-2]
+            if n <= rows or torch.is_grad_enabled():
+                return _orig(x, *a, **kw)
+            return torch.cat([_orig(x[..., i:i + rows, :], *a, **kw) for i in range(0, n, rows)], dim=-2)
+
+        ff.forward = forward
+        ff._h3_chunked = True
+
+
 @contextmanager
 def _queue_progress(plugin, inputs):
     """Forward the denoise loop's tqdm steps to the render-queue progress bar.
@@ -338,6 +385,7 @@ class MiniMaxH3Plugin(ModelPlugin):
         # .encode()/.decode() calls never trigger — so onload per call instead.
         _onload_vae_per_call(pipe.vae, onload_device)
         _onload_vae_per_call(pipe.audio_vae, onload_device)
+        _trim_cache_before_denoise(pipe)
         # Qwen3-VL conditioner: query-chunked attention + stop at hidden_states[50]
         # (diffusers' version spikes ~23 GB with an image/video reference).
         from ._h3_conditioner import install_fast_patch_embed, install_lean_conditioner
@@ -381,6 +429,7 @@ class MiniMaxH3Plugin(ModelPlugin):
         from diffusers.utils.export_utils import encode_video
 
         pipe = pipe_obj["pipe"]
+        pipe._h3_trim_armed = True  # empty the CUDA cache once, before the first denoise step
         seed = inputs.seed
         generator = torch.Generator("cpu").manual_seed(seed) if seed != 0 else None
 
