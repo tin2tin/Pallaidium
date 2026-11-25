@@ -38,6 +38,11 @@ _REPO = "OzzyGT/minimax_h3_image_sdnq_dynamic_4bit"
 _TE_REPO = "OzzyGT/MiniMax_H3_sdnq_dynamic_4bit"
 # Total VRAM (GiB) to keep the 17.5 GB transformer resident; below it, it streams block by block.
 _RESIDENT_GIB = 23
+# Above this many MP in one denoise sequence (canvas + references, see _job_megapixels) the activations
+# don't fit beside the resident transformer: a 4-image edit at 1 MP spilled 2.5 GB into shared memory
+# and ran 66 s per step. Those jobs stream the transformer block by block instead.
+# PALLAIDIUM_H3IMG_PLACEMENT=resident|stream overrides the choice.
+_STREAM_ABOVE_MP = 4.0
 # First-run downloads in GB.
 _TRANSFORMER_GB = 17.5
 _TE_GB = 15
@@ -191,6 +196,18 @@ def _crop_to_subject(img, thresh=28, pad=0.06, max_frac=0.85):
     if min(box[2] - box[0], box[3] - box[1]) < 256:
         return img
     return img.crop(box)
+
+
+def _job_megapixels(width: int, height: int, min_area: int, refs) -> float:
+    """Pixels (MP) the transformer denoises in one sequence: the canvas (at least min_area, as the pipeline
+    upscales it) plus every reference, whose short edge the pipeline clamps to [1024, 2048]."""
+    total = max(width * height, min_area)
+    for img in refs:
+        w, h = img.size
+        short = min(w, h)
+        scale = 1024 / short if short < 1024 else (2048 / short if short > 2048 else 1.0)
+        total += w * h * scale * scale
+    return total / 2**20
 
 
 def _release_pipeline(pipe, names=("transformer", "text_encoder", "vae")) -> None:
@@ -494,13 +511,15 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
         # purpose: block-level groups of 5 decoder layers (measured 2026-11-10, 2-reference edit at
         # 1920x896) pushed the 24 GB card into shared memory — text encode 285 s, denoise 49 s.
         apply_group_offloading(pipe.text_encoder.model, offload_type="leaf_level", **opts)
-        resident = not low_vram() and _total_vram_gib() >= _RESIDENT_GIB
-        if resident:
-            pipe.transformer.to(onload)
-            placement = "transformer resident on GPU"
-        else:
-            pipe.transformer.enable_group_offload(offload_type="block_level", num_blocks_per_group=2, **opts)
+        pipe._h3img_offload_opts = opts
+        pipe._h3img_placement = None
+        if low_vram() or _total_vram_gib() < _RESIDENT_GIB:
+            self._place_transformer(pipe, "stream")
             placement = f"transformer streamed block by block ({_total_vram_gib():.0f} GB VRAM)"
+        else:
+            # Decided per job in generate(): resident for light jobs, streamed when the canvas plus the
+            # references don't fit beside the 17.5 GB transformer.
+            placement = "transformer placed at the first job"
         # VAE weights onload only inside encode()/decode() (group offload hooks forward(), which the
         # blocks never call).
         _onload_vae_per_call(pipe.vae, onload)
@@ -510,7 +529,33 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
         # Reference images: bf16 Conv3d patch embed ran 240 s for two references; a matmul is ~2 ms.
         install_fast_patch_embed(pipe.text_encoder)
         print(f"MiniMax H3 Image: {placement}; text encoder offloaded")
-        return resident
+        return pipe._h3img_placement == "resident"
+
+    @staticmethod
+    def _place_transformer(pipe, mode: str) -> None:
+        """Put the transformer on the GPU ("resident") or stream it block by block ("stream").
+
+        One-way except for one case: a resident transformer that a heavy job needs streamed is moved back
+        to the CPU first. That GPU->CPU copy lands in a host heap that is not returned to the OS until
+        Blender exits (see ensure_group_offload_keep_cpu_weights), so it happens at most once per load;
+        a streamed transformer stays streamed for the rest of the session."""
+        import gc
+        import torch
+        current = getattr(pipe, "_h3img_placement", None)
+        if current == mode or current == "stream":
+            return
+        if current == "resident":
+            print("MiniMax H3 Image: this job needs the transformer streamed — moving it off the GPU "
+                  "(streamed for the rest of the session)")
+            pipe.transformer.to("cpu")
+            gc.collect()
+            torch.cuda.empty_cache()
+        if mode == "resident":
+            pipe.transformer.to("cuda")
+        else:
+            pipe.transformer.enable_group_offload(offload_type="block_level", num_blocks_per_group=2,
+                                                  **pipe._h3img_offload_opts)
+        pipe._h3img_placement = mode
 
     # ------------------------------------------------------------------ UI
 
@@ -646,6 +691,18 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
             kwargs["image"] = refs
         workflow = f"edit, {len(refs)} reference(s)" if refs else "text-to-image"
         print(f"MiniMax H3 Image: {workflow}, {width}x{height}, min area {min_area / 2**20:.1f} MP")
+        if gfx_device == "cuda" and hasattr(pipe, "_h3img_offload_opts"):
+            mp = _job_megapixels(width, height, min_area, refs)
+            mode = os.environ.get("PALLAIDIUM_H3IMG_PLACEMENT", "auto")
+            if mode not in ("resident", "stream"):
+                mode = "stream" if mp > _STREAM_ABOVE_MP else "resident"
+            before = pipe._h3img_placement
+            self._place_transformer(pipe, mode)
+            pipe_obj["h3img_on_gpu"] = pipe._h3img_placement == "resident"
+            if pipe._h3img_placement != before:
+                print(f"MiniMax H3 Image: {mp:.1f} MP to denoise (canvas + references) — transformer "
+                      f"{'resident on the GPU' if pipe._h3img_placement == 'resident' else 'streamed block by block'}")
+            timer.mark("place transformer")
         self.set_phase(inputs, "Generating")
         # Time the pipeline's parts: the conditioner (looked up as a module global at call time),
         # the VAE calls, and the rest (canvas/layout prep + the 6 denoise steps).
