@@ -6,16 +6,17 @@ the inputs:
   - the Input strip and/or Ref. strips set     -> image_conditioned (edit); the prompt names the
                                                   references in order as <Picture 1>, <Picture 2>, ...
 
-The released transformer and text encoder are ~62 GB each in bf16, so this plugin assembles a
-24 GB-card version from parts:
-  - transformer: WaveCut/MiniMax-H3-Image-Pruned (the AdaLN projections stored as exact tables;
-    images bit-identical to the original), quantized with SDNQ on the first load and saved to
-    <HF cache>/pallaidium_sdnq so later loads skip the 40 GB bf16 read. The model class is
-    vendored beside this file (_minimax_h3_image_pruned.py).
-  - text encoder: the MiniMax-H3 Qwen3-VL conditioner, which the image model shares (diffusers
-    docs), from OzzyGT's pre-quantized SDNQ MiniMax-H3 repos -- the same files the MiniMax H3
-    video plugin uses, so a machine that runs H3 video downloads nothing new for it.
-  - VAE, tokenizer, processor, scheduler: from the WaveCut repo (original files).
+The released transformer and text encoder are ~62 GB each in bf16. This plugin loads OzzyGT's
+pre-quantized SDNQ 4-bit build (uint4 + Hadamard rotation), with diffusers' stock classes:
+  - shell, transformer (17.5 GB), tokenizer, processor, scheduler:
+    OzzyGT/minimax_h3_image_sdnq_dynamic_4bit.
+  - VAE: ostris/ostris_h3_image_vae, a decoder fine-tune (less over-sharpened skin and detail).
+  - text encoder: byte-identical (same LFS object) in that repo and in OzzyGT's MiniMax-H3 video
+    repo; it loads from the video repo, so a machine that runs H3 video downloads nothing new.
+The 8-bit build (31 GB transformer + 25 GB text encoder) does not fit a 24 GB card and 32 GB RAM, so
+only 4-bit is offered (the scene's h3img_weights property is ignored).
+Until 2026-11-24 the plugin quantized WaveCut/MiniMax-H3-Image-Pruned itself (40 GB bf16 read, a
+vendored model class tied to one WaveCut revision); later WaveCut commits broke that class.
 
 Sampling is fixed by the checkpoint: six steps, one output head per step, no CFG, no negative
 prompt, no LoRA support in diffusers. Output size is any height x width; below "Min Generation
@@ -32,22 +33,25 @@ from ...models.base import ModelPlugin, InputSpec, UISection, ParamSpec, ModelIn
 from ...utils.helpers import gfx_device, low_vram
 
 
-_REPO = "WaveCut/MiniMax-H3-Image-Pruned"
-_REPO_REVISION_NOTE = "3a804c0fc3e73a04606fd9618d947b08b5cfc970"  # vendored modeling file's revision
-_TE_REPOS = {"sdnq4": "OzzyGT/MiniMax_H3_sdnq_dynamic_4bit", "sdnq8": "OzzyGT/MiniMax_H3_sdnq_dynamic_8bit"}
-_SDNQ_DTYPE = {"sdnq4": "uint4", "sdnq8": "int8"}
-# Total VRAM (GiB) to keep the quantized transformer resident; below it, it streams block by block.
-_RESIDENT_GIB = {"sdnq4": 20, "sdnq8": 32}
-# First-run downloads in GB: the bf16 transformer source, and each text encoder.
-_TRANSFORMER_SOURCE_GB = 40
-_TE_GB = {"sdnq4": 16, "sdnq8": 27}
-_SMALL_COMPONENTS = ("tokenizer", "processor", "vae", "scheduler")
+_REPO = "OzzyGT/minimax_h3_image_sdnq_dynamic_4bit"
+# Same text_encoder/model.safetensors (LFS object) as _REPO's; shared with the MiniMax H3 video plugin.
+_TE_REPO = "OzzyGT/MiniMax_H3_sdnq_dynamic_4bit"
+# Total VRAM (GiB) to keep the 17.5 GB transformer resident; below it, it streams block by block.
+_RESIDENT_GIB = 23
+# First-run downloads in GB.
+_TRANSFORMER_GB = 17.5
+_TE_GB = 15
+# ostris' decoder fine-tune of the H3 Image VAE (encoder unchanged, a drop-in AutoencoderKLMiniMaxH3Image
+# in the repo root, fp16). A/B on identical latents 2026-11-25: natural skin instead of the stock
+# decoder's over-sharpened, etched look; same speed and VRAM; half the download.
+_VAE_REPO = "ostris/ostris_h3_image_vae"
+_VAE_GB = 1.2
+_SMALL_COMPONENTS = ("tokenizer", "processor", "scheduler")
 # A file each component needs in a cached snapshot: a snapshot folder can exist with only the
 # index in it, and a tokenizer "loaded" from an empty folder comes back with no vocabulary.
 _SMALL_FILES = {
     "tokenizer": "tokenizer/tokenizer.json",
     "processor": "processor/preprocessor_config.json",
-    "vae": "vae/diffusion_pytorch_model.safetensors",
     "scheduler": "scheduler/scheduler_config.json",
 }
 
@@ -67,11 +71,6 @@ _PE_MAX_NEW_TOKENS = 2048
 _T2I_RATIOS = ("1:1", "5:4", "4:3", "3:2", "16:9", "21:9", "4:5", "3:4", "2:3", "9:16")
 
 
-def _weights_of(scene) -> str:
-    w = getattr(scene, "h3img_weights", "sdnq4")
-    return w if w in _SDNQ_DTYPE else "sdnq4"
-
-
 def _in_cache(repo: str, files, cache_dir) -> bool:
     """True when every file of *repo* is in the local HF cache (no network)."""
     try:
@@ -89,12 +88,6 @@ def _total_vram_gib() -> float:
     except Exception:
         pass
     return 0.0
-
-
-def _quant_dir(cache_dir, weights) -> str:
-    from huggingface_hub import constants
-    return os.path.join(cache_dir or constants.HF_HUB_CACHE, "pallaidium_sdnq",
-                        f"MiniMax-H3-Image-Pruned_transformer_{_SDNQ_DTYPE[weights]}")
 
 
 def _pe_quant_dir(cache_dir, quant) -> str:
@@ -200,12 +193,53 @@ def _crop_to_subject(img, thresh=28, pad=0.06, max_frac=0.85):
     return img.crop(box)
 
 
+def _release_pipeline(pipe, names=("transformer", "text_encoder", "vae")) -> None:
+    """Strip every tensor out of the pipeline; called by release_model_cache before it drops the cache.
+
+    Afterwards nothing of the model is reachable through the pipeline object, so a stray reference to
+    it (the queue worker's local `loaded` until the job function returns, a traceback) pins no VRAM
+    or host memory. Holders of tensors besides the modules themselves:
+      - diffusers group-offload hooks: each ModuleGroup lists its modules/parameters/buffers, and
+        ensure_group_offload_keep_cpu_weights() adds a CPU snapshot of the weights;
+      - _onload_vae_per_call(): the encode/decode wrappers close over the VAE's CPU weights.
+    Hooks come off without any onload/offload (deinitalize_hook moves nothing), then the module
+    tensors are dropped; nothing is copied, so no new host or device memory is touched."""
+    import gc
+    import torch
+    for name in names:
+        model = getattr(pipe, name, None)
+        if not isinstance(model, torch.nn.Module):
+            continue
+        model.__dict__.pop("encode", None)   # VAE per-call onload wrappers
+        model.__dict__.pop("decode", None)
+        for module in model.modules():
+            registry = getattr(module, "_diffusers_hook", None)
+            if registry is not None:
+                for hook in list(registry.hooks.values()):
+                    group = getattr(hook, "group", None)
+                    if group is not None:
+                        group._pallaidium_cpu_data = None
+                        group.modules, group.parameters, group.buffers = [], [], []
+                        for attr in ("cpu_param_dict", "tensor_to_key", "key_to_tensor"):
+                            if isinstance(getattr(group, attr, None), dict):
+                                setattr(group, attr, {})
+                for hook_name in list(registry.hooks):
+                    registry.remove_hook(hook_name, recurse=False)
+            module._parameters.clear()
+            module._buffers.clear()
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()   # no kernel may still use a block empty_cache() unmaps
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
+
+
 class _Timer:
     """Wall-clock timings of the load / job steps, printed as one summary line (GPU work is synced)."""
 
-    def __init__(self, title):
+    def __init__(self, title, label="MiniMax H3 Image"):
         import time
-        self.title, self.marks, self._t = title, [], time.perf_counter()
+        self.title, self.label, self.marks, self._t = title, label, [], time.perf_counter()
 
     def mark(self, label):
         import time
@@ -247,7 +281,7 @@ class _Timer:
     def report(self):
         total = sum(s for _, s in self.marks)
         parts = ", ".join(f"{label} {s:.1f}s" for label, s in self.marks)
-        print(f"MiniMax H3 Image timings ({self.title}): {parts} | total {total:.1f}s")
+        print(f"{self.label} timings ({self.title}): {parts} | total {total:.1f}s")
 
 
 class MiniMaxH3ImagePlugin(ModelPlugin):
@@ -256,7 +290,7 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
     MODEL_TYPE   = "image"
     DESCRIPTION  = (
         "MiniMax-H3-Image (6 steps, guidance-distilled): text-to-image and multi-reference editing "
-        "(name references as <Picture 1>, <Picture 2>, ...). SDNQ 4/8-bit on the pruned checkpoint, "
+        "(name references as <Picture 1>, <Picture 2>, ...). OzzyGT's SDNQ 4-bit build, "
         "optional prompt expansion with MiniMax's PE prompts"
     )
     INPUTS       = InputSpec.PROMPT | InputSpec.IMAGE
@@ -267,7 +301,6 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
     REQUIRED_PACKAGES = ["torch", "diffusers", "transformers", "sdnq"]
     supports_inpaint  = False   # edits are instruction-driven through the references
     uses_strip_power  = False   # references condition the model; no denoise blend
-    LOAD_VARIANT_KEYS = ("h3img_weights",)
 
     # ------------------------------------------------------------------ load
 
@@ -285,17 +318,16 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
         if kw.get("enabled_items"):
             print("MiniMax H3 Image: LoRAs are not supported by this model in diffusers — ignoring the LoRA list.")
 
-        weights = _weights_of(scene)
-        self._check_offline(prefs, weights)
-        print(f"MiniMax H3 Image: loading (weights={weights})…")
+        self._check_offline(prefs)
+        print(f"MiniMax H3 Image: loading ({_REPO})…")
         timer = _Timer("load")
         pipe = self._load_shell(prefs)
         timer.mark("index")
         self._load_small_components(pipe, prefs)
         timer.mark("vae+tokenizer+processor")
-        text_encoder = self._load_text_encoder(weights, prefs)
+        text_encoder = self._load_text_encoder(prefs)
         timer.mark("text encoder")
-        transformer = self._load_transformer(weights, prefs)
+        transformer = self._load_transformer(prefs)
         timer.mark("transformer")
         pipe.update_components(text_encoder=text_encoder, transformer=transformer)
 
@@ -310,22 +342,29 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
             pipe.transformer = apply_sdnq_options_to_model(pipe.transformer, use_quantized_matmul=True)
             pipe.text_encoder = apply_sdnq_options_to_model(pipe.text_encoder, use_quantized_matmul=True)
 
-        on_gpu = self._place(pipe, weights)
+        on_gpu = self._place(pipe)
         timer.mark("placement")
         timer.report()
-        return {"pipe": pipe, "weights": weights, "h3img_on_gpu": on_gpu, "h3img_pe_cache": {}}
+        return {"pipe": pipe, "h3img_on_gpu": on_gpu, "h3img_pe_cache": {},
+                "release_hook": lambda: _release_pipeline(pipe)}
 
-    def _check_offline(self, prefs, weights):
+    @staticmethod
+    def _missing_downloads(cache_dir) -> list:
+        """What of the model is not in the local HF cache yet (no network)."""
+        todo = []
+        if not _in_cache(_REPO, ("transformer/diffusion_pytorch_model-00001-of-00002.safetensors",
+                                 "transformer/diffusion_pytorch_model-00002-of-00002.safetensors"), cache_dir):
+            todo.append(f"transformer (~{_TRANSFORMER_GB} GB)")
+        if not _in_cache(_TE_REPO, ("text_encoder/model.safetensors",), cache_dir):
+            todo.append(f"text encoder (~{_TE_GB} GB)")
+        if not _in_cache(_VAE_REPO, ("config.json", "diffusion_pytorch_model.safetensors"), cache_dir):
+            todo.append(f"VAE (~{_VAE_GB} GB)")
+        return todo
+
+    def _check_offline(self, prefs):
         if not prefs.local_files_only:
             return
-        todo = []
-        if not _quant_ready(_quant_dir(prefs.hf_cache_dir, weights)) and not _in_cache(
-                _REPO, ("transformer/diffusion_pytorch_model.safetensors.index.json",), prefs.hf_cache_dir):
-            todo.append(f"transformer (~{_TRANSFORMER_SOURCE_GB} GB, quantized once)")
-        if not _in_cache(_TE_REPOS[weights], ("text_encoder/model.safetensors",), prefs.hf_cache_dir):
-            todo.append(f"text encoder (~{_TE_GB[weights]} GB)")
-        if not _in_cache(_REPO, ("vae/diffusion_pytorch_model.safetensors",), prefs.hf_cache_dir):
-            todo.append("VAE (~2.3 GB)")
+        todo = self._missing_downloads(prefs.hf_cache_dir)
         if todo:
             raise RuntimeError(
                 "MiniMax H3 Image is not downloaded yet and 'Use Local Files Only' is on. Uncheck it in the "
@@ -350,7 +389,7 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
         return self._cache_first(prefs, lambda lfo: ModularPipeline.from_pretrained(_REPO, **self._hub(prefs, lfo)))
 
     def _load_small_components(self, pipe, prefs):
-        """VAE, tokenizer, processor and scheduler of the WaveCut repo (original files).
+        """VAE, tokenizer, processor and scheduler of OzzyGT's repo.
 
         Cached components load from their snapshot folder: the processor's inner tokenizer probes a
         processor/config.json the repo doesn't have — a quick 404 online, a hard error local-only.
@@ -377,58 +416,36 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
         if uncached and not prefs.local_files_only:
             print(f"MiniMax H3 Image: not in local cache, fetching online: {uncached}")
             pipe.load_components(names=uncached, dtype=torch.bfloat16, cache_dir=cache_dir, local_files_only=False)
+        from diffusers import AutoencoderKLMiniMaxH3Image
+        vae = self._cache_first(prefs, lambda lfo: AutoencoderKLMiniMaxH3Image.from_pretrained(
+            _VAE_REPO, dtype=torch.bfloat16, **self._hub(prefs, lfo)))
+        pipe.update_components(vae=vae.eval())
+        print(f"MiniMax H3 Image: VAE from {_VAE_REPO} (decoder fine-tune)")
         tokenizer = getattr(pipe, "tokenizer", None)
         if tokenizer is not None and not tokenizer("a photo", add_special_tokens=False)["input_ids"]:
             raise RuntimeError("MiniMax H3 Image: the tokenizer loaded without a vocabulary (incomplete download?). "
                                f"Delete the {_REPO} folder from the HF cache and run again.")
 
-    def _load_text_encoder(self, weights, prefs):
+    def _load_text_encoder(self, prefs):
         import torch
         from transformers import Qwen3VLForConditionalGeneration
-        repo = _TE_REPOS[weights]
-        print(f"MiniMax H3 Image: text encoder from {repo} (shared with MiniMax H3 video)")
+        print(f"MiniMax H3 Image: text encoder from {_TE_REPO} (shared with MiniMax H3 video)")
         te = self._cache_first(prefs, lambda lfo: Qwen3VLForConditionalGeneration.from_pretrained(
-            repo, subfolder="text_encoder", dtype=torch.bfloat16, **self._hub(prefs, lfo)))
+            _TE_REPO, subfolder="text_encoder", dtype=torch.bfloat16, **self._hub(prefs, lfo)))
         layers = te.config.text_config.num_hidden_layers
         if layers <= 50:
             raise RuntimeError(f"MiniMax H3 Image: the text encoder has {layers} layers; hidden_states[50] needs 51+")
         return te.eval()
 
-    def _load_transformer(self, weights, prefs):
-        """The SDNQ transformer: the saved quantized copy when there is one, else quantize the bf16 source."""
-        import shutil
+    def _load_transformer(self, prefs):
+        """OzzyGT's pre-quantized SDNQ uint4 transformer (stock diffusers class; the quantization
+        config ships in transformer/config.json, sdnq is imported in load())."""
         import torch
-        from ._minimax_h3_image_pruned import MiniMaxH3ImagePrunedTransformer2DModel as Transformer
-
-        qdir = _quant_dir(prefs.hf_cache_dir, weights)
-        if _quant_ready(qdir):
-            try:
-                model = Transformer.from_pretrained(qdir, dtype=torch.bfloat16, local_files_only=True)
-                _check_materialized(model, "MiniMax H3 Image transformer")
-                print(f"MiniMax H3 Image: SDNQ {_SDNQ_DTYPE[weights]} transformer from {qdir}")
-                return model.eval()
-            except Exception as exc:
-                print(f"MiniMax H3 Image: saved SDNQ transformer unusable ({exc}); quantizing it again")
-                shutil.rmtree(qdir, ignore_errors=True)
-
-        from sdnq import SDNQConfig
-        on_cuda = gfx_device == "cuda" and torch.cuda.is_available()
-        print(f"MiniMax H3 Image: quantizing the transformer to {_SDNQ_DTYPE[weights]} — once; the bf16 source "
-              f"is ~{_TRANSFORMER_SOURCE_GB} GB on first download")
-        # Attention and feed-forward of the blocks and the text refiner are quantized; the patch
-        # projection, text embedder, output heads, norms, RoPE and the AdaLN tables stay as released
-        # (the recipe of OzzyGT's MiniMax-H3 SDNQ repos).
-        cfg = SDNQConfig(
-            weights_dtype=_SDNQ_DTYPE[weights],
-            quantization_device="cuda" if on_cuda else None,
-            return_device="cpu",
-            modules_to_not_convert=["proj_in", "context_embedder", "pdd_proj_out", "norm_out", "rope"],
-        )
-        model = self._cache_first(prefs, lambda lfo: Transformer.from_pretrained(
-            _REPO, subfolder="transformer", dtype=torch.bfloat16, quantization_config=cfg, **self._hub(prefs, lfo)))
+        from diffusers import MiniMaxH3ImageTransformer2DModel
+        model = self._cache_first(prefs, lambda lfo: MiniMaxH3ImageTransformer2DModel.from_pretrained(
+            _REPO, subfolder="transformer", dtype=torch.bfloat16, **self._hub(prefs, lfo)))
         _check_materialized(model, "MiniMax H3 Image transformer")
-        self._save_quantized(model, qdir, {"source": _REPO, "revision": _REPO_REVISION_NOTE, "weights": weights},
-                             "transformer")
+        print(f"MiniMax H3 Image: SDNQ uint4 transformer from {_REPO}")
         return model.eval()
 
     @staticmethod
@@ -452,7 +469,7 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
             print(f"MiniMax H3 Image: could not save the quantized {label} ({exc}); "
                   "the next load quantizes it again")
 
-    def _place(self, pipe, weights) -> bool:
+    def _place(self, pipe) -> bool:
         """Device placement; True when the transformer is resident on the GPU."""
         import torch
         if gfx_device == "mps":
@@ -477,14 +494,11 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
         # purpose: block-level groups of 5 decoder layers (measured 2026-11-10, 2-reference edit at
         # 1920x896) pushed the 24 GB card into shared memory — text encode 285 s, denoise 49 s.
         apply_group_offloading(pipe.text_encoder.model, offload_type="leaf_level", **opts)
-        resident = not low_vram() and _total_vram_gib() >= _RESIDENT_GIB[weights]
+        resident = not low_vram() and _total_vram_gib() >= _RESIDENT_GIB
         if resident:
             pipe.transformer.to(onload)
             placement = "transformer resident on GPU"
         else:
-            # The pruned model's last block calls its submodules directly (skipping block.forward and
-            # so the offload hook); the full last block is bit-identical, only slightly slower.
-            pipe.transformer.skip_dead_rows = False
             pipe.transformer.enable_group_offload(offload_type="block_level", num_blocks_per_group=2, **opts)
             placement = f"transformer streamed block by block ({_total_vram_gib():.0f} GB VRAM)"
         # VAE weights onload only inside encode()/decode() (group offload hooks forward(), which the
@@ -527,10 +541,9 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
         return True
 
     def draw_model_options_ui(self, col, context):
-        """Weights, generation area and prompt expansion, between the HF token and Batch Count."""
+        """Generation area and prompt expansion, between the HF token and Batch Count."""
         scene = context.scene
         sub = col.column(align=True)
-        sub.prop(scene, "h3img_weights", text="Weights")
         sub.prop(scene, "h3img_min_area", text="Min Area")
         sub.prop(scene, "h3img_crop_refs", text="Crop Refs to Subject")
         sub.prop(scene, "h3img_prompt_expansion", text="Prompt Expansion")
@@ -548,15 +561,7 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
             return
         scene = context.scene
         cache_dir = getattr(prefs, "hf_cache_dir", "") or None
-        weights = _weights_of(scene)
-        notes = []
-        try:
-            if not _quant_ready(_quant_dir(cache_dir, weights)):
-                notes.append(f"First load: ~{_TRANSFORMER_SOURCE_GB} GB, quantized once to {_SDNQ_DTYPE[weights]}")
-        except Exception:
-            pass
-        if not _in_cache(_TE_REPOS[weights], ("text_encoder/model.safetensors",), cache_dir):
-            notes.append(f"Text encoder not downloaded: ~{_TE_GB[weights]} GB")
+        notes = [f"Not downloaded yet: {item}" for item in self._missing_downloads(cache_dir)]
         if scene.h3img_prompt_expansion and not _quant_ready(_pe_quant_dir(cache_dir, scene.h3img_pe_quant)) \
                 and not _in_cache(_PE_VLM, _PE_VLM_FILES, cache_dir):
             notes.append(f"Prompt expander not downloaded: ~{_PE_VLM_GB} GB")
@@ -738,7 +743,6 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
     def _load_pe(self, quant: str, prefs) -> dict:
         """The expander VLM: the saved quantized copy when there is one (~9/5 GB read), else quantize the
         17.5 GB bf16 weights and save them for the next job."""
-        import shutil
         import torch
         from huggingface_hub import hf_hub_download
         from transformers import AutoProcessor, Qwen3VLForConditionalGeneration
@@ -759,9 +763,12 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
                 _check_materialized(model, "prompt expander")
                 print(f"MiniMax H3 Image: prompt expander ({quant}) from {qdir}")
             except Exception as exc:
-                print(f"MiniMax H3 Image: saved prompt expander unusable ({exc}); quantizing it again")
-                model = None
-                shutil.rmtree(qdir, ignore_errors=True)
+                # Keep the copy (see _load_transformer): a read error must not trigger an 18 GB
+                # re-download. _expand() catches this and uses the prompt as typed.
+                raise RuntimeError(
+                    f"could not read the saved prompt expander in {qdir} ({exc}); delete that folder "
+                    "if it is really damaged"
+                ) from exc
         if model is None:
             if prefs.local_files_only and not _in_cache(_PE_VLM, _PE_VLM_FILES, prefs.hf_cache_dir):
                 raise RuntimeError(f"{_PE_VLM} is not downloaded and 'Use Local Files Only' is on "

@@ -948,6 +948,16 @@ def suppress_text_encoder_warnings():
 
 def release_model_cache(cache: dict) -> None:
     import gc
+    # Opt-in: a plugin's load() may return a "release_hook" callable that strips
+    # its pipeline (hooks, weights) before the references are dropped, so the
+    # memory is freed here even if a stray reference to the pipeline object
+    # survives (e.g. the queue worker's local `loaded` until the job returns).
+    hook = cache.get("release_hook")
+    if callable(hook):
+        try:
+            hook()
+        except Exception as exc:
+            print(f"[Pallaidium] release hook failed: {exc}")
     skip = {"last_model_card"}
     for key in list(cache.keys()):
         if key in skip:
@@ -1585,6 +1595,9 @@ class DependencyManager:
             "dacvae @ git+https://github.com/facebookresearch/dacvae.git",
             "perception-models @ git+https://github.com/facebookresearch/perception_models@unpin-deps",
             "sam-audio @ git+https://github.com/facebookresearch/sam-audio.git",
+            # Inworld Voice Isolator (pure torch; its deps numpy/soundfile/safetensors/torch/
+            # torchaudio/huggingface-hub are already bundled; mamba-ssm is an optional speed-up).
+            "inworld-voice-isolation @ git+https://github.com/inworld-ai/voice-isolator.git",
             # spacy and model wheel: Windows/macOS install here; Linux uses get_phase_linux_binary_only()
         ]
 
