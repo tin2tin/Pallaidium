@@ -805,6 +805,19 @@ def register():
         name="Audio Strip", default="",
         description="Name of a SOUND strip whose audio drives the extended video (overrides the source clip's audio)")
 
+    # Kandinsky Video SR scale mode
+    bpy.types.Scene.kvsr_scale = bpy.props.EnumProperty(
+        name="Scale",
+        items=[
+            ("AUTO", "Auto (Resolution)", "Smallest factor that reaches the Resolution target, then fit to it (default)"),
+            ("2",    "x2",    "Native x2, output size = source x 2 (Resolution ignored)"),
+            ("2.25", "x2.25", "x2 with a 1.125x pre-upscale, output = source x 2.25 (Resolution ignored)"),
+            ("4",    "x4",    "Native x4, output size = source x 4 (Resolution ignored)"),
+        ],
+        default="AUTO",
+        description="Kandinsky Video SR upscale factor",
+    )
+
     # Maxine VSR quality level
     bpy.types.Scene.maxine_quality = bpy.props.EnumProperty(
         name="Quality",
@@ -1493,6 +1506,22 @@ def register():
         description="The model works best at 4 megapixels or more: a smaller resolution is generated on a larger "
                     "canvas and resized back, so 1024x1024 costs as much as 2048x2048",
     )
+    bpy.types.Scene.h3img_text_encoder = bpy.props.EnumProperty(
+        name="Text Encoder",
+        items=[
+            ("native", "Native (Qwen3-VL-32B)", "The model's own 4-bit 32B conditioner (~15 GB). Best prompt "
+                                               "following and text rendering; needed for edits"),
+            ("qwen35_2b", "Qwen3.5-2B (Plato's Key)", "Qwen3.5-2B mapped into the native space by a closed-form "
+                                                      "key (~4.6 GB download, ~4 GB VRAM). Same compositions, but "
+                                                      "text in the image and object counts are less exact. "
+                                                      "Text-to-image only"),
+            ("qwen35_9b", "Qwen3.5-9B (Plato's Key)", "Qwen3.5-9B with its key (~19.5 GB download, more memory "
+                                                      "than Native). Cleaner text than 2B, but may miscount "
+                                                      "objects. Text-to-image only"),
+        ],
+        default="native",
+        description="Which encoder turns the prompt into conditioning. Changing it reloads the model",
+    )
     bpy.types.Scene.h3img_crop_refs = bpy.props.BoolProperty(
         name="Crop Refs to Subject",
         default=False,
@@ -1900,7 +1929,7 @@ def unregister():
                   "mossimg_slg_scale", "mossimg_shift"):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
-    for _prop in ("h3img_weights", "h3img_min_area", "h3img_crop_refs", "h3img_prompt_expansion",
+    for _prop in ("h3img_weights", "h3img_text_encoder", "h3img_min_area", "h3img_crop_refs", "h3img_prompt_expansion",
                   "h3img_pe_aspect", "h3img_pe_quant"):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
@@ -1926,6 +1955,7 @@ def unregister():
         "ltx23ic_input_downscale_pct",
         "ltx23_stage_mode",
         "maxine_quality",
+        "kvsr_scale",
         "nano_banana_model", "nano_banana_aspect", "nano_banana_resolution",
         "veo_model", "veo_aspect", "veo_resolution", "veo_duration",
         "veo_person_generation",

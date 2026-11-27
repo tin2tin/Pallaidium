@@ -51,6 +51,22 @@ _TE_GB = 15
 # decoder's over-sharpened, etched look; same speed and VRAM; half the download.
 _VAE_REPO = "ostris/ostris_h3_image_vae"
 _VAE_GB = 1.2
+# Optional low-VRAM text encoder: Qwen3.5-2B mapped into the native encoder's hidden_states[50] space by a
+# closed-form "Plato's Key" (Alissonerdx, Ridge v3, calibrated on 20k prompts). Text-to-image only — the key
+# maps text, not the reference-image tokens of an edit. A/B 2026-11-27: same composition as native at the
+# same seed, but exact text in the image and object counts are less reliable ("OPEN 24/7" -> "OPEN 24/5").
+# The 9B (A/B: cleaner text layout, but miscounted objects) is ~18 GB in bf16 — more than the 4-bit native
+# encoder — and is offered for comparison.
+_PK_KEY_REPO = "Alissonerdx/TE-PK-Minimax-H3"
+_PK_ENCODERS = {  # scene value: (donor repo, files to check in the cache, key file, download GB)
+    "qwen35_2b": ("Qwen/Qwen3.5-2B",
+                  ("config.json", "tokenizer.json", "model.safetensors-00001-of-00001.safetensors"),
+                  "qwen3.5/minimax_h3_32b_pk_ridge_qwen3.5_2b.safetensors", 4.6),
+    "qwen35_9b": ("Qwen/Qwen3.5-9B",
+                  ("config.json", "tokenizer.json") + tuple(
+                      f"model.safetensors-0000{i}-of-00004.safetensors" for i in range(1, 5)),
+                  "qwen3.5/minimax_h3_32b_pk_ridge_qwen3.5_9b.safetensors", 19.5),
+}
 _SMALL_COMPONENTS = ("tokenizer", "processor", "scheduler")
 # A file each component needs in a cached snapshot: a snapshot folder can exist with only the
 # index in it, and a tokenizer "loaded" from an empty folder comes back with no vocabulary.
@@ -210,6 +226,50 @@ def _job_megapixels(width: int, height: int, min_area: int, refs) -> float:
     return total / 2**20
 
 
+def _lite_encoder(scene):
+    """The Plato's Key encoder chosen for this scene, or None for the native conditioner."""
+    choice = getattr(scene, "h3img_text_encoder", "native")
+    return choice if choice in _PK_ENCODERS else None
+
+
+def _platos_key_class():
+    import torch
+
+    class PlatosKeyTextEncoder(torch.nn.Module):
+        """Qwen3.5 + a linear map standing in for the native Qwen3-VL-32B conditioner (text only).
+
+        The key was fitted on raw prompts (no chat template, no special tokens) against the native
+        encoder's unnormalized hidden_states[50], from the donor's final-norm last hidden state."""
+
+        def __init__(self, donor, tokenizer, key):
+            super().__init__()
+            self.model = donor
+            self.tokenizer = tokenizer
+            for name in ("R", "scale", "donor_mean", "target_mean"):
+                self.register_buffer(name, key[name].float(), persistent=False)
+
+        @property
+        def dtype(self):
+            return torch.bfloat16
+
+        @torch.no_grad()
+        def encode(self, text: str, length: int, device, dtype):
+            ids = self.tokenizer(text, add_special_tokens=False, return_tensors="pt")["input_ids"]
+            ids = ids[:, : max(1, length * 2)].to(device)
+            x = self.model(input_ids=ids, output_hidden_states=True).hidden_states[-1].float()
+            key = {n: getattr(self, n).to(device) for n in ("R", "scale", "donor_mean", "target_mean")}
+            y = (x - key["donor_mean"]) @ key["R"] * key["scale"] + key["target_mean"]
+            if y.shape[1] != length:
+                # The two vocabularies split non-English text differently; the transformer tags one
+                # row per native token, so resample the sequence to that length.
+                print(f"MiniMax H3 Image: Qwen3.5 tokens {y.shape[1]} vs native {length} — resampling")
+                y = torch.nn.functional.interpolate(y.transpose(1, 2), size=length, mode="linear",
+                                                    align_corners=True).transpose(1, 2)
+            return y.to(device=device, dtype=dtype)
+
+    return PlatosKeyTextEncoder
+
+
 def _release_pipeline(pipe, names=("transformer", "text_encoder", "vae")) -> None:
     """Strip every tensor out of the pipeline; called by release_model_cache before it drops the cache.
 
@@ -318,6 +378,7 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
     REQUIRED_PACKAGES = ["torch", "diffusers", "transformers", "sdnq"]
     supports_inpaint  = False   # edits are instruction-driven through the references
     uses_strip_power  = False   # references condition the model; no denoise blend
+    LOAD_VARIANT_KEYS = ("h3img_text_encoder",)   # native 32B vs Qwen3.5-2B: a change reloads
 
     # ------------------------------------------------------------------ load
 
@@ -335,14 +396,15 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
         if kw.get("enabled_items"):
             print("MiniMax H3 Image: LoRAs are not supported by this model in diffusers — ignoring the LoRA list.")
 
-        self._check_offline(prefs)
+        lite = _lite_encoder(scene)
+        self._check_offline(prefs, lite)
         print(f"MiniMax H3 Image: loading ({_REPO})…")
         timer = _Timer("load")
         pipe = self._load_shell(prefs)
         timer.mark("index")
         self._load_small_components(pipe, prefs)
         timer.mark("vae+tokenizer+processor")
-        text_encoder = self._load_text_encoder(prefs)
+        text_encoder = self._load_lite_text_encoder(prefs, lite) if lite else self._load_text_encoder(prefs)
         timer.mark("text encoder")
         transformer = self._load_transformer(prefs)
         timer.mark("transformer")
@@ -357,8 +419,10 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
         if triton_is_available and torch.cuda.is_available():
             from sdnq.loader import apply_sdnq_options_to_model
             pipe.transformer = apply_sdnq_options_to_model(pipe.transformer, use_quantized_matmul=True)
-            pipe.text_encoder = apply_sdnq_options_to_model(pipe.text_encoder, use_quantized_matmul=True)
+            if not lite:
+                pipe.text_encoder = apply_sdnq_options_to_model(pipe.text_encoder, use_quantized_matmul=True)
 
+        pipe._h3img_lite_te = bool(lite)
         on_gpu = self._place(pipe)
         timer.mark("placement")
         timer.report()
@@ -366,22 +430,26 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
                 "release_hook": lambda: _release_pipeline(pipe)}
 
     @staticmethod
-    def _missing_downloads(cache_dir) -> list:
+    def _missing_downloads(cache_dir, lite=None) -> list:
         """What of the model is not in the local HF cache yet (no network)."""
         todo = []
         if not _in_cache(_REPO, ("transformer/diffusion_pytorch_model-00001-of-00002.safetensors",
                                  "transformer/diffusion_pytorch_model-00002-of-00002.safetensors"), cache_dir):
             todo.append(f"transformer (~{_TRANSFORMER_GB} GB)")
-        if not _in_cache(_TE_REPO, ("text_encoder/model.safetensors",), cache_dir):
+        if lite:
+            repo, files, key_file, gb = _PK_ENCODERS[lite]
+            if not (_in_cache(repo, files, cache_dir) and _in_cache(_PK_KEY_REPO, (key_file,), cache_dir)):
+                todo.append(f"{repo.split('/')[-1]} text encoder + key (~{gb} GB)")
+        elif not _in_cache(_TE_REPO, ("text_encoder/model.safetensors",), cache_dir):
             todo.append(f"text encoder (~{_TE_GB} GB)")
         if not _in_cache(_VAE_REPO, ("config.json", "diffusion_pytorch_model.safetensors"), cache_dir):
             todo.append(f"VAE (~{_VAE_GB} GB)")
         return todo
 
-    def _check_offline(self, prefs):
+    def _check_offline(self, prefs, lite=None):
         if not prefs.local_files_only:
             return
-        todo = self._missing_downloads(prefs.hf_cache_dir)
+        todo = self._missing_downloads(prefs.hf_cache_dir, lite)
         if todo:
             raise RuntimeError(
                 "MiniMax H3 Image is not downloaded yet and 'Use Local Files Only' is on. Uncheck it in the "
@@ -454,6 +522,24 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
             raise RuntimeError(f"MiniMax H3 Image: the text encoder has {layers} layers; hidden_states[50] needs 51+")
         return te.eval()
 
+    def _load_lite_text_encoder(self, prefs, choice):
+        """Qwen3.5 + Plato's Key in place of the 15 GB native conditioner (text-to-image only)."""
+        import torch
+        from huggingface_hub import hf_hub_download
+        from safetensors.torch import load_file
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+        repo, _files, key_file, _gb = _PK_ENCODERS[choice]
+        print(f"MiniMax H3 Image: text encoder {repo} + Plato's Key ({_PK_KEY_REPO})")
+        tokenizer = self._cache_first(prefs, lambda lfo: AutoTokenizer.from_pretrained(
+            repo, **self._hub(prefs, lfo)))
+        donor = self._cache_first(prefs, lambda lfo: AutoModelForCausalLM.from_pretrained(
+            repo, dtype=torch.bfloat16, **self._hub(prefs, lfo)))
+        key_path = self._cache_first(prefs, lambda lfo: hf_hub_download(
+            _PK_KEY_REPO, key_file, **self._hub(prefs, lfo)))
+        # The LM head is never used (hidden states only); drop it to save ~1 GB.
+        donor = getattr(donor, "model", donor)
+        return _platos_key_class()(donor.eval(), tokenizer, load_file(key_path)).eval()
+
     def _load_transformer(self, prefs):
         """OzzyGT's pre-quantized SDNQ uint4 transformer (stock diffusers class; the quantization
         config ships in transformer/config.json, sdnq is imported in load())."""
@@ -525,9 +611,10 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
         _onload_vae_per_call(pipe.vae, onload)
         # Qwen3-VL conditioner: query-chunked attention + stop at hidden_states[50] (diffusers'
         # pass spikes past 20 GB with reference images in the presentation).
-        install_lean_conditioner("diffusers.modular_pipelines.minimax_h3_image.encoders")
-        # Reference images: bf16 Conv3d patch embed ran 240 s for two references; a matmul is ~2 ms.
-        install_fast_patch_embed(pipe.text_encoder)
+        if not getattr(pipe, "_h3img_lite_te", False):
+            install_lean_conditioner("diffusers.modular_pipelines.minimax_h3_image.encoders")
+            # Reference images: bf16 Conv3d patch embed ran 240 s for two references; a matmul is ~2 ms.
+            install_fast_patch_embed(pipe.text_encoder)
         print(f"MiniMax H3 Image: {placement}; text encoder offloaded")
         return pipe._h3img_placement == "resident"
 
@@ -589,6 +676,7 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
         """Generation area and prompt expansion, between the HF token and Batch Count."""
         scene = context.scene
         sub = col.column(align=True)
+        sub.prop(scene, "h3img_text_encoder", text="Text Encoder")
         sub.prop(scene, "h3img_min_area", text="Min Area")
         sub.prop(scene, "h3img_crop_refs", text="Crop Refs to Subject")
         sub.prop(scene, "h3img_prompt_expansion", text="Prompt Expansion")
@@ -606,7 +694,9 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
             return
         scene = context.scene
         cache_dir = getattr(prefs, "hf_cache_dir", "") or None
-        notes = [f"Not downloaded yet: {item}" for item in self._missing_downloads(cache_dir)]
+        notes = [f"Not downloaded yet: {item}" for item in self._missing_downloads(cache_dir, _lite_encoder(scene))]
+        if _lite_encoder(scene):
+            notes.append("Qwen3.5 encoder: text-to-image only; text in images and counts less exact")
         if scene.h3img_prompt_expansion and not _quant_ready(_pe_quant_dir(cache_dir, scene.h3img_pe_quant)) \
                 and not _in_cache(_PE_VLM, _PE_VLM_FILES, cache_dir):
             notes.append(f"Prompt expander not downloaded: ~{_PE_VLM_GB} GB")
@@ -661,6 +751,10 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
         if not prompt:
             raise RuntimeError("MiniMax H3 Image needs a prompt (it has no unconditional mode).")
         refs = self._reference_images(inputs, scene)
+        lite = getattr(pipe, "_h3img_lite_te", False)
+        if lite and refs:
+            raise RuntimeError("MiniMax H3 Image: the Qwen3.5 text encoders are text-to-image only — clear "
+                               "the Input/Ref. images or set Text Encoder to Native for edits.")
         width, height = max(64, int(inputs.width)), max(64, int(inputs.height))
         timer = _Timer("job")
 
@@ -709,7 +803,15 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
         import time
         import diffusers.modular_pipelines.minimax_h3_image.encoders as _enc
         parts = {}
-        undo = [_Timer.wrap(_enc, "get_qwen3vl_prompt_embeds", parts, "text encode"),
+        undo = []
+        if lite:
+            native_fn = _enc.get_qwen3vl_prompt_embeds
+            def _lite_embeds(text_encoder, processor, token_ids, *a, device=None, dtype=None, **kw):
+                text = pipe.tokenizer.decode(token_ids)
+                return text_encoder.encode(text, len(token_ids), device, dtype or torch.bfloat16)
+            _enc.get_qwen3vl_prompt_embeds = _lite_embeds
+            undo.append(lambda: setattr(_enc, "get_qwen3vl_prompt_embeds", native_fn))
+        undo += [_Timer.wrap(_enc, "get_qwen3vl_prompt_embeds", parts, "text encode"),
                 _Timer.wrap(pipe.vae, "encode", parts, "vae encode"),
                 _Timer.wrap(pipe.vae, "decode", parts, "vae decode")]
         if torch.cuda.is_available():

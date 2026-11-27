@@ -147,6 +147,14 @@ def _discover_and_register(prefs) -> int:
 def _movie_model_update(self, context):
     self.movie_model_card_id = self.movie_model_card
     input_strips_updated(self, context)
+    try:
+        from ..models import get_plugin
+        plugin = get_plugin(self.movie_model_card)
+        if plugin is not None and hasattr(plugin, "on_model_selected"):
+            if context and context.scene:
+                plugin.on_model_selected(context.scene, context)
+    except Exception:
+        pass
 
 def _image_model_update(self, context):
     self.image_model_card_id = self.image_model_card

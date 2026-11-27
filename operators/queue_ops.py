@@ -122,6 +122,7 @@ _MOSSIMG_CARDS = (
 # The reference images ride the shared klein_strip_N pickers.
 _H3IMG_DEFAULTS = (
     ("h3img_weights",          "sdnq4"),
+    ("h3img_text_encoder",     "native"),
     ("h3img_min_area",         "4mp"),
     ("h3img_crop_refs",        False),
     ("h3img_prompt_expansion", False),
@@ -408,6 +409,7 @@ class RenderQueueJob(PropertyGroup):
 
     # MiniMax H3 Image (see _H3IMG_DEFAULTS)
     h3img_weights:           StringProperty(default="sdnq4")
+    h3img_text_encoder:      StringProperty(default="native")
     h3img_min_area:          StringProperty(default="4mp")
     h3img_crop_refs:         BoolProperty(default=False)
     h3img_prompt_expansion:  BoolProperty(default=False)
@@ -495,6 +497,7 @@ class RenderQueueJob(PropertyGroup):
 
     # Maxine VSR
     maxine_quality:              StringProperty(default="HIGH")
+    kvsr_scale:                  StringProperty(default="AUTO")
 
     # Google Nano Banana (Gemini image)
     nano_banana_model:           StringProperty(default="gemini-2.5-flash-image")
@@ -793,6 +796,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             ltx23ext_audio_path            = snapshot.get("ltx23ext_audio_path",         ""),
             ltx23_stage_mode               = snapshot.get("ltx23_stage_mode",            "FULL"),
             maxine_quality                 = snapshot.get("maxine_quality",              "HIGH"),
+            kvsr_scale                     = snapshot.get("kvsr_scale",                  "AUTO"),
             # Google Nano Banana / Veo cloud settings
             nano_banana_model              = snapshot.get("nano_banana_model",      "gemini-2.5-flash-image"),
             nano_banana_aspect             = snapshot.get("nano_banana_aspect",     "1:1"),
@@ -1327,6 +1331,7 @@ def _run_job(snapshot: dict, result_queue, cancel_event, progress_store) -> None
             "ltx23ext_audio_path":         snapshot.get("ltx23ext_audio_path",         ""),
             "ltx23_stage_mode":            snapshot.get("ltx23_stage_mode",            "FULL"),
             "maxine_quality":              snapshot.get("maxine_quality",              "HIGH"),
+            "kvsr_scale":                  snapshot.get("kvsr_scale",                  "AUTO"),
             # Google Nano Banana / Veo cloud settings
             "nano_banana_model":           snapshot.get("nano_banana_model",      "gemini-2.5-flash-image"),
             "nano_banana_aspect":          snapshot.get("nano_banana_aspect",     "1:1"),
@@ -1908,6 +1913,7 @@ class SEQUENCER_OT_add_to_queue(Operator):
             ltx23ext_video_strength     = getattr(scene, "ltx23ext_video_strength",     1.0),
             ltx23_stage_mode            = getattr(scene, "ltx23_stage_mode",            "FULL"),
             maxine_quality              = getattr(scene, "maxine_quality",              "HIGH"),
+            kvsr_scale                  = getattr(scene, "kvsr_scale",                  "AUTO"),
             # Google Nano Banana / Veo cloud settings
             nano_banana_model           = getattr(scene, "nano_banana_model",      "gemini-2.5-flash-image"),
             nano_banana_aspect          = getattr(scene, "nano_banana_aspect",     "1:1"),
@@ -3233,6 +3239,7 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 ("ltx23_stage_mode",            "FULL"),
                 # Maxine VSR
                 ("maxine_quality",              "HIGH"),
+                ("kvsr_scale",                  "AUTO"),
                 # Google Nano Banana (Gemini image)
                 ("nano_banana_model",      "gemini-2.5-flash-image"),
                 ("nano_banana_aspect",     "1:1"),
