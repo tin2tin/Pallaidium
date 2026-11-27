@@ -25,7 +25,7 @@ TEXT_ENCODER_ITEMS = [
     ("native", "Native (Qwen3-VL-32B)", "The model's own conditioner (~15 GB VRAM). Needed for image/video inputs"),
     ("qwen35_2b", "Qwen3.5-2B (Plato's Key)",
      "Qwen3.5-2B mapped into the native encoder's space (~4 GB VRAM, 4.6 GB download). Prompt-only "
-     "generation; text in the image, counts and small details are less exact"),
+     "generation (image inputs switch to Native automatically); text in the image, counts and small details are less exact"),
     ("qwen35_9b", "Qwen3.5-9B (Plato's Key)",
      "Qwen3.5-9B mapped into the native encoder's space (~18 GB VRAM, 19.5 GB download): more memory than "
      "Native, for comparison. Prompt-only generation"),
@@ -127,3 +127,55 @@ def patch_lite_embeds(encoders_module, native_tokenizer):
 
     encoders_module.get_qwen3vl_prompt_embeds = _lite_embeds
     return lambda: setattr(encoders_module, "get_qwen3vl_prompt_embeds", native_fn)
+
+
+def swap_text_encoder(pipe, choice, load_native, load_lite, place, label):
+    """Make pipe.text_encoder the wanted encoder (choice=None → native), loading it if needed.
+
+    The pipeline is cached per scene setting, so a Qwen3.5 pipeline that met an image job holds the native
+    encoder afterwards (and the other way round): swap on demand. place(te, lite) puts it on the device."""
+    import gc
+    import torch
+    current = getattr(pipe, "_h3_te_choice", None)
+    if current == choice:
+        return False
+    print(f"{label}: switching text encoder {current or 'native'} -> {choice or 'native'}")
+    te = load_lite(choice) if choice else load_native()
+    place(te, bool(choice))
+    pipe.update_components(text_encoder=te)  # drops the old encoder
+    pipe._h3_te_choice = choice
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    return True
+
+
+def switch_note(wanted, used) -> str:
+    """Queue note shown on the finished job when the encoder differs from the panel choice."""
+    if wanted and not used:
+        return f"Text Encoder {PK_ENCODERS[wanted][0].split('/')[-1]} is prompt-only: used Native for the reference input"
+    return ""
+
+
+def hide_keyframes_from_conditioner(step_cls, undo_lite):
+    """Run an fl2va text step as if there were no keyframes (text-only presentation). The keyframes still
+    reach the clip through the keyframe VAE step, which reads them from the state afterwards.
+
+    Measured 2026-11-27 (H3, first frame + dialogue prompt, same seed): Qwen3.5-2B with the keyframe through
+    the VAE only gave nearly the same clip as native (same identity, same motion beats)."""
+    orig = step_cls.__call__
+
+    def _call(self, components, state):
+        keyframes = state.get("keyframes")
+        state.set("keyframes", None)
+        try:
+            return orig(self, components, state)
+        finally:
+            state.set("keyframes", keyframes)
+
+    step_cls.__call__ = _call
+
+    def _undo():
+        step_cls.__call__ = orig
+        undo_lite()
+    return _undo

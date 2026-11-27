@@ -371,6 +371,7 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
                 pipe.text_encoder = apply_sdnq_options_to_model(pipe.text_encoder, use_quantized_matmul=True)
 
         pipe._h3img_lite_te = bool(lite)
+        pipe._h3_te_choice = lite
         on_gpu = self._place(pipe)
         timer.mark("placement")
         timer.report()
@@ -607,6 +608,26 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
             col.label(text="Name references <Picture 1>, <Picture 2>… in the prompt", icon="INFO")
         return True
 
+    @staticmethod
+    def _place_te(pipe, te, lite):
+        import torch
+        opts = getattr(pipe, "_h3img_offload_opts", None)
+        if not lite:
+            from sdnq.common import use_torch_compile as triton_is_available
+            if triton_is_available and torch.cuda.is_available():
+                from sdnq.loader import apply_sdnq_options_to_model
+                te = apply_sdnq_options_to_model(te, use_quantized_matmul=True)
+        if opts is None:
+            te.to(gfx_device)
+        else:
+            from diffusers.hooks import apply_group_offloading
+            apply_group_offloading(te.model, offload_type="leaf_level", **opts)
+        pipe._h3img_lite_te = lite
+        if not lite:
+            from ..video._h3_conditioner import install_fast_patch_embed, install_lean_conditioner
+            install_lean_conditioner("diffusers.modular_pipelines.minimax_h3_image.encoders")
+            install_fast_patch_embed(te)
+
     def draw_model_options_ui(self, col, context):
         """Generation area and prompt expansion, between the HF token and Batch Count."""
         scene = context.scene
@@ -631,7 +652,7 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
         cache_dir = getattr(prefs, "hf_cache_dir", "") or None
         notes = [f"Not downloaded yet: {item}" for item in self._missing_downloads(cache_dir, _lite_encoder(scene))]
         if _lite_encoder(scene):
-            notes.append("Qwen3.5 encoder: text-to-image only; text in images and counts less exact")
+            notes.append("Qwen3.5 encoder: edits switch to Native automatically; text in images less exact")
         if scene.h3img_prompt_expansion and not _quant_ready(_pe_quant_dir(cache_dir, scene.h3img_pe_quant)) \
                 and not _in_cache(_PE_VLM, _PE_VLM_FILES, cache_dir):
             notes.append(f"Prompt expander not downloaded: ~{_PE_VLM_GB} GB")
@@ -686,10 +707,22 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
         if not prompt:
             raise RuntimeError("MiniMax H3 Image needs a prompt (it has no unconditional mode).")
         refs = self._reference_images(inputs, scene)
-        lite = getattr(pipe, "_h3img_lite_te", False)
-        if lite and refs:
-            raise RuntimeError("MiniMax H3 Image: the Qwen3.5 text encoders are text-to-image only — clear "
-                               "the Input/Ref. images or set Text Encoder to Native for edits.")
+        # Qwen3.5 + Plato's Key maps text only: an edit switches to the native conditioner (and the next
+        # text-to-image job switches back).
+        from ..video._h3_platos_key import swap_text_encoder, switch_note
+        wanted = _lite_encoder(scene)
+        use = None if refs else wanted
+        if getattr(pipe, "_h3_te_choice", None) != use:
+            self.set_phase(inputs, "Loading native text encoder (edit)" if wanted and not use
+                           else "Loading text encoder")
+            swap_text_encoder(pipe, use, lambda: self._load_text_encoder(prefs),
+                              lambda c: self._load_lite_text_encoder(prefs, c),
+                              lambda te, is_lite: self._place_te(pipe, te, is_lite), "MiniMax H3 Image")
+        note = switch_note(wanted, use)
+        if note:
+            print(f"MiniMax H3 Image: {note}")
+            inputs.usage_note = note
+        lite = bool(use)
         width, height = max(64, int(inputs.width)), max(64, int(inputs.height))
         timer = _Timer("job")
 

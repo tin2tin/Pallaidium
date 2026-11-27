@@ -1514,10 +1514,10 @@ def register():
             ("qwen35_2b", "Qwen3.5-2B (Plato's Key)", "Qwen3.5-2B mapped into the native space by a closed-form "
                                                       "key (~4.6 GB download, ~4 GB VRAM). Same compositions, but "
                                                       "text in the image and object counts are less exact. "
-                                                      "Text-to-image only"),
+                                                      "Edits switch to Native automatically"),
             ("qwen35_9b", "Qwen3.5-9B (Plato's Key)", "Qwen3.5-9B with its key (~19.5 GB download, more memory "
                                                       "than Native). Cleaner text than 2B, but may miscount "
-                                                      "objects. Text-to-image only"),
+                                                      "objects. Edits switch to Native automatically"),
         ],
         default="native",
         description="Which encoder turns the prompt into conditioning. Changing it reloads the model",
@@ -1528,7 +1528,8 @@ def register():
         items=_H3_TE_ITEMS,
         default="native",
         description="MiniMax H3 / Pika H3 Flex: which encoder turns the prompt into conditioning. The Qwen3.5 "
-                    "options are text-to-video only. Changing it reloads the model",
+                    "options encode the prompt only: first/last frames go through the VAE, Ref Strip / Audio Ref jobs switch "
+                    "to Native automatically. Changing it reloads the model",
     )
     bpy.types.Scene.h3img_crop_refs = bpy.props.BoolProperty(
         name="Crop Refs to Subject",

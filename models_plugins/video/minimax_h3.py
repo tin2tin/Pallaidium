@@ -286,6 +286,8 @@ class MiniMaxH3Plugin(ModelPlugin):
         # the attribute None instead of raising — fail loudly here instead of
         # letting the first .model/.enable_group_offload() access below crash
         # with an opaque AttributeError.
+        _te_spec = pipe._component_specs["text_encoder"]
+        pipe._h3_te_src = (_te_spec.pretrained_model_name_or_path, getattr(_te_spec, "subfolder", None))
         if lite:
             from ._h3_platos_key import load_lite_text_encoder
             pipe.update_components(text_encoder=load_lite_text_encoder(lite, _cache_dir, _lfo, "MiniMax H3"))
@@ -405,6 +407,8 @@ class MiniMaxH3Plugin(ModelPlugin):
         # Image/video references and the fl2va frame go through the vision tower: its bf16 Conv3d
         # patch embed is ~14 ms/patch on this torch/cuDNN, a matmul ~0 (see _h3_conditioner.py).
         pipe._h3_lite_te = bool(lite)
+        pipe._h3_te_choice = lite
+        pipe._h3_offload_opts = offload
         if not lite:
             install_fast_patch_embed(pipe.text_encoder)
 
@@ -414,7 +418,7 @@ class MiniMaxH3Plugin(ModelPlugin):
         col.prop(context.scene, "h3_text_encoder", text="Text Encoder")
         from ._h3_platos_key import lite_choice
         if lite_choice(context.scene, "h3_text_encoder"):
-            col.label(text="Qwen3.5 encoder: prompt-only; text and details less exact", icon="INFO")
+            col.label(text="Qwen3.5 encoder: Ref Strip / Audio Ref jobs switch to Native", icon="INFO")
 
     def draw_custom_ui(self, col, context) -> bool:
         scene = context.scene
@@ -441,20 +445,83 @@ class MiniMaxH3Plugin(ModelPlugin):
         return min(17 * n + 5, 345)
 
     def generate(self, pipe_obj, inputs: ModelInputs, scene, prefs):
+        from ._h3_platos_key import lite_choice, swap_text_encoder, switch_note, patch_lite_embeds
         pipe = pipe_obj["pipe"]
-        if not getattr(pipe, "_h3_lite_te", False):
+        wanted = lite_choice(scene, "h3_text_encoder")
+        # Qwen3.5 + Plato's Key maps text only: keyframes and references go through the native conditioner,
+        # so such a job switches to Native (and the next prompt-only job switches back).
+        needs_native = bool(inputs.image is not None or getattr(scene, "h3_ref_strip_path", "") or inputs.audio_ref)
+        # A first-frame-only job keeps the Qwen3.5 encoder: the keyframe conditions the clip through the VAE
+        # only, the conditioner sees the prompt without the image block (PALLAIDIUM_H3_PK_FRAME_VAE_ONLY=0 to
+        # switch such jobs to Native instead).
+        import os
+        vae_only = bool(wanted and inputs.image is not None and not getattr(scene, "h3_ref_strip_path", "")
+                        and not inputs.audio_ref and os.environ.get("PALLAIDIUM_H3_PK_FRAME_VAE_ONLY", "1") != "0")
+        if vae_only:
+            needs_native = False
+        use = None if needs_native else wanted
+        if getattr(pipe, "_h3_te_choice", None) != use:
+            self.set_phase(inputs, "Loading native text encoder (image input)" if wanted and not use
+                           else "Loading text encoder")
+            swap_text_encoder(pipe, use, lambda: self._load_native_te(pipe, prefs),
+                              lambda c: self._load_lite_te(c, prefs), lambda te, lite: self._place_te(pipe, te, lite),
+                              "MiniMax H3")
+        note = switch_note(wanted, use)
+        if note:
+            print(f"MiniMax H3: {note}")
+            inputs.usage_note = note
+        if not use:
             return self._generate(pipe_obj, inputs, scene, prefs)
-        # Qwen3.5 + Plato's Key maps text only: keyframes and references need the native conditioner.
-        if inputs.image is not None or getattr(scene, "h3_ref_strip_path", "") or inputs.audio_ref:
-            raise RuntimeError("MiniMax H3: the Qwen3.5 text encoders are text-to-video only — clear the "
-                               "Input image / Ref Strip / Audio Ref, or set Text Encoder to Native.")
         import diffusers.modular_pipelines.minimax_h3.encoders as _enc
-        from ._h3_platos_key import patch_lite_embeds
         undo = patch_lite_embeds(_enc, pipe.tokenizer)
+        if vae_only:
+            from ._h3_platos_key import hide_keyframes_from_conditioner
+            print("MiniMax H3: first frame through the VAE only, prompt through the Qwen3.5 encoder")
+            undo = hide_keyframes_from_conditioner(_enc.MiniMaxH3FL2VATextEncoderStep, undo)
         try:
             return self._generate(pipe_obj, inputs, scene, prefs)
         finally:
             undo()
+
+    @staticmethod
+    def _load_lite_te(choice, prefs):
+        from ._h3_platos_key import load_lite_text_encoder
+        return load_lite_text_encoder(choice, prefs.hf_cache_dir or None, prefs.local_files_only, "MiniMax H3")
+
+    @staticmethod
+    def _load_native_te(pipe, prefs):
+        import torch
+        from transformers import Qwen3VLForConditionalGeneration
+        repo, subfolder = pipe._h3_te_src  # recorded at load: the spec is replaced along with the component
+        cache_dir = prefs.hf_cache_dir or None
+        print(f"MiniMax H3: loading the native text encoder ({repo})")
+        try:
+            local_dir = _cached_snapshot_dir(repo, cache_dir, subfolder)
+            te = Qwen3VLForConditionalGeneration.from_pretrained(local_dir, subfolder=subfolder, dtype=torch.bfloat16,
+                                                                  local_files_only=True)
+        except (OSError, ValueError):
+            if prefs.local_files_only:
+                raise
+            te = Qwen3VLForConditionalGeneration.from_pretrained(repo, subfolder=subfolder, dtype=torch.bfloat16,
+                                                                  cache_dir=cache_dir, local_files_only=False)
+        from sdnq.common import use_torch_compile as triton_is_available
+        if triton_is_available and torch.cuda.is_available():
+            from sdnq.loader import apply_sdnq_options_to_model
+            te = apply_sdnq_options_to_model(te, use_quantized_matmul=True)
+        return te
+
+    @staticmethod
+    def _place_te(pipe, te, lite):
+        from diffusers.hooks import apply_group_offloading
+        opts = getattr(pipe, "_h3_offload_opts", None)
+        if opts is None:
+            te.to(gfx_device)
+        else:
+            apply_group_offloading(te.model, offload_type="leaf_level", **opts)
+        pipe._h3_lite_te = lite
+        if not lite:
+            from ._h3_conditioner import install_fast_patch_embed
+            install_fast_patch_embed(te)
 
     def _generate(self, pipe_obj, inputs: ModelInputs, scene, prefs):
         import os
