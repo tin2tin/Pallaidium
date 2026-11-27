@@ -205,6 +205,8 @@ class MiniMaxH3Plugin(ModelPlugin):
     PARAMS       = ParamSpec(width=864, height=480, frames=124, steps=20)
     REQUIRED_PACKAGES = ["torch", "diffusers", "transformers", "av", "sdnq"]
 
+    LOAD_VARIANT_KEYS = ("h3_text_encoder",)   # native 32B vs Qwen3.5 + Plato's Key: a change reloads
+
     def load(self, prefs, scene, **kw):
         import torch
         from diffusers import ModularPipeline
@@ -214,6 +216,9 @@ class MiniMaxH3Plugin(ModelPlugin):
         from sdnq.loader import apply_sdnq_options_to_model
 
         _cache_dir = prefs.hf_cache_dir or None
+        from ._h3_platos_key import lite_choice
+        lite = lite_choice(scene, "h3_text_encoder")
+        _skip = {"text_encoder"} if lite else set()  # the lite encoder replaces the 21-35 GB conditioner
         _lfo = prefs.local_files_only
         # The "pruned" repos only prune the transformer; text_encoder loads from
         # a separate, unpruned repo (OzzyGT/MiniMax_H3_sdnq_dynamic_{8,4}bit) —
@@ -259,7 +264,7 @@ class MiniMaxH3Plugin(ModelPlugin):
             # processor/config.json the repo doesn't have — online that's a
             # quick 404, local-only a hard error (and a long traceback).
             for name, spec in list(pipe._component_specs.items()):
-                if spec.default_creation_method != "from_pretrained" or getattr(pipe, name, None) is not None:
+                if spec.default_creation_method != "from_pretrained" or getattr(pipe, name, None) is not None or name in _skip:
                     continue
                 try:
                     local_dir = _cached_snapshot_dir(spec.pretrained_model_name_or_path, _cache_dir,
@@ -269,16 +274,22 @@ class MiniMaxH3Plugin(ModelPlugin):
                 pipe.load_components(names=name, pretrained_model_name_or_path=local_dir, dtype=dtype,
                                      cache_dir=_cache_dir, local_files_only=True)
             uncached = [n for n, sp in pipe._component_specs.items()
-                        if sp.default_creation_method == "from_pretrained" and getattr(pipe, n, None) is None]
+                        if sp.default_creation_method == "from_pretrained" and getattr(pipe, n, None) is None and n not in _skip]
             if uncached and not _lfo:
                 print(f"MiniMax H3: not in local cache, fetching online: {uncached}")
                 pipe.load_components(names=uncached, dtype=dtype, cache_dir=_cache_dir, local_files_only=False)
         else:
-            pipe.load_components(dtype=dtype, cache_dir=_cache_dir, local_files_only=_lfo)
+            pipe.load_components(names=[n for n, sp in pipe._component_specs.items()
+                                        if sp.default_creation_method == "from_pretrained" and n not in _skip],
+                                 dtype=dtype, cache_dir=_cache_dir, local_files_only=_lfo)
         # load_components() logs a per-component failure as a warning and leaves
         # the attribute None instead of raising — fail loudly here instead of
         # letting the first .model/.enable_group_offload() access below crash
         # with an opaque AttributeError.
+        if lite:
+            from ._h3_platos_key import load_lite_text_encoder
+            pipe.update_components(text_encoder=load_lite_text_encoder(lite, _cache_dir, _lfo, "MiniMax H3"))
+        pipe._h3_lite_te = bool(lite)
         missing = [n for n in ("transformer", "transformer_ref", "text_encoder", "vae", "audio_vae") if getattr(pipe, n, None) is None]
         if missing:
             raise RuntimeError(
@@ -305,7 +316,8 @@ class MiniMaxH3Plugin(ModelPlugin):
         if triton_is_available and (torch.cuda.is_available() or torch.xpu.is_available()):
             pipe.transformer = apply_sdnq_options_to_model(pipe.transformer, use_quantized_matmul=True)
             pipe.transformer_ref = apply_sdnq_options_to_model(pipe.transformer_ref, use_quantized_matmul=True)
-            pipe.text_encoder = apply_sdnq_options_to_model(pipe.text_encoder, use_quantized_matmul=True)
+            if not lite:
+                pipe.text_encoder = apply_sdnq_options_to_model(pipe.text_encoder, use_quantized_matmul=True)
 
         # LoRA — loaded into both partitions up front since the workflow (and
         # therefore which partition actually runs) is only known per-job, at
@@ -392,9 +404,17 @@ class MiniMaxH3Plugin(ModelPlugin):
         install_lean_conditioner("diffusers.modular_pipelines.minimax_h3.encoders")
         # Image/video references and the fl2va frame go through the vision tower: its bf16 Conv3d
         # patch embed is ~14 ms/patch on this torch/cuDNN, a matmul ~0 (see _h3_conditioner.py).
-        install_fast_patch_embed(pipe.text_encoder)
+        pipe._h3_lite_te = bool(lite)
+        if not lite:
+            install_fast_patch_embed(pipe.text_encoder)
 
         return {"pipe": pipe, "bits": bits}
+
+    def draw_model_options_ui(self, col, context):
+        col.prop(context.scene, "h3_text_encoder", text="Text Encoder")
+        from ._h3_platos_key import lite_choice
+        if lite_choice(context.scene, "h3_text_encoder"):
+            col.label(text="Qwen3.5 encoder: prompt-only; text and details less exact", icon="INFO")
 
     def draw_custom_ui(self, col, context) -> bool:
         scene = context.scene
@@ -421,6 +441,22 @@ class MiniMaxH3Plugin(ModelPlugin):
         return min(17 * n + 5, 345)
 
     def generate(self, pipe_obj, inputs: ModelInputs, scene, prefs):
+        pipe = pipe_obj["pipe"]
+        if not getattr(pipe, "_h3_lite_te", False):
+            return self._generate(pipe_obj, inputs, scene, prefs)
+        # Qwen3.5 + Plato's Key maps text only: keyframes and references need the native conditioner.
+        if inputs.image is not None or getattr(scene, "h3_ref_strip_path", "") or inputs.audio_ref:
+            raise RuntimeError("MiniMax H3: the Qwen3.5 text encoders are text-to-video only — clear the "
+                               "Input image / Ref Strip / Audio Ref, or set Text Encoder to Native.")
+        import diffusers.modular_pipelines.minimax_h3.encoders as _enc
+        from ._h3_platos_key import patch_lite_embeds
+        undo = patch_lite_embeds(_enc, pipe.tokenizer)
+        try:
+            return self._generate(pipe_obj, inputs, scene, prefs)
+        finally:
+            undo()
+
+    def _generate(self, pipe_obj, inputs: ModelInputs, scene, prefs):
         import os
         import torch
         from diffusers.modular_pipelines.minimax_h3 import (

@@ -128,8 +128,10 @@ _H3IMG_DEFAULTS = (
     ("h3img_prompt_expansion", False),
     ("h3img_pe_aspect",        False),
     ("h3img_pe_quant",         "int8"),
+    ("h3_text_encoder",        "native"),   # MiniMax H3 video / Pika H3 Flex
 )
 _H3IMG_CARDS = ("MiniMaxAI/MiniMax-H3-Image",)
+_H3VID_CARDS = ("MiniMaxAI/MiniMax-H3", "Pika-Labs/Pika-H3-Flex")
 
 # Plapre 3 (Danish TTS) settings carried through the queue: (name, default).
 _PLAPRE_DEFAULTS = (
@@ -410,6 +412,7 @@ class RenderQueueJob(PropertyGroup):
     # MiniMax H3 Image (see _H3IMG_DEFAULTS)
     h3img_weights:           StringProperty(default="sdnq4")
     h3img_text_encoder:      StringProperty(default="native")
+    h3_text_encoder:         StringProperty(default="native")
     h3img_min_area:          StringProperty(default="4mp")
     h3img_crop_refs:         BoolProperty(default=False)
     h3img_prompt_expansion:  BoolProperty(default=False)
@@ -3371,6 +3374,9 @@ def _queue_insert_strip(scene, result: dict) -> None:
                 _final = result.get("h3img_final_prompt", "")
                 if _final and _final.strip() != (result.get("prompt", "") or "").strip():
                     extra_meta["h3img_final_prompt"] = _final
+            # MiniMax H3 video / Pika H3 Flex — text encoder always written so Redo resets it
+            if result.get("model_card", "") in _H3VID_CARDS:
+                extra_meta["h3_text_encoder"] = result.get("h3_text_encoder", "native")
             # Plapre 3 — speaker always written so Redo resets it
             if result.get("model_card", "") == "syvai/plapre-3":
                 for _k, _def in _PLAPRE_DEFAULTS:

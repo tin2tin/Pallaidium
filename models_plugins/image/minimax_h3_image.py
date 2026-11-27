@@ -51,22 +51,8 @@ _TE_GB = 15
 # decoder's over-sharpened, etched look; same speed and VRAM; half the download.
 _VAE_REPO = "ostris/ostris_h3_image_vae"
 _VAE_GB = 1.2
-# Optional low-VRAM text encoder: Qwen3.5-2B mapped into the native encoder's hidden_states[50] space by a
-# closed-form "Plato's Key" (Alissonerdx, Ridge v3, calibrated on 20k prompts). Text-to-image only — the key
-# maps text, not the reference-image tokens of an edit. A/B 2026-11-27: same composition as native at the
-# same seed, but exact text in the image and object counts are less reliable ("OPEN 24/7" -> "OPEN 24/5").
-# The 9B (A/B: cleaner text layout, but miscounted objects) is ~18 GB in bf16 — more than the 4-bit native
-# encoder — and is offered for comparison.
-_PK_KEY_REPO = "Alissonerdx/TE-PK-Minimax-H3"
-_PK_ENCODERS = {  # scene value: (donor repo, files to check in the cache, key file, download GB)
-    "qwen35_2b": ("Qwen/Qwen3.5-2B",
-                  ("config.json", "tokenizer.json", "model.safetensors-00001-of-00001.safetensors"),
-                  "qwen3.5/minimax_h3_32b_pk_ridge_qwen3.5_2b.safetensors", 4.6),
-    "qwen35_9b": ("Qwen/Qwen3.5-9B",
-                  ("config.json", "tokenizer.json") + tuple(
-                      f"model.safetensors-0000{i}-of-00004.safetensors" for i in range(1, 5)),
-                  "qwen3.5/minimax_h3_32b_pk_ridge_qwen3.5_9b.safetensors", 19.5),
-}
+# Optional low-VRAM text encoders (Qwen3.5 + Plato's Key, text-to-image only): ../video/_h3_platos_key.py
+from ..video._h3_platos_key import PK_ENCODERS as _PK_ENCODERS, PK_KEY_REPO as _PK_KEY_REPO  # noqa: E402
 _SMALL_COMPONENTS = ("tokenizer", "processor", "scheduler")
 # A file each component needs in a cached snapshot: a snapshot folder can exist with only the
 # index in it, and a tokenizer "loaded" from an empty folder comes back with no vocabulary.
@@ -230,44 +216,6 @@ def _lite_encoder(scene):
     """The Plato's Key encoder chosen for this scene, or None for the native conditioner."""
     choice = getattr(scene, "h3img_text_encoder", "native")
     return choice if choice in _PK_ENCODERS else None
-
-
-def _platos_key_class():
-    import torch
-
-    class PlatosKeyTextEncoder(torch.nn.Module):
-        """Qwen3.5 + a linear map standing in for the native Qwen3-VL-32B conditioner (text only).
-
-        The key was fitted on raw prompts (no chat template, no special tokens) against the native
-        encoder's unnormalized hidden_states[50], from the donor's final-norm last hidden state."""
-
-        def __init__(self, donor, tokenizer, key):
-            super().__init__()
-            self.model = donor
-            self.tokenizer = tokenizer
-            for name in ("R", "scale", "donor_mean", "target_mean"):
-                self.register_buffer(name, key[name].float(), persistent=False)
-
-        @property
-        def dtype(self):
-            return torch.bfloat16
-
-        @torch.no_grad()
-        def encode(self, text: str, length: int, device, dtype):
-            ids = self.tokenizer(text, add_special_tokens=False, return_tensors="pt")["input_ids"]
-            ids = ids[:, : max(1, length * 2)].to(device)
-            x = self.model(input_ids=ids, output_hidden_states=True).hidden_states[-1].float()
-            key = {n: getattr(self, n).to(device) for n in ("R", "scale", "donor_mean", "target_mean")}
-            y = (x - key["donor_mean"]) @ key["R"] * key["scale"] + key["target_mean"]
-            if y.shape[1] != length:
-                # The two vocabularies split non-English text differently; the transformer tags one
-                # row per native token, so resample the sequence to that length.
-                print(f"MiniMax H3 Image: Qwen3.5 tokens {y.shape[1]} vs native {length} — resampling")
-                y = torch.nn.functional.interpolate(y.transpose(1, 2), size=length, mode="linear",
-                                                    align_corners=True).transpose(1, 2)
-            return y.to(device=device, dtype=dtype)
-
-    return PlatosKeyTextEncoder
 
 
 def _release_pipeline(pipe, names=("transformer", "text_encoder", "vae")) -> None:
@@ -524,21 +472,8 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
 
     def _load_lite_text_encoder(self, prefs, choice):
         """Qwen3.5 + Plato's Key in place of the 15 GB native conditioner (text-to-image only)."""
-        import torch
-        from huggingface_hub import hf_hub_download
-        from safetensors.torch import load_file
-        from transformers import AutoModelForCausalLM, AutoTokenizer
-        repo, _files, key_file, _gb = _PK_ENCODERS[choice]
-        print(f"MiniMax H3 Image: text encoder {repo} + Plato's Key ({_PK_KEY_REPO})")
-        tokenizer = self._cache_first(prefs, lambda lfo: AutoTokenizer.from_pretrained(
-            repo, **self._hub(prefs, lfo)))
-        donor = self._cache_first(prefs, lambda lfo: AutoModelForCausalLM.from_pretrained(
-            repo, dtype=torch.bfloat16, **self._hub(prefs, lfo)))
-        key_path = self._cache_first(prefs, lambda lfo: hf_hub_download(
-            _PK_KEY_REPO, key_file, **self._hub(prefs, lfo)))
-        # The LM head is never used (hidden states only); drop it to save ~1 GB.
-        donor = getattr(donor, "model", donor)
-        return _platos_key_class()(donor.eval(), tokenizer, load_file(key_path)).eval()
+        from ..video._h3_platos_key import load_lite_text_encoder
+        return load_lite_text_encoder(choice, prefs.hf_cache_dir, prefs.local_files_only, "MiniMax H3 Image")
 
     def _load_transformer(self, prefs):
         """OzzyGT's pre-quantized SDNQ uint4 transformer (stock diffusers class; the quantization
@@ -805,12 +740,8 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
         parts = {}
         undo = []
         if lite:
-            native_fn = _enc.get_qwen3vl_prompt_embeds
-            def _lite_embeds(text_encoder, processor, token_ids, *a, device=None, dtype=None, **kw):
-                text = pipe.tokenizer.decode(token_ids)
-                return text_encoder.encode(text, len(token_ids), device, dtype or torch.bfloat16)
-            _enc.get_qwen3vl_prompt_embeds = _lite_embeds
-            undo.append(lambda: setattr(_enc, "get_qwen3vl_prompt_embeds", native_fn))
+            from ..video._h3_platos_key import patch_lite_embeds
+            undo.append(patch_lite_embeds(_enc, pipe.tokenizer))
         undo += [_Timer.wrap(_enc, "get_qwen3vl_prompt_embeds", parts, "text encode"),
                 _Timer.wrap(pipe.vae, "encode", parts, "vae encode"),
                 _Timer.wrap(pipe.vae, "decode", parts, "vae decode")]

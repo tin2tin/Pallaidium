@@ -4560,6 +4560,13 @@ class SEQUENCER_OT_redo_from_metadata(bpy.types.Operator):
                 except Exception:
                     pass
 
+        # MiniMax H3 video / Pika H3 Flex — text encoder (missing key → native)
+        if str(model or "") in ("MiniMaxAI/MiniMax-H3", "Pika-Labs/Pika-H3-Flex") and hasattr(scene, "h3_text_encoder"):
+            try:
+                scene.h3_text_encoder = str(_get("h3_text_encoder") or "native")
+            except Exception:
+                pass
+
         # Robin TTS — reset every setting for a Robin strip (missing keys → default)
         if str(model or "") == "FixedSeed/Robin" and hasattr(scene, "robin_voice"):
             for _attr, _def in (
@@ -4728,7 +4735,7 @@ class AI_Metadata_PT_Panel(bpy.types.Panel):
             "mossimg_weights", "mossimg_guidance_mode", "mossimg_skip_layers",
             "mossimg_slg_scale", "mossimg_shift",
             "h3img_weights", "h3img_text_encoder", "h3img_min_area", "h3img_crop_refs", "h3img_prompt_expansion", "h3img_pe_aspect",
-            "h3img_pe_quant", "h3img_final_prompt",
+            "h3img_pe_quant", "h3img_final_prompt", "h3_text_encoder",
             "plapre_speaker", "plapre_sentence_pause", "plapre_max_pause",
             "robin_voice", "robin_lang", "robin_revoice", "robin_lora", "robin_lora_scale",
             "whisper_model_size", "whisper_language", "detected_language", "whistle_keywords",
@@ -4754,7 +4761,7 @@ class AI_Metadata_PT_Panel(bpy.types.Panel):
             "mossimg_shift": "Shift",
             "h3img_weights": "Weights", "h3img_text_encoder": "Text Encoder", "h3img_min_area": "Min Area",
             "h3img_crop_refs": "Crop Refs", "h3img_prompt_expansion": "Prompt Expansion", "h3img_pe_aspect": "Suggested Aspect",
-            "h3img_pe_quant": "Expander Quant", "h3img_final_prompt": "Final Prompt",
+            "h3img_pe_quant": "Expander Quant", "h3_text_encoder": "Text Encoder", "h3img_final_prompt": "Final Prompt",
             "plapre_speaker": "Speaker", "plapre_sentence_pause": "Sentence Pause",
             "plapre_max_pause": "Max Pause",
             "robin_voice": "Voice", "robin_lang": "Language", "robin_revoice": "Re-voice",

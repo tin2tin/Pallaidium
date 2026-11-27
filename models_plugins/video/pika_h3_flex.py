@@ -83,6 +83,8 @@ class PikaH3FlexPlugin(ModelPlugin):
     PARAMS       = ParamSpec(width=832, height=480, frames=124, steps=6)
     REQUIRED_PACKAGES = ["torch", "diffusers", "transformers", "av", "sdnq"]
 
+    LOAD_VARIANT_KEYS = ("h3_text_encoder",)   # native 32B vs Qwen3.5 + Plato's Key: a change reloads
+
     def load(self, prefs, scene, **kw):
         import os
         import torch
@@ -100,6 +102,9 @@ class PikaH3FlexPlugin(ModelPlugin):
         from sdnq.loader import apply_sdnq_options_to_model
 
         _cache_dir = prefs.hf_cache_dir or None
+        from ._h3_platos_key import lite_choice
+        lite = lite_choice(scene, "h3_text_encoder")
+        _skip = {"text_encoder"} if lite else set()  # the lite encoder replaces the 21-35 GB conditioner
         _lfo = prefs.local_files_only
         # Same base weights and RAM rule as the MiniMax H3 plugin (shared HF
         # cache, no second download): 8-bit only with >= 64GB RAM.
@@ -145,7 +150,7 @@ class PikaH3FlexPlugin(ModelPlugin):
         if from_cache:
             # Load from cached snapshot folders, not repo ids — see minimax_h3.py.
             for name, spec in list(pipe._component_specs.items()):
-                if spec.default_creation_method != "from_pretrained" or getattr(pipe, name, None) is not None:
+                if spec.default_creation_method != "from_pretrained" or getattr(pipe, name, None) is not None or name in _skip:
                     continue
                 try:
                     local_dir = _cached_snapshot_dir(spec.pretrained_model_name_or_path, _cache_dir,
@@ -155,14 +160,18 @@ class PikaH3FlexPlugin(ModelPlugin):
                 pipe.load_components(names=name, pretrained_model_name_or_path=local_dir, dtype=dtype,
                                      cache_dir=_cache_dir, local_files_only=True)
             uncached = [n for n, sp in pipe._component_specs.items()
-                        if sp.default_creation_method == "from_pretrained" and getattr(pipe, n, None) is None]
+                        if sp.default_creation_method == "from_pretrained" and getattr(pipe, n, None) is None and n not in _skip]
             if uncached and not _lfo:
                 print(f"Pika H3 Flex: not in local cache, fetching online: {uncached}")
                 pipe.load_components(names=uncached, dtype=dtype, cache_dir=_cache_dir, local_files_only=False)
         else:
             uncached = [n for n, sp in pipe._component_specs.items()
-                        if sp.default_creation_method == "from_pretrained" and getattr(pipe, n, None) is None]
+                        if sp.default_creation_method == "from_pretrained" and getattr(pipe, n, None) is None and n not in _skip]
             pipe.load_components(names=uncached, dtype=dtype, cache_dir=_cache_dir, local_files_only=_lfo)
+        if lite:
+            from ._h3_platos_key import load_lite_text_encoder
+            pipe.update_components(text_encoder=load_lite_text_encoder(lite, _cache_dir, _lfo, "Pika H3 Flex"))
+        pipe._h3_lite_te = bool(lite)
         missing = [n for n in ("transformer", "transformer_ref", "text_encoder", "vae", "audio_vae") if getattr(pipe, n, None) is None]
         if missing:
             raise RuntimeError(
@@ -182,7 +191,8 @@ class PikaH3FlexPlugin(ModelPlugin):
         if triton_is_available and (torch.cuda.is_available() or torch.xpu.is_available()):
             pipe.transformer = apply_sdnq_options_to_model(pipe.transformer, use_quantized_matmul=True)
             pipe.transformer_ref = apply_sdnq_options_to_model(pipe.transformer_ref, use_quantized_matmul=True)
-            pipe.text_encoder = apply_sdnq_options_to_model(pipe.text_encoder, use_quantized_matmul=True)
+            if not lite:
+                pipe.text_encoder = apply_sdnq_options_to_model(pipe.text_encoder, use_quantized_matmul=True)
 
         # Pika's adapters, one per partition, at their trained scale 1.0
         # (alpha == rank). Must load before group offload is enabled below.
@@ -253,9 +263,17 @@ class PikaH3FlexPlugin(ModelPlugin):
         _trim_cache_before_denoise(pipe)
         from ._h3_conditioner import install_fast_patch_embed, install_lean_conditioner
         install_lean_conditioner("diffusers.modular_pipelines.pika_h3_flex.encoders")
-        install_fast_patch_embed(pipe.text_encoder)  # bf16 Conv3d patch embed is pathologically slow
+        pipe._h3_lite_te = bool(lite)
+        if not lite:
+            install_fast_patch_embed(pipe.text_encoder)  # bf16 Conv3d patch embed is pathologically slow
 
         return {"pipe": pipe, "bits": bits}
+
+    def draw_model_options_ui(self, col, context):
+        col.prop(context.scene, "h3_text_encoder", text="Text Encoder")
+        from ._h3_platos_key import lite_choice
+        if lite_choice(context.scene, "h3_text_encoder"):
+            col.label(text="Qwen3.5 encoder: prompt-only; text and details less exact", icon="INFO")
 
     def draw_custom_ui(self, col, context) -> bool:
         scene = context.scene
@@ -300,6 +318,22 @@ class PikaH3FlexPlugin(ModelPlugin):
         return img.convert("RGB") if isinstance(img, Image.Image) else img
 
     def generate(self, pipe_obj, inputs: ModelInputs, scene, prefs):
+        pipe = pipe_obj["pipe"]
+        if not getattr(pipe, "_h3_lite_te", False):
+            return self._generate(pipe_obj, inputs, scene, prefs)
+        # Qwen3.5 + Plato's Key maps text only: keyframes and references need the native conditioner.
+        if inputs.image is not None or getattr(scene, "h3_ref_strip_path", "") or inputs.audio_ref or inputs.last_image is not None or getattr(scene, "h3_last_strip_path", ""):
+            raise RuntimeError("Pika H3 Flex: the Qwen3.5 text encoders are text-to-video only — clear the "
+                               "Input image / Ref Strip / Audio Ref, or set Text Encoder to Native.")
+        import diffusers.modular_pipelines.pika_h3_flex.encoders as _enc
+        from ._h3_platos_key import patch_lite_embeds
+        undo = patch_lite_embeds(_enc, pipe.tokenizer)
+        try:
+            return self._generate(pipe_obj, inputs, scene, prefs)
+        finally:
+            undo()
+
+    def _generate(self, pipe_obj, inputs: ModelInputs, scene, prefs):
         import os
         import torch
         from diffusers.modular_pipelines.pika_h3_flex import (

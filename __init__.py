@@ -1522,6 +1522,14 @@ def register():
         default="native",
         description="Which encoder turns the prompt into conditioning. Changing it reloads the model",
     )
+    from .models_plugins.video._h3_platos_key import TEXT_ENCODER_ITEMS as _H3_TE_ITEMS
+    bpy.types.Scene.h3_text_encoder = bpy.props.EnumProperty(
+        name="Text Encoder",
+        items=_H3_TE_ITEMS,
+        default="native",
+        description="MiniMax H3 / Pika H3 Flex: which encoder turns the prompt into conditioning. The Qwen3.5 "
+                    "options are text-to-video only. Changing it reloads the model",
+    )
     bpy.types.Scene.h3img_crop_refs = bpy.props.BoolProperty(
         name="Crop Refs to Subject",
         default=False,
@@ -1942,7 +1950,7 @@ def unregister():
     for _prop in ("chatterbox_mtl_language",):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
-    for _prop in ("h3_ref_strip", "h3_last_strip"):
+    for _prop in ("h3_ref_strip", "h3_last_strip", "h3_text_encoder"):
         if hasattr(bpy.types.Scene, _prop):
             delattr(bpy.types.Scene, _prop)
     for _prop in (
