@@ -1514,10 +1514,10 @@ def register():
             ("qwen35_2b", "Qwen3.5-2B (Plato's Key)", "Qwen3.5-2B mapped into the native space by a closed-form "
                                                       "key (~4.6 GB download, ~4 GB VRAM). Same compositions, but "
                                                       "text in the image and object counts are less exact. "
-                                                      "Edits switch to Native automatically"),
+                                                      "Edits work; for new text in edits use Native"),
             ("qwen35_9b", "Qwen3.5-9B (Plato's Key)", "Qwen3.5-9B with its key (~19.5 GB download, more memory "
                                                       "than Native). Cleaner text than 2B, but may miscount "
-                                                      "objects. Edits switch to Native automatically"),
+                                                      "objects. For new text in edits use Native"),
         ],
         default="native",
         description="Which encoder turns the prompt into conditioning. Changing it reloads the model",

@@ -652,7 +652,7 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
         cache_dir = getattr(prefs, "hf_cache_dir", "") or None
         notes = [f"Not downloaded yet: {item}" for item in self._missing_downloads(cache_dir, _lite_encoder(scene))]
         if _lite_encoder(scene):
-            notes.append("Qwen3.5 encoder: edits switch to Native automatically; text in images less exact")
+            notes.append("Qwen3.5 encoder: new text in images is unreliable — use Native for text edits")
         if scene.h3img_prompt_expansion and not _quant_ready(_pe_quant_dir(cache_dir, scene.h3img_pe_quant)) \
                 and not _in_cache(_PE_VLM, _PE_VLM_FILES, cache_dir):
             notes.append(f"Prompt expander not downloaded: ~{_PE_VLM_GB} GB")
@@ -711,7 +711,12 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
         # text-to-image job switches back).
         from ..video._h3_platos_key import swap_text_encoder, switch_note
         wanted = _lite_encoder(scene)
-        use = None if refs else wanted
+        # An edit keeps the Qwen3.5 encoder: the references reach the transformer through the VAE only, the
+        # conditioner sees the prompt alone. Tested 2026-11-27: night/snow edits and a two-reference composite
+        # matched native; new lettering broke ("CLOSED" -> "SLOEDED"). PALLAIDIUM_H3IMG_PK_REFS_VAE_ONLY=0
+        # switches edits to Native instead.
+        refs_vae_only = bool(wanted and refs and os.environ.get("PALLAIDIUM_H3IMG_PK_REFS_VAE_ONLY", "1") != "0")
+        use = None if (refs and not refs_vae_only) else wanted
         if getattr(pipe, "_h3_te_choice", None) != use:
             self.set_phase(inputs, "Loading native text encoder (edit)" if wanted and not use
                            else "Loading text encoder")
@@ -775,6 +780,12 @@ class MiniMaxH3ImagePlugin(ModelPlugin):
         if lite:
             from ..video._h3_platos_key import patch_lite_embeds
             undo.append(patch_lite_embeds(_enc, pipe.tokenizer))
+            if refs_vae_only:
+                print("MiniMax H3 Image: references through the VAE only, prompt through Qwen3.5")
+                _edit_step = _enc.MiniMaxH3ImageEditTextEncoderStep
+                _edit_call = _edit_step.__call__
+                _edit_step.__call__ = _enc.MiniMaxH3ImageTextEncoderStep.__call__
+                undo.append(lambda: setattr(_edit_step, "__call__", _edit_call))
         undo += [_Timer.wrap(_enc, "get_qwen3vl_prompt_embeds", parts, "text encode"),
                 _Timer.wrap(pipe.vae, "encode", parts, "vae encode"),
                 _Timer.wrap(pipe.vae, "decode", parts, "vae decode")]
